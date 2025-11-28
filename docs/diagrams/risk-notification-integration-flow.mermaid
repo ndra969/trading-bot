@@ -1,0 +1,106 @@
+# Risk-Notification Integration Flow Diagram
+# Phase 4.5: Complete Risk-Notification Integration Architecture
+
+flowchart TD
+    %% Risk Management Components
+    RM[RealTimeRiskMonitor] --> |monitors| PORT[PortfolioRiskManager]
+    PORT --> |calculates| METRICS[Portfolio Metrics]
+
+    %% Risk Check Process
+    RM --> |performs risk check| CHECK[Risk Check Process]
+    CHECK --> |checks| DD[Drawdown Levels]
+    CHECK --> |checks| PR[Portfolio Risk]
+    CHECK --> |checks| CORR[Correlation Levels]
+    CHECK --> |checks| PS[Position Sizes]
+    CHECK --> |checks| VOL[Volatility Spikes]
+    CHECK --> |checks| MARGIN[Margin Levels]
+
+    %% Alert Creation
+    DD --> |triggers if exceeded| ALERT[AlertHistory Object]
+    PR --> |triggers if exceeded| ALERT
+    CORR --> |triggers if exceeded| ALERT
+    PS --> |triggers if exceeded| ALERT
+    VOL --> |triggers if exceeded| ALERT
+    MARGIN --> |triggers if exceeded| ALERT
+
+    %% Alert Processing
+    ALERT --> |contains| ALERT_DATA[Alert Data:<br/>- alert_id<br/>- alert_type<br/>- severity<br/>- message<br/>- timestamp]
+
+    %% Rate Limiting & Cooldowns
+    ALERT --> |checked by| RATE[Rate Limiting Check]
+    RATE --> |per hour limit| HOURLY[20 notifications/hour]
+    RATE --> |cooldown| COOL[5 minutes cooldown]
+
+    %% Notification Service Selection
+    RATE --> |passes to| NOTIF_HANDLER[Notification Handler]
+    NOTIF_HANDLER --> |checks config| TEL_CONFIG{Telegram Enabled?}
+    NOTIF_HANDLER --> |checks config| EMAIL_CONFIG{Email Enabled?}
+
+    %% Telegram Notification Flow
+    TEL_CONFIG --> |true| TEL_SERVICE[TelegramNotifier]
+    TEL_SERVICE --> |calls| SEND_RISK[send_risk_alert(alert)]
+
+    %% Rich Formatting Process
+    SEND_RISK --> |formats with| SEVERITY_EMOJI[Severity Emojis:<br/>ℹ️ LOW<br/>⚠️ MEDIUM<br/>🚨 HIGH<br/>🔴 CRITICAL]
+    SEND_RISK --> |formats with| ALERT_TYPE[Alert Type Display:<br/>- Drawdown Exceeded<br/>- Portfolio Risk High<br/>- Correlation High<br/>- Emergency Stop]
+    SEND_RISK --> |formats with| ACTION_REQ[Action Required Text:<br/>Based on alert type]
+
+    %% Message Construction
+    SEVERITY_EMOJI --> |builds| MESSAGE[Rich Telegram Message]
+    ALERT_TYPE --> |builds| MESSAGE
+    ACTION_REQ --> |builds| MESSAGE
+    ALERT_DATA --> |builds| MESSAGE
+
+    %% Priority Handling
+    MESSAGE --> |priority| PRIORITY{Alert Priority}
+    PRIORITY --> |LOW| LOW_PRIOR[Low Priority Queue]
+    PRIORITY --> |MEDIUM/HIGH| HIGH_PRIOR[High Priority Queue]
+    PRIORITY --> |CRITICAL| EMERGENCY[Emergency Queue]
+
+    %% Delivery
+    LOW_PRIOR --> |normal send| TELEGRAM[Telegram API]
+    HIGH_PRIOR --> |priority send| TELEGRAM
+    EMERGENCY --> |immediate send| TELEGRAM
+
+    %% Email Service (Optional)
+    EMAIL_CONFIG --> |false (default)| EMAIL_SKIP[Email Skipped<br/>Gracefully]
+    EMAIL_CONFIG --> |true (if configured)| EMAIL_SERVICE[Email Service]
+    EMAIL_SERVICE --> |would call| EMAIL_SEND[send_risk_alert(alert)]
+
+    %% Integration Points
+    MAIN[TradingBot Main] --> |initializes| RM
+    MAIN --> |initializes| NS[NotificationService]
+    NS --> |contains| TEL_SERVICE
+    NS --> |contains| EMAIL_SERVICE
+
+    %% Connection Setup
+    MAIN --> |connects via| CONNECTION[set_notification_services()]
+    CONNECTION --> |links| RM
+    CONNECTION --> |to| TEL_SERVICE
+
+    %% Configuration
+    CONFIG[risk_parameters.yaml] --> |configures| NOTIF_SETTINGS[Notification Settings:<br/>- telegram.enabled: true<br/>- telegram.rate_limit: 20/hour<br/>- telegram.cooldown: 5min<br/>- email.enabled: false]
+    NOTIF_SETTINGS --> |feeds into| NOTIF_HANDLER
+
+    %% Callbacks and Error Handling
+    RM --> |registers| CALLBACK[Alert Callbacks]
+    CALLBACK --> |triggers| MAIN_HANDLER[_handle_risk_alert()]
+    MAIN_HANDLER --> |logs| LOGGER[Risk Alert Logging]
+    MAIN_HANDLER --> |critical alerts| EMERGENCY_PROC[Emergency Procedures]
+
+    %% Error Recovery
+    TELEGRAM --> |on failure| RETRY[Retry Mechanism:<br/>- 3 attempts<br/>- Exponential backoff<br/>- Queue failed messages]
+    RETRY --> |final failure| QUEUE[Failed Message Queue]
+
+    %% Styling
+    classDef riskComponent fill:#ff6b6b,stroke:#333,stroke-width:2px,color:#fff
+    classDef notifComponent fill:#4ecdc4,stroke:#333,stroke-width:2px,color:#fff
+    classDef processComponent fill:#45b7d1,stroke:#333,stroke-width:2px,color:#fff
+    classDef configComponent fill:#96ceb4,stroke:#333,stroke-width:2px,color:#fff
+    classDef alertComponent fill:#feca57,stroke:#333,stroke-width:2px,color:#333
+
+    class RM,PORT,CHECK,METRICS riskComponent
+    class TEL_SERVICE,EMAIL_SERVICE,NS,TELEGRAM,MESSAGE notifComponent
+    class RATE,COOL,PRIORITY,RETRY,CALLBACK processComponent
+    class CONFIG,NOTIF_SETTINGS,TEL_CONFIG,EMAIL_CONFIG configComponent
+    class ALERT,ALERT_DATA,SEVERITY_EMOJI,ALERT_TYPE alertComponent

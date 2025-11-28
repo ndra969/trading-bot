@@ -1,0 +1,270 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-bot"
+version = "2.0.0"
+description = "Advanced Trading Bot System with Multi-Asset Support"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "Trading Bot Team", email = "contact@tradingbot.com" }
+]
+keywords = [
+    "trading", "forex", "commodities", "crypto", "mt5", "metatrader",
+    "algorithmic-trading", "supply-demand", "technical-analysis"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Core Framework
+    "click>=8.1.0", # CLI framework
+    "rich>=13.0.0", # Beautiful CLI output
+    "loguru>=0.7.0", # Structured logging
+    "pydantic>=2.0.0", # Data validation
+    "pydantic-settings>=2.0.0", # Settings management
+    "everett[yaml]>=3.0.0", # Configuration management
+    "pyyaml>=6.0.0", # YAML support
+    # Database
+    "sqlalchemy[asyncio]>=2.0.0", # Async ORM
+    "aiosqlite>=0.19.0", # Async SQLite driver
+    "alembic>=1.12.0", # Database migrations
+    # Async and Concurrency
+    "asyncio-mqtt>=0.16.0", # Async MQTT if needed
+    "aiofiles>=23.0.0", # Async file operations
+    "asyncio>=3.4.3", # Async support
+    # HTTP and API
+    "httpx>=0.25.0", # Async HTTP client
+    "fastapi>=0.104.0", # API framework (optional dashboard)
+    "uvicorn[standard]>=0.24.0", # ASGI server
+    # Data Processing
+    "pandas>=2.0.0", # Data manipulation
+    "numpy>=1.24.0", # Numerical computations
+    # Technical Indicators (RECOMMENDED LIBRARIES)
+    "pandas-ta>=0.3.14b0", # Pure Python - Most reliable for Windows
+    "ta>=0.10.2", # Comprehensive technical analysis
+    "yfinance>=0.2.18", # Market data (for testing/backtesting)
+    # Trading Platform Integration (Windows-only, will be ignored on other platforms)
+    # Notifications
+    "python-telegram-bot>=20.0", # Telegram notifications
+    # Utils and Helpers
+    "python-dotenv>=1.0.0", # Environment variables
+    "schedule>=1.2.0", # Task scheduling
+    "pytz>=2023.3", # Timezone handling
+    "python-dateutil>=2.8.2", # Date utilities
+    "playwright>=1.55.0",
+    "asyncpg>=0.21.0",
+    "psycopg2-binary>=2.9.11",
+    "metatrader5>=5.0.5260",
+    "psutil>=7.1.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "black>=23.7.0",             # Code formatting
+    "ruff>=0.0.287",             # Fast linting
+    "mypy>=1.5.0",              # Type checking
+    "pre-commit>=3.4.0",        # Git hooks
+    "coverage>=7.3.0",          # Coverage reporting
+]
+
+# High-performance technical indicators (may require compilation)
+performance = [
+    "TA-Lib>=0.4.25",           # Industry standard (requires Visual Studio on Windows)
+    "tulipy>=0.4.0",            # Fast C implementation
+    "cython>=3.0.0",            # For compilation if needed
+]
+
+# Windows-specific dependencies
+windows = [
+    "MetaTrader5>=5.0.45",       # Windows MT5 integration
+    "pywin32>=306",              # Windows API access
+    "wmi>=1.5.1",                # Windows Management Interface
+    "psutil>=5.9.0",            # System monitoring
+]
+
+# Testing and validation dependencies
+testing = [
+    "hypothesis>=6.82.0",       # Property-based testing
+    "factory-boy>=3.3.0",       # Test data generation
+    "freezegun>=1.2.2",         # Time mocking
+    "responses>=0.23.0",        # HTTP mocking
+]
+
+# Documentation dependencies
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.2.0",
+    "mkdocs-click>=0.8.0",
+    "mkdocstrings[python]>=0.23.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/trading-bot"
+Documentation = "https://trading-bot.readthedocs.io"
+Repository = "https://github.com/yourusername/trading-bot"
+"Bug Tracker" = "https://github.com/yourusername/trading-bot/issues"
+
+[project.scripts]
+trading-bot = "trading_bot.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trading_bot"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/config",
+    "/docs",
+    "/tests",
+    "/scripts",
+    "README.md",
+    "CLAUDE.md",
+]
+
+# Black configuration
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+# Ruff configuration
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*" = ["B011"]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "MetaTrader5",
+    "pandas_ta",
+    "ta.*",
+    "talib",
+    "tulipy",
+]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src/trading_bot",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+python_classes = ["Test*"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "mt5: marks tests that require MetaTrader5 connection",
+    "windows: marks tests that only run on Windows",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src/trading_bot"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*Protocol.*:",
+    "@abstractmethod",
+]
+show_missing = true
+skip_covered = false
+skip_empty = false
+
+# UV-specific configuration
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.7.0",
+    "ruff>=0.0.287",
+    "mypy>=1.5.0",
+    "hypothesis>=6.140.3",
+]

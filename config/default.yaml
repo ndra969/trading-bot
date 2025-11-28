@@ -1,0 +1,27 @@
+# Default Configuration for Trading Bot
+# Base configuration that can be overridden by environment-specific files
+
+trading:
+  risk_per_trade: 0.005  # 0.5% risk per trade
+  max_concurrent_positions: 5
+  confluence_threshold: 65.0
+
+database:
+  url: "sqlite+aiosqlite:///./data/trading_bot.db"
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 3600
+
+telegram:
+  bot_token: null
+  chat_id: null
+  enabled: false
+
+logging:
+  level: "INFO"
+  file_path: "./logs/trading_bot.log"
+  max_file_size: "10 MB"
+  backup_count: 5
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"

@@ -1,0 +1,78 @@
+# Trading Types Configuration
+# Different trading styles with their parameters
+
+trading_types:
+  scalping:
+    name: "Scalping"
+    description: "Ultra-short term trading, 1-240 minutes duration"
+    risk_per_trade: 0.002  # 0.2%
+    max_positions: 20
+    confluence_threshold: 75.0
+    max_loss_per_day: 0.01  # 1%
+    timeframes: ["M1", "M5", "M15"]
+    preferred_sessions: ["london", "new_york"]
+    stop_loss_pips:
+      forex_major: 5
+      forex_jpy: 50
+      commodities: 20
+    take_profit_pips:
+      forex_major: 8
+      forex_jpy: 80
+      commodities: 30
+
+  day_trading:
+    name: "Day Trading"
+    description: "Intraday trading, 30-1440 minutes duration"
+    risk_per_trade: 0.01  # 1%
+    max_positions: 5
+    confluence_threshold: 65.0
+    max_loss_per_day: 0.02  # 2%
+    timeframes: ["M15", "H1", "H4"]
+    preferred_sessions: ["london", "new_york", "tokyo"]
+    stop_loss_pips:
+      forex_major: 15
+      forex_jpy: 150
+      commodities: 50
+    take_profit_pips:
+      forex_major: 30
+      forex_jpy: 300
+      commodities: 100
+
+  swing_trading:
+    name: "Swing Trading"
+    description: "Multi-day trading, 1-7 days duration"
+    risk_per_trade: 0.02  # 2%
+    max_positions: 3
+    confluence_threshold: 60.0
+    max_loss_per_day: 0.05  # 5%
+    timeframes: ["H4", "D1", "W1"]
+    preferred_sessions: ["london", "new_york"]
+    stop_loss_pips:
+      forex_major: 50
+      forex_jpy: 500
+      commodities: 200
+    take_profit_pips:
+      forex_major: 100
+      forex_jpy: 1000
+      commodities: 400
+
+  position_trading:
+    name: "Position Trading"
+    description: "Long-term trading, 1-4 weeks duration"
+    risk_per_trade: 0.05  # 5%
+    max_positions: 1
+    confluence_threshold: 50.0
+    max_loss_per_day: 0.10  # 10%
+    timeframes: ["D1", "W1", "MN1"]
+    preferred_sessions: ["london", "new_york", "tokyo"]
+    stop_loss_pips:
+      forex_major: 150
+      forex_jpy: 1500
+      commodities: 500
+    take_profit_pips:
+      forex_major: 500
+      forex_jpy: 5000
+      commodities: 1500
+
+# Active trading type (can be changed via CLI)
+active_trading_type: day_trading

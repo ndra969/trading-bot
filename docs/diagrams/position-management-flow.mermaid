@@ -1,0 +1,152 @@
+graph TB
+    %% =============================================================================
+    %% POSITION MANAGEMENT SYSTEM - COMPLETE FLOW DIAGRAM
+    %% Shows complete lifecycle from signal to position closure with pip tracking
+    %% =============================================================================
+
+    subgraph "Trading Signal Generation"
+        A[Trading Signal Generated] --> B{Signal Qualified?}
+        B -->|Yes| C[Foundation Score ≥ 50%]
+        B -->|No| Z1[Signal Rejected]
+        C --> D[Enhancement Layers Analysis]
+        D --> E[Final Confidence ≥ 70%]
+        E -->|Yes| F[Signal Ready for Execution]
+        E -->|No| Z1
+    end
+
+    subgraph "Position Creation & Risk Validation"
+        F --> G[Risk Manager Validation]
+        G --> H{Risk Approved?}
+        H -->|No| Z2[Position Rejected - Risk]
+        H -->|Yes| I[Determine Asset Class]
+        I --> J[Calculate Pip Values]
+        J --> K[Calculate Position Size]
+        K --> L[Create Position with Pip Data]
+    end
+
+    subgraph "Pip Calculation Engine"
+        J --> J1[Get Asset-Specific Pip Size]
+        J1 --> J2[Calculate Pip Value per Lot]
+        J2 --> J3[Calculate Entry to SL Pips]
+        J3 --> J4[Calculate Entry to TP Pips]
+        J4 --> J5[Calculate Risk Amount USD]
+        J5 --> J6[Calculate Potential Profit USD]
+        J6 --> L
+    end
+
+    subgraph "Asset-Specific Configuration"
+        I --> I1{Asset Class}
+        I1 -->|Forex Major| I2[15 pips breakeven<br/>10 pips trailing]
+        I1 -->|Forex JPY| I3[150 pips breakeven<br/>100 pips trailing]
+        I1 -->|Commodities| I4[500 pips breakeven<br/>300 pips trailing]
+        I1 -->|Crypto| I5[50 USD breakeven<br/>30 USD trailing]
+        I2 --> K
+        I3 --> K
+        I4 --> K
+        I5 --> K
+    end
+
+    subgraph "Position Management Loop"
+        L --> M[Position Created & Active]
+        M --> N[Price Update Received]
+        N --> O[Calculate Current Pips Profit]
+        O --> P[Update P&L in USD]
+        P --> Q[Check Automation Triggers]
+    end
+
+    subgraph "Automation Decision Engine"
+        Q --> Q1{Breakeven Eligible?}
+        Q1 -->|Yes| R1[Move SL to Breakeven]
+        Q1 -->|No| Q2{Trailing Eligible?}
+        Q2 -->|Yes| R2[Activate/Update Trailing Stop]
+        Q2 -->|No| Q3{Partial Close Eligible?}
+        Q3 -->|Yes| R3[Execute Partial Close]
+        Q3 -->|No| Q4{SL/TP Hit?}
+        Q4 -->|Yes| R4[Close Position]
+        Q4 -->|No| S[Continue Monitoring]
+
+        R1 --> R1A[Calculate Breakeven Level]
+        R1A --> R1B[Update Stop Loss]
+        R1B --> R1C[Mark Breakeven Activated]
+        R1C --> T1[Log Modification]
+
+        R2 --> R2A[Calculate Trailing Level]
+        R2A --> R2B[Update Stop Loss]
+        R2B --> R2C[Mark Trailing Activated]
+        R2C --> T2[Log Modification]
+
+        R3 --> R3A[Calculate Close Volume]
+        R3A --> R3B[Execute Partial Close]
+        R3B --> R3C[Update Remaining Volume]
+        R3C --> R3D[Record Partial Close]
+        R3D --> T3[Log Partial Close]
+
+        R4 --> R4A[Calculate Final P&L]
+        R4A --> R4B[Close Entire Position]
+        R4B --> R4C[Update Position Status]
+        R4C --> T4[Log Position Closure]
+    end
+
+    subgraph "Database Operations"
+        T1 --> DB1[Update positions table]
+        T2 --> DB2[Insert position_modifications]
+        T3 --> DB3[Insert partial_closes]
+        T4 --> DB4[Update position status = CLOSED]
+
+        DB1 --> DB_LOG[Audit Log Entry]
+        DB2 --> DB_LOG
+        DB3 --> DB_LOG
+        DB4 --> DB_LOG
+    end
+
+    subgraph "Real-time Monitoring & Reporting"
+        S --> MON1[Update Position Summary]
+        T1 --> MON2[Send Breakeven Notification]
+        T2 --> MON3[Send Trailing Notification]
+        T3 --> MON4[Send Partial Close Notification]
+        T4 --> MON5[Send Position Closed Notification]
+
+        MON1 --> MON_SUMMARY[Position Summary Dashboard]
+        MON2 --> MON_SUMMARY
+        MON3 --> MON_SUMMARY
+        MON4 --> MON_SUMMARY
+        MON5 --> MON_SUMMARY
+    end
+
+    %% Continue monitoring loop
+    S --> N
+    T1 --> N
+    T2 --> N
+    T3 --> N
+
+    %% Position closed - end of lifecycle
+    T4 --> END[Position Lifecycle Complete]
+
+    %% Error handling paths
+    R1B -->|Failed| ERR1[Breakeven Failed]
+    R2B -->|Failed| ERR2[Trailing Failed]
+    R3B -->|Failed| ERR3[Partial Close Failed]
+    R4B -->|Failed| ERR4[Close Failed]
+
+    ERR1 --> ERR_LOG[Log Error & Recovery]
+    ERR2 --> ERR_LOG
+    ERR3 --> ERR_LOG
+    ERR4 --> ERR_LOG
+
+    ERR_LOG --> ERR_NOTIFY[Error Notification]
+    ERR_LOG --> N
+
+    %% Styling
+    classDef signalBox fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef positionBox fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef automationBox fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    classDef databaseBox fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef errorBox fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef endBox fill:#f1f8e9,stroke:#689f38,stroke-width:3px
+
+    class A,B,C,D,E,F signalBox
+    class G,H,I,J,K,L,M positionBox
+    class Q,Q1,Q2,Q3,Q4,R1,R2,R3,R4 automationBox
+    class T1,T2,T3,T4,DB1,DB2,DB3,DB4 databaseBox
+    class ERR1,ERR2,ERR3,ERR4,ERR_LOG errorBox
+    class END endBox

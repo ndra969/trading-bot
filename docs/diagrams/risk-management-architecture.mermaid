@@ -1,0 +1,361 @@
+# 🛡️ Risk Management System Architecture
+
+```mermaid
+graph TB
+    %% Main System Components
+    TB[Trading Bot Main] --> RM[Risk Management System]
+
+    %% Risk Management Subsystem
+    subgraph "Risk Management System"
+        RM --> PRM[Portfolio Risk Manager]
+        RM --> RTRM[Real-Time Risk Monitor]
+        RM --> TEE[Trade Execution Engine]
+        RM --> SV[Signal Validator]
+
+        %% Portfolio Risk Manager Components
+        subgraph "Portfolio Risk Manager"
+            PRM --> RL[Risk Limits]
+            PRM --> PM[Portfolio Metrics]
+            PRM --> RA[Risk Alerts]
+            PRM --> PC[Position Validation]
+        end
+
+        %% Real-Time Monitor Components
+        subgraph "Real-Time Monitor"
+            RTRM --> AS[Alert System]
+            RTRM --> DM[Dashboard Metrics]
+            RTRM --> ES[Emergency Stop]
+            RTRM --> NS[Notification Services]
+        end
+
+        %% Execution Engine Components
+        subgraph "Execution Engine"
+            TEE --> OM[Order Management]
+            TEE --> EV[Execution Validation]
+            TEE --> SM[Slippage Monitor]
+            TEE --> QT[Quality Tracking]
+        end
+
+        %% Signal Validator Components
+        subgraph "Signal Validator"
+            SV --> SQ[Signal Quality]
+            SV --> BE[Backtest Engine]
+            SV --> PE[Paper Trading Engine]
+            SV --> SP[Success Probability]
+        end
+    end
+
+    %% External Data Sources
+    subgraph "External Data"
+        MT5[MetaTrader 5]
+        DB[(Database)]
+        CFG[Config Files]
+        TG[Telegram]
+    end
+
+    %% Data Connections
+    MT5 --> RM
+    DB --> RM
+    CFG --> RM
+    RM --> TG
+
+    %% Risk Assessment Flow
+    subgraph "Risk Assessment Flow"
+        Signal[Trading Signal] --> SV
+        SV --> |Validated| PRM
+        PRM --> |Risk Check| TEE
+        TEE --> |Execute| MT5
+        MT5 --> |Position Update| RTRM
+        RTRM --> |Monitor| AS
+        AS --> |Alert| TG
+    end
+
+    %% Configuration Flow
+    subgraph "Configuration Hierarchy"
+        Global[Global Settings] --> TradingTypes[Trading Types]
+        RiskParams[Risk Parameters] --> AssetRules[Asset Rules]
+        Correlation[Correlation Rules] --> Exposure[Exposure Limits]
+
+        CFG --> Global
+        Global --> TradingTypes
+        Global --> RiskParams
+        RiskParams --> AssetRules
+        RiskParams --> Correlation
+        Correlation --> Exposure
+    end
+
+    %% Emergency Procedures
+    subgraph "Emergency Procedures"
+        Critical[Critical Risk Level] --> ES
+        ES --> CloseAll[Close All Positions]
+        ES --> PauseTrading[Pause Trading]
+        ES --> NotifyAdmin[Notify Administrator]
+
+        AS --> Critical
+    end
+
+    %% Performance Monitoring
+    subgraph "Performance Metrics"
+        CalcTime[Calculation Time] --> Perf[Performance Monitor]
+        MemUsage[Memory Usage] --> Perf
+        AlertLatency[Alert Latency] --> Perf
+
+        PRM --> CalcTime
+        RTRM --> MemUsage
+        AS --> AlertLatency
+    end
+
+    %% Styling
+    classDef riskComponent fill:#ff9999,stroke:#ff0000,stroke-width:2px
+    classDef dataFlow fill:#99ccff,stroke:#0066cc,stroke-width:2px
+    classDef configFlow fill:#99ff99,stroke:#00cc00,stroke-width:2px
+    classDef emergencyFlow fill:#ffcc99,stroke:#ff6600,stroke-width:2px
+
+    class PRM,RTRM,TEE,SV riskComponent
+    class Signal,Validated,RiskCheck,Execute,PositionUpdate,Monitor,Alert dataFlow
+    class Global,TradingTypes,RiskParams,AssetRules,Correlation,Exposure configFlow
+    class Critical,CloseAll,PauseTrading,NotifyAdmin emergencyFlow
+```
+
+# Risk Management Data Flow
+
+```mermaid
+sequenceDiagram
+    participant TB as Trading Bot
+    participant SV as Signal Validator
+    participant PRM as Portfolio Manager
+    participant TEE as Execution Engine
+    participant MT5 as MT5 Broker
+    participant RTRM as Risk Monitor
+    participant DB as Database
+    participant TG as Telegram
+
+    %% Signal Validation Flow
+    TB->>SV: New Trading Signal
+    SV->>SV: Validate Signal Quality
+    SV->>SV: Calculate Success Probability
+    SV->>PRM: Signal Validation Result
+
+    %% Risk Assessment Flow
+    PRM->>PRM: Check Position Limits
+    PRM->>PRM: Calculate Portfolio Risk
+    PRM->>PRM: Validate Correlation
+    PRM->>TEE: Risk Assessment Result
+
+    %% Execution Flow
+    TEE->>TEE: Validate Order
+    TEE->>MT5: Execute Trade
+    MT5->>TEE: Execution Result
+    TEE->>DB: Store Trade Data
+    TEE->>TB: Execution Status
+
+    %% Monitoring Flow
+    PRM->>RTRM: Position Update
+    RTRM->>RTRM: Real-Time Risk Assessment
+    RTRM->>DB: Update Risk Metrics
+
+    %% Alert Flow
+    alt Risk Alert Triggered
+        RTRM->>TG: Send Alert
+        RTRM->>TB: Risk Notification
+    end
+
+    %% Emergency Flow
+    alt Emergency Stop Triggered
+        RTRM->>TEE: Emergency Stop
+        TEE->>MT5: Close All Positions
+        TEE->>TB: Emergency Status
+        RTRM->>TG: Emergency Alert
+    end
+```
+
+# Risk Level Decision Tree
+
+```mermaid
+graph TD
+    Start[New Position Request] --> CheckRisk{Check Position Risk}
+
+    CheckRisk --> |Risk ≤ 0.5%| CheckPortfolio{Check Portfolio Risk}
+    CheckRisk --> |Risk > 0.5%| Reject1[❌ Reject - High Position Risk]
+
+    CheckPortfolio --> |Total Risk ≤ 2%| CheckCorrelation{Check Correlation}
+    CheckPortfolio --> |Total Risk > 2%| Reject2[❌ Reject - Portfolio Risk Limit]
+
+    CheckCorrelation --> |Correlation ≤ 0.7| CheckDrawdown{Check Drawdown}
+    CheckCorrelation --> |Correlation > 0.7| Reject3[❌ Reject - High Correlation]
+
+    CheckDrawdown --> |Drawdown ≤ 10%| Approve[✅ Approve Position]
+    CheckDrawdown --> |10% < Drawdown ≤ 15%| ReduceSize[⚠️ Approve with Reduced Size]
+    CheckDrawdown --> |Drawdown > 15%| Emergency[🚨 Emergency Stop - Block All]
+
+    %% Emergency Procedures
+    Emergency --> CloseAll[Close All Positions]
+    Emergency --> PauseTrading[Pause Trading 24h]
+    Emergency --> NotifyAdmin[Notify Admin]
+
+    %% Styling
+    classDef approve fill:#d4edda,stroke:#155724,stroke-width:2px
+    classDef reject fill:#f8d7da,stroke:#721c24,stroke-width:2px
+    classDef warning fill:#fff3cd,stroke:#856404,stroke-width:2px
+    classDef emergency fill:#f8d7da,stroke:#dc3545,stroke-width:3px
+
+    class Approve approve
+    class Reject1,Reject2,Reject3 reject
+    class ReduceSize warning
+    class Emergency,CloseAll,PauseTrading,NotifyAdmin emergency
+```
+
+# Risk Monitoring Dashboard Flow
+
+```mermaid
+graph LR
+    subgraph "Data Sources"
+        MT5[MT5 Positions]
+        DB[Historical Data]
+        CFG[Risk Config]
+    end
+
+    subgraph "Real-Time Processing"
+        Calc[Metrics Calculator]
+        Corr[Correlation Engine]
+        Risk[Risk Assessor]
+    end
+
+    subgraph "Dashboard Components"
+        PM[Portfolio Metrics]
+        AR[Alert History]
+        SM[System Monitor]
+        EM[Emergency Status]
+    end
+
+    subgraph "Alert System"
+        TA[Threshold Analysis]
+        AA[Alert Generator]
+        NS[Notification Service]
+    end
+
+    subgraph "Output Channels"
+        Dashboard[Web Dashboard]
+        Telegram[Telegram Alerts]
+        Logs[System Logs]
+        Reports[Risk Reports]
+    end
+
+    %% Data Flow
+    MT5 --> Calc
+    DB --> Calc
+    CFG --> Risk
+
+    Calc --> Corr
+    Corr --> Risk
+    Risk --> PM
+    Risk --> SM
+
+    PM --> TA
+    SM --> TA
+    TA --> AA
+    AA --> NS
+
+    AA --> AR
+    AR --> EM
+
+    %% Output Flow
+    PM --> Dashboard
+    AR --> Dashboard
+    SM --> Dashboard
+    EM --> Dashboard
+
+    NS --> Telegram
+    AA --> Logs
+    PM --> Reports
+
+    %% Styling
+    classDef dataSource fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef processing fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef dashboard fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef alert fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef output fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class MT5,DB,CFG dataSource
+    class Calc,Corr,Risk processing
+    class PM,AR,SM,EM dashboard
+    class TA,AA,NS alert
+    class Dashboard,Telegram,Logs,Reports output
+```
+
+# Risk Configuration Hierarchy
+
+```mermaid
+graph TD
+    subgraph "Configuration Files"
+        YAML[YAML Config Files]
+        RiskParams[risk_parameters.yaml]
+        TradingTypes[trading_types.yaml]
+        StrategyParams[strategy_parameters.yaml]
+    end
+
+    subgraph "Global Settings"
+        GlobalRisk[Global Risk Limits]
+        MaxPortfolio[Max Portfolio Risk: 2%]
+        DailyLoss[Daily Loss Limit: 1%]
+        Emergency[Emergency Stop: 15%]
+    end
+
+    subgraph "Trading Type Settings"
+        Scalping[Scalping: 0.16% per trade]
+        DayTrading[Day Trading: 0.5% per trade]
+        SwingTrading[Swing Trading: 0.96% per trade]
+        PositionTrading[Position Trading: 1.8% per trade]
+    end
+
+    subgraph "Asset-Specific Rules"
+        ForexMajor[Forex Major: 0.0001 pip]
+        ForexJPY[Forex JPY: 0.01 pip]
+        Commodities[Commodities: 0.1 pip]
+        Crypto[Crypto: 1.0 pip]
+    end
+
+    subgraph "Runtime Configuration"
+        ConfigMgr[Configuration Manager]
+        RiskLimits[Risk Limits Object]
+        MonitoringConfig[Monitoring Config]
+        VolumeCalc[Volume Calculator]
+    end
+
+    subgraph "Applied Configuration"
+        PosValidation[Position Validation]
+        PortfolioMgmt[Portfolio Management]
+        RealTimeMon[Real-Time Monitoring]
+        Execution[Trade Execution]
+    end
+
+    %% Configuration Flow
+    YAML --> ConfigMgr
+    RiskParams --> GlobalRisk
+    TradingTypes --> TradingTypeSettings
+    StrategyParams --> AssetRules
+
+    GlobalRisk --> RiskLimits
+    TradingTypeSettings --> RiskLimits
+    AssetRules --> VolumeCalc
+
+    RiskLimits --> PosValidation
+    RiskLimits --> PortfolioMgmt
+    MonitoringConfig --> RealTimeMon
+    VolumeCalc --> Execution
+
+    %% Styling
+    classDef configFile fill:#fff3cd,stroke:#856404,stroke-width:2px
+    classDef global fill:#d1ecf1,stroke:#0c5460,stroke-width:2px
+    classDef tradingType fill:#d4edda,stroke:#155724,stroke-width:2px
+    classDef asset fill:#f8d7da,stroke:#721c24,stroke-width:2px
+    classDef runtime fill:#e2e3e5,stroke:#383d41,stroke-width:2px
+    classDef applied fill:#d6d8db,stroke:#1a1e22,stroke-width:2px
+
+    class YAML,RiskParams,TradingTypes,StrategyParams configFile
+    class GlobalRisk,MaxPortfolio,DailyLoss,Emergency global
+    class Scalping,DayTrading,SwingTrading,PositionTrading tradingType
+    class ForexMajor,ForexJPY,Commodities,Crypto asset
+    class ConfigMgr,RiskLimits,MonitoringConfig,VolumeCalc runtime
+    class PosValidation,PortfolioMgmt,RealTimeMon,Execution applied
+```

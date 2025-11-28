@@ -1,0 +1,54 @@
+# Risk-Notification Integration Overview
+# Phase 4.5: High-Level Integration Architecture
+
+graph TD
+    %% Main Components
+    TB[TradingBot Main] --> |initializes| RM[RealTimeRiskMonitor]
+    TB --> |initializes| NS[NotificationService]
+
+    %% Integration Layer
+    TB --> |connects via<br/>set_notification_services()| INT[Integration Layer]
+    INT --> |links| RM
+    INT --> |to| TN[TelegramNotifier]
+
+    %% Risk Monitoring Flow
+    RM --> |monitors| PORTFOLIO[Portfolio Risk]
+    PORTFOLIO --> |triggers| ALERT[Risk Alert]
+
+    %% Alert Processing
+    ALERT --> |creates| AH[AlertHistory Object]
+    AH --> |severity-based| PROC[Alert Processing]
+
+    %% Notification Flow
+    PROC --> |calls| TN
+    TN --> |send_risk_alert()| FORMAT[Rich Formatting]
+    FORMAT --> |delivers to| TELEGRAM[📱 Telegram]
+
+    %% Configuration
+    CONFIG[risk_parameters.yaml] --> |configures| SETTINGS[Notification Settings]
+    SETTINGS --> |enables/disables| TN
+    SETTINGS --> |rate limits| PROC
+
+    %% Key Features
+    RATE[Rate Limiting<br/>20/hour] --> PROC
+    COOL[Cooldown<br/>5 minutes] --> PROC
+    RETRY[Retry Logic<br/>3 attempts] --> TN
+
+    %% Alert Types
+    PORTFOLIO --> |15% loss| EMERGENCY[🔴 Emergency Stop]
+    PORTFOLIO --> |10% loss| HIGH[🚨 High Risk]
+    PORTFOLIO --> |5% loss| MEDIUM[⚠️ Medium Risk]
+    PORTFOLIO --> |correlation| CORR_ALERT[🔗 Correlation Alert]
+
+    %% Styling
+    classDef mainComponent fill:#3498db,stroke:#2c3e50,stroke-width:3px,color:#fff
+    classDef riskComponent fill:#e74c3c,stroke:#c0392b,stroke-width:2px,color:#fff
+    classDef notifComponent fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff
+    classDef alertComponent fill:#f39c12,stroke:#d68910,stroke-width:2px,color:#fff
+    classDef configComponent fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff
+
+    class TB,INT mainComponent
+    class RM,PORTFOLIO,EMERGENCY,HIGH,MEDIUM,CORR_ALERT riskComponent
+    class NS,TN,FORMAT,TELEGRAM notifComponent
+    class ALERT,AH,PROC alertComponent
+    class CONFIG,SETTINGS,RATE,COOL,RETRY configComponent
