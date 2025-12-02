@@ -27,10 +27,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import our models for autogenerate support
-from src.trading_bot.data.models.base import Base
-from src.trading_bot.data.models.zone import SupplyDemandZone
-from src.trading_bot.data.models.trade import Trade
-from src.trading_bot.data.models.position_update import PositionUpdate
+from trading_bot.data.database import Base
+from trading_bot.data.models import SupplyDemandZone  # Import all models
 
 # add your model's MetaData object here
 # for 'autogenerate' support

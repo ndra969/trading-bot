@@ -121,6 +121,9 @@ class DataManager:
                 }
             )
 
+            # Set timestamp as index for zone detection compatibility
+            df = df.set_index("timestamp")
+
             logger.info(f"Retrieved {len(df)} bars for {symbol} {timeframe}")
             return df
 
@@ -178,6 +181,9 @@ class DataManager:
                     "tick_volume": "volume",
                 }
             )
+
+            # Set timestamp as index for zone detection compatibility
+            df = df.set_index("timestamp")
 
             logger.info(f"Retrieved {len(df)} bars for {symbol} {timeframe}")
             return df

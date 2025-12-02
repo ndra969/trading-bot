@@ -251,7 +251,7 @@ brokers:
     USDJPY: USDJPY
     XAGUSD: SILVER
     XAUUSD: GOLD
-default_broker: exness_standard
+default_broker: exness_cent
 pip_values:
   commodities: 0.1
   crypto: 1.0

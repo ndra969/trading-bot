@@ -5,6 +5,7 @@ trading:
   risk_per_trade: 0.005  # 0.5% risk per trade
   max_concurrent_positions: 5
   confluence_threshold: 65.0
+  active_broker: exness_cent  # Broker symbol mapping (exness_cent, exness_standard, etc.)
 
 database:
   url: "sqlite+aiosqlite:///./data/trading_bot.db"

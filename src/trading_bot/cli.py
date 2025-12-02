@@ -85,7 +85,15 @@ def start(ctx, dry_run, connect_mt5):
 
         # Initialize database
         db_url = config.database.url
-        init_database(db_url, echo=config.database.echo)
+        db_manager = init_database(db_url, echo=config.database.echo)
+
+        # Create tables if they don't exist
+        import asyncio
+
+        async def create_tables():
+            await db_manager.create_tables()
+
+        asyncio.run(create_tables())
 
         # Extract database name for display (security)
         db_name = (
@@ -164,8 +172,43 @@ def start(ctx, dry_run, connect_mt5):
         console.print("\n[bold green]Trading Bot started successfully![/bold green]")
         console.print("\nPress Ctrl+C to stop...")
 
-        # Main loop placeholder
-        logger.info("Trading bot started")
+        # Start TradingBot with main loop
+        try:
+            from .main import TradingBot
+
+            # Create bot instance
+            bot_config = {
+                "symbols": config.get("symbols", ["EURUSD", "GBPUSD"]),
+                "timeframe": config.get("timeframe", "H1"),
+                "analysis_interval": config.get("analysis_interval", 300),
+            }
+
+            bot = TradingBot(bot_config)
+
+            # Override MT5 connector if available
+            if _mt5_connector:
+                bot.mt5 = _mt5_connector
+                from .connectors.data_manager import DataManager
+                from .connectors.symbol_manager import SymbolManager
+
+                symbol_manager = SymbolManager(_mt5_connector)
+                bot.data_manager = DataManager(_mt5_connector, symbol_manager)
+
+            # Start bot (this will run the trading loop)
+            import asyncio
+
+            logger.info("Starting TradingBot main loop...")
+            asyncio.run(bot.start())
+
+        except KeyboardInterrupt:
+            logger.info("Received stop signal (Ctrl+C)")
+            console.print("\n[yellow]Stopping bot...[/yellow]")
+            if bot:
+                asyncio.run(bot.stop())
+        except Exception as e:
+            logger.error(f"Error in trading loop: {e}", exc_info=True)
+            console.print(f"[red]ERROR: {e}[/red]")
+            raise
 
     except Exception as e:
         console.print(f"[bold red]ERROR: Error starting bot: {e}[/bold red]")
