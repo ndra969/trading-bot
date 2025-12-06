@@ -5,12 +5,16 @@ Coordinates position lifecycle, tracking, and management.
 """
 
 import uuid
+from typing import Optional
 
+from trading_bot.data.database import get_session
+from trading_bot.data.models import Position as DBPosition
 from trading_bot.position.pip_calculator import PipCalculator
 from trading_bot.position.position_models import Position, PositionStatus, PositionType
 from trading_bot.position.position_tracker import PositionTracker
 from trading_bot.strategies.models import TradingSignal
 from trading_bot.utils.logger import get_logger
+from sqlalchemy import select
 
 logger = get_logger(__name__)
 
@@ -52,6 +56,105 @@ class PositionManager:
             f"PositionManager initialized "
             f"(max positions per symbol: {self.max_positions_per_symbol})"
         )
+
+    async def load_positions_from_db(self):
+        """Load active positions from database."""
+        try:
+            async with get_session() as session:
+                # Query active positions (PENDING or OPEN)
+                stmt = select(DBPosition).where(
+                    DBPosition.status.in_([PositionStatus.PENDING.value, PositionStatus.OPEN.value])
+                )
+                result = await session.execute(stmt)
+                db_positions = result.scalars().all()
+
+                count = 0
+                for db_pos in db_positions:
+                    # Convert DB model to Position object
+                    position = Position(
+                        position_id=db_pos.position_id,
+                        symbol=db_pos.symbol,
+                        position_type=PositionType(db_pos.position_type),
+                        entry_price=db_pos.entry_price,
+                        stop_loss=db_pos.stop_loss,
+                        take_profit=db_pos.take_profit,
+                        volume=db_pos.volume,
+                        pip_size=db_pos.pip_size,
+                        pip_value_per_lot=db_pos.pip_value_per_lot,
+                        status=PositionStatus(db_pos.status),
+                        open_time=db_pos.open_time,
+                        close_time=db_pos.close_time,
+                        close_price=db_pos.close_price,
+                        current_price=db_pos.current_price,
+                        current_profit_pips=db_pos.current_profit_pips,
+                        current_pnl_usd=db_pos.current_pnl_usd,
+                        risk_amount_usd=db_pos.risk_amount_usd,
+                        potential_profit_usd=db_pos.potential_profit_usd,
+                        metadata=db_pos.meta_data or {},
+                    )
+                    
+                    # Store in memory
+                    self.positions[position.position_id] = position
+                    
+                    if position.symbol not in self.positions_by_symbol:
+                        self.positions_by_symbol[position.symbol] = []
+                    self.positions_by_symbol[position.symbol].append(position.position_id)
+                    
+                    count += 1
+
+                if count > 0:
+                    logger.info(f"Loaded {count} active positions from database")
+
+        except Exception as e:
+            logger.error(f"Error loading positions from database: {e}")
+
+    async def save_position(self, position: Position):
+        """Save or update position in database."""
+        try:
+            async with get_session() as session:
+                # Check if position exists
+                stmt = select(DBPosition).where(DBPosition.position_id == position.position_id)
+                result = await session.execute(stmt)
+                db_pos = result.scalars().first()
+
+                if db_pos:
+                    # Update existing
+                    db_pos.status = position.status.value
+                    db_pos.current_price = position.current_price
+                    db_pos.close_price = position.close_price
+                    db_pos.current_profit_pips = position.current_profit_pips
+                    db_pos.current_pnl_usd = position.current_pnl_usd
+                    db_pos.open_time = position.open_time
+                    db_pos.close_time = position.close_time
+                    db_pos.meta_data = position.metadata
+                else:
+                    # Create new
+                    db_pos = DBPosition(
+                        position_id=position.position_id,
+                        symbol=position.symbol,
+                        position_type=position.position_type.value,
+                        entry_price=position.entry_price,
+                        stop_loss=position.stop_loss,
+                        take_profit=position.take_profit,
+                        volume=position.volume,
+                        pip_size=position.pip_size,
+                        pip_value_per_lot=position.pip_value_per_lot,
+                        status=position.status.value,
+                        current_price=position.current_price,
+                        current_profit_pips=position.current_profit_pips,
+                        current_pnl_usd=position.current_pnl_usd,
+                        risk_amount_usd=position.risk_amount_usd,
+                        potential_profit_usd=position.potential_profit_usd,
+                        open_time=position.open_time,
+                        meta_data=position.metadata
+                    )
+                    session.add(db_pos)
+
+                await session.commit()
+                # logger.debug(f"Position {position.position_id} saved to database")
+
+        except Exception as e:
+            logger.error(f"Error saving position {position.position_id} to database: {e}")
 
     def create_position_from_signal(self, signal: TradingSignal, volume: float) -> Position:
         """
@@ -150,22 +253,26 @@ class PositionManager:
 
         self.tracker.update_position_price(position, current_price)
 
-    def close_position(self, position_id: str, close_price: float) -> None:
+    def close_position(self, position_id: str, close_price: float, reason: str = "Manual") -> dict | None:
         """
         Close a position.
 
         Args:
             position_id: Position ID to close
             close_price: Price at which to close
+            reason: Reason for closing
 
-        Raises:
-            ValueError: If position not found
+        Returns:
+            Dictionary with close results or None if not found
         """
         position = self.get_position(position_id)
         if not position:
-            raise ValueError(f"Position {position_id} not found")
+            return None
 
-        self.tracker.close_position(position, close_price)
+        result = self.tracker.close_position(position, close_price)
+        position.metadata["close_reason"] = reason
+        
+        return result
 
     def get_position(self, position_id: str) -> Position | None:
         """
@@ -263,6 +370,7 @@ class PositionManager:
             if self.tracker.check_stop_loss(position):
                 logger.info(f"Stop loss hit for {position.position_id}: {position.symbol}")
                 self.tracker.close_position(position, current_price)
+                position.metadata["close_reason"] = "Stop Loss"
                 closed_positions.append(position)
                 continue
 
@@ -270,6 +378,7 @@ class PositionManager:
             if self.tracker.check_take_profit(position):
                 logger.info(f"Take profit hit for {position.position_id}: {position.symbol}")
                 self.tracker.close_position(position, current_price)
+                position.metadata["close_reason"] = "Take Profit"
                 closed_positions.append(position)
 
         return closed_positions

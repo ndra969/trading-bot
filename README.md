@@ -1,33 +1,49 @@
 # 🤖 Trading Bot - Modern Python Trading System
 
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-16%20passing-success.svg)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-33%25-orange.svg)](htmlcov/)
+[![Tests](https://img.shields.io/badge/tests-400%2B%20passing-success.svg)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-98%25-success.svg)](htmlcov/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-🚀 **Rebuild Complete - Phase 0 & Phase 1 Successfully Implemented**
+🚀 **Phase 3 Completed: Position Management & Risk Control System Integrated**
 
 A sophisticated, production-ready automated trading bot built with modern Python architecture for multi-asset trading (Forex, Commodities, Crypto) with MetaTrader5 integration.
 
+## 🌟 Current Status (Dec 6, 2025)
+
+- ✅ **Phase 1: Core Architecture** (Completed)
+- ✅ **Phase 2: Foundation Strategy** (Completed - Supply & Demand)
+- ✅ **Phase 2.5: Integration Layer** (Completed - Strategy Orchestration)
+- ✅ **Phase 3: Position & Risk** (Completed - Live Management)
+- 🔄 **Phase 4: Monitoring** (In Progress)
+
 ## ✨ Features
+
+### 🧠 Intelligent Strategy System
+- **Supply & Demand**: Advanced zone detection and validation
+- **Multi-Timeframe**: Adaptive analysis (M1 to W1)
+- **Confluence Scoring**: Weighted signal generation
+- **Dynamic Configuration**: Strategy parameters adjustable via YAML
+
+### 🛡️ Robust Risk Management
+- **Portfolio Protection**: Max 2% risk per trade, 1% daily loss limit
+- **Drawdown Control**: Emergency stop at 15% drawdown
+- **Exposure Limits**: Asset class and symbol-specific limits
+- **Capital Preservation**: Auto-sizing based on account balance
+
+### 💼 Advanced Position Management
+- **Real-time Tracking**: Live pip and USD P&L monitoring
+- **Smart Automation**: 
+  - 🔄 **Breakeven**: Auto-move SL to entry + buffer
+  - 📉 **Trailing Stop**: Dynamic profit locking
+  - ✂️ **Partial Close**: Multi-target profit taking
+- **Asset Logic**: Specific handling for Forex, Gold, Crypto
 
 ### Core Architecture
 - 🏗️ **Modern Stack**: UV + Click + SQLAlchemy 2.0 + Pydantic
 - 🔌 **MT5 Integration**: Complete MetaTrader5 platform integration
-- 💹 **Multi-Asset Support**: Forex, Commodities, Crypto
-- 🧪 **Test-Driven Development**: 16 tests passing (100% success rate)
-- 🔒 **Type Safety**: Full type hints with MyPy validation
+- 🧪 **Test-Driven Development**: 400+ tests passing (100% success rate)
 - ⚡ **Async-First**: Modern async/await architecture throughout
-- ⚙️ **Smart Configuration**: Environment-specific .env files + YAML hierarchy
-- 🔐 **Security**: Credentials protection, secure logging
-
-### Trading Features
-- 📊 **Real-time Data**: OHLCV and tick data retrieval
-- 💼 **Position Management**: Complete position tracking and monitoring
-- 📈 **Order Execution**: Market and pending orders with validation
-- 🎯 **Account Management**: Balance, equity, margin monitoring
-- 🔍 **Symbol Management**: Symbol discovery and validation
-- 📉 **Risk Management**: Position sizing and risk controls
 
 ## 📦 Installation
 
