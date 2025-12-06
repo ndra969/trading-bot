@@ -314,4 +314,3 @@ class TestUtilityMethods:
         str_repr = str(risk_manager)
         assert "PortfolioRiskManager" in str_repr
         assert "$10,000.00" in str_repr
-
