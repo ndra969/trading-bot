@@ -222,6 +222,76 @@ class MT5Connector:
 
         return health
 
+    def place_order(
+        self,
+        symbol: str,
+        order_type: str,
+        volume: float,
+        price: float,
+        sl: float,
+        tp: float,
+        comment: str = "",
+        magic: int = 0,
+    ) -> dict[str, Any] | None:
+        """
+        Place a trade order.
+
+        Args:
+            symbol: Trading symbol
+            order_type: 'BUY' or 'SELL'
+            volume: Lot size
+            price: Entry price (for pending orders, current price for market)
+            sl: Stop Loss price
+            tp: Take Profit price
+            comment: Order comment
+            magic: Magic number
+
+        Returns:
+            Dictionary with order result or None if failed
+        """
+        if not self._is_connected:
+            logger.error("Cannot place order: MT5 not connected")
+            return None
+
+        try:
+            # Prepare request
+            action = mt5.TRADE_ACTION_DEAL  # Market execution
+
+            type_op = mt5.ORDER_TYPE_BUY if order_type.upper() == "BUY" else mt5.ORDER_TYPE_SELL
+
+            request = {
+                "action": action,
+                "symbol": symbol,
+                "volume": volume,
+                "type": type_op,
+                "price": price,
+                "sl": sl,
+                "tp": tp,
+                "deviation": 20,  # Slippage tolerance
+                "magic": magic,
+                "comment": comment,
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            # Send order
+            result = mt5.order_send(request)
+
+            if result is None:
+                logger.error("Order failed: result is None")
+                return None
+
+            if result.retcode != mt5.TRADE_RETCODE_DONE:
+                logger.error(f"Order failed: {result.comment} (code: {result.retcode})")
+                return None
+
+            logger.info(f"Order placed successfully: {result.order}")
+            return result._asdict()
+
+        except Exception as e:
+            logger.error(f"Error placing order: {e}")
+            return None
+
     @property
     def terminal_info(self) -> dict[str, Any]:
         """Get terminal information."""

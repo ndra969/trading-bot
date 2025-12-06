@@ -28,13 +28,17 @@ class TestSupplyDemandStrategyInitialization:
             "zone_detection": {"min_zone_strength": 70.0},
             "analysis": {"min_zone_strength": 65.0},
         }
-        strategy = SupplyDemandStrategy(config=config, use_database=False)  # Disable database for unit tests
+        strategy = SupplyDemandStrategy(
+            config=config, use_database=False
+        )  # Disable database for unit tests
         assert strategy.detector.min_zone_strength == 70.0
         assert strategy.analyzer.min_zone_strength == 65.0
 
     def test_supply_demand_strategy_initialization_empty_config(self):
         """Test strategy with empty config uses defaults."""
-        strategy = SupplyDemandStrategy(config={}, use_database=False)  # Disable database for unit tests
+        strategy = SupplyDemandStrategy(
+            config={}, use_database=False
+        )  # Disable database for unit tests
         assert strategy.detector is not None
         assert strategy.manager is not None
         assert strategy.analyzer is not None

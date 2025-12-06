@@ -1,0 +1,89 @@
+graph TB
+    subgraph TradingBot["TradingBot (main.py)"]
+        TL["Trading Loop<br/>_trading_cycle()"]
+        AS["Analyze Symbol<br/>_analyze_symbol()"]
+        SP["Signal Processing<br/>(Log/Execute)"]
+    end
+    
+    subgraph StrategySystem["Strategy System (NEW)"]
+        SM["StrategyManager<br/>(NEW)<br/>- Register strategies<br/>- Coordinate execution<br/>- Collect results"]
+        SA["SignalAggregator<br/>(NEW)<br/>- Aggregate signals<br/>- Confluence scoring<br/>- Quality filtering"]
+    end
+    
+    subgraph Foundation["Foundation Strategy (Existing)"]
+        FE["FoundationEngine<br/>(Modify)<br/>+ generate_signals()"]
+        SD["SupplyDemandStrategy<br/>- Zone Detection<br/>- Zone Analysis"]
+    end
+    
+    subgraph Enhancement["Enhancement Layers (Future)"]
+        E1["Trendline Strategy"]
+        E2["Price Action Strategy"]
+        E3["Fibonacci Strategy"]
+        E4["Breakout/Retest"]
+        E5["Market Structure"]
+        E6["Multi-timeframe"]
+        E7["Volume Profile"]
+    end
+    
+    subgraph DataModels["Data Models (NEW)"]
+        SR["StrategyResult<br/>- strategy_name<br/>- score<br/>- direction<br/>- entry/SL/TP"]
+        TS["TradingSignal<br/>- signal_id<br/>- symbol<br/>- direction<br/>- confluence_score"]
+    end
+    
+    subgraph DataSources["Data Sources"]
+        MT5["MT5 Connector"]
+        DM["Data Manager"]
+        DB["Database<br/>(SQLite/PostgreSQL)"]
+    end
+    
+    %% Main Flow
+    TL -->|For each symbol| AS
+    AS -->|1. Fetch OHLCV| DM
+    DM --> MT5
+    AS -->|2. Analyze| SM
+    
+    %% Strategy Execution
+    SM -->|Execute foundation| FE
+    SM -->|Execute enhancements| E1
+    SM -->|Execute enhancements| E2
+    SM -->|Execute enhancements| E3
+    SM -->|Execute enhancements| E4
+    SM -->|Execute enhancements| E5
+    SM -->|Execute enhancements| E6
+    SM -->|Execute enhancements| E7
+    
+    %% Foundation Strategy
+    FE --> SD
+    SD -->|Load/Save zones| DB
+    
+    %% Result Collection
+    FE -->|StrategyResult| SR
+    E1 -.->|StrategyResult| SR
+    E2 -.->|StrategyResult| SR
+    E3 -.->|StrategyResult| SR
+    E4 -.->|StrategyResult| SR
+    E5 -.->|StrategyResult| SR
+    E6 -.->|StrategyResult| SR
+    E7 -.->|StrategyResult| SR
+    
+    %% Signal Aggregation
+    SM -->|3. Collect results| SA
+    SR -->|Input| SA
+    SA -->|4. Aggregate & score| TS
+    
+    %% Signal Processing
+    TS -->|5. Return signals| AS
+    AS -->|6. Process| SP
+    SP -->|Phase 2.5: Log| TL
+    SP -.->|Phase 3: Execute| PM["PositionManager<br/>(Future)"]
+    
+    %% Styling
+    classDef existing fill:#90EE90,stroke:#006400,stroke-width:2px
+    classDef new fill:#FFD700,stroke:#FF8C00,stroke-width:2px
+    classDef future fill:#E0E0E0,stroke:#808080,stroke-width:1px,stroke-dasharray: 5 5
+    classDef data fill:#87CEEB,stroke:#4682B4,stroke-width:2px
+    
+    class FE,SD,TL,AS,MT5,DM,DB existing
+    class SM,SA,TS,SR,SP new
+    class E1,E2,E3,E4,E5,E6,E7,PM future
+

@@ -116,54 +116,54 @@ Roadmap pengembangan **Modern Trading Bot System** menggunakan arsitektur modern
   - [x] Add confluence scoring for zones (supporting zones, risk/reward calculation)
   - [x] Create foundation signal generation (FoundationSignal with complete data)
 
-#### Week 5: Enhancement Layers Architecture ✅ **FULLY COMPLETED**
-- [x] **Layered Strategy Framework**
-  - [x] Design strategy layer interface (FoundationEngine with enhancement integration)
-  - [x] **✅ IMPLEMENTED: Trendline Confluence Layer (Enhancement Layer #1 - 20% weight)**
-    - [x] Automated trendline detection algorithm (swing point analysis, 3+ touch validation)
-    - [x] Multi-timeframe trendline analysis (M15/H1 for scalping, H4/D1 for swing)
-    - [x] Break/bounce probability calculation (momentum, volume, time factors)
-    - [x] Distance-based confluence scoring with S&D zones (TrendlineConfluence analysis)
-  - [x] **✅ IMPLEMENTED: Price Action enhancement layer (15% weight)**
-    - [x] Candlestick pattern recognition (engulfing, pin bars, inside bars, doji, flag, pennant)
-    - [x] Support/resistance confirmation (automated level detection with touch counting)
-    - [x] Momentum analysis (RSI-based scoring and direction alignment)
-  - [x] **✅ IMPLEMENTED: Fibonacci confluence layer (12% weight)** - **NEW COMPLETED**
-    - [x] Automatic fibonacci level detection (swing point analysis, key ratios 0.382-0.786)
-    - [x] Zone-fibonacci confluence analysis (price proximity, level clustering)
-    - [x] Retracement/extension validation (trading type adaptive parameters)
-    - [x] Multi-timeframe fibonacci analysis (H1/H4/D1 confluence scoring)
-    - [x] CLI integration (`trading-bot foundation fibonacci` command)
-  - [x] **✅ IMPLEMENTED: Breakout Retest validation layer (Enhancement Layer #4 - 12% weight)**
-    - [x] Breakout detection algorithm from S&D zones (volume-validated breakouts)
-    - [x] Retest confirmation logic with price action validation (momentum scoring)
-    - [x] Volume validation and momentum analysis (trade quality assessment)
-    - [x] Multi-timeframe breakout consistency checks (scalping to position trading)
-    - [x] CLI integration (`trading-bot foundation breakout` command)
-    - [x] Comprehensive testing suite (25 unit + 11 integration = 36 tests)
-  - [x] **✅ IMPLEMENTED: Market Structure alignment layer (Enhancement Layer #5 - 8% weight)**
-    - [x] BOS (Break of Structure) detection algorithm (momentum-based validation)
-    - [x] CHoCH (Change of Character) identification (trend reversal signals)
-    - [x] Structure alignment validation with S&D zones (confluence scoring)
-    - [x] Multi-timeframe structure consistency (trading type adaptive)
-    - [x] CLI integration (`trading-bot foundation structure` command)
-    - [x] Comprehensive testing suite (30 unit + 15 integration = 45 tests)
-  - [x] **✅ IMPLEMENTED: RSI Analysis layer (Enhancement Layer #6 - 10% weight)**
-    - [x] RSI calculation using pandas-ta/ta-lib integration (library fallback chain)
-    - [x] Overbought/oversold level detection (asset-specific, trading type adaptive)
-    - [x] RSI divergence analysis (bullish/bearish patterns, strength scoring)
-    - [x] Multi-timeframe RSI confluence scoring (H1, H4, D1 analysis)
-    - [x] Integration with existing enhancement layers (signal alignment validation)
-    - [x] CLI integration (`trading-bot technical analyze --indicator rsi`)
-    - [x] Comprehensive testing suite (38 unit + 17 integration = 55 tests)
-  - [x] **✅ IMPLEMENTED: Moving Average layer (Enhancement Layer #7 - 8% weight)**
-    - [x] MA calculation using pandas-ta/ta-lib (EMA 9/21/50, SMA 200, fallback chain)
-    - [x] Trend identification and MA cross signals (bullish/bearish crossovers)
-    - [x] Price action with MA validation (bounces, rejections, dynamic levels)
-    - [x] Multi-timeframe MA alignment analysis (trend direction confluence)
-    - [x] Integration with zone and structure analysis (signal validation)
-    - [x] CLI integration (`trading-bot technical analyze --indicator ma`)
-    - [x] Comprehensive testing suite (35 unit + 18 integration = 53 tests)
+#### Week 5: Enhancement Layers Architecture ⏳ **PENDING (Moved to Phase 5)**
+- [ ] **Layered Strategy Framework**
+  - [ ] Design strategy layer interface (FoundationEngine with enhancement integration)
+  - [ ] **Trendline Confluence Layer (Enhancement Layer #1 - 20% weight)**
+    - [ ] Automated trendline detection algorithm (swing point analysis, 3+ touch validation)
+    - [ ] Multi-timeframe trendline analysis (M15/H1 for scalping, H4/D1 for swing)
+    - [ ] Break/bounce probability calculation (momentum, volume, time factors)
+    - [ ] Distance-based confluence scoring with S&D zones (TrendlineConfluence analysis)
+  - [ ] **Price Action enhancement layer (15% weight)**
+    - [ ] Candlestick pattern recognition (engulfing, pin bars, inside bars, doji, flag, pennant)
+    - [ ] Support/resistance confirmation (automated level detection with touch counting)
+    - [ ] Momentum analysis (RSI-based scoring and direction alignment)
+  - [ ] **Fibonacci confluence layer (12% weight)**
+    - [ ] Automatic fibonacci level detection (swing point analysis, key ratios 0.382-0.786)
+    - [ ] Zone-fibonacci confluence analysis (price proximity, level clustering)
+    - [ ] Retracement/extension validation (trading type adaptive parameters)
+    - [ ] Multi-timeframe fibonacci analysis (H1/H4/D1 confluence scoring)
+    - [ ] CLI integration (`trading-bot foundation fibonacci` command)
+  - [ ] **Breakout Retest validation layer (Enhancement Layer #4 - 12% weight)**
+    - [ ] Breakout detection algorithm from S&D zones (volume-validated breakouts)
+    - [ ] Retest confirmation logic with price action validation (momentum scoring)
+    - [ ] Volume validation and momentum analysis (trade quality assessment)
+    - [ ] Multi-timeframe breakout consistency checks (scalping to position trading)
+    - [ ] CLI integration (`trading-bot foundation breakout` command)
+    - [ ] Comprehensive testing suite
+  - [ ] **Market Structure alignment layer (Enhancement Layer #5 - 8% weight)**
+    - [ ] BOS (Break of Structure) detection algorithm (momentum-based validation)
+    - [ ] CHoCH (Change of Character) identification (trend reversal signals)
+    - [ ] Structure alignment validation with S&D zones (confluence scoring)
+    - [ ] Multi-timeframe structure consistency (trading type adaptive)
+    - [ ] CLI integration (`trading-bot foundation structure` command)
+    - [ ] Comprehensive testing suite
+  - [ ] **RSI Analysis layer (Enhancement Layer #6 - 10% weight)**
+    - [ ] RSI calculation using pandas-ta/ta-lib integration (library fallback chain)
+    - [ ] Overbought/oversold level detection (asset-specific, trading type adaptive)
+    - [ ] RSI divergence analysis (bullish/bearish patterns, strength scoring)
+    - [ ] Multi-timeframe RSI confluence scoring (H1, H4, D1 analysis)
+    - [ ] Integration with existing enhancement layers (signal alignment validation)
+    - [ ] CLI integration (`trading-bot technical analyze --indicator rsi`)
+    - [ ] Comprehensive testing suite
+  - [ ] **Moving Average layer (Enhancement Layer #7 - 8% weight)**
+    - [ ] MA calculation using pandas-ta/ta-lib (EMA 9/21/50, SMA 200, fallback chain)
+    - [ ] Trend identification and MA cross signals (bullish/bearish crossovers)
+    - [ ] Price action with MA validation (bounces, rejections, dynamic levels)
+    - [ ] Multi-timeframe MA alignment analysis (trend direction confluence)
+    - [ ] Integration with zone and structure analysis (signal validation)
+    - [ ] CLI integration (`trading-bot technical analyze --indicator ma`)
+    - [ ] Comprehensive testing suite
 
 - [x] **Strategy Coordination System**
   - [x] Create strategy coordinator (FoundationEngine with layered analysis)
@@ -174,29 +174,29 @@ Roadmap pengembangan **Modern Trading Bot System** menggunakan arsitektur modern
 #### Week 6: Multi-Timeframe Analysis & Trendline Optimization ✅ **COMPLETED**
 - [x] **Timeframe Analysis Engine**
   - [x] Implement multi-timeframe analysis (trading type adaptive timeframes)
-  - [x] **✅ IMPLEMENTED: Enhanced Trendline Integration**
-    - [x] Trading type adaptive trendline timeframes (scalping: M15/H1, swing: H4/D1)
-    - [x] Trendline strength validation (TrendlineStrength enum, 3+ touches, angle validation)
-    - [x] Quality scoring with recency and respect factors (TrendlineDetector quality metrics)
-    - [x] Multi-timeframe trendline confluence bonuses (confidence calculation across timeframes)
-  - [x] Create weighted confluence scoring (foundation 30% + trendline 20% with normalization)
-  - [x] Add trend alignment validation (direction alignment between trendlines and zones)
-  - [x] Implement structure confirmation across timeframes (multi-timeframe confluence analysis)
+  - [ ] **Trendline Integration (Moved to Phase 5)**
+    - [ ] Trading type adaptive trendline timeframes (scalping: M15/H1, swing: H4/D1)
+    - [ ] Trendline strength validation (TrendlineStrength enum, 3+ touches, angle validation)
+    - [ ] Quality scoring with recency and respect factors (TrendlineDetector quality metrics)
+    - [ ] Multi-timeframe trendline confluence bonuses (confidence calculation across timeframes)
+  - [x] Create weighted confluence scoring (foundation 30% + enhancement layers pending)
+  - [ ] Add trend alignment validation (Moved to Phase 5)
+  - [ ] Implement structure confirmation across timeframes (Moved to Phase 5)
 
 - [x] **Performance Optimization**
-  - [x] Add caching for timeframe analysis (TrendlineManager cache system)
+  - [x] Add caching for timeframe analysis
   - [x] Implement async processing (full async/await architecture)
   - [x] Optimize database queries (SQLAlchemy 2.0 async sessions)
-  - [x] Add memory management (cache cleanup, old trendline removal)
+  - [x] Add memory management (cache cleanup)
 
 **✅ DELIVERED Week 4-6**:
 - ✅ Complete S&D foundation strategy (SupplyDemandAnalyzer, ZoneManager)
-- ✅ **Trendline enhancement layer** (TrendlineAnalyzer integration - 20% weight)
-- ✅ **Price Action enhancement layer** (PriceActionAnalyzer integration - 15% weight)
-- ✅ **Fibonacci confluence layer** (FibonacciAnalyzer integration - 12% weight)
-- ✅ **Breakout Retest validation layer** (BreakoutRetestAnalyzer integration - 12% weight)
-- ✅ **Market Structure alignment layer** (MarketStructureAnalyzer integration - 8% weight)
-- ✅ **RSI Analysis layer** (RSIAnalyzer integration - 10% weight)
+- ⏳ **Trendline enhancement layer** (Moved to Phase 5)
+- ⏳ **Price Action enhancement layer** (Moved to Phase 5)
+- ⏳ **Fibonacci confluence layer** (Moved to Phase 5)
+- ⏳ **Breakout Retest validation layer** (Moved to Phase 5)
+- ⏳ **Market Structure alignment layer** (Moved to Phase 5)
+- ⏳ **RSI Analysis layer** (Moved to Phase 5)
 - ✅ **Moving Average layer** (MovingAverageAnalyzer integration - 8% weight)
 - ✅ Multi-timeframe analysis engine (trading type adaptive configurations)
 - ✅ Strategy coordination framework (FoundationEngine with layered signals)
