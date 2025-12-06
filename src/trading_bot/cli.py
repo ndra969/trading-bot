@@ -178,15 +178,18 @@ def start(ctx, dry_run, connect_mt5):
 
             # Create bot instance
             bot_config = {
+                "env": config.env,  # Pass environment name
                 "symbols": config.get("symbols", ["EURUSD", "GBPUSD"]),
                 "timeframe": config.get("timeframe", "H1"),
                 "analysis_interval": config.get("analysis_interval", 300),
                 "trading": {
                     "dry_run": dry_run,  # Pass CLI dry-run flag
                 },
-                "initial_balance": config.get("initial_balance", 10000.0), # Ensure this is passed if needed
-                "risk_management": config.get("risk_management", {}), # Pass risk config
-                "position_manager": config.get("position_manager", {}), # Pass position config
+                "initial_balance": config.get(
+                    "initial_balance", 10000.0
+                ),  # Ensure this is passed if needed
+                "risk_management": config.get("risk_management", {}),  # Pass risk config
+                "position_manager": config.get("position_manager", {}),  # Pass position config
             }
 
             # Update bot_config with full config object content for other settings
@@ -194,7 +197,7 @@ def start(ctx, dry_run, connect_mt5):
             # A better approach would be to pass the full Configuration object
             if hasattr(config, "_config"):
                 bot_config.update(config._config)
-            
+
             # Explicitly set dry_run from CLI to override file config
             if "trading" not in bot_config:
                 bot_config["trading"] = {}

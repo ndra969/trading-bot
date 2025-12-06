@@ -1,7 +1,8 @@
 """Tests for trading strategy models."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 from trading_bot.strategies.models import (
     SignalDirection,

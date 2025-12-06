@@ -246,4 +246,3 @@ class TestUtilityMethods:
 
         str_repr = str(drawdown_protector)
         assert "EMERGENCY" in str_repr
-

@@ -5,21 +5,23 @@ Coordinates all trading components and manages the trading loop.
 """
 
 import asyncio
+from datetime import UTC
 
 from .connectors.data_manager import DataManager
 from .connectors.mt5_connector import MT5Connector
 from .connectors.symbol_mapper import SymbolMapper
-from .position.position_manager import PositionManager
 from .position.automation.breakeven_manager import BreakevenManager
-from .position.automation.trailing_stop_manager import TrailingStopManager
 from .position.automation.partial_close_manager import PartialCloseManager
-from .risk.portfolio_risk_manager import PortfolioRiskManager
-from .risk.exposure_manager import ExposureManager
+from .position.automation.trailing_stop_manager import TrailingStopManager
+from .position.position_manager import PositionManager
 from .risk.drawdown_protector import DrawdownProtector
+from .risk.exposure_manager import ExposureManager
+from .risk.portfolio_risk_manager import PortfolioRiskManager
 from .strategies.foundation.foundation_engine import FoundationEngine
 from .strategies.signal_aggregator import SignalAggregator
 from .strategies.strategy_manager import StrategyManager
 from .utils.logger import get_logger
+from .utils.notification_manager import NotificationLevel, NotificationManager
 
 logger = get_logger(__name__)
 
@@ -48,6 +50,7 @@ class TradingBot:
         self.symbol_mapper = None
         self.strategy_manager = None
         self.signal_aggregator = None
+        self.notification_manager = None
 
         # Position and Risk Management components
         self.position_manager = None
@@ -68,6 +71,9 @@ class TradingBot:
             logger.warning(f"Symbol mapper initialization failed: {e} - using symbols as-is")
             self.symbol_mapper = None
             self.active_broker = None
+
+        # Initialize Notification Manager
+        self.notification_manager = NotificationManager(self.config)
 
         # Trading symbols (internal/universal format)
         self.symbols: list[str] = config.get("symbols", ["EURUSD", "GBPUSD"])
@@ -91,12 +97,15 @@ class TradingBot:
                 # MT5 connector provided, verify connection
                 try:
                     if not self.mt5.is_connected():
-                        logger.warning("MT5 connector provided but not connected - attempting connection...")
+                        logger.warning(
+                            "MT5 connector provided but not connected - attempting connection..."
+                        )
                         await self._initialize_mt5()
                     else:
                         # MT5 already connected, just create data manager if needed
                         if self.data_manager is None:
                             from .connectors.symbol_manager import SymbolManager
+
                             symbol_manager = SymbolManager(self.mt5)
                             self.data_manager = DataManager(self.mt5, symbol_manager)
                 except Exception as e:
@@ -111,6 +120,9 @@ class TradingBot:
 
             # Initialize position and risk management system
             await self._initialize_position_risk_system()
+
+            # Start notification manager
+            await self.notification_manager.start()
 
             # Start main trading loop
             self.is_running = True
@@ -127,6 +139,10 @@ class TradingBot:
         """Stop trading bot."""
         logger.info("🛑 Stopping trading bot...")
         self.is_running = False
+
+        # Stop notification manager
+        if self.notification_manager:
+            await self.notification_manager.stop()
 
         # Cleanup MT5 connection
         if self.mt5:
@@ -253,14 +269,14 @@ class TradingBot:
             # Initialize portfolio risk with starting balance
             # Priority: 1. Live MT5 Balance, 2. Config Balance, 3. Default 10k
             initial_balance = self.config.get("initial_balance", 10000.0)
-            
+
             if self.mt5 and self.mt5.is_connected():
                 account_info = self.mt5.account_info
                 mt5_balance = account_info.get("balance")
                 if mt5_balance is not None and mt5_balance > 0:
                     initial_balance = float(mt5_balance)
                     logger.info(f"Using live MT5 balance: ${initial_balance:,.2f}")
-            
+
             self.portfolio_risk.initialize_balance(initial_balance)
 
             # Load active positions from database
@@ -288,6 +304,16 @@ class TradingBot:
                 f"Confluence: {signal.confluence_score:.1f}%"
             )
 
+            # Notify signal detection (Optional: can be noisy if many signals)
+            # await self.notification_manager.send_message(
+            #     f"📍 **SIGNAL DETECTED**\n"
+            #     f"💱 **{signal.symbol}** | **{signal.direction.value}**\n"
+            #     f"📉 Entry: `{signal.entry_price:.5f}`\n"
+            #     f"📊 Score: `{signal.confluence_score:.1f}%`",
+            #     level=NotificationLevel.INFO,
+            #     sound=False
+            # )
+
             # Log strategy scores
             for strategy_name, score in signal.strategy_scores.items():
                 logger.debug(f"    └─ {strategy_name}: {score:.1f}")
@@ -295,11 +321,19 @@ class TradingBot:
             # Step 1: Risk validation
             if not await self._validate_signal_risk(signal):
                 logger.warning(f"  ❌ Signal {signal.symbol} failed risk validation")
+                await self.notification_manager.send_message(
+                    f"🛡️ **SIGNAL REJECTED (RISK)**\n"
+                    f"💱 `{signal.symbol}`\n"
+                    f"Reason: Risk Validation Failed\n"
+                    f"(Check logs for details)",
+                    level=NotificationLevel.WARNING,
+                )
                 return
 
             # Step 2: Check exposure limits
             if not await self._check_exposure_limits(signal):
                 logger.warning(f"  ❌ Signal {signal.symbol} failed exposure validation")
+                # Silent rejection for exposure to avoid spam if signal persists
                 return
 
             # Step 3: Calculate position size
@@ -310,7 +344,7 @@ class TradingBot:
 
             # Step 3.5: Execute order on MT5 (if not dry-run)
             is_dry_run = self.config.get("trading", {}).get("dry_run", True)
-            
+
             if not is_dry_run:
                 if not self.mt5 or not self.mt5.is_connected():
                     logger.error("  ❌ Cannot execute trade: MT5 not connected")
@@ -324,31 +358,52 @@ class TradingBot:
                     price=signal.entry_price,
                     sl=signal.stop_loss,
                     tp=signal.take_profit,
-                    comment=f"Signal {signal.signal_id}"
+                    comment=f"Signal {signal.signal_id}",
                 )
-                
+
                 if not order_result:
                     logger.error(f"  ❌ MT5 Order Execution Failed for {signal.symbol}")
+                    await self.notification_manager.send_message(
+                        f"❌ **MT5 Order Failed**\n"
+                        f"Symbol: `{signal.symbol}`\n"
+                        f"Direction: `{signal.direction.value}`",
+                        level=NotificationLevel.ERROR,
+                    )
                     return
-                
+
                 logger.info(f"  ✅ MT5 Order Executed: Ticket {order_result.get('order')}")
+
+                await self.notification_manager.send_message(
+                    f"✅ **LIVE ORDER EXECUTED**\n"
+                    f"🎫 Ticket: `{order_result.get('order')}`\n"
+                    f"💱 **{signal.symbol}** | **{signal.direction.value}**\n"
+                    f"📊 Size: `{position_size:.2f}` lots\n"
+                    f"📉 Price: `{signal.entry_price:.5f}`\n"
+                    f"🛑 SL: `{signal.stop_loss:.5f}`\n"
+                    f"🎯 TP: `{signal.take_profit:.5f}`",
+                    level=NotificationLevel.SUCCESS,
+                )
             else:
                 logger.info(f"  ⚠️ Dry-Run Mode: Skipping MT5 execution for {signal.symbol}")
+                await self.notification_manager.send_message(
+                    f"⚠️ **Dry-Run Order**\n"
+                    f"💱 **{signal.symbol}** | **{signal.direction.value}**\n"
+                    f"📊 Size: `{position_size:.2f}` lots\n"
+                    f"📉 Price: `{signal.entry_price:.5f}`",
+                    level=NotificationLevel.INFO,
+                    sound=False,
+                )
 
             # Step 4: Create position
             position = self.position_manager.create_position_from_signal(signal, position_size)
 
             # Step 5: Register with exposure manager
             asset_class = self._get_asset_class(signal.symbol)
-            self.exposure_manager.register_position(
-                signal.symbol,
-                asset_class,
-                position_size
-            )
+            self.exposure_manager.register_position(signal.symbol, asset_class, position_size)
 
             # Step 6: Open position
             self.position_manager.open_position(position.position_id)
-            
+
             # Save to database
             await self.position_manager.save_position(position)
 
@@ -369,7 +424,7 @@ class TradingBot:
             max_risk_amount = self.portfolio_risk.calculate_max_risk_amount(
                 self.portfolio_risk.current_balance
             )
-            
+
             # Check portfolio risk limits using max risk amount
             can_trade, reason = self.portfolio_risk.can_take_trade(max_risk_amount)
             if not can_trade:
@@ -378,7 +433,7 @@ class TradingBot:
 
             # Check drawdown protection
             if self.drawdown_protector.should_close_all_positions():
-                logger.warning(f"  Drawdown protection triggered - no new positions allowed")
+                logger.warning("  Drawdown protection triggered - no new positions allowed")
                 return False
 
             return True
@@ -400,7 +455,7 @@ class TradingBot:
             max_risk_amount = self.portfolio_risk.calculate_max_risk_amount(
                 self.portfolio_risk.current_balance
             )
-            
+
             # Check symbol exposure limits
             asset_class = self._get_asset_class(signal.symbol)
             can_open, reason = self.exposure_manager.can_open_position(
@@ -421,31 +476,29 @@ class TradingBot:
         """Calculate appropriate position size for the signal."""
         try:
             from trading_bot.position.pip_calculator import PipCalculator
-            
+
             # Calculate max risk amount (2% of portfolio)
             max_risk_amount = self.portfolio_risk.calculate_max_risk_amount(
                 self.portfolio_risk.current_balance
             )
-            
+
             # Get pip calculator to determine pip size and value
             pip_calculator = PipCalculator()
             pip_size = pip_calculator.get_pip_size(signal.symbol)
-            
+
             # Calculate stop loss distance in pips
             # signal.risk_pips is already the price difference, convert to pips
             stop_distance_pips = signal.risk_pips / pip_size
-            
+
             # Calculate pip value per lot
-            pip_value_per_lot = pip_calculator.calculate_pip_value(
-                signal.symbol, 1.0  # 1 lot
-            )
-            
+            pip_value_per_lot = pip_calculator.calculate_pip_value(signal.symbol, 1.0)  # 1 lot
+
             # Calculate position size using portfolio risk manager
             position_size = self.portfolio_risk.calculate_position_size(
                 account_balance=self.portfolio_risk.current_balance,
                 risk_amount_usd=max_risk_amount,
                 stop_distance_pips=stop_distance_pips,
-                pip_value_per_lot=pip_value_per_lot
+                pip_value_per_lot=pip_value_per_lot,
             )
 
             return position_size
@@ -458,8 +511,9 @@ class TradingBot:
         """Determine asset class from symbol using config."""
         try:
             # Load asset classes from config
-            if not hasattr(self, '_asset_classes'):
+            if not hasattr(self, "_asset_classes"):
                 from .connectors.symbol_mapper import SymbolMapper
+
                 symbol_mapper = SymbolMapper()
                 self._asset_classes = symbol_mapper.asset_classes
 
@@ -489,17 +543,17 @@ class TradingBot:
                 return self._get_asset_class(internal_symbol)
 
             # Default fallback - try to determine from symbol pattern
-            if any(c in symbol for c in ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD']):
+            if any(c in symbol for c in ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"]):
                 # It's a forex pair
                 if symbol.endswith("JPY") or "JPY" in symbol:
                     return "forex_jpy"
                 else:
                     return "forex_major"
-            elif any(c in symbol for c in ['XAU', 'XAG', 'WTI', 'BRENT']):
+            elif any(c in symbol for c in ["XAU", "XAG", "WTI", "BRENT"]):
                 return "commodities"
-            elif any(c in symbol for c in ['BTC', 'ETH', 'LTC', 'BCH', 'XRP']):
+            elif any(c in symbol for c in ["BTC", "ETH", "LTC", "BCH", "XRP"]):
                 return "crypto"
-            elif any(c in symbol for c in ['US30', 'SPX', 'NAS', 'UK100', 'GER', 'JPN', 'CHN']):
+            elif any(c in symbol for c in ["US30", "SPX", "NAS", "UK100", "GER", "JPN", "CHN"]):
                 return "index"
 
             # Final fallback
@@ -522,7 +576,7 @@ class TradingBot:
             broker_name = self.active_broker.lower()
 
             # Check reverse mappings
-            if hasattr(self.symbol_mapper, '_reverse_mappings'):
+            if hasattr(self.symbol_mapper, "_reverse_mappings"):
                 if broker_name in self.symbol_mapper._reverse_mappings:
                     reverse_mappings = self.symbol_mapper._reverse_mappings[broker_name]
                     if normalized_broker_symbol in reverse_mappings:
@@ -530,10 +584,10 @@ class TradingBot:
 
             # If not found in reverse mappings, try to strip broker suffixes
             # Common suffixes: 'c' for cent, 'm' for standard, etc.
-            clean_symbol = normalized_broker_symbol.rstrip('cm')
+            clean_symbol = normalized_broker_symbol.rstrip("cm")
 
             # Try again with clean symbol
-            if hasattr(self.symbol_mapper, '_reverse_mappings'):
+            if hasattr(self.symbol_mapper, "_reverse_mappings"):
                 if broker_name in self.symbol_mapper._reverse_mappings:
                     reverse_mappings = self.symbol_mapper._reverse_mappings[broker_name]
                     if clean_symbol in reverse_mappings:
@@ -567,7 +621,7 @@ class TradingBot:
 
                     # Update position
                     self.position_manager.update_position(position.position_id, current_price)
-                    
+
                     # Save update to database
                     await self.position_manager.save_position(position)
 
@@ -599,22 +653,21 @@ class TradingBot:
 
                 # Get current price from data manager
                 data = self.data_manager.get_ohlcv(
-                    symbol=broker_symbol,
-                    timeframe="M1",  # Use M1 for current price
-                    count=1
+                    symbol=broker_symbol, timeframe="M1", count=1  # Use M1 for current price
                 )
 
                 if data is not None and not data.empty:
-                    return float(data['close'].iloc[-1])
+                    return float(data["close"].iloc[-1])
 
             # Fallback: only simulate price in dry-run/mock mode
             is_dry_run = self.config.get("trading", {}).get("dry_run", True)
             if is_dry_run or not self.data_manager:
                 import random
+
                 # Use a more realistic base price simulation if available, otherwise static default
                 base_price = 1.1000 if symbol == "EURUSD" else 1.2000
                 return base_price + random.uniform(-0.001, 0.001)
-            
+
             # In live mode with missing data (e.g. market closed), return None
             # This prevents updating positions with fake data
             logger.debug(f"Live mode: No price data available for {symbol} (Market closed?)")
@@ -633,6 +686,14 @@ class TradingBot:
                 if new_sl:
                     logger.info(f"  🔄 BREAKEVEN: {position.position_id} SL moved to {new_sl:.5f}")
                     await self.position_manager.save_position(position)
+                    await self.notification_manager.send_message(
+                        f"🛡️ **BREAKEVEN SECURED**\n"
+                        f"🆔 `{position.position_id}`\n"
+                        f"🛑 SL Moved: `{new_sl:.5f}`\n"
+                        f"🔒 Risk Free",
+                        level=NotificationLevel.INFO,
+                        sound=False,
+                    )
 
             # Trailing stop check
             if self.trailing_manager.should_update_trailing_stop(position):
@@ -640,18 +701,27 @@ class TradingBot:
                 if new_sl:
                     logger.info(f"  🔄 TRAILING: {position.position_id} SL moved to {new_sl:.5f}")
                     await self.position_manager.save_position(position)
+                    # Don't notify every trailing step to avoid spam, or use silent notification
+                    # await self.notification_manager.send_message(..., sound=False)
 
             # Partial close check
             if self.partial_manager.should_close_partial(position):
                 current_price = await self._get_current_price(position.symbol)
                 result = self.partial_manager.execute_partial_close(position, current_price)
-                if result and result['closed_volume'] > 0:
+                if result and result["closed_volume"] > 0:
                     logger.info(
                         f"  🔄 PARTIAL CLOSE: {position.position_id} "
                         f"Closed {result['closed_volume']:.2f} at {current_price:.5f} "
                         f"P&L: ${result['profit_usd']:.2f}"
                     )
                     await self.position_manager.save_position(position)
+                    await self.notification_manager.send_message(
+                        f"💰 **PARTIAL PROFIT TAKEN**\n"
+                        f"🆔 `{position.position_id}`\n"
+                        f"📊 Closed: `{result['closed_volume']:.2f}` lots\n"
+                        f"💵 Profit: **${result['profit_usd']:.2f}**",
+                        level=NotificationLevel.SUCCESS,
+                    )
 
         except Exception as e:
             logger.error(f"Error checking automation for position {position.position_id}: {e}")
@@ -703,9 +773,9 @@ class TradingBot:
 
                             # Update portfolio risk
                             self.portfolio_risk.update_balance(
-                                self.portfolio_risk.current_balance + result['pnl_usd']
+                                self.portfolio_risk.current_balance + result["pnl_usd"]
                             )
-                            
+
                             # Save closed state to database
                             await self.position_manager.save_position(position)
 
@@ -714,6 +784,22 @@ class TradingBot:
                                 f"{close_reason} | "
                                 f"P&L: ${result['pnl_usd']:.2f} | "
                                 f"Pips: {result['pips']:.1f}"
+                            )
+
+                            # Determine emoji based on profit
+                            pnl_emoji = "💰" if result["pnl_usd"] > 0 else "💸"
+
+                            await self.notification_manager.send_message(
+                                f"{pnl_emoji} **POSITION CLOSED**\n"
+                                f"🆔 `{position.position_id}`\n"
+                                f"📝 Reason: `{close_reason}`\n"
+                                f"💵 P&L: **${result['pnl_usd']:.2f}**\n"
+                                f"📏 Pips: `{result['pips']:.1f}`",
+                                level=(
+                                    NotificationLevel.SUCCESS
+                                    if result["pnl_usd"] > 0
+                                    else NotificationLevel.WARNING
+                                ),
                             )
 
                 except Exception as e:
@@ -725,6 +811,9 @@ class TradingBot:
     async def _trading_loop(self):
         """Main trading loop."""
         logger.info("📊 Starting main trading loop...")
+
+        # Start heartbeat loop in background
+        asyncio.create_task(self._heartbeat_loop())
 
         while self.is_running:
             try:
@@ -744,45 +833,87 @@ class TradingBot:
                 break
             except Exception as e:
                 logger.error(f"Error in trading loop: {e}")
+                # Notify critical error
+                if self.notification_manager:
+                    await self.notification_manager.send_message(
+                        f"❌ **CRITICAL ERROR**\n" f"Error in trading loop:\n" f"`{str(e)}`",
+                        level=NotificationLevel.CRITICAL,
+                    )
                 await asyncio.sleep(60)  # Wait 1 minute on error
+
+    async def _heartbeat_loop(self):
+        """Periodic heartbeat notifications."""
+        # Default interval: 4 hours (14400 seconds)
+        # Use config if available or fallback
+        interval_hours = 4
+
+        logger.info(f"Heartbeat monitor started (interval: {interval_hours}h)")
+
+        while self.is_running:
+            try:
+                # Wait for interval (convert to seconds)
+                await asyncio.sleep(interval_hours * 3600)
+
+                if not self.notification_manager:
+                    continue
+
+                # Gather stats
+                balance = 0.0
+                if self.portfolio_risk:
+                    balance = self.portfolio_risk.current_balance
+
+                open_positions = 0
+                if self.position_manager:
+                    open_positions = len(self.position_manager.get_open_positions())
+
+                stats = {"balance": balance, "open_positions": open_positions}
+
+                # Send heartbeat
+                await self.notification_manager.send_heartbeat(stats)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in heartbeat loop: {e}")
+                await asyncio.sleep(300)  # Retry after 5 mins on error
 
     def _is_market_open(self, symbol: str) -> bool:
         """
         Check if market is open for the symbol.
-        
+
         Args:
             symbol: Trading symbol
-            
+
         Returns:
             True if market is likely open, False otherwise
         """
-        from datetime import datetime, timezone
-        
+        from datetime import datetime
+
         # Get asset class
         asset_class = self._get_asset_class(symbol)
-        
+
         # Crypto is always open
         if asset_class == "crypto":
             return True
-            
+
         # Get current UTC time
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         weekday = now.weekday()  # 0=Monday, ..., 5=Saturday, 6=Sunday
         hour = now.hour
-        
+
         # Weekend logic for Forex/Commodities (Simplified)
         # Saturday: Closed
         if weekday == 5:
             return False
-            
+
         # Sunday: Closed before 21:00 UTC (approx market open)
         if weekday == 6 and hour < 21:
             return False
-            
+
         # Friday: Closed after 22:00 UTC (approx market close)
         if weekday == 4 and hour >= 22:
             return False
-            
+
         return True
 
     async def _analyze_symbol(self, symbol: str):
@@ -847,9 +978,7 @@ class TradingBot:
                 logger.debug(f"{symbol}: No strategy results generated")
                 return
 
-            logger.info(
-                f"📊 {symbol}: Received {len(strategy_results)} results from strategies"
-            )
+            logger.info(f"📊 {symbol}: Received {len(strategy_results)} results from strategies")
 
             # Aggregate signals via SignalAggregator
             signals = await self.signal_aggregator.aggregate_signals(strategy_results)

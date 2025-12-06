@@ -185,4 +185,3 @@ class TestUtilityMethods:
         str_repr = str(exposure_manager)
         assert "ExposureManager" in str_repr
         assert "1 positions" in str_repr
-

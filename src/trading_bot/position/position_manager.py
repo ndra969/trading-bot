@@ -5,7 +5,8 @@ Coordinates position lifecycle, tracking, and management.
 """
 
 import uuid
-from typing import Optional
+
+from sqlalchemy import select
 
 from trading_bot.data.database import get_session
 from trading_bot.data.models import Position as DBPosition
@@ -14,7 +15,6 @@ from trading_bot.position.position_models import Position, PositionStatus, Posit
 from trading_bot.position.position_tracker import PositionTracker
 from trading_bot.strategies.models import TradingSignal
 from trading_bot.utils.logger import get_logger
-from sqlalchemy import select
 
 logger = get_logger(__name__)
 
@@ -92,14 +92,14 @@ class PositionManager:
                         potential_profit_usd=db_pos.potential_profit_usd,
                         metadata=db_pos.meta_data or {},
                     )
-                    
+
                     # Store in memory
                     self.positions[position.position_id] = position
-                    
+
                     if position.symbol not in self.positions_by_symbol:
                         self.positions_by_symbol[position.symbol] = []
                     self.positions_by_symbol[position.symbol].append(position.position_id)
-                    
+
                     count += 1
 
                 if count > 0:
@@ -146,7 +146,7 @@ class PositionManager:
                         risk_amount_usd=position.risk_amount_usd,
                         potential_profit_usd=position.potential_profit_usd,
                         open_time=position.open_time,
-                        meta_data=position.metadata
+                        meta_data=position.metadata,
                     )
                     session.add(db_pos)
 
@@ -253,7 +253,9 @@ class PositionManager:
 
         self.tracker.update_position_price(position, current_price)
 
-    def close_position(self, position_id: str, close_price: float, reason: str = "Manual") -> dict | None:
+    def close_position(
+        self, position_id: str, close_price: float, reason: str = "Manual"
+    ) -> dict | None:
         """
         Close a position.
 
@@ -271,7 +273,7 @@ class PositionManager:
 
         result = self.tracker.close_position(position, close_price)
         position.metadata["close_reason"] = reason
-        
+
         return result
 
     def get_position(self, position_id: str) -> Position | None:

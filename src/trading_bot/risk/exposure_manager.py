@@ -231,4 +231,3 @@ class ExposureManager:
     def __repr__(self) -> str:
         """Developer representation."""
         return self.__str__()
-
