@@ -1,6 +1,27 @@
 # Strategy Parameters Configuration
 # Supply & Demand Foundation Strategy Settings
 
+# Strategy Manager Configuration
+strategy_manager:
+  max_concurrent_strategies: 8
+  conflict_prevention: true
+  health_check_interval: 300
+
+# Confluence Weights for Signal Aggregation
+confluence_weights:
+  foundation: 1.0        # Foundation S&D strategy (100% for Phase 2.5)
+  trendline: 0.0         # Phase 5 enhancement
+  price_action: 0.0      # Phase 5 enhancement
+  fibonacci: 0.0         # Phase 5 enhancement
+  breakout_retest: 0.0   # Phase 5 enhancement
+  market_structure: 0.0  # Phase 5 enhancement
+  volume_profile: 0.0    # Phase 5 enhancement
+  multi_timeframe: 0.0   # Phase 5 enhancement
+
+# Signal Aggregator Configuration
+signal_aggregator:
+  conflict_resolution: "highest_score"  # Options: highest_score, first_signal
+
 supply_demand:
   # Zone Detection Parameters
   zone_detection:

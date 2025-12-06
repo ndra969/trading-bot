@@ -1,7 +1,7 @@
 """Zone Manager - Manages zone lifecycle and storage."""
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select

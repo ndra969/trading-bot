@@ -30,7 +30,9 @@ class TestFoundationEngineInitialization:
                 "analysis": {"min_zone_strength": 65.0},
             }
         }
-        engine = FoundationEngine(config=config, use_database=False)  # Disable database for unit tests
+        engine = FoundationEngine(
+            config=config, use_database=False
+        )  # Disable database for unit tests
         assert engine.strategy.detector.min_zone_strength == 70.0
         assert engine.strategy.analyzer.min_zone_strength == 65.0
 
@@ -296,7 +298,9 @@ class TestFoundationEngineEdgeCases:
                 "analysis": {"min_zone_strength": 70.0},
             }
         }
-        engine = FoundationEngine(config=config, use_database=False)  # Disable database for unit tests
+        engine = FoundationEngine(
+            config=config, use_database=False
+        )  # Disable database for unit tests
 
         # Verify config was passed
         assert engine.strategy.detector.min_zone_strength == 75.0

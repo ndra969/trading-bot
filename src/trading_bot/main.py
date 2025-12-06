@@ -10,6 +10,8 @@ from .connectors.data_manager import DataManager
 from .connectors.mt5_connector import MT5Connector
 from .connectors.symbol_mapper import SymbolMapper
 from .strategies.foundation.foundation_engine import FoundationEngine
+from .strategies.signal_aggregator import SignalAggregator
+from .strategies.strategy_manager import StrategyManager
 from .utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,6 +39,8 @@ class TradingBot:
         self.data_manager = None
         self.foundation_engine = None
         self.symbol_mapper = None
+        self.strategy_manager = None
+        self.signal_aggregator = None
 
         # Initialize symbol mapper for broker symbol conversion
         try:
@@ -61,19 +65,33 @@ class TradingBot:
         logger.info("🚀 Starting trading bot...")
 
         try:
-            # Initialize MT5 connection (skip if already set from CLI)
+            # Initialize MT5 connection (skip if already set from CLI or in mock mode)
             if self.mt5 is None:
+                # In mock MT5 mode (dry-run), mt5 is intentionally None
+                # Skip initialization and continue without MT5
+                logger.debug("MT5 not set (mock mode) - continuing without MT5 connection")
+                self.data_manager = None
+            else:
+                # MT5 connector provided, verify connection
                 try:
-                    await self._initialize_mt5()
+                    if not self.mt5.is_connected():
+                        logger.warning("MT5 connector provided but not connected - attempting connection...")
+                        await self._initialize_mt5()
+                    else:
+                        # MT5 already connected, just create data manager if needed
+                        if self.data_manager is None:
+                            from .connectors.symbol_manager import SymbolManager
+                            symbol_manager = SymbolManager(self.mt5)
+                            self.data_manager = DataManager(self.mt5, symbol_manager)
                 except Exception as e:
                     logger.warning(f"MT5 initialization failed: {e} - continuing without MT5")
-                    # Create mock data manager for dry-run
-                    # Skip data manager initialization if MT5 not available
-                    logger.warning("MT5 not available - data manager will not be initialized")
                     self.data_manager = None
 
             # Initialize foundation strategy
             await self._initialize_foundation_strategy()
+
+            # Initialize strategy system (manager + aggregator)
+            await self._initialize_strategy_system()
 
             # Start main trading loop
             self.is_running = True
@@ -173,6 +191,28 @@ class TradingBot:
 
         logger.info("✅ Foundation strategy initialized")
 
+    async def _initialize_strategy_system(self):
+        """Initialize strategy manager and signal aggregator."""
+        logger.info("Initializing strategy system...")
+
+        # Get config dict (handle both Configuration object and dict)
+        if hasattr(self.config, "_config"):
+            config_dict = self.config._config
+        else:
+            config_dict = self.config if isinstance(self.config, dict) else {}
+
+        # Initialize StrategyManager
+        self.strategy_manager = StrategyManager(config_dict)
+
+        # Register foundation strategy
+        self.strategy_manager.register_strategy("foundation", self.foundation_engine)
+        logger.info("Foundation strategy registered with StrategyManager")
+
+        # Initialize SignalAggregator
+        self.signal_aggregator = SignalAggregator(config_dict)
+
+        logger.info("✅ Strategy system initialized")
+
     async def _trading_loop(self):
         """Main trading loop."""
         logger.info("📊 Starting main trading loop...")
@@ -196,7 +236,7 @@ class TradingBot:
 
     async def _analyze_symbol(self, symbol: str):
         """
-        Analyze a symbol using foundation strategy.
+        Analyze a symbol using strategy system.
 
         Args:
             symbol: Trading symbol (internal/universal format)
@@ -242,20 +282,40 @@ class TradingBot:
                 logger.warning(f"No data available for {symbol} (broker: {broker_symbol})")
                 return
 
-            # Analyze with foundation strategy (use internal symbol for logging/storage)
-            zones = await self.foundation_engine.analyze_symbol(symbol, data, self.timeframe)
+            # Run strategy analysis via StrategyManager
+            strategy_results = await self.strategy_manager.analyze_symbol(
+                symbol, data, self.timeframe
+            )
 
-            # Log results
-            if zones:
-                logger.info(f"✅ {symbol} ({broker_symbol}): Found {len(zones)} high-quality zones")
-                for i, zone in enumerate(zones[:3], 1):  # Log top 3 zones
-                    logger.info(
-                        f"  Zone {i}: {zone.zone_type.value} | "
-                        f"{zone.lower_bound:.5f}-{zone.upper_bound:.5f} | "
-                        f"Strength: {zone.strength:.1f}"
-                    )
-            else:
-                logger.debug(f"{symbol} ({broker_symbol}): No high-quality zones detected")
+            if not strategy_results:
+                logger.debug(f"{symbol}: No strategy results generated")
+                return
+
+            logger.info(
+                f"📊 {symbol}: Received {len(strategy_results)} results from strategies"
+            )
+
+            # Aggregate signals via SignalAggregator
+            signals = await self.signal_aggregator.aggregate_signals(strategy_results)
+
+            if not signals:
+                logger.debug(f"{symbol}: No valid signals after aggregation")
+                return
+
+            logger.info(f"✅ {symbol}: Generated {len(signals)} trading signals")
+
+            # Log signals (Phase 2.5: just logging, Phase 3: execution)
+            for signal in signals:
+                logger.info(
+                    f"  📍 SIGNAL: {signal.direction.value} {signal.symbol} @ {signal.entry_price:.5f} | "
+                    f"SL: {signal.stop_loss:.5f} | TP: {signal.take_profit:.5f} | "
+                    f"R:R: {signal.risk_reward_ratio:.2f} | "
+                    f"Confluence: {signal.confluence_score:.1f}%"
+                )
+
+                # Log strategy scores
+                for strategy_name, score in signal.strategy_scores.items():
+                    logger.debug(f"    └─ {strategy_name}: {score:.1f}")
 
         except Exception as e:
             logger.error(f"Error analyzing {symbol}: {e}", exc_info=True)
