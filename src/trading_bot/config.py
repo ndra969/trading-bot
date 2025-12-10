@@ -131,6 +131,34 @@ class Configuration:
             with open(default_path) as f:
                 self._config = yaml.safe_load(f) or {}
 
+        # Load strategy parameters
+        strategy_path = self.config_dir / "strategy_parameters.yaml"
+        if strategy_path.exists():
+            with open(strategy_path) as f:
+                strategy_config = yaml.safe_load(f) or {}
+                self._deep_merge(self._config, strategy_config)
+
+        # Load active symbols
+        active_symbols_path = self.config_dir / "active_symbols.yaml"
+        if active_symbols_path.exists():
+            with open(active_symbols_path) as f:
+                active_symbols_config = yaml.safe_load(f) or {}
+                # Handle special structure of active_symbols.yaml
+                if "symbols" in active_symbols_config:
+                    # Flatten symbol keys to list if needed by main.py
+                    # Or just merge normally if main.py expects full config
+                    self._deep_merge(self._config, active_symbols_config)
+
+                    # Also populate the simple "symbols" list expected by TradingBot
+                    enabled_symbols = []
+                    if "symbols" in active_symbols_config:
+                        for sym, data in active_symbols_config["symbols"].items():
+                            if data.get("enabled", False):
+                                enabled_symbols.append(sym)
+
+                    if enabled_symbols:
+                        self._config["symbols"] = enabled_symbols
+
         # Load environment-specific configuration
         env_path = self.config_dir / f"{self.env}.yaml"
         if env_path.exists():

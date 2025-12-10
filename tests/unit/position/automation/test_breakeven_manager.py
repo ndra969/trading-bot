@@ -228,7 +228,7 @@ class TestGetBreakevenParameters:
     def test_get_breakeven_distance_crypto(self, breakeven_manager):
         """Test get breakeven distance for crypto."""
         distance = breakeven_manager.get_breakeven_distance("BTCUSD")
-        assert distance == 50.0
+        assert distance == 1000.0  # Crypto uses 1000 pips/USD for breakeven trigger
 
     def test_get_breakeven_buffer_forex(self, breakeven_manager):
         """Test get breakeven buffer for forex."""

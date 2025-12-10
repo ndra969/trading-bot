@@ -30,7 +30,7 @@ class TrailingStopManager:
         "forex_major": 10.0,  # 10 pips
         "forex_jpy": 100.0,  # 100 pips
         "commodities": 300.0,  # 300 pips for Gold
-        "crypto": 30.0,  # 30 USD
+        "crypto": 500.0,  # 500 USD/pips (wide trailing for crypto volatility)
     }
 
     # Activation threshold (pips profit required to activate trailing)
@@ -38,7 +38,7 @@ class TrailingStopManager:
         "forex_major": 20.0,  # Activate after 20 pips profit
         "forex_jpy": 200.0,  # Activate after 200 pips profit
         "commodities": 600.0,  # Activate after 600 pips profit
-        "crypto": 60.0,  # Activate after 60 USD profit
+        "crypto": 500.0,  # Activate after 500 USD/pips profit (~$5 for 0.01 lot)
     }
 
     def __init__(self, config: dict = None):
@@ -62,6 +62,9 @@ class TrailingStopManager:
     def should_activate_trailing(self, position: Position) -> bool:
         """
         Check if trailing stop should be activated.
+        
+        Activation threshold is calculated as proportion of TP distance to ensure
+        it triggers before TP regardless of RR ratio.
 
         Args:
             position: Position to check
@@ -77,19 +80,48 @@ class TrailingStopManager:
         if not position.is_open:
             return False
 
-        # Get activation threshold
+        # Calculate TP distance in pips
+        pip_size = position.pip_size
+        if position.position_type.value == "BUY":
+            tp_distance_pips = (position.take_profit - position.entry_price) / pip_size
+        else:  # SELL
+            tp_distance_pips = (position.entry_price - position.take_profit) / pip_size
+
+        # Get activation threshold as proportion of TP distance
+        # Default: 66% of TP (equivalent to ~20 pips for 30 pips TP with RR 1:2)
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        threshold = self.ACTIVATION_THRESHOLDS.get(asset_class, 20.0)
+        activation_ratio = self._get_activation_ratio(asset_class)
+        threshold_pips = tp_distance_pips * activation_ratio
 
         # Check if profit exceeds threshold
-        if position.current_profit_pips >= threshold:
+        if position.current_profit_pips >= threshold_pips:
             logger.info(
                 f"Trailing stop activated for {position.position_id}: "
-                f"{position.current_profit_pips:.1f} pips (threshold: {threshold:.1f})"
+                f"{position.current_profit_pips:.1f} pips (threshold: {threshold_pips:.1f} pips, "
+                f"{activation_ratio*100:.0f}% of TP {tp_distance_pips:.1f} pips)"
             )
             return True
 
         return False
+    
+    def _get_activation_ratio(self, asset_class: str) -> float:
+        """
+        Get trailing stop activation threshold as proportion of TP distance.
+        
+        Returns ratio (0.66 = 66% of TP distance).
+        This ensures trailing activates before TP regardless of RR ratio.
+        
+        Args:
+            asset_class: Asset class (forex_major, forex_jpy, commodities, crypto)
+            
+        Returns:
+            Activation ratio (0.0 - 1.0)
+        """
+        # Default: 66% of TP distance
+        # This means trailing activates when profit reaches 66% of TP
+        # Example: TP = 30 pips → activation at 20 pips
+        # This ensures trailing activates well before TP is reached
+        return 0.66  # 66% of TP distance
 
     def activate_trailing(self, position: Position) -> None:
         """
@@ -211,18 +243,35 @@ class TrailingStopManager:
         asset_class = self.pip_calculator._determine_asset_class(symbol)
         return self.TRAILING_DISTANCES.get(asset_class, 10.0)
 
-    def get_activation_threshold(self, symbol: str) -> float:
+    def get_activation_threshold(self, symbol: str, position: Position | None = None) -> float:
         """
         Get activation threshold for a symbol.
+        
+        If position is provided, calculates threshold as proportion of TP distance.
+        Otherwise, returns default static threshold (for reference only).
 
         Args:
             symbol: Trading symbol
+            position: Optional position to calculate dynamic threshold
 
         Returns:
             Activation threshold in pips
         """
-        asset_class = self.pip_calculator._determine_asset_class(symbol)
-        return self.ACTIVATION_THRESHOLDS.get(asset_class, 20.0)
+        if position:
+            # Calculate dynamic threshold based on TP distance
+            pip_size = position.pip_size
+            if position.position_type.value == "BUY":
+                tp_distance_pips = (position.take_profit - position.entry_price) / pip_size
+            else:  # SELL
+                tp_distance_pips = (position.entry_price - position.take_profit) / pip_size
+            
+            asset_class = self.pip_calculator._determine_asset_class(symbol)
+            activation_ratio = self._get_activation_ratio(asset_class)
+            return tp_distance_pips * activation_ratio
+        else:
+            # Return static config (for reference, may not match actual threshold)
+            asset_class = self.pip_calculator._determine_asset_class(symbol)
+            return self.ACTIVATION_THRESHOLDS.get(asset_class, 20.0)
 
     def get_highest_profit(self, position_id: str) -> float:
         """

@@ -47,16 +47,19 @@ class TestShouldActivateTrailing:
     """Test should_activate_trailing method."""
 
     def test_should_activate_forex_threshold_hit(self, trailing_manager, buy_position_forex):
-        """Test trailing should activate when threshold hit (20 pips for forex)."""
-        buy_position_forex.current_price = 1.1020
-        buy_position_forex.current_profit_pips = 20.0
+        """Test trailing should activate when threshold hit (66% of TP)."""
+        # TP distance: 1.1150 - 1.1000 = 0.0150 = 150 pips
+        # Activation threshold: 66% of 150 = 99 pips
+        buy_position_forex.current_price = 1.1099
+        buy_position_forex.current_profit_pips = 99.0
 
         assert trailing_manager.should_activate_trailing(buy_position_forex) is True
 
     def test_should_activate_forex_threshold_not_hit(self, trailing_manager, buy_position_forex):
         """Test trailing should not activate when threshold not hit."""
-        buy_position_forex.current_price = 1.1010
-        buy_position_forex.current_profit_pips = 10.0
+        # TP distance: 150 pips, threshold: 99 pips (66%)
+        buy_position_forex.current_price = 1.1090
+        buy_position_forex.current_profit_pips = 90.0  # Below threshold
 
         assert trailing_manager.should_activate_trailing(buy_position_forex) is False
 
@@ -216,14 +219,20 @@ class TestGetTrailingParameters:
         assert distance == 100.0
 
     def test_get_activation_threshold_forex(self, trailing_manager):
-        """Test get activation threshold for forex."""
+        """Test get activation threshold for forex (static, for reference)."""
         threshold = trailing_manager.get_activation_threshold("EURUSD")
-        assert threshold == 20.0
+        assert threshold == 20.0  # Static default value
+
+    def test_get_activation_threshold_dynamic_forex(self, trailing_manager, buy_position_forex):
+        """Test get activation threshold dynamically based on TP (66% of TP)."""
+        # TP distance: 150 pips, threshold: 66% = 99 pips
+        threshold = trailing_manager.get_activation_threshold("EURUSD", buy_position_forex)
+        assert threshold == pytest.approx(99.0, abs=0.1)
 
     def test_get_activation_threshold_jpy(self, trailing_manager):
-        """Test get activation threshold for JPY pair."""
+        """Test get activation threshold for JPY pair (static, for reference)."""
         threshold = trailing_manager.get_activation_threshold("USDJPY")
-        assert threshold == 200.0
+        assert threshold == 200.0  # Static default value
 
 
 class TestGetHighestProfit:

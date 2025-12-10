@@ -21,13 +21,13 @@ asset_classes:
     trading_sessions: ["london", "new_york"]
 
   commodities:
-    enabled: true
+    enabled: false  # Disabled until pip calculation is fixed
     max_concurrent_positions: 1
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
 
   crypto:
-    enabled: false  # Disabled for initial phase
+    enabled: false  # Disabled until pip calculation is fixed
     max_concurrent_positions: 1
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["24/7"]
@@ -108,7 +108,7 @@ symbols:
 
   # Commodities
   XAUUSD:
-    enabled: true
+    enabled: false  # Disabled until pip calculation is fixed
     priority: 6
     asset_class: "commodities"
     timeframes: ["H1", "H4"]
@@ -130,6 +130,20 @@ symbols:
     max_zones_per_session: 1
     risk_per_trade: 0.001
     max_spread_pips: 10  # 10 pips for silver
+    min_volume_lots: 0.01
+    max_volume_lots: 0.1
+
+  # Crypto
+  BTCUSD:
+    enabled: false  # Disabled until pip calculation is fixed
+    priority: 8
+    asset_class: "crypto"
+    timeframes: ["H1", "H4"]
+    trading_sessions: ["24/7"]
+    min_zone_strength: 75
+    max_zones_per_session: 1
+    risk_per_trade: 0.001  # 0.1%
+    max_spread_pips: 1000 # ~10 USD spread
     min_volume_lots: 0.01
     max_volume_lots: 0.1
 

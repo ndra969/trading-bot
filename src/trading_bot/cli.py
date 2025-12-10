@@ -181,7 +181,7 @@ def start(ctx, dry_run, connect_mt5):
                 "env": config.env,  # Pass environment name
                 "symbols": config.get("symbols", ["EURUSD", "GBPUSD"]),
                 "timeframe": config.get("timeframe", "H1"),
-                "analysis_interval": config.get("analysis_interval", 300),
+                "analysis_interval": config.get("analysis_interval", 60),
                 "trading": {
                     "dry_run": dry_run,  # Pass CLI dry-run flag
                 },

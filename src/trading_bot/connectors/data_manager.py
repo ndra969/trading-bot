@@ -63,6 +63,7 @@ class DataManager:
         timeframe: str = "H1",
         count: int = 100,
         start_pos: int = 0,
+        enabled_symbols: list[str] | None = None,
     ) -> pd.DataFrame:
         """
         Get OHLCV data for symbol.
@@ -72,6 +73,8 @@ class DataManager:
             timeframe: Timeframe (M1, M5, M15, M30, H1, H4, D1, W1, MN1)
             count: Number of bars to retrieve
             start_pos: Start position (0 = most recent)
+            enabled_symbols: Optional list of enabled symbols. If provided, only validate
+                            symbols in this list. Others will raise error.
 
         Returns:
             DataFrame with OHLCV data
@@ -82,8 +85,22 @@ class DataManager:
         if not self.connector.is_connected():
             raise MT5ConnectionError("MT5 not connected")
 
-        # Validate symbol
-        self.symbol_manager.validate_symbol(symbol)
+        # Check if symbol is enabled (if enabled_symbols list provided)
+        if enabled_symbols is not None:
+            # Convert broker symbol back to universal symbol for checking
+            # For now, just check if symbol (or its base) is in enabled list
+            # This is a simple check - can be improved with symbol mapper
+            universal_symbol = symbol.rstrip("cmCM")  # Remove broker suffixes
+            if universal_symbol not in enabled_symbols:
+                raise MT5DataError(
+                    f"Symbol {symbol} is not enabled in configuration",
+                    symbol=symbol,
+                    timeframe=timeframe
+                )
+
+        # Validate symbol (but don't auto-enable if not in enabled list)
+        auto_enable = enabled_symbols is None or symbol.rstrip("cmCM") in enabled_symbols
+        self.symbol_manager.validate_symbol(symbol, auto_enable=auto_enable)
 
         # Get timeframe constant
         if timeframe not in self.TIMEFRAMES:

@@ -85,17 +85,19 @@ class Position:
         if self.pip_size <= 0:
             raise ValueError("Pip size must be positive")
 
-        # Validate position logic
-        if self.position_type == PositionType.BUY:
-            if self.stop_loss >= self.entry_price:
-                raise ValueError("BUY: stop_loss must be below entry_price")
-            if self.take_profit <= self.entry_price:
-                raise ValueError("BUY: take_profit must be above entry_price")
-        elif self.position_type == PositionType.SELL:
-            if self.stop_loss <= self.entry_price:
-                raise ValueError("SELL: stop_loss must be above entry_price")
-            if self.take_profit >= self.entry_price:
-                raise ValueError("SELL: take_profit must be below entry_price")
+        # Validate position logic (only for PENDING positions)
+        # OPEN positions may have SL above/below entry (breakeven/trailing)
+        if self.status == PositionStatus.PENDING:
+            if self.position_type == PositionType.BUY:
+                if self.stop_loss >= self.entry_price:
+                    raise ValueError("BUY: stop_loss must be below entry_price")
+                if self.take_profit <= self.entry_price:
+                    raise ValueError("BUY: take_profit must be above entry_price")
+            elif self.position_type == PositionType.SELL:
+                if self.stop_loss <= self.entry_price:
+                    raise ValueError("SELL: stop_loss must be above entry_price")
+                if self.take_profit >= self.entry_price:
+                    raise ValueError("SELL: take_profit must be below entry_price")
 
         # Convert string to enum if needed
         if not isinstance(self.position_type, PositionType):

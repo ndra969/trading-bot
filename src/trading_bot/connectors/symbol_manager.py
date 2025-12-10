@@ -205,12 +205,14 @@ class SymbolManager:
             logger.error(f"Error selecting symbol {symbol}: {e}")
             return False
 
-    def validate_symbol(self, symbol: str) -> bool:
+    def validate_symbol(self, symbol: str, auto_enable: bool = True) -> bool:
         """
         Validate symbol for trading.
 
         Args:
             symbol: Symbol name
+            auto_enable: If True, automatically enable symbol in Market Watch.
+                        If False, only validate without enabling.
 
         Returns:
             True if symbol is valid and tradable
@@ -226,8 +228,9 @@ class SymbolManager:
         if not self.is_trading_allowed(symbol):
             raise MT5SymbolError(symbol, "Trading not allowed for this symbol")
 
-        # Ensure symbol is in Market Watch
-        self.select_symbol(symbol, True)
+        # Optionally ensure symbol is in Market Watch
+        if auto_enable:
+            self.select_symbol(symbol, True)
 
         logger.info(f"Symbol {symbol} validated successfully")
         return True

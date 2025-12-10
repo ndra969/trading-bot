@@ -69,41 +69,132 @@ class PositionManager:
                 db_positions = result.scalars().all()
 
                 count = 0
+                invalid_count = 0
                 for db_pos in db_positions:
-                    # Convert DB model to Position object
-                    position = Position(
-                        position_id=db_pos.position_id,
-                        symbol=db_pos.symbol,
-                        position_type=PositionType(db_pos.position_type),
-                        entry_price=db_pos.entry_price,
-                        stop_loss=db_pos.stop_loss,
-                        take_profit=db_pos.take_profit,
-                        volume=db_pos.volume,
-                        pip_size=db_pos.pip_size,
-                        pip_value_per_lot=db_pos.pip_value_per_lot,
-                        status=PositionStatus(db_pos.status),
-                        open_time=db_pos.open_time,
-                        close_time=db_pos.close_time,
-                        close_price=db_pos.close_price,
-                        current_price=db_pos.current_price,
-                        current_profit_pips=db_pos.current_profit_pips,
-                        current_pnl_usd=db_pos.current_pnl_usd,
-                        risk_amount_usd=db_pos.risk_amount_usd,
-                        potential_profit_usd=db_pos.potential_profit_usd,
-                        metadata=db_pos.meta_data or {},
-                    )
+                    try:
+                        # Convert DB model to Position object
+                        metadata = db_pos.meta_data or {}
+                        
+                        # Pre-validate data before creating Position object
+                        position_type = PositionType(db_pos.position_type)
+                        position_status = PositionStatus(db_pos.status)
+                        entry_price = db_pos.entry_price
+                        stop_loss = db_pos.stop_loss
+                        take_profit = db_pos.take_profit
+                        
+                        # Validate price relationships
+                        # For PENDING positions: strict validation (SL must be below/above entry)
+                        # For OPEN positions: allow breakeven (SL can be above/below entry)
+                        if position_status == PositionStatus.PENDING:
+                            # Strict validation for PENDING positions
+                            if position_type == PositionType.BUY:
+                                if stop_loss >= entry_price:
+                                    logger.warning(
+                                        f"Skipping invalid PENDING BUY position {db_pos.position_id} ({db_pos.symbol}): "
+                                        f"SL {stop_loss:.5f} >= Entry {entry_price:.5f}"
+                                    )
+                                    invalid_count += 1
+                                    continue
+                                if take_profit <= entry_price:
+                                    logger.warning(
+                                        f"Skipping invalid PENDING BUY position {db_pos.position_id} ({db_pos.symbol}): "
+                                        f"TP {take_profit:.5f} <= Entry {entry_price:.5f}"
+                                    )
+                                    invalid_count += 1
+                                    continue
+                            elif position_type == PositionType.SELL:
+                                if stop_loss <= entry_price:
+                                    logger.warning(
+                                        f"Skipping invalid PENDING SELL position {db_pos.position_id} ({db_pos.symbol}): "
+                                        f"SL {stop_loss:.5f} <= Entry {entry_price:.5f}"
+                                    )
+                                    invalid_count += 1
+                                    continue
+                                if take_profit >= entry_price:
+                                    logger.warning(
+                                        f"Skipping invalid PENDING SELL position {db_pos.position_id} ({db_pos.symbol}): "
+                                        f"TP {take_profit:.5f} >= Entry {entry_price:.5f}"
+                                    )
+                                    invalid_count += 1
+                                    continue
+                        # For OPEN positions: only validate that prices are positive
+                        # (breakeven positions may have SL above/below entry)
+                        elif position_status == PositionStatus.OPEN:
+                            if stop_loss <= 0:
+                                logger.warning(
+                                    f"Skipping invalid OPEN position {db_pos.position_id} ({db_pos.symbol}): "
+                                    f"SL {stop_loss:.5f} <= 0"
+                                )
+                                invalid_count += 1
+                                continue
+                            if take_profit <= 0:
+                                logger.warning(
+                                    f"Skipping invalid OPEN position {db_pos.position_id} ({db_pos.symbol}): "
+                                    f"TP {take_profit:.5f} <= 0"
+                                )
+                                invalid_count += 1
+                                continue
+                        
+                        # Create Position object (will validate other fields)
+                        position = Position(
+                            position_id=db_pos.position_id,
+                            symbol=db_pos.symbol,
+                            position_type=position_type,
+                            entry_price=entry_price,
+                            stop_loss=stop_loss,
+                            take_profit=take_profit,
+                            volume=db_pos.volume,
+                            pip_size=db_pos.pip_size,
+                            pip_value_per_lot=db_pos.pip_value_per_lot,
+                            status=PositionStatus(db_pos.status),
+                            open_time=db_pos.open_time,
+                            close_time=db_pos.close_time,
+                            close_price=db_pos.close_price,
+                            current_price=db_pos.current_price,
+                            current_profit_pips=db_pos.current_profit_pips,
+                            current_pnl_usd=db_pos.current_pnl_usd,
+                            risk_amount_usd=db_pos.risk_amount_usd,
+                            potential_profit_usd=db_pos.potential_profit_usd,
+                            metadata=metadata,
+                        )
 
-                    # Store in memory
-                    self.positions[position.position_id] = position
+                        # Extract ticket from metadata and set to position object
+                        if 'ticket' in metadata:
+                            position.ticket = int(metadata['ticket'])
+                            logger.debug(f"Loaded ticket {position.ticket} for position {position.position_id}")
 
-                    if position.symbol not in self.positions_by_symbol:
-                        self.positions_by_symbol[position.symbol] = []
-                    self.positions_by_symbol[position.symbol].append(position.position_id)
+                        # Store in memory
+                        self.positions[position.position_id] = position
 
-                    count += 1
+                        if position.symbol not in self.positions_by_symbol:
+                            self.positions_by_symbol[position.symbol] = []
+                        self.positions_by_symbol[position.symbol].append(position.position_id)
+
+                        count += 1
+                        
+                    except ValueError as e:
+                        # Handle validation errors from Position.__post_init__
+                        logger.warning(
+                            f"Skipping invalid position {db_pos.position_id} ({db_pos.symbol}): {e}"
+                        )
+                        invalid_count += 1
+                        continue
+                    except Exception as e:
+                        # Handle any other unexpected errors
+                        logger.error(
+                            f"Error loading position {db_pos.position_id} ({db_pos.symbol}): {e}",
+                            exc_info=True
+                        )
+                        invalid_count += 1
+                        continue
 
                 if count > 0:
                     logger.info(f"Loaded {count} active positions from database")
+                if invalid_count > 0:
+                    logger.warning(
+                        f"Skipped {invalid_count} invalid positions from database. "
+                        f"These positions may need manual review or cleanup."
+                    )
 
         except Exception as e:
             logger.error(f"Error loading positions from database: {e}")
@@ -111,6 +202,12 @@ class PositionManager:
     async def save_position(self, position: Position):
         """Save or update position in database."""
         try:
+            # Sync ticket from position object to metadata if exists
+            if hasattr(position, 'ticket') and position.ticket:
+                if not position.metadata:
+                    position.metadata = {}
+                position.metadata['ticket'] = position.ticket
+            
             async with get_session() as session:
                 # Check if position exists
                 stmt = select(DBPosition).where(DBPosition.position_id == position.position_id)
@@ -118,15 +215,53 @@ class PositionManager:
                 db_pos = result.scalars().first()
 
                 if db_pos:
+                    # Validate SL/TP before updating (only for PENDING positions)
+                    # OPEN positions may have SL above/below entry (breakeven/trailing)
+                    if position.status == PositionStatus.PENDING:
+                        if position.position_type == PositionType.BUY:
+                            if position.stop_loss >= position.entry_price:
+                                logger.error(
+                                    f"Cannot save position {position.position_id}: "
+                                    f"BUY SL {position.stop_loss:.5f} >= Entry {position.entry_price:.5f}"
+                                )
+                                raise ValueError("Invalid stop_loss for BUY position")
+                            if position.take_profit <= position.entry_price:
+                                logger.error(
+                                    f"Cannot save position {position.position_id}: "
+                                    f"BUY TP {position.take_profit:.5f} <= Entry {position.entry_price:.5f}"
+                                )
+                                raise ValueError("Invalid take_profit for BUY position")
+                        elif position.position_type == PositionType.SELL:
+                            if position.stop_loss <= position.entry_price:
+                                logger.error(
+                                    f"Cannot save position {position.position_id}: "
+                                    f"SELL SL {position.stop_loss:.5f} <= Entry {position.entry_price:.5f}"
+                                )
+                                raise ValueError("Invalid stop_loss for SELL position")
+                            if position.take_profit >= position.entry_price:
+                                logger.error(
+                                    f"Cannot save position {position.position_id}: "
+                                    f"SELL TP {position.take_profit:.5f} >= Entry {position.entry_price:.5f}"
+                                )
+                                raise ValueError("Invalid take_profit for SELL position")
+                    # For OPEN positions, allow SL above/below entry (breakeven/trailing)
+                    # Only validate that SL/TP are positive
+                    if position.stop_loss <= 0:
+                        raise ValueError("Stop loss must be positive")
+                    if position.take_profit <= 0:
+                        raise ValueError("Take profit must be positive")
+                    
                     # Update existing
                     db_pos.status = position.status.value
+                    db_pos.stop_loss = position.stop_loss  # Update SL (for breakeven/trailing)
+                    db_pos.take_profit = position.take_profit  # Update TP (if changed)
                     db_pos.current_price = position.current_price
                     db_pos.close_price = position.close_price
                     db_pos.current_profit_pips = position.current_profit_pips
                     db_pos.current_pnl_usd = position.current_pnl_usd
                     db_pos.open_time = position.open_time
                     db_pos.close_time = position.close_time
-                    db_pos.meta_data = position.metadata
+                    db_pos.meta_data = position.metadata  # This includes ticket
                 else:
                     # Create new
                     db_pos = DBPosition(

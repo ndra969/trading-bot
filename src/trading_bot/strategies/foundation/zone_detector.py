@@ -58,8 +58,26 @@ class DetectedZone:
 
     @property
     def size_pips(self) -> float:
-        """Calculate zone size in pips."""
-        return abs(self.upper_bound - self.lower_bound) * 10000
+        """
+        Calculate zone size in pips.
+
+        Uses heuristic based on price level to determine pip multiplier:
+        - Price > 20,000 (Crypto): 1 pip = 1.0 (Multiplier 1)
+        - Price > 500 (Gold/Indices): 1 pip = 0.1 (Multiplier 10)
+        - Price > 50 (JPY): 1 pip = 0.01 (Multiplier 100)
+        - Price < 50 (Forex): 1 pip = 0.0001 (Multiplier 10000)
+        """
+        diff = abs(self.upper_bound - self.lower_bound)
+        mid = self.midpoint
+
+        if mid > 20000:
+            return diff * 1.0
+        elif mid > 500:
+            return diff * 10.0
+        elif mid > 50:
+            return diff * 100.0
+        else:
+            return diff * 10000.0
 
     @property
     def midpoint(self) -> float:

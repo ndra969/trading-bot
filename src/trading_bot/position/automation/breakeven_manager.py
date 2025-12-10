@@ -30,7 +30,7 @@ class BreakevenManager:
         "forex_major": 15.0,  # 15 pips
         "forex_jpy": 150.0,  # 150 pips (0.01 pip size)
         "commodities": 500.0,  # 500 pips for Gold (0.1 pip size)
-        "crypto": 50.0,  # 50 USD
+        "crypto": 1000.0,  # 1000 USD/pips (~70% of typical 1440 pip SL for crypto)
     }
 
     # Breakeven buffer (additional distance beyond entry)
@@ -38,7 +38,7 @@ class BreakevenManager:
         "forex_major": 2.0,  # 2 pips
         "forex_jpy": 20.0,  # 20 pips
         "commodities": 50.0,  # 50 pips
-        "crypto": 5.0,  # 5 USD
+        "crypto": 300.0,  # 300 USD/pips (wide buffer for crypto volatility)
     }
 
     def __init__(self, config: dict = None):
@@ -68,24 +68,41 @@ class BreakevenManager:
         """
         # Already moved to breakeven
         if position.position_id in self.breakeven_positions:
+            logger.debug(
+                f"Breakeven check for {position.position_id}: Already at breakeven"
+            )
             return False
 
         # Position must be open
         if not position.is_open:
+            logger.debug(
+                f"Breakeven check for {position.position_id}: Position not open (status: {position.status.value})"
+            )
             return False
 
         # Current price must be set
         if position.current_price is None:
+            logger.debug(
+                f"Breakeven check for {position.position_id}: Current price not set"
+            )
             return False
 
         # Get breakeven trigger distance
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
         trigger_distance = self.BREAKEVEN_DISTANCES.get(asset_class, 15.0)
 
+        # Log current status for debugging
+        logger.debug(
+            f"Breakeven check for {position.position_id} ({position.symbol}): "
+            f"profit={position.current_profit_pips:.1f} pips, "
+            f"trigger={trigger_distance:.1f} pips, "
+            f"asset_class={asset_class}"
+        )
+
         # Check if current profit exceeds trigger distance
         if position.current_profit_pips >= trigger_distance:
             logger.info(
-                f"Breakeven trigger hit for {position.position_id}: "
+                f"✅ Breakeven trigger hit for {position.position_id}: "
                 f"{position.current_profit_pips:.1f} pips (trigger: {trigger_distance:.1f})"
             )
             return True

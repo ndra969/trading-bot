@@ -108,11 +108,20 @@ class PositionTracker:
             volume=position.volume,
         )
 
+        # Calculate R:R ratio based on USD (for verification)
+        rr_ratio_usd = (
+            position.potential_profit_usd / position.risk_amount_usd
+            if position.risk_amount_usd > 0
+            else 0.0
+        )
+
         logger.info(
             f"Opened position {position.position_id}: {position.position_type.value} "
             f"{position.symbol} @ {position.entry_price:.5f}, "
             f"Risk: ${position.risk_amount_usd:.2f}, "
-            f"Potential: ${position.potential_profit_usd:.2f}"
+            f"Potential: ${position.potential_profit_usd:.2f}, "
+            f"R:R (USD): {rr_ratio_usd:.2f}, "
+            f"R:R (Price): {position.risk_reward_ratio:.2f}"
         )
 
     def close_position(self, position: Position, close_price: float) -> None:

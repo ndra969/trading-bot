@@ -62,26 +62,32 @@ class TestGetNextLevel:
     """Test get_next_level method."""
 
     def test_get_next_level_first(self, partial_manager, buy_position_forex):
-        """Test getting first partial close level."""
+        """Test getting first partial close level (50% of TP)."""
         partial_manager.initialize_position(buy_position_forex)
+        
+        # TP distance: 1.1150 - 1.1000 = 0.0150 = 150 pips
+        # Level 1: 50% of TP = 75 pips
 
         next_level = partial_manager.get_next_level(buy_position_forex)
 
         assert next_level is not None
         assert next_level.level == 1
-        assert next_level.distance_pips == 20.0  # Forex major level 1
+        assert next_level.distance_pips == pytest.approx(75.0, abs=0.1)  # 50% of 150 pips
         assert next_level.close_percentage == 0.25
 
     def test_get_next_level_second(self, partial_manager, buy_position_forex):
-        """Test getting second partial close level."""
+        """Test getting second partial close level (80% of TP)."""
         partial_manager.initialize_position(buy_position_forex)
         partial_manager.partial_closes[buy_position_forex.position_id] = [1]
+        
+        # TP distance: 150 pips
+        # Level 2: 80% of TP = 120 pips
 
         next_level = partial_manager.get_next_level(buy_position_forex)
 
         assert next_level is not None
         assert next_level.level == 2
-        assert next_level.distance_pips == 40.0  # Forex major level 2
+        assert next_level.distance_pips == pytest.approx(120.0, abs=0.1)  # 80% of 150 pips
 
     def test_get_next_level_none_all_completed(self, partial_manager, buy_position_forex):
         """Test getting next level when all completed."""
@@ -97,17 +103,19 @@ class TestShouldClosePartial:
     """Test should_close_partial method."""
 
     def test_should_close_partial_level_1_hit(self, partial_manager, buy_position_forex):
-        """Test should close partial when level 1 hit (20 pips)."""
+        """Test should close partial when level 1 hit (50% of TP = 75 pips)."""
         partial_manager.initialize_position(buy_position_forex)
-        buy_position_forex.current_price = 1.1020
-        buy_position_forex.current_profit_pips = 20.0
+        # TP distance: 150 pips, Level 1: 75 pips (50% of TP)
+        buy_position_forex.current_price = 1.1075
+        buy_position_forex.current_profit_pips = 75.0
 
         assert partial_manager.should_close_partial(buy_position_forex) is True
 
     def test_should_close_partial_not_hit(self, partial_manager, buy_position_forex):
         """Test should not close partial when level not hit."""
         partial_manager.initialize_position(buy_position_forex)
-        buy_position_forex.current_profit_pips = 15.0
+        # Level 1 threshold: 75 pips (50% of 150 pips TP)
+        buy_position_forex.current_profit_pips = 70.0  # Below threshold
 
         assert partial_manager.should_close_partial(buy_position_forex) is False
 
@@ -149,35 +157,37 @@ class TestExecutePartialClose:
     """Test execute_partial_close method."""
 
     def test_execute_partial_close_level_1(self, partial_manager, buy_position_forex):
-        """Test executing partial close for level 1."""
+        """Test executing partial close for level 1 (50% of TP)."""
         partial_manager.initialize_position(buy_position_forex)
-        buy_position_forex.current_price = 1.1020
-        buy_position_forex.current_profit_pips = 20.0
+        # Level 1: 75 pips (50% of 150 pips TP)
+        buy_position_forex.current_price = 1.1075
+        buy_position_forex.current_profit_pips = 75.0
 
-        result = partial_manager.execute_partial_close(buy_position_forex, close_price=1.1020)
+        result = partial_manager.execute_partial_close(buy_position_forex, close_price=1.1075)
 
         assert result["level"] == 1
         assert result["close_volume"] == 0.25
         assert result["remaining_volume"] == 0.75
-        assert result["profit_pips"] == pytest.approx(20.0, abs=0.1)
+        assert result["profit_pips"] == pytest.approx(75.0, abs=0.1)
         assert 1 in partial_manager.partial_closes[buy_position_forex.position_id]
 
     def test_execute_partial_close_level_2(self, partial_manager, buy_position_forex):
-        """Test executing partial close for level 2."""
+        """Test executing partial close for level 2 (80% of TP)."""
         partial_manager.initialize_position(buy_position_forex)
 
-        # Execute level 1 first
-        buy_position_forex.current_profit_pips = 20.0
-        partial_manager.execute_partial_close(buy_position_forex, close_price=1.1020)
+        # Execute level 1 first (75 pips = 50% of TP)
+        buy_position_forex.current_price = 1.1075
+        buy_position_forex.current_profit_pips = 75.0
+        partial_manager.execute_partial_close(buy_position_forex, close_price=1.1075)
 
-        # Now execute level 2
-        buy_position_forex.current_price = 1.1040
-        buy_position_forex.current_profit_pips = 40.0
+        # Now execute level 2 (120 pips = 80% of TP)
+        buy_position_forex.current_price = 1.1120
+        buy_position_forex.current_profit_pips = 120.0
 
-        result = partial_manager.execute_partial_close(buy_position_forex, close_price=1.1040)
+        result = partial_manager.execute_partial_close(buy_position_forex, close_price=1.1120)
 
         assert result["level"] == 2
-        assert result["close_volume"] == pytest.approx(0.38, abs=0.01)
+        assert result["close_volume"] == pytest.approx(0.38, abs=0.01)  # 50% of remaining 0.75
         assert result["remaining_volume"] == pytest.approx(0.37, abs=0.01)
 
     def test_execute_partial_close_no_more_levels(self, partial_manager, buy_position_forex):
@@ -235,29 +245,39 @@ class TestGetRemainingVolume:
 class TestGetPartialCloseLevels:
     """Test get_partial_close_levels method."""
 
-    def test_get_partial_close_levels_forex(self, partial_manager):
-        """Test getting partial close levels for forex."""
+    def test_get_partial_close_levels_forex_static(self, partial_manager):
+        """Test getting partial close levels for forex (static, for reference)."""
         levels = partial_manager.get_partial_close_levels("EURUSD")
 
         assert len(levels) == 2
-        assert levels[0].distance_pips == 20.0
-        assert levels[1].distance_pips == 40.0
+        assert levels[0].distance_pips == 20.0  # Static default
+        assert levels[1].distance_pips == 40.0  # Static default
+
+    def test_get_partial_close_levels_forex_dynamic(self, partial_manager, buy_position_forex):
+        """Test getting partial close levels dynamically based on TP."""
+        # TP distance: 150 pips
+        # Level 1: 50% = 75 pips, Level 2: 80% = 120 pips
+        levels = partial_manager.get_partial_close_levels("EURUSD", buy_position_forex)
+
+        assert len(levels) == 2
+        assert levels[0].distance_pips == pytest.approx(75.0, abs=0.1)  # 50% of 150
+        assert levels[1].distance_pips == pytest.approx(120.0, abs=0.1)  # 80% of 150
 
     def test_get_partial_close_levels_jpy(self, partial_manager):
-        """Test getting partial close levels for JPY pair."""
+        """Test getting partial close levels for JPY pair (static, for reference)."""
         levels = partial_manager.get_partial_close_levels("USDJPY")
 
         assert len(levels) == 2
-        assert levels[0].distance_pips == 200.0
-        assert levels[1].distance_pips == 400.0
+        assert levels[0].distance_pips == 200.0  # Static default
+        assert levels[1].distance_pips == 400.0  # Static default
 
     def test_get_partial_close_levels_gold(self, partial_manager):
-        """Test getting partial close levels for Gold."""
+        """Test getting partial close levels for Gold (static, for reference)."""
         levels = partial_manager.get_partial_close_levels("XAUUSD")
 
         assert len(levels) == 2
-        assert levels[0].distance_pips == 600.0
-        assert levels[1].distance_pips == 1200.0
+        assert levels[0].distance_pips == 600.0  # Static default
+        assert levels[1].distance_pips == 1200.0  # Static default
 
 
 class TestResetPosition:

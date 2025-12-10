@@ -153,9 +153,13 @@ class DryRunOrderManager:
         if self.dry_run:
             logger.info(f"[DRY-RUN] Simulated position modification: {ticket} SL={sl} TP={tp}")
 
+            # Return dict in same format as real modify_position
             simulated_result = {
-                "retcode": 10009,
-                "comment": "DRY-RUN: Position modified",
+                "success": True,
+                "modified": True,  # In dry-run, we simulate modification
+                "sl_changed": sl is not None,
+                "tp_changed": tp is not None,
+                "message": "DRY-RUN: Position modified",
             }
 
             logger.info(f"[DRY-RUN] Modification simulated: {simulated_result}")

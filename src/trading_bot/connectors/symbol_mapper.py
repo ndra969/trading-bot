@@ -240,21 +240,37 @@ class SymbolMapper:
 
     def get_asset_class(self, symbol: str) -> str:
         """
-        Get asset class for a symbol.
+        Get asset class for a symbol (handles both universal and broker symbols).
 
         Args:
-            symbol: Symbol name
+            symbol: Symbol name (can be universal or broker-specific)
 
         Returns:
             Asset class (forex, commodity, crypto, index)
         """
         normalized_symbol = self.normalize_symbol(symbol)
 
+        # First, try direct lookup in asset_classes
         for asset_class, symbols in self.asset_classes.items():
             if normalized_symbol in symbols:
                 return asset_class
 
+        # If not found, try converting broker symbol to universal symbol
+        # This handles cases like BTCUSDC -> BTCUSD, EURUSDc -> EURUSD
+        try:
+            # Try with default broker first
+            universal_symbol = self.convert_to_universal_symbol(normalized_symbol)
+            # Try lookup again with universal symbol
+            for asset_class, symbols in self.asset_classes.items():
+                if universal_symbol in symbols:
+                    return asset_class
+        except SymbolMappingError:
+            # If conversion fails, symbol might not be a broker symbol
+            # or might be a new symbol not in config - continue to default
+            pass
+
         # Default to forex if not found
+        logger.debug(f"Symbol {symbol} not found in asset_classes, defaulting to forex")
         return "forex"
 
     def get_pip_size(self, symbol: str) -> float:

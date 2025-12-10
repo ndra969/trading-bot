@@ -369,3 +369,146 @@ class TestMT5ConnectorAdvanced:
 
             assert result is True
             assert connector.account_info.get("login") == 12345
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_modify_position_success(self, mock_mt5):
+        """Test successful position modification."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock position
+        class MockPosition:
+            def __init__(self):
+                self.ticket = 12345
+                self.symbol = "EURUSD"
+                self.sl = 1.0950
+                self.tp = 1.1100
+                self.price_open = 1.1000
+
+        mock_mt5.positions_get.return_value = [MockPosition()]
+
+        # Mock symbol info for tolerance calculation
+        class MockSymbolInfo:
+            def __init__(self):
+                self.point = 0.00001  # 5-digit forex
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+
+        # Mock successful order_send
+        # Set TRADE_RETCODE_DONE constant on mock
+        mock_mt5.TRADE_RETCODE_DONE = 10009
+        
+        class MockOrderResult:
+            def __init__(self):
+                self.retcode = mock_mt5.TRADE_RETCODE_DONE
+                self.comment = "Success"
+
+        mock_mt5.order_send.return_value = MockOrderResult()
+
+        result = connector.modify_position(ticket=12345, sl=1.0960, tp=1.1100)
+
+        assert result["success"] is True
+        assert result["modified"] is True
+        assert result["sl_changed"] is True
+        assert result["tp_changed"] is False
+        assert "Successfully modified" in result["message"]
+        assert mock_mt5.order_send.called
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_modify_position_no_changes_needed(self, mock_mt5):
+        """Test modify_position when no changes are needed."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock position with SL already at target
+        class MockPosition:
+            def __init__(self):
+                self.ticket = 12345
+                self.symbol = "EURUSD"
+                self.sl = 1.0960  # Already at target
+                self.tp = 1.1100
+                self.price_open = 1.1000
+
+        mock_mt5.positions_get.return_value = [MockPosition()]
+
+        # Mock symbol info for tolerance calculation
+        class MockSymbolInfo:
+            def __init__(self):
+                self.point = 0.00001  # 5-digit forex
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+
+        # Try to modify to same value
+        result = connector.modify_position(ticket=12345, sl=1.0960, tp=1.1100)
+
+        assert result["success"] is True
+        assert result["modified"] is False  # No actual modification
+        assert result["sl_changed"] is False
+        assert result["tp_changed"] is False
+        assert "No changes needed" in result["message"]
+        # Should not call order_send
+        assert not mock_mt5.order_send.called
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_modify_position_not_connected(self, mock_mt5):
+        """Test modify_position when not connected."""
+        connector = MT5Connector()
+        connector._is_connected = False
+
+        result = connector.modify_position(ticket=12345, sl=1.0960)
+
+        assert result["success"] is False
+        assert result["modified"] is False
+        assert "MT5 not connected" in result["message"]
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_modify_position_not_found(self, mock_mt5):
+        """Test modify_position when position not found."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        mock_mt5.positions_get.return_value = None
+
+        result = connector.modify_position(ticket=99999, sl=1.0960)
+
+        assert result["success"] is False
+        assert result["modified"] is False
+        assert "not found" in result["message"]
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_modify_position_mt5_error(self, mock_mt5):
+        """Test modify_position when MT5 returns error."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock position
+        class MockPosition:
+            def __init__(self):
+                self.ticket = 12345
+                self.symbol = "EURUSD"
+                self.sl = 1.0950
+                self.tp = 1.1100
+                self.price_open = 1.1000
+
+        mock_mt5.positions_get.return_value = [MockPosition()]
+
+        # Mock symbol info
+        class MockSymbolInfo:
+            def __init__(self):
+                self.point = 0.00001
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+
+        # Mock error response
+        class MockOrderResult:
+            def __init__(self):
+                self.retcode = 10004  # Error code
+                self.comment = "Invalid request"
+
+        mock_mt5.order_send.return_value = MockOrderResult()
+
+        result = connector.modify_position(ticket=12345, sl=1.0960)
+
+        assert result["success"] is False
+        assert result["modified"] is False
+        assert "error" in result["message"].lower() or "rejected" in result["message"].lower()

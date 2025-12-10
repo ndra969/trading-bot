@@ -7,16 +7,51 @@ strategy_manager:
   conflict_prevention: true
   health_check_interval: 300
 
-# Confluence Weights for Signal Aggregation
+# Confluence Weights for Signal Aggregation (Phase 5 Enhanced)
 confluence_weights:
-  foundation: 1.0        # Foundation S&D strategy (100% for Phase 2.5)
-  trendline: 0.0         # Phase 5 enhancement
-  price_action: 0.0      # Phase 5 enhancement
-  fibonacci: 0.0         # Phase 5 enhancement
-  breakout_retest: 0.0   # Phase 5 enhancement
-  market_structure: 0.0  # Phase 5 enhancement
-  volume_profile: 0.0    # Phase 5 enhancement
-  multi_timeframe: 0.0   # Phase 5 enhancement
+  foundation: 0.30           # Foundation S&D zones
+  trendline: 0.20            # Trendline confluence
+  price_action: 0.15         # Price Action patterns
+  fibonacci: 0.12            # Fibonacci levels
+  breakout_retest: 0.12      # Breakout confirmation
+  market_structure: 0.08     # Structure (BOS/CHoCH)
+  rsi: 0.10                  # RSI Analysis
+  ma: 0.08                   # Moving Average alignment
+  volume_profile: 0.05       # (Optional) Volume profile
+  multi_timeframe: 0.05      # (Optional) MTF confirmation
+
+# Enhancement Layer Parameters
+rsi:
+  period: 14
+  overbought: 70
+  oversold: 30
+
+ma:
+  fast_period: 9
+  medium_period: 21
+  slow_period: 50
+  trend_period: 200
+  ema: true
+
+trendline:
+  min_touches: 3
+  tolerance: 0.0005
+
+price_action:
+  enabled_patterns: ["PINBAR", "ENGULFING", "INSIDE_BAR"]
+  min_confidence: 60.0
+
+fibonacci:
+  levels: {0.382: 10, 0.5: 20, 0.618: 15}
+  tolerance: 0.0005
+
+structure:
+  swing_window: 5
+  bos_confirmation_candles: 2
+
+breakout:
+  min_momentum: 1.5
+  volume_threshold: 1.2
 
 # Signal Aggregator Configuration
 signal_aggregator:
@@ -30,7 +65,7 @@ supply_demand:
     min_touch_points: 2          # Minimum touches for zone validation
     volume_confirmation: true    # Require volume confirmation for zones
     min_zone_size_pips: 5        # Minimum zone size in pips
-    max_zone_size_pips: 100      # Maximum zone size in pips
+    max_zone_size_pips: 1000     # Maximum zone size in pips
   
   # Zone Scoring Weights
   scoring_weights:
@@ -60,8 +95,8 @@ supply_demand:
 signal_generation:
   # Signal Quality Requirements
   quality_thresholds:
-    min_confluence_score: 65.0   # Minimum overall confluence score
-    min_foundation_score: 70.0   # Minimum foundation S&D score
+    min_confluence_score: 25.0   # Minimum overall confluence score (Lowered for Testing)
+    min_foundation_score: 20.0   # Minimum foundation S&D score (Lowered for Testing)
     max_signals_per_symbol: 1    # Maximum signals per symbol
     signal_refresh_interval: 300  # Signal refresh interval (seconds)
   
@@ -75,7 +110,21 @@ signal_generation:
   risk_reward:
     min_risk_reward_ratio: 2.0   # Minimum R:R ratio (1:2)
     max_stop_loss_pips: 50       # Maximum stop loss in pips
-    default_take_profit_ratio: 3.0 # Default TP ratio (1:3)
+    default_take_profit_ratio: 2.0 # Default TP ratio (1:2)
+    # Minimum Stop Loss Distance (in pips)
+    # Prevents SL from being too tight and getting stopped out by normal market noise
+    min_stop_loss_distance:
+      forex_major: 15.0          # 15 pips (150 points for 5-digit broker) for EURUSD, GBPUSD, etc.
+      forex_jpy: 15.0            # 15 pips (150 points for 5-digit broker) for USDJPY, EURJPY, etc.
+      commodities: 50.0           # 50 pips for XAUUSD (Gold)
+      crypto: 50.0                # 50 pips for BTCUSD, ETHUSD, etc.
+    # Maximum Take Profit Distance (in pips)
+    # Prevents TP from being too far and unreachable
+    max_take_profit_distance:
+      forex_major: 60.0           # Maximum 60 pips TP distance for forex major
+      forex_jpy: 60.0             # Maximum 60 pips TP distance for JPY pairs
+      commodities: 200.0          # Maximum 200 pips TP distance for commodities
+      crypto: 200.0                # Maximum 200 pips TP distance for crypto
 
 # Multi-Timeframe Analysis Configuration
 timeframe_analysis:

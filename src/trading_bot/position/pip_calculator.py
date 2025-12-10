@@ -2,6 +2,7 @@
 Pip Calculator - Asset-specific pip calculations.
 
 Handles pip size and pip value calculations for different asset classes.
+Uses SymbolMapper to get asset class from YAML configuration.
 """
 
 from trading_bot.utils.logger import get_logger
@@ -13,20 +14,9 @@ class PipCalculator:
     """
     Calculates pips and USD values for different asset classes.
 
-    Pip sizes by asset class:
-    - Forex Major Pairs: 0.0001 (EURUSD, GBPUSD, etc.)
-    - Forex JPY Pairs: 0.01 (USDJPY, EURJPY, etc.)
-    - Commodities (Gold): 0.1 (XAUUSD)
-    - Crypto: 1.0 (BTCUSD, ETHUSD)
+    Uses SymbolMapper to determine asset class from YAML configuration,
+    ensuring consistency with broker symbol mappings.
     """
-
-    # Pip sizes by asset class
-    PIP_SIZES = {
-        "forex_major": 0.0001,
-        "forex_jpy": 0.01,
-        "commodities": 0.1,
-        "crypto": 1.0,
-    }
 
     # Standard pip value per lot for major pairs (at 1.0 exchange rate)
     # For most forex pairs, 1 pip = $10 per standard lot (100,000 units)
@@ -34,11 +24,21 @@ class PipCalculator:
 
     def __init__(self):
         """Initialize pip calculator."""
+        # Lazy load SymbolMapper to avoid circular imports
+        self._symbol_mapper = None
         logger.debug("PipCalculator initialized")
+
+    @property
+    def symbol_mapper(self):
+        """Lazy load SymbolMapper."""
+        if self._symbol_mapper is None:
+            from trading_bot.connectors.symbol_mapper import SymbolMapper
+            self._symbol_mapper = SymbolMapper()
+        return self._symbol_mapper
 
     def get_pip_size(self, symbol: str) -> float:
         """
-        Get pip size for a symbol.
+        Get pip size for a symbol using SymbolMapper (from YAML config).
 
         Args:
             symbol: Trading symbol
@@ -46,8 +46,7 @@ class PipCalculator:
         Returns:
             Pip size for the symbol
         """
-        asset_class = self._determine_asset_class(symbol)
-        return self.PIP_SIZES[asset_class]
+        return self.symbol_mapper.get_pip_size(symbol)
 
     def calculate_pips(
         self, symbol: str, entry_price: float, current_price: float, position_type: str
@@ -88,26 +87,11 @@ class PipCalculator:
         Returns:
             USD value per pip
         """
-        asset_class = self._determine_asset_class(symbol)
-
-        # Base pip value per standard lot
-        base_pip_value = self.STANDARD_PIP_VALUE
-
-        # Adjust for asset class
-        if asset_class == "forex_jpy":
-            # JPY pairs have different pip value calculation
-            # 1 pip for JPY = 0.01, so value is 100x higher
-            base_pip_value = self.STANDARD_PIP_VALUE
-        elif asset_class == "commodities":
-            # Gold: 1 pip = 0.1, value varies by contract size
-            # Standard gold lot = 100 oz, 1 pip = $10
-            base_pip_value = 10.0
-        elif asset_class == "crypto":
-            # Crypto: 1 pip = $1, value = volume
-            base_pip_value = 1.0
-
+        # Get pip value per lot from SymbolMapper (from YAML config)
+        pip_value_per_lot = self.symbol_mapper.get_pip_value_per_lot(symbol)
+        
         # Calculate pip value for the given volume
-        pip_value = base_pip_value * volume
+        pip_value = pip_value_per_lot * volume
         return pip_value
 
     def calculate_usd_amount(
@@ -161,34 +145,39 @@ class PipCalculator:
 
     def _determine_asset_class(self, symbol: str) -> str:
         """
-        Determine asset class from symbol.
+        Determine asset class from symbol using SymbolMapper (from YAML config).
 
         Args:
             symbol: Trading symbol
 
         Returns:
-            Asset class identifier
+            Asset class identifier (forex_major, forex_jpy, commodities, crypto, index)
         """
-        symbol = symbol.upper()
-
-        # Check for JPY pairs
-        if "JPY" in symbol:
-            return "forex_jpy"
-
-        # Check for commodities (Gold)
-        if symbol in ["XAUUSD", "GOLD", "XAGUSD", "SILVER"]:
+        # Use SymbolMapper to get asset class from YAML config
+        asset_class = self.symbol_mapper.get_asset_class(symbol)
+        
+        # Map YAML asset class names to internal format
+        # YAML uses: forex, commodity, crypto, index
+        # Internal uses: forex_major, forex_jpy, commodities, crypto, index
+        if asset_class == "forex":
+            # Further classify forex pairs
+            normalized = self.symbol_mapper.normalize_symbol(symbol)
+            if "JPY" in normalized:
+                return "forex_jpy"
+            else:
+                return "forex_major"
+        elif asset_class == "commodity":
             return "commodities"
-
-        # Check for crypto
-        if symbol in ["BTCUSD", "ETHUSD", "BTCUSDT", "ETHUSDT"]:
-            return "crypto"
-
-        # Default to forex major
-        return "forex_major"
+        elif asset_class in ["crypto", "index"]:
+            return asset_class
+        else:
+            # Default to forex major if not found
+            logger.warning(f"Unknown asset class '{asset_class}' for {symbol}, defaulting to forex_major")
+            return "forex_major"
 
     def __str__(self) -> str:
         """String representation."""
-        return "PipCalculator(forex: 0.0001, jpy: 0.01, gold: 0.1, crypto: 1.0)"
+        return "PipCalculator(uses SymbolMapper from YAML config)"
 
     def __repr__(self) -> str:
         """Developer representation."""
