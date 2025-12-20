@@ -2,10 +2,26 @@
 # Base configuration that can be overridden by environment-specific files
 
 trading:
-  risk_per_trade: 0.005  # 0.5% risk per trade
+  mode: mtf
+  mtf:
+    zone_timeframe: H1
+    entry_timeframe: M30
+    zone_cache_minutes: 60
+
+  watchlist:
+    - symbol: XAUUSD
+      enabled: false
+    - symbol: EURUSD
+      enabled: true
+    - symbol: GBPUSD
+      enabled: true
+    - symbol: USDJPY
+      enabled: true
+
+  risk_per_trade: 0.005
   max_concurrent_positions: 5
   confluence_threshold: 65.0
-  active_broker: exness_cent  # Broker symbol mapping (exness_cent, exness_standard, etc.)
+  active_broker: exness_cent
 
 database:
   url: "sqlite+aiosqlite:///./data/trading_bot.db"

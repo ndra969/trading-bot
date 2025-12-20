@@ -59,8 +59,12 @@ class TestDatabaseSessionManagement:
 
         async with manager.get_session() as session:
             assert session == mock_session
+            # User would call commit explicitly in real usage
+            # await session.commit()
 
-        mock_session.commit.assert_called_once()
+        # Session context exits normally (no exception), so rollback is not called
+        # Commit is not automatically called - it's user's responsibility
+        mock_session.rollback.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_session_rollback_on_error(self):

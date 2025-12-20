@@ -264,7 +264,7 @@ MT5_SERVER=YourBroker-Real
 ## 🎯 Decision Flow
 
 ```
-Need to develop/test? 
+Need to develop/test?
     ↓ YES
     Use: --dry-run (mock MT5)
     Risk: ✅ Zero
@@ -281,7 +281,7 @@ Ready for live trading?
     Use: (no flags)
     Risk: ⚠️ REAL MONEY
     MT5 needed: ✅ Yes
-    
+
     ⚠️ CHECKLIST:
     □ Strategy tested thoroughly
     □ Risk management validated
@@ -302,6 +302,5 @@ Ready for live trading?
 
 ---
 
-**Version**: 1.0.0  
+**Version**: 1.0.0
 **Last Updated**: 2025-11-29
-

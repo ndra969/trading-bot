@@ -9,7 +9,7 @@ Automatically detects PostgreSQL installation path.
 import os
 import subprocess
 import sys
-from pathlib import Path
+
 
 def find_postgresql_bin():
     """Find PostgreSQL bin directory on Windows"""
@@ -25,6 +25,7 @@ def find_postgresql_bin():
     for path_pattern in possible_paths:
         if "*" in path_pattern:
             from glob import glob
+
             matches = glob(path_pattern)
             for match in matches:
                 if os.path.exists(os.path.join(match, "psql.exe")):
@@ -34,6 +35,7 @@ def find_postgresql_bin():
                 return path_pattern
 
     return None
+
 
 def test_postgres_password(postgresql_bin, password):
     """Test if PostgreSQL password works"""
@@ -48,17 +50,26 @@ def test_postgres_password(postgresql_bin, password):
             text=True,
             check=True,
             env=env,
-            timeout=5
+            timeout=5,
         )
         return True
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return False
 
+
 def find_postgres_password(postgresql_bin):
     """Try common PostgreSQL passwords"""
     common_passwords = [
-        "kosonginaja", "", "admin", "postgres", "password", "123456",
-        "root", "sa", "PostgreSQL", "pgadmin"
+        "kosonginaja",
+        "",
+        "admin",
+        "postgres",
+        "password",
+        "123456",
+        "root",
+        "sa",
+        "PostgreSQL",
+        "pgadmin",
     ]
 
     print("[INFO] Testing PostgreSQL passwords...")
@@ -73,6 +84,7 @@ def find_postgres_password(postgresql_bin):
     print("[ERROR] Could not find valid PostgreSQL password")
     print("[INFO] Please check your PostgreSQL installation")
     return None
+
 
 def run_psql_command(command, description, postgresql_bin, password):
     """Run PostgreSQL command with error handling"""
@@ -90,7 +102,7 @@ def run_psql_command(command, description, postgresql_bin, password):
             capture_output=True,
             text=True,
             check=True,
-            env=env
+            env=env,
         )
         print(f"[SUCCESS] {description}")
         if result.stdout:
@@ -102,6 +114,7 @@ def run_psql_command(command, description, postgresql_bin, password):
         if e.stderr:
             print(f"[ERROR] {e.stderr}")
         return False
+
 
 def create_databases():
     """Create development and production databases"""
@@ -134,14 +147,14 @@ def create_databases():
             "name": "trading_bot_dev",
             "user": "trading_bot_dev_user",
             "password": "dev_password_123",
-            "description": "Development Database"
+            "description": "Development Database",
         },
         {
             "name": "trading_bot_db",
             "user": "trading_bot_prod_user",
             "password": "prod_password_456",
-            "description": "Production Database"
-        }
+            "description": "Production Database",
+        },
     ]
 
     success_count = 0
@@ -153,14 +166,18 @@ def create_databases():
 
         # Create user (if not exists)
         user_sql = f"CREATE USER {db['user']} WITH PASSWORD '{db['password']}';"
-        if run_psql_command(["-c", user_sql], f"Creating user {db['user']}", postgresql_bin, postgres_password):
+        if run_psql_command(
+            ["-c", user_sql], f"Creating user {db['user']}", postgresql_bin, postgres_password
+        ):
             print(f"[SUCCESS] User {db['user']} created")
         else:
             print(f"[INFO] User {db['user']} may already exist")
 
         # Create database (if not exists)
         db_sql = f"CREATE DATABASE {db['name']} OWNER {db['user']};"
-        if run_psql_command(["-c", db_sql], f"Creating database {db['name']}", postgresql_bin, postgres_password):
+        if run_psql_command(
+            ["-c", db_sql], f"Creating database {db['name']}", postgresql_bin, postgres_password
+        ):
             print(f"[SUCCESS] Database {db['name']} created")
             success_count += 1
         else:
@@ -168,7 +185,12 @@ def create_databases():
 
         # Grant privileges
         grant_sql = f"GRANT ALL PRIVILEGES ON DATABASE {db['name']} TO {db['user']};"
-        run_psql_command(["-c", grant_sql], f"Granting privileges to {db['user']}", postgresql_bin, postgres_password)
+        run_psql_command(
+            ["-c", grant_sql],
+            f"Granting privileges to {db['user']}",
+            postgresql_bin,
+            postgres_password,
+        )
 
     print("\n" + "=" * 60)
     print(f"Database Setup Complete! ({success_count}/{len(databases)} databases created)")
@@ -178,10 +200,13 @@ def create_databases():
         print(f"\n{db['Description']}:")
         print(f"  Database: {db['name']}")
         print(f"  User: {db['user']}")
-        print(f"  Connection URL: postgresql+asyncpg://{db['user']}:{db['password']}@localhost:5432/{db['name']}")
+        print(
+            f"  Connection URL: postgresql+asyncpg://{db['user']}:{db['password']}@localhost:5432/{db['name']}"
+        )
 
     print("=" * 60)
     return True
+
 
 if __name__ == "__main__":
     try:

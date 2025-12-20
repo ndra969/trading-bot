@@ -38,7 +38,7 @@ src/trading_bot/position/
   - [x] Real-time P&L tracking in pips and USD
   - [x] Position lifecycle management (OPEN → CLOSED)
   - [x] Database persistence (SQLAlchemy models)
-  
+
 - [x] **PipCalculator Class**
   - [x] Asset-specific pip values (Forex: 0.0001, JPY: 0.01, Gold: 0.1, Crypto: 1.0)
   - [x] Real-time pip profit/loss calculation

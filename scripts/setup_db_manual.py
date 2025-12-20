@@ -5,6 +5,7 @@ Manual Database Setup Instructions
 This script provides instructions for manual database setup.
 """
 
+
 def print_manual_instructions():
     """Print manual setup instructions"""
 
@@ -17,7 +18,8 @@ def print_manual_instructions():
     print("1. Open pgAdmin 4 (installed with PostgreSQL)")
     print("2. Connect to server with your postgres password")
     print("3. Run these SQL queries:")
-    print("""
+    print(
+        """
 -- Create Development User
 CREATE USER trading_bot_dev_user WITH PASSWORD 'dev_password_123';
 
@@ -35,7 +37,8 @@ CREATE DATABASE trading_bot_db OWNER trading_bot_prod_user;
 
 -- Grant privileges
 GRANT ALL PRIVILEGES ON DATABASE trading_bot_db TO trading_bot_prod_user;
-""")
+"""
+    )
 
     print("\nOPTION 2: Use Command Line")
     print("-" * 40)
@@ -66,13 +69,17 @@ GRANT ALL PRIVILEGES ON DATABASE trading_bot_db TO trading_bot_prod_user;
     print("  Database: trading_bot_dev")
     print("  User: trading_bot_dev_user")
     print("  Password: dev_password_123")
-    print("  Connection: postgresql+asyncpg://trading_bot_dev_user:dev_password_123@localhost:5432/trading_bot_dev")
+    print(
+        "  Connection: postgresql+asyncpg://trading_bot_dev_user:dev_password_123@localhost:5432/trading_bot_dev"
+    )
 
     print("\nProduction:")
     print("  Database: trading_bot_db")
     print("  User: trading_bot_prod_user")
     print("  Password: prod_password_456")
-    print("  Connection: postgresql+asyncpg://trading_bot_prod_user:prod_password_456@localhost:5432/trading_bot_db")
+    print(
+        "  Connection: postgresql+asyncpg://trading_bot_prod_user:prod_password_456@localhost:5432/trading_bot_db"
+    )
 
     print("\n🧪 TEST CONNECTION")
     print("-" * 40)
@@ -81,6 +88,7 @@ GRANT ALL PRIVILEGES ON DATABASE trading_bot_db TO trading_bot_prod_user;
     print("  TRADING_BOT_ENV=production uv run trading-bot start --dry-run")
 
     print("=" * 70)
+
 
 if __name__ == "__main__":
     print_manual_instructions()

@@ -64,7 +64,7 @@ class TestGetNextLevel:
     def test_get_next_level_first(self, partial_manager, buy_position_forex):
         """Test getting first partial close level (50% of TP)."""
         partial_manager.initialize_position(buy_position_forex)
-        
+
         # TP distance: 1.1150 - 1.1000 = 0.0150 = 150 pips
         # Level 1: 50% of TP = 75 pips
 
@@ -79,7 +79,7 @@ class TestGetNextLevel:
         """Test getting second partial close level (80% of TP)."""
         partial_manager.initialize_position(buy_position_forex)
         partial_manager.partial_closes[buy_position_forex.position_id] = [1]
-        
+
         # TP distance: 150 pips
         # Level 2: 80% of TP = 120 pips
 
@@ -309,3 +309,157 @@ class TestUtilityMethods:
         str_repr = str(partial_manager)
         assert "PartialCloseManager" in str_repr
         assert "0 positions tracked" in str_repr
+
+    def test_get_next_level_auto_initialize(self, partial_manager, buy_position_forex):
+        """Test get_next_level auto-initializes position if not tracked."""
+        # Position not initialized yet
+        assert buy_position_forex.position_id not in partial_manager.partial_closes
+
+        # Should auto-initialize and return level
+        next_level = partial_manager.get_next_level(buy_position_forex)
+
+        assert next_level is not None
+        assert buy_position_forex.position_id in partial_manager.partial_closes
+
+    def test_get_next_level_sell_position(self, partial_manager):
+        """Test get_next_level for SELL position calculates TP distance correctly."""
+        sell_position = Position(
+            position_id="pos_sell_001",
+            symbol="EURUSD",
+            position_type=PositionType.SELL,
+            entry_price=1.1000,
+            stop_loss=1.1050,
+            take_profit=1.0850,  # TP below entry for SELL
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,
+        )
+
+        # TP distance: 1.1000 - 1.0850 = 0.0150 = 150 pips
+        # Level 1: 50% of TP = 75 pips
+        next_level = partial_manager.get_next_level(sell_position)
+
+        assert next_level is not None
+        assert next_level.level == 1
+        assert next_level.distance_pips == pytest.approx(75.0, abs=0.1)
+
+    def test_should_close_partial_closed_position(self, partial_manager, buy_position_forex):
+        """Test should_close_partial returns False for closed position."""
+        buy_position_forex.status = PositionStatus.CLOSED
+        buy_position_forex.current_profit_pips = 100.0
+
+        assert partial_manager.should_close_partial(buy_position_forex) is False
+
+    def test_should_close_partial_volume_too_small(self, partial_manager, buy_position_forex):
+        """Test should_close_partial returns False when close volume is too small."""
+        partial_manager.initialize_position(buy_position_forex)
+        # Use very small volume that would result in close volume < 0.01
+        buy_position_forex.volume = 0.01  # Very small position
+        partial_manager.remaining_volume[buy_position_forex.position_id] = 0.01
+        buy_position_forex.current_profit_pips = 100.0  # Above threshold
+
+        # Close volume would be 0.01 * 0.25 = 0.0025 < 0.01 minimum
+        assert partial_manager.should_close_partial(buy_position_forex) is False
+
+    def test_calculate_close_volume_commodities(self, partial_manager):
+        """Test calculate_close_volume rounds correctly for commodities."""
+        position = Position(
+            position_id="pos_gold_001",
+            symbol="XAUUSD",
+            position_type=PositionType.BUY,
+            entry_price=2000.0,
+            stop_loss=1990.0,
+            take_profit=2060.0,
+            volume=1.0,
+            pip_size=0.1,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,
+        )
+        partial_manager.initialize_position(position)
+        partial_manager.remaining_volume[position.position_id] = 0.75
+
+        level = PartialCloseLevel(2, 40.0, 0.50)
+        close_volume = partial_manager.calculate_close_volume(position, level)
+
+        # Should round to 1 decimal for commodities
+        assert close_volume == pytest.approx(0.4, abs=0.01)
+
+    def test_calculate_close_volume_crypto(self, partial_manager):
+        """Test calculate_close_volume rounds correctly for crypto."""
+        position = Position(
+            position_id="pos_crypto_001",
+            symbol="BTCUSD",
+            position_type=PositionType.BUY,
+            entry_price=50000.0,
+            stop_loss=49000.0,
+            take_profit=52000.0,
+            volume=1.0,
+            pip_size=1.0,
+            pip_value_per_lot=1.0,
+            status=PositionStatus.OPEN,
+        )
+        partial_manager.initialize_position(position)
+        partial_manager.remaining_volume[position.position_id] = 0.75
+
+        level = PartialCloseLevel(2, 40.0, 0.50)
+        close_volume = partial_manager.calculate_close_volume(position, level)
+
+        # Should round to 3 decimals for crypto
+        assert close_volume == pytest.approx(0.375, abs=0.001)
+
+    def test_execute_partial_close_volume_exceeds_remaining(
+        self, partial_manager, buy_position_forex
+    ):
+        """Test execute_partial_close adjusts when close volume exceeds remaining."""
+        partial_manager.initialize_position(buy_position_forex)
+        # Set remaining volume to be less than calculated close volume
+        # Use a scenario where calculated volume (25% of remaining) would exceed remaining
+        # Set remaining to 0.1, but force calculated volume to be higher
+        partial_manager.remaining_volume[buy_position_forex.position_id] = 0.1
+        buy_position_forex.current_profit_pips = 100.0
+
+        # Manually set a level that would calculate to more than remaining
+        # We need to mock the calculate_close_volume to return > remaining
+        from unittest.mock import patch
+
+        with patch.object(partial_manager, "calculate_close_volume", return_value=0.15):
+            result = partial_manager.execute_partial_close(buy_position_forex, close_price=1.1100)
+
+            # Should adjust to remaining volume (0.1)
+            assert result["close_volume"] == 0.1
+            assert result["remaining_volume"] == 0.0
+
+    def test_execute_partial_close_volume_too_small_raises_error(
+        self, partial_manager, buy_position_forex
+    ):
+        """Test execute_partial_close raises error when volume too small."""
+        partial_manager.initialize_position(buy_position_forex)
+        # Set very small remaining volume
+        partial_manager.remaining_volume[buy_position_forex.position_id] = 0.005  # < 0.01 minimum
+        buy_position_forex.current_profit_pips = 100.0
+
+        with pytest.raises(ValueError, match="Cannot partial close"):
+            partial_manager.execute_partial_close(buy_position_forex, close_price=1.1100)
+
+    def test_get_partial_close_levels_sell_position(self, partial_manager):
+        """Test get_partial_close_levels for SELL position calculates correctly."""
+        sell_position = Position(
+            position_id="pos_sell_001",
+            symbol="EURUSD",
+            position_type=PositionType.SELL,
+            entry_price=1.1000,
+            stop_loss=1.1050,
+            take_profit=1.0850,  # TP below entry
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,
+        )
+
+        # TP distance: 1.1000 - 1.0850 = 0.0150 = 150 pips
+        levels = partial_manager.get_partial_close_levels("EURUSD", sell_position)
+
+        assert len(levels) == 2
+        assert levels[0].distance_pips == pytest.approx(75.0, abs=0.1)  # 50% of 150
+        assert levels[1].distance_pips == pytest.approx(120.0, abs=0.1)  # 80% of 150

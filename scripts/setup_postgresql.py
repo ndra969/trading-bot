@@ -7,8 +7,8 @@ Requires PostgreSQL to be installed and running.
 """
 
 import subprocess
-import sys
 from pathlib import Path
+
 
 def run_command(command, description):
     """Run shell command with error handling"""
@@ -25,6 +25,7 @@ def run_command(command, description):
             print(f"[ERROR] {e.stderr}")
         return False
     return True
+
 
 def setup_postgresql():
     """Setup PostgreSQL database and user"""
@@ -57,25 +58,28 @@ def setup_postgresql():
 
     # Create user (if not exists)
     user_sql = f"CREATE USER {user_name} WITH PASSWORD '{user_password}';"
-    run_command(f"psql -U postgres -c \"{user_sql}\"", f"Creating user {user_name}")
+    run_command(f'psql -U postgres -c "{user_sql}"', f"Creating user {user_name}")
 
     # Create database (if not exists)
     db_sql = f"CREATE DATABASE {db_name} OWNER {user_name};"
-    run_command(f"psql -U postgres -c \"{db_sql}\"", f"Creating database {db_name}")
+    run_command(f'psql -U postgres -c "{db_sql}"', f"Creating database {db_name}")
 
     # Grant privileges
     grant_sql = f"GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {user_name};"
-    run_command(f"psql -U postgres -c \"{grant_sql}\"", f"Granting privileges to {user_name}")
+    run_command(f'psql -U postgres -c "{grant_sql}"', f"Granting privileges to {user_name}")
 
     print("\n" + "=" * 60)
     print("PostgreSQL Setup Complete!")
     print("=" * 60)
     print(f"Database: {db_name}")
     print(f"User: {user_name}")
-    print(f"Connection URL: postgresql+asyncpg://{user_name}:{user_password}@localhost:5432/{db_name}")
+    print(
+        f"Connection URL: postgresql+asyncpg://{user_name}:{user_password}@localhost:5432/{db_name}"
+    )
     print("=" * 60)
 
     return True
+
 
 def setup_production_database():
     """Setup PostgreSQL database for production"""
@@ -94,28 +98,32 @@ def setup_production_database():
 
     # Create user (if not exists)
     user_sql = f"CREATE USER {user_name} WITH PASSWORD '{user_password}';"
-    run_command(f"psql -U postgres -c \"{user_sql}\"", f"Creating user {user_name}")
+    run_command(f'psql -U postgres -c "{user_sql}"', f"Creating user {user_name}")
 
     # Create database (if not exists)
     db_sql = f"CREATE DATABASE {db_name} OWNER {user_name};"
-    run_command(f"psql -U postgres -c \"{db_sql}\"", f"Creating database {db_name}")
+    run_command(f'psql -U postgres -c "{db_sql}"', f"Creating database {db_name}")
 
     # Grant privileges
     grant_sql = f"GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {user_name};"
-    run_command(f"psql -U postgres -c \"{grant_sql}\"", f"Granting privileges to {user_name}")
+    run_command(f'psql -U postgres -c "{grant_sql}"', f"Granting privileges to {user_name}")
 
     print("\n" + "=" * 60)
     print("PostgreSQL Production Setup Complete!")
     print("=" * 60)
     print(f"Database: {db_name}")
     print(f"User: {user_name}")
-    print(f"Connection URL: postgresql+asyncpg://{user_name}:{user_password}@localhost:5432/{db_name}")
+    print(
+        f"Connection URL: postgresql+asyncpg://{user_name}:{user_password}@localhost:5432/{db_name}"
+    )
     print("=" * 60)
 
     return True
 
+
 if __name__ == "__main__":
     import os
+
     env = os.getenv("ENVIRONMENT", "development").lower()
 
     if env in ["production", "prod"]:

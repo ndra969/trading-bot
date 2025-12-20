@@ -206,9 +206,7 @@ class DrawdownProtector:
             if self.emergency_triggered
             else ("WARNING" if self.warning_triggered else "OK")
         )
-        return (
-            f"DrawdownProtector(" f"DD: {self.get_drawdown_percent():.1f}%, " f"Status: {status})"
-        )
+        return f"DrawdownProtector(DD: {self.get_drawdown_percent():.1f}%, Status: {status})"
 
     def __repr__(self) -> str:
         """Developer representation."""

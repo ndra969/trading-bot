@@ -1,5 +1,7 @@
 """Tests for asset-specific position managers."""
 
+import pytest
+
 from trading_bot.position.asset_managers import (
     AssetManagerFactory,
     CommodityPositionManager,
@@ -234,3 +236,9 @@ class TestAssetManagerStringRepresentation:
         manager = CryptoPositionManager()
         str_repr = str(manager)
         assert "Crypto" in str_repr
+
+    def test_factory_unknown_asset_class(self):
+        """Test factory raises ValueError for unknown asset class."""
+        # Directly test _create_manager with unknown asset class
+        with pytest.raises(ValueError, match="Unknown asset class"):
+            AssetManagerFactory._create_manager("unknown_asset_class")

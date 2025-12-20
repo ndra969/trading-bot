@@ -344,4 +344,3 @@ uv run trading-bot --config test start
 - [Configuration Guide](configuration-guide.md)
 - [PostgreSQL Migration Guide](postgresql-migration-guide.md)
 - [Windows Setup Guide](windows-setup-guide.md)
-

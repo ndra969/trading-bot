@@ -1,11 +1,13 @@
 asset_classes:
   commodity:
   - XAUUSD
+  - GOLD
   - XAGUSD
   - WTIUSD
   - BRENTUSD
   crypto:
   - BTCUSD
+  - BTCUSDT
   - ETHUSD
   - LTCUSD
   - BCHUSD

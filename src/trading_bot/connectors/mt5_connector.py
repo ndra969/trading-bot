@@ -59,7 +59,7 @@ class MT5Connector:
         """
         if not MT5_AVAILABLE:
             raise ImportError(
-                "MetaTrader5 package not available. " "Install it with: pip install MetaTrader5"
+                "MetaTrader5 package not available. Install it with: pip install MetaTrader5"
             )
 
         self.terminal_path = terminal_path
@@ -264,22 +264,22 @@ class MT5Connector:
             if symbol_info is None:
                 logger.error(f"Symbol {symbol} not found")
                 return None
-            
+
             # Determine appropriate filling mode
             filling_mode = mt5.ORDER_FILLING_FOK  # Default fallback
-            
+
             # Check filling modes supported by the symbol
             # SYMBOL_FILLING_FOK = 1
-            # SYMBOL_FILLING_IOC = 2 
-            
+            # SYMBOL_FILLING_IOC = 2
+
             # It's safer to rely on what the symbol actually supports
-            if symbol_info.filling_mode & 1: # 1 = SYMBOL_FILLING_FOK
+            if symbol_info.filling_mode & 1:  # 1 = SYMBOL_FILLING_FOK
                 filling_mode = mt5.ORDER_FILLING_FOK
-            elif symbol_info.filling_mode & 2: # 2 = SYMBOL_FILLING_IOC
+            elif symbol_info.filling_mode & 2:  # 2 = SYMBOL_FILLING_IOC
                 filling_mode = mt5.ORDER_FILLING_IOC
             else:
                 # If neither FOK nor IOC is explicitly flagged, try RETURN (common for some market execution)
-                pass 
+                pass
 
             request = {
                 "action": action,
@@ -389,12 +389,12 @@ class MT5Connector:
                     "tp_changed": False,
                     "message": f"Position {ticket} not found",
                 }
-            
+
             current_position = positions[0]
             current_sl = current_position.sl
             current_tp = current_position.tp
             symbol = current_position.symbol
-            
+
             # Calculate tolerance based on symbol's pip size
             # Get symbol info to determine pip size
             symbol_info = mt5.symbol_info(symbol)
@@ -416,26 +416,32 @@ class MT5Connector:
                     tolerance = 0.1  # Commodities (XAUUSD, etc.)
                 else:
                     tolerance = 1.0  # Crypto (BTCUSD, etc.)
-            
+
             # Check if SL needs to change (with tolerance for floating point)
             sl_changed = False
             if sl is not None:
                 if abs(sl - current_sl) > tolerance:
                     sl_changed = True
                 else:
-                    logger.debug(f"SL unchanged: {current_sl:.5f} ≈ {sl:.5f} (tolerance: {tolerance:.5f}, diff: {abs(sl - current_sl):.5f})")
-            
+                    logger.debug(
+                        f"SL unchanged: {current_sl:.5f} ≈ {sl:.5f} (tolerance: {tolerance:.5f}, diff: {abs(sl - current_sl):.5f})"
+                    )
+
             # Check if TP needs to change
             tp_changed = False
             if tp is not None:
                 if abs(tp - current_tp) > tolerance:
                     tp_changed = True
                 else:
-                    logger.debug(f"TP unchanged: {current_tp:.5f} ≈ {tp:.5f} (tolerance: {tolerance:.5f}, diff: {abs(tp - current_tp):.5f})")
-            
+                    logger.debug(
+                        f"TP unchanged: {current_tp:.5f} ≈ {tp:.5f} (tolerance: {tolerance:.5f}, diff: {abs(tp - current_tp):.5f})"
+                    )
+
             # If no changes needed, return success but not modified
             if not sl_changed and not tp_changed:
-                logger.debug(f"No changes needed for position {ticket} (SL: {current_sl:.5f}, TP: {current_tp:.5f})")
+                logger.debug(
+                    f"No changes needed for position {ticket} (SL: {current_sl:.5f}, TP: {current_tp:.5f})"
+                )
                 return {
                     "success": True,
                     "modified": False,
@@ -443,7 +449,7 @@ class MT5Connector:
                     "tp_changed": False,
                     "message": "No changes needed",
                 }
-            
+
             # Prepare request (use current values if not changing)
             request = {
                 "action": mt5.TRADE_ACTION_SLTP,
@@ -466,7 +472,9 @@ class MT5Connector:
 
             # Handle "No changes" error (10025) - treat as success but not modified
             if result.retcode == 10025:
-                logger.debug(f"MT5 reports no changes (code: 10025) for ticket {ticket} - treating as success")
+                logger.debug(
+                    f"MT5 reports no changes (code: 10025) for ticket {ticket} - treating as success"
+                )
                 return {
                     "success": True,
                     "modified": False,
@@ -486,7 +494,9 @@ class MT5Connector:
                 }
 
             # Successfully modified
-            logger.info(f"Position {ticket} modified: SL={sl if sl_changed else 'unchanged'}, TP={tp if tp_changed else 'unchanged'}")
+            logger.info(
+                f"Position {ticket} modified: SL={sl if sl_changed else 'unchanged'}, TP={tp if tp_changed else 'unchanged'}"
+            )
             return {
                 "success": True,
                 "modified": True,
@@ -532,23 +542,25 @@ class MT5Connector:
             if not positions:
                 logger.error(f"Position {ticket} not found")
                 return None
-            
+
             position = positions[0]
             symbol = position.symbol
-            
+
             # Determine close type (Opposite of position type)
             # If BUY (0), close with SELL (1). If SELL (1), close with BUY (0).
             # But order_send uses ORDER_TYPE_SELL to close BUY, and vice versa.
-            close_type = mt5.ORDER_TYPE_SELL if position.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
-            
+            close_type = (
+                mt5.ORDER_TYPE_SELL if position.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            )
+
             # Determine price (Bid for SELL close, Ask for BUY close)
             tick = mt5.symbol_info_tick(symbol)
             if not tick:
                 logger.error(f"Tick data not found for {symbol}")
                 return None
-                
+
             price = tick.bid if close_type == mt5.ORDER_TYPE_SELL else tick.ask
-            
+
             # Volume to close
             close_volume = volume if volume is not None else position.volume
 
@@ -556,8 +568,10 @@ class MT5Connector:
             symbol_info = mt5.symbol_info(symbol)
             filling_mode = mt5.ORDER_FILLING_FOK
             if symbol_info:
-                if symbol_info.filling_mode & 1: filling_mode = mt5.ORDER_FILLING_FOK
-                elif symbol_info.filling_mode & 2: filling_mode = mt5.ORDER_FILLING_IOC
+                if symbol_info.filling_mode & 1:
+                    filling_mode = mt5.ORDER_FILLING_FOK
+                elif symbol_info.filling_mode & 2:
+                    filling_mode = mt5.ORDER_FILLING_IOC
 
             request = {
                 "action": mt5.TRADE_ACTION_DEAL,
@@ -607,15 +621,15 @@ class MT5Connector:
             # Get deals for this position (limit to recent deals only)
             # Use position ID to get deals, but limit to last 10 deals to avoid heavy query
             from datetime import datetime, timedelta
-            
+
             # Only query deals from last 24 hours to limit query size
             date_from = datetime.now() - timedelta(days=1)
-            
+
             deals = mt5.history_deals_get(position=ticket, date_from=date_from)
-            
+
             if deals is None or len(deals) == 0:
                 return None
-            
+
             # Filter for closing deals only (DEAL_TYPE_BALANCE or deals with opposite type)
             # The last deal is usually the closing deal
             closing_deal = None
@@ -624,11 +638,11 @@ class MT5Connector:
                 if deal.entry == mt5.DEAL_ENTRY_OUT:
                     closing_deal = deal
                     break
-            
+
             # If no OUT deal found, use the last deal
             if closing_deal is None:
                 closing_deal = deals[-1]
-                
+
             return closing_deal._asdict()
 
         except Exception as e:

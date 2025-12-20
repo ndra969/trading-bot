@@ -1,7 +1,11 @@
 """Tests for PositionManager."""
 
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+
 import pytest
 
+from trading_bot.data.models import Position as DBPosition
 from trading_bot.position.position_manager import PositionManager
 from trading_bot.position.position_models import PositionStatus, PositionType
 from trading_bot.strategies.models import SignalDirection, TradingSignal
@@ -175,9 +179,9 @@ class TestClosePosition:
         assert position.close_price == 1.1050
 
     def test_close_nonexistent_position(self, position_manager):
-        """Test closing nonexistent position raises error."""
-        with pytest.raises(ValueError, match="not found"):
-            position_manager.close_position("nonexistent_id", 1.1050)
+        """Test closing nonexistent position returns None."""
+        result = position_manager.close_position("nonexistent_id", 1.1050)
+        assert result is None
 
 
 class TestGetPositions:
@@ -329,6 +333,19 @@ class TestCheckAndClosePositions:
         assert len(closed) == 0
         assert position.status == PositionStatus.OPEN
 
+    def test_check_and_close_positions_symbol_not_in_prices(self, position_manager, buy_signal):
+        """Test check_and_close_positions skips positions when symbol not in prices."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Prices dict doesn't include this symbol
+        prices = {"OTHER_SYMBOL": 1.1050}
+        closed = position_manager.check_and_close_positions(prices)
+
+        # Should skip position (continue) and return empty list
+        assert len(closed) == 0
+        assert position.is_open
+
 
 class TestGetPortfolioSummary:
     """Test portfolio summary."""
@@ -395,3 +412,822 @@ class TestUtilityMethods:
         assert id1.startswith("pos_")
         assert id2.startswith("pos_")
         assert id1 != id2
+
+
+class TestDatabaseOperations:
+    """Test database operations (load_positions_from_db, save_position)."""
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_success(self, mock_get_session, position_manager):
+        """Test loading positions from database successfully."""
+        # Create mock database position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_test_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.PENDING.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions
+        await position_manager.load_positions_from_db()
+
+        # Verify position was loaded
+        assert len(position_manager.positions) == 1
+        assert "pos_test_001" in position_manager.positions
+        assert position_manager.positions["pos_test_001"].symbol == "EURUSD"
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_invalid_pending_buy(
+        self, mock_get_session, position_manager
+    ):
+        """Test loading invalid PENDING BUY position (SL >= Entry)."""
+        # Create invalid mock database position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_invalid_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.PENDING.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.1100  # Invalid: SL > Entry for BUY
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - invalid position should be skipped
+        await position_manager.load_positions_from_db()
+
+        # Verify invalid position was NOT loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_invalid_pending_buy_tp(
+        self, mock_get_session, position_manager
+    ):
+        """Test loading invalid PENDING BUY position (TP <= Entry)."""
+        # Create invalid mock database position with TP <= Entry
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_invalid_tp_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.PENDING.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950  # Valid SL
+        mock_db_pos.take_profit = 1.0990  # Invalid: TP <= Entry for BUY
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - invalid position should be skipped
+        await position_manager.load_positions_from_db()
+
+        # Verify invalid position was NOT loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_create_new(self, mock_get_session, position_manager, buy_signal):
+        """Test saving new position to database."""
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None  # Position doesn't exist
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position
+        await position_manager.save_position(position)
+
+        # Verify position was added and committed
+        mock_session.add.assert_called_once()
+        mock_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_update_existing(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test updating existing position in database."""
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos  # Position exists
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position
+        await position_manager.save_position(position)
+
+        # Verify position was updated and committed
+        assert mock_db_pos.status == PositionStatus.OPEN.value
+        mock_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_invalid_pending_buy(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving invalid PENDING BUY position logs error (error is caught and logged)."""
+        # Create position with invalid SL
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position.stop_loss = 1.1100  # Invalid: SL > Entry for BUY
+        position.status = PositionStatus.PENDING
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - error is caught and logged, not raised
+        await position_manager.save_position(position)
+
+        # Verify error was logged (error is caught in try-except)
+        # Position should not be saved (commit should not be called)
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_open_position_validation(
+        self, mock_get_session, position_manager
+    ):
+        """Test loading OPEN positions with validation (SL/TP must be positive)."""
+        # Create mock OPEN position with invalid SL (negative)
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_open_invalid_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.OPEN.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = -1.0  # Invalid: negative SL
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - invalid OPEN position should be skipped
+        await position_manager.load_positions_from_db()
+
+        # Verify invalid position was NOT loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_open_position_invalid_tp(
+        self, mock_get_session, position_manager
+    ):
+        """Test loading OPEN position with invalid TP (zero or negative)."""
+        # Create mock OPEN position with invalid TP
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_open_invalid_tp_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.OPEN.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 0.0  # Invalid: zero TP
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - invalid OPEN position should be skipped
+        await position_manager.load_positions_from_db()
+
+        # Verify invalid position was NOT loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_with_ticket(self, mock_get_session, position_manager):
+        """Test loading position with ticket in metadata."""
+        # Create mock position with ticket
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_with_ticket_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.PENDING.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {"ticket": 12345}  # Ticket in metadata
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions
+        await position_manager.load_positions_from_db()
+
+        # Verify position was loaded with ticket
+        assert len(position_manager.positions) == 1
+        position = position_manager.positions["pos_with_ticket_001"]
+        assert position.ticket == 12345
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_value_error_handling(
+        self, mock_get_session, position_manager
+    ):
+        """Test handling ValueError when creating Position object."""
+        # Create mock position that will cause ValueError in Position.__post_init__
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_value_error_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = "INVALID_TYPE"  # Will cause ValueError
+        mock_db_pos.status = PositionStatus.PENDING.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - ValueError should be caught and logged
+        await position_manager.load_positions_from_db()
+
+        # Verify invalid position was NOT loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_exception_handling(
+        self, mock_get_session, position_manager
+    ):
+        """Test handling unexpected exceptions when loading positions."""
+        # Create mock position that will cause unexpected exception
+        mock_db_pos = MagicMock(spec=DBPosition)
+        # Make accessing position_id raise exception
+        type(mock_db_pos).position_id = PropertyMock(side_effect=Exception("Unexpected error"))
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - Exception should be caught and logged
+        await position_manager.load_positions_from_db()
+
+        # Verify no positions were loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_database_error(self, mock_get_session, position_manager):
+        """Test handling database errors when loading positions."""
+        # Mock session to raise exception
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(
+            side_effect=Exception("Database connection error")
+        )
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - Exception should be caught and logged
+        await position_manager.load_positions_from_db()
+
+        # Verify no positions were loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_with_ticket_sync(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving position syncs ticket from position object to metadata."""
+        # Create position with ticket
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position.ticket = 54321  # Set ticket on position object
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None  # New position
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position
+        await position_manager.save_position(position)
+
+        # Verify ticket was synced to metadata
+        assert position.metadata.get("ticket") == 54321
+        mock_session.add.assert_called_once()
+        mock_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_pending_sell_validation(
+        self, mock_get_session, position_manager, sell_signal
+    ):
+        """Test saving PENDING SELL position with invalid SL/TP raises error."""
+        # Create SELL position with invalid SL (SL <= Entry for SELL)
+        position = position_manager.create_position_from_signal(sell_signal, volume=1.0)
+        position.stop_loss = 1.2400  # Invalid: SL < Entry for SELL
+        position.status = PositionStatus.PENDING
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - error is caught and logged
+        await position_manager.save_position(position)
+
+        # Verify error was handled (commit should not be called)
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_open_negative_sl(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving OPEN position with negative SL raises error."""
+        # Create position and open it
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+        position.stop_loss = -1.0  # Invalid: negative SL
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - error is caught and logged
+        await position_manager.save_position(position)
+
+        # Verify error was handled (commit should not be called)
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_open_negative_tp(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving OPEN position with negative TP raises error."""
+        # Create position and open it
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+        position.take_profit = -1.0  # Invalid: negative TP
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - error is caught and logged
+        await position_manager.save_position(position)
+
+        # Verify error was handled (commit should not be called)
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_database_error(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test handling database errors when saving position."""
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+
+        # Mock session to raise exception
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(side_effect=Exception("Database error"))
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - Exception should be caught and logged
+        await position_manager.save_position(position)
+
+        # Position should still exist in memory (not removed)
+        assert position.position_id in position_manager.positions
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_invalid_pending_sell(
+        self, mock_get_session, position_manager
+    ):
+        """Test loading invalid PENDING SELL position (SL <= Entry or TP >= Entry)."""
+        # Test SELL with invalid SL
+        mock_db_pos_sl = MagicMock(spec=DBPosition)
+        mock_db_pos_sl.position_id = "pos_sell_invalid_sl_001"
+        mock_db_pos_sl.symbol = "EURUSD"
+        mock_db_pos_sl.position_type = PositionType.SELL.value
+        mock_db_pos_sl.status = PositionStatus.PENDING.value
+        mock_db_pos_sl.entry_price = 1.2500
+        mock_db_pos_sl.stop_loss = 1.2400  # Invalid: SL < Entry for SELL
+        mock_db_pos_sl.take_profit = 1.2350
+        mock_db_pos_sl.volume = 1.0
+        mock_db_pos_sl.pip_size = 0.0001
+        mock_db_pos_sl.pip_value_per_lot = 10.0
+        mock_db_pos_sl.open_time = datetime.now()
+        mock_db_pos_sl.close_time = None
+        mock_db_pos_sl.close_price = None
+        mock_db_pos_sl.current_price = 1.2500
+        mock_db_pos_sl.current_profit_pips = 0.0
+        mock_db_pos_sl.current_pnl_usd = 0.0
+        mock_db_pos_sl.risk_amount_usd = 50.0
+        mock_db_pos_sl.potential_profit_usd = 150.0
+        mock_db_pos_sl.meta_data = {}
+
+        # Test SELL with invalid TP
+        mock_db_pos_tp = MagicMock(spec=DBPosition)
+        mock_db_pos_tp.position_id = "pos_sell_invalid_tp_001"
+        mock_db_pos_tp.symbol = "EURUSD"
+        mock_db_pos_tp.position_type = PositionType.SELL.value
+        mock_db_pos_tp.status = PositionStatus.PENDING.value
+        mock_db_pos_tp.entry_price = 1.2500
+        mock_db_pos_tp.stop_loss = 1.2550
+        mock_db_pos_tp.take_profit = 1.2600  # Invalid: TP > Entry for SELL
+        mock_db_pos_tp.volume = 1.0
+        mock_db_pos_tp.pip_size = 0.0001
+        mock_db_pos_tp.pip_value_per_lot = 10.0
+        mock_db_pos_tp.open_time = datetime.now()
+        mock_db_pos_tp.close_time = None
+        mock_db_pos_tp.close_price = None
+        mock_db_pos_tp.current_price = 1.2500
+        mock_db_pos_tp.current_profit_pips = 0.0
+        mock_db_pos_tp.current_pnl_usd = 0.0
+        mock_db_pos_tp.risk_amount_usd = 50.0
+        mock_db_pos_tp.potential_profit_usd = 150.0
+        mock_db_pos_tp.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos_sl, mock_db_pos_tp]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - invalid positions should be skipped
+        await position_manager.load_positions_from_db()
+
+        # Verify invalid positions were NOT loaded
+        assert len(position_manager.positions) == 0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_ticket_sync_no_metadata(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving position syncs ticket when metadata doesn't exist."""
+        # Create position with ticket but no metadata
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position.ticket = 99999
+        position.metadata = None  # No metadata initially
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None  # New position
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position
+        await position_manager.save_position(position)
+
+        # Verify ticket was synced to metadata (metadata should be created)
+        assert position.metadata is not None
+        assert position.metadata.get("ticket") == 99999
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_pending_sell_invalid_tp(
+        self, mock_get_session, position_manager, sell_signal
+    ):
+        """Test saving PENDING SELL position with invalid TP raises error."""
+        # Create SELL position with invalid TP (TP >= Entry for SELL)
+        position = position_manager.create_position_from_signal(sell_signal, volume=1.0)
+        position.take_profit = 1.2600  # Invalid: TP > Entry for SELL
+        position.status = PositionStatus.PENDING
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - error is caught and logged
+        await position_manager.save_position(position)
+
+        # Verify error was handled (commit should not be called)
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_pending_buy_invalid_tp(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving PENDING BUY position with invalid TP raises error."""
+        # Create BUY position with invalid TP (TP <= Entry for BUY)
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position.take_profit = 1.0900  # Invalid: TP < Entry for BUY
+        position.status = PositionStatus.PENDING
+
+        # Create mock existing DB position
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = position.position_id
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_db_pos
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - error is caught and logged
+        await position_manager.save_position(position)
+
+        # Verify error was handled (commit should not be called)
+        mock_session.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_positions_from_db_general_exception(
+        self, mock_get_session, position_manager
+    ):
+        """Test handling general exceptions (not ValueError) when loading positions (lines 184-191)."""
+        # Create mock position that will cause general exception (not ValueError)
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_exception_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.PENDING.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Patch Position to raise general exception (not ValueError) during creation
+        # This triggers the Exception handler (lines 184-191)
+        with patch(
+            "trading_bot.position.position_manager.Position",
+            side_effect=RuntimeError("General error"),
+        ):
+            # Load positions - exception should be caught and logged
+            await position_manager.load_positions_from_db()
+
+            # Position should not be loaded
+            assert len(position_manager.positions) == 0

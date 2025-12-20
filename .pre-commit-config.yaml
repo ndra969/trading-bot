@@ -1,0 +1,101 @@
+# Pre-commit hooks configuration
+# Install: uv run pre-commit install
+# Run manually: uv run pre-commit run --all-files
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: end-of-file-fixer
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: check-yaml
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: check-json
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: check-toml
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: check-merge-conflict
+        exclude: ^(scripts/|tests/|alembic/)
+      - id: debug-statements
+        exclude: ^(scripts/|tests/|alembic/)
+
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.12
+        args: ['--line-length=100']
+        exclude: ^(scripts/|tests/|alembic/)
+
+  # Python linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        args: ['--fix', '--exit-non-zero-on-fix']
+        exclude: ^(scripts/|tests/|alembic/)
+      # Disabled ruff-format to avoid conflict with black
+      # Black is used for formatting, ruff is used for linting only
+      # - id: ruff-format
+      #   exclude: ^(scripts/|tests/|alembic/)
+
+  # Type checking
+  # Note: types-all has dependency issues, so we skip it in pre-commit
+  # Run mypy manually: uv run mypy src/trading_bot/
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.8.0
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies: [types-all]
+  #       args: ['--ignore-missing-imports', '--no-strict-optional']
+  #       exclude: ^(tests/|alembic/)
+
+  # Run all unit tests
+  - repo: local
+    hooks:
+      - id: pytest-all
+        name: Run all unit tests
+        entry: uv run pytest tests/unit/ -v --tb=short
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: pytest-coverage-overall
+        name: Check overall test coverage (minimum 85%)
+        entry: uv run pytest tests/unit/ --cov=src/trading_bot --cov-report=term-missing --cov-fail-under=85 -v
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: pytest-coverage-critical-risk
+        name: Check risk management coverage (minimum 95%)
+        entry: uv run pytest tests/unit/risk/ --cov=src/trading_bot/risk --cov-report=term-missing --cov-fail-under=95 -v
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: pytest-coverage-critical-position
+        name: Check position management coverage (minimum 100%)
+        entry: uv run pytest tests/unit/position/ --cov=src/trading_bot/position --cov-report=term-missing --cov-fail-under=100 -v
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: pytest-foundation-engine
+        name: Check foundation engine tests (Phase 5)
+        entry: uv run pytest tests/unit/strategies/foundation/test_foundation_engine.py -v
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]

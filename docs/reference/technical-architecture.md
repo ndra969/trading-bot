@@ -12,48 +12,48 @@ graph TB
         PM[PositionManager]
         RM[RiskManager]
     end
-    
+
     subgraph "Market Data & Execution"
         MT5[MT5Connector]
         SM[SymbolMapper]
         MH[MarketHours]
     end
-    
+
     subgraph "Analytics & Storage"
         DB[(SQLite Database)]
         CSV[CSV Loggers]
         AN[Analytics Engine]
     end
-    
+
     subgraph "Market Structure Analysis"
         SA[StructureAnalyzer]
         OB[OrderBlockDetector]
         LA[LiquidityAnalyzer]
         FVG[FairValueGapDetector]
     end
-    
+
     subgraph "Notifications & Monitoring"
         TG[Telegram Notifier]
         HM[Health Monitor]
         PM[Performance Monitor]
     end
-    
+
     TB --> SE
     TB --> PM
     TB --> RM
     TB --> MT5
-    
+
     SE --> SA
     SE --> OB
     SE --> LA
-    
+
     PM --> DB
     RM --> DB
     SA --> DB
-    
+
     TB --> TG
     TB --> HM
-    
+
     MT5 --> SM
     MT5 --> MH
 ```
@@ -78,7 +78,7 @@ class TradingBotV2:
         self.position_manager = PositionManager(config)
         self.risk_manager = RiskManager(config)
         self.mt5_connector = MT5Connector(config)
-        
+
     async def trading_loop(self):
         # Main 1-minute execution cycle
         while self.is_running:
@@ -99,7 +99,7 @@ class StrategyEngine:
             'breakout_retest': BreakoutRetestStrategy(),
             'price_action': PriceActionStrategy()
         }
-        
+
     async def generate_signals(self):
         signals = []
         for strategy in self.active_strategies:
@@ -126,7 +126,7 @@ class PositionManager:
         self.breakeven_manager = BreakevenManager()
         self.trailing_manager = TrailingManager()
         self.partial_close_manager = PartialCloseManager()
-        
+
     async def manage_positions(self):
         for position in self.active_positions:
             await self.update_position_state(position)
@@ -162,7 +162,7 @@ class RiskManager:
             DrawdownValidator(),
             ExposureValidator()
         ]
-        
+
     async def validate_trade(self, signal):
         for validator in self.risk_validators:
             result = await validator.validate(signal)
@@ -187,14 +187,14 @@ class StructureAnalyzer:
         self.bos_detector = BOSDetector()
         self.choch_detector = CHoCHDetector()
         self.order_block_detector = OrderBlockDetector()
-        
+
     async def analyze_structure(self, symbol, timeframe):
         structure_events = []
-        
+
         # Detect structure changes
         bos_events = await self.bos_detector.detect(symbol, timeframe)
         choch_events = await self.choch_detector.detect(symbol, timeframe)
-        
+
         return StructureAnalysis(bos_events, choch_events)
 ```
 
@@ -269,7 +269,7 @@ sequenceDiagram
     participant SA as StructureAnalyzer
     participant DB as Database
     participant MT5 as MT5Connector
-    
+
     TB->>SE: Request signals
     SE->>SA: Analyze structure
     SA->>DB: Store structure events
@@ -294,7 +294,7 @@ class ConfigurationManager:
             'database_settings',
             'default_values'
         ]
-        
+
     def get_config(self, key):
         for source in self.config_hierarchy:
             value = self.get_from_source(source, key)
@@ -346,7 +346,7 @@ class AsyncTradingLoop:
             self.generate_signals(),
             self.update_risk_metrics()
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return self.process_results(results)
 ```
@@ -358,7 +358,7 @@ class MemoryManager:
     def __init__(self):
         self.data_cache = LRUCache(maxsize=1000)
         self.cleanup_interval = 300  # 5 minutes
-        
+
     async def cleanup_memory(self):
         # Periodic memory cleanup
         gc.collect()
@@ -375,7 +375,7 @@ class SQLiteOptimizer:
             min_connections=3,
             max_connections=10
         )
-        
+
     def optimize_queries(self):
         # Query optimization strategies
         self.enable_wal_mode()
@@ -415,7 +415,7 @@ class ErrorRecoveryManager:
             DatabaseError: self.recover_database_connection,
             RiskValidationError: self.handle_risk_violation
         }
-        
+
     async def handle_error(self, error):
         strategy = self.recovery_strategies.get(type(error))
         if strategy:
@@ -432,11 +432,11 @@ class ErrorRecoveryManager:
 class SecurityManager:
     def __init__(self):
         self.encryption_key = self.load_encryption_key()
-        
+
     def encrypt_sensitive_data(self, data):
         # Encrypt credentials and sensitive information
         return self.cipher.encrypt(data)
-        
+
     def validate_configuration(self, config):
         # Validate configuration for security issues
         return self.security_validator.validate(config)
@@ -452,7 +452,7 @@ class AccessController:
             'analytics': ['read_data', 'generate_reports'],
             'admin': ['all_permissions']
         }
-        
+
     def check_permission(self, user, action):
         user_permissions = self.get_user_permissions(user)
         return action in user_permissions
@@ -471,7 +471,7 @@ class HealthMonitor:
             MemoryUsageCheck(),
             PositionHealthCheck()
         ]
-        
+
     async def perform_health_check(self):
         results = {}
         for check in self.health_checks:
@@ -485,7 +485,7 @@ class HealthMonitor:
 class PerformanceMonitor:
     def __init__(self):
         self.metrics_collector = MetricsCollector()
-        
+
     async def collect_metrics(self):
         metrics = {
             'loop_execution_time': self.measure_loop_time(),
@@ -493,7 +493,7 @@ class PerformanceMonitor:
             'database_performance': self.measure_db_performance(),
             'trade_execution_latency': self.measure_trade_latency()
         }
-        
+
         await self.metrics_collector.store(metrics)
 ```
 
@@ -542,7 +542,7 @@ class ScalabilityManager:
     def __init__(self):
         self.load_balancer = LoadBalancer()
         self.instance_manager = InstanceManager()
-        
+
     async def scale_based_on_load(self):
         current_load = await self.measure_system_load()
         if current_load > self.scale_up_threshold:
@@ -558,14 +558,14 @@ class ResourceOptimizer:
     def __init__(self):
         self.cpu_optimizer = CPUOptimizer()
         self.memory_optimizer = MemoryOptimizer()
-        
+
     async def optimize_resources(self):
         # CPU optimization
         await self.cpu_optimizer.optimize_thread_pool()
-        
+
         # Memory optimization
         await self.memory_optimizer.optimize_cache_size()
-        
+
         # I/O optimization
         await self.optimize_database_connections()
 ```
@@ -580,7 +580,7 @@ class TestSuite:
         self.unit_tests = UnitTestSuite()
         self.integration_tests = IntegrationTestSuite()
         self.performance_tests = PerformanceTestSuite()
-        
+
     async def run_all_tests(self):
         results = {}
         results['unit'] = await self.unit_tests.run()
@@ -595,10 +595,10 @@ class TestSuite:
 class MockMT5Connector:
     def __init__(self):
         self.mock_data = MockDataProvider()
-        
+
     async def positions_get(self):
         return self.mock_data.get_mock_positions()
-        
+
     async def order_send(self, request):
         return self.mock_data.simulate_order_execution(request)
 ```

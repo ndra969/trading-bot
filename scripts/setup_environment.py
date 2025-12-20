@@ -10,6 +10,7 @@ import os
 import sys
 from pathlib import Path
 
+
 def setup_environment():
     """Setup environment file based on environment variable"""
 
@@ -21,7 +22,7 @@ def setup_environment():
         "development": ".env.dev",
         "dev": ".env.dev",
         "production": ".env.prd",
-        "prod": ".env.prd"
+        "prod": ".env.prd",
     }
 
     if env not in env_files:
@@ -40,15 +41,16 @@ def setup_environment():
     # Copy the appropriate environment file
     try:
         import shutil
+
         shutil.copy2(source_file, target_file)
         print(f"[SUCCESS] Environment setup complete: {target_file} <- {source_file}")
         print(f"[INFO] Environment: {env}")
 
         # Show database URL being used
-        with open(target_file, 'r') as f:
+        with open(target_file) as f:
             content = f.read()
-            for line in content.split('\n'):
-                if line.startswith('DATABASE_URL='):
+            for line in content.split("\n"):
+                if line.startswith("DATABASE_URL="):
                     print(f"[INFO] Database URL: {line.split('=', 1)[1]}")
                     break
             else:
@@ -57,6 +59,7 @@ def setup_environment():
     except Exception as e:
         print(f"[ERROR] Failed to setup environment: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     setup_environment()

@@ -6,7 +6,7 @@ trading:
   max_concurrent_positions: 3
   confluence_threshold: 70.0  # Higher threshold for development
   market_validation: false  # Skip market hours validation in development
-  
+
 telegram:
   enabled: true  # Enable notifications in development
 

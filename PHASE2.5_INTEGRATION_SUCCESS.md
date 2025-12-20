@@ -321,7 +321,7 @@ signal_generation:
     min_confluence_score: 65.0
     min_foundation_score: 70.0
     max_signals_per_symbol: 1
-  
+
   risk_reward:
     min_risk_reward_ratio: 2.0
     max_stop_loss_pips: 50
@@ -524,4 +524,3 @@ The trading bot can now:
 **Last Updated**: December 4, 2025
 **Phase**: 2.5 - Integration Layer
 **Status**: 🎉 **SUCCESS** 🎉
-

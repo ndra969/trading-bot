@@ -72,16 +72,12 @@ class FibonacciAnalyzer:
         low_idx = recent_lows.index(min_low)
 
         # Determine Fibo Direction based on Zone Type
-        swing_start = 0.0
-        swing_end = 0.0
         direction = "UNKNOWN"
 
         if zone_type == "DEMAND":
             # Looking for retracement of an UP move (Low -> High)
             # Valid if Low happened BEFORE High
             if low_idx < high_idx:
-                swing_start = min_low
-                swing_end = max_high
                 direction = "UP"
             else:
                 # If High happened before Low, we are in a downtrend.
@@ -93,8 +89,6 @@ class FibonacciAnalyzer:
             # Looking for retracement of a DOWN move (High -> Low)
             # Valid if High happened BEFORE Low
             if high_idx < low_idx:
-                swing_start = max_high
-                swing_end = min_low
                 direction = "DOWN"
             else:
                 return None
@@ -103,8 +97,8 @@ class FibonacciAnalyzer:
             return None
 
         # Calculate Levels
-        diff = swing_end - swing_start
-        levels = []
+        # diff = swing_end - swing_start  # Not used in calculation
+        # levels = []  # Not used, we calculate best_level directly
 
         # Retracement formula:
         # If UP (Start=Low, End=High): Level Price = End - (Diff * Ratio)
@@ -120,7 +114,7 @@ class FibonacciAnalyzer:
 
         best_level = None
         best_score = 0
-        min_dist = float("inf")
+        # min_dist = float("inf")  # Not used in current implementation
 
         for ratio, score_val in self.levels.items():
             level_price = 0.0
@@ -137,7 +131,7 @@ class FibonacciAnalyzer:
             if dist < (zone_price * self.tolerance):  # Within tolerance (e.g. 0.05%)
                 if score_val > best_score:
                     best_score = score_val
-                    best_level = FibonacciLevel(ratio, level_price, f"{ratio*100:.1f}%")
+                    best_level = FibonacciLevel(ratio, level_price, f"{ratio * 100:.1f}%")
 
         if best_level:
             return FibonacciSignal(

@@ -25,22 +25,6 @@ class BreakevenManager:
     - Crypto: 50 USD
     """
 
-    # Breakeven trigger distances (in pips/USD)
-    BREAKEVEN_DISTANCES = {
-        "forex_major": 15.0,  # 15 pips
-        "forex_jpy": 150.0,  # 150 pips (0.01 pip size)
-        "commodities": 500.0,  # 500 pips for Gold (0.1 pip size)
-        "crypto": 1000.0,  # 1000 USD/pips (~70% of typical 1440 pip SL for crypto)
-    }
-
-    # Breakeven buffer (additional distance beyond entry)
-    BREAKEVEN_BUFFERS = {
-        "forex_major": 2.0,  # 2 pips
-        "forex_jpy": 20.0,  # 20 pips
-        "commodities": 50.0,  # 50 pips
-        "crypto": 300.0,  # 300 USD/pips (wide buffer for crypto volatility)
-    }
-
     def __init__(self, config: dict = None):
         """
         Initialize breakeven manager.
@@ -56,6 +40,26 @@ class BreakevenManager:
 
         logger.debug("BreakevenManager initialized")
 
+    def _get_settings(self, asset_class: str) -> dict:
+        """
+        Get breakeven settings for asset class.
+
+        Merges defaults with overrides.
+        """
+        tm_config = self.config.get("trade_management", {})
+
+        # Get Defaults
+        defaults = tm_config.get("defaults", {}).get("breakeven", {})
+
+        # Get Overrides for Asset Class
+        overrides = tm_config.get("overrides", {}).get(asset_class, {}).get("breakeven", {})
+
+        # Merge
+        settings = defaults.copy()
+        settings.update(overrides)
+
+        return settings
+
     def should_move_to_breakeven(self, position: Position) -> bool:
         """
         Check if position should be moved to breakeven.
@@ -68,9 +72,7 @@ class BreakevenManager:
         """
         # Already moved to breakeven
         if position.position_id in self.breakeven_positions:
-            logger.debug(
-                f"Breakeven check for {position.position_id}: Already at breakeven"
-            )
+            logger.debug(f"Breakeven check for {position.position_id}: Already at breakeven")
             return False
 
         # Position must be open
@@ -82,14 +84,13 @@ class BreakevenManager:
 
         # Current price must be set
         if position.current_price is None:
-            logger.debug(
-                f"Breakeven check for {position.position_id}: Current price not set"
-            )
+            logger.debug(f"Breakeven check for {position.position_id}: Current price not set")
             return False
 
         # Get breakeven trigger distance
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        trigger_distance = self.BREAKEVEN_DISTANCES.get(asset_class, 15.0)
+        settings = self._get_settings(asset_class)
+        trigger_distance = settings.get("trigger_pips", 15.0)
 
         # Log current status for debugging
         logger.debug(
@@ -127,7 +128,8 @@ class BreakevenManager:
 
         # Get asset class and buffer
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        buffer_pips = self.BREAKEVEN_BUFFERS.get(asset_class, 2.0)
+        settings = self._get_settings(asset_class)
+        buffer_pips = settings.get("offset_pips", 2.0)
         pip_size = position.pip_size
 
         # Calculate buffer in price units
@@ -177,7 +179,8 @@ class BreakevenManager:
             Breakeven trigger distance in pips
         """
         asset_class = self.pip_calculator._determine_asset_class(symbol)
-        return self.BREAKEVEN_DISTANCES.get(asset_class, 15.0)
+        settings = self._get_settings(asset_class)
+        return settings.get("trigger_pips", 15.0)
 
     def get_breakeven_buffer(self, symbol: str) -> float:
         """
@@ -190,7 +193,8 @@ class BreakevenManager:
             Breakeven buffer in pips
         """
         asset_class = self.pip_calculator._determine_asset_class(symbol)
-        return self.BREAKEVEN_BUFFERS.get(asset_class, 2.0)
+        settings = self._get_settings(asset_class)
+        return settings.get("offset_pips", 2.0)
 
     def reset_position(self, position_id: str) -> None:
         """

@@ -70,7 +70,6 @@ class BreakoutAnalyzer:
         # Previous candle (to check if we were below/above before)
         prev_close = closes[-2]
 
-        signal = None
         confidence = 0.0
         details = {}
 

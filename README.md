@@ -40,7 +40,7 @@ A sophisticated, production-ready automated trading bot built with modern Python
 
 ### 💼 Advanced Position Management
 - **Real-time Tracking**: Live pip and USD P&L monitoring
-- **Smart Automation**: 
+- **Smart Automation**:
   - 🔄 **Breakeven**: Auto-move SL to entry + buffer
   - 📉 **Trailing Stop**: Dynamic profit locking
   - ✂️ **Partial Close**: Multi-target profit taking
@@ -375,10 +375,10 @@ uv run trading-bot start --dry-run
    ```bash
    # Run tests
    uv run pytest tests/ -v
-   
+
    # Validate configuration
    uv run trading-bot config validate
-   
+
    # Check status
    uv run trading-bot status
    ```

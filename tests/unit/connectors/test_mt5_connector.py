@@ -397,7 +397,7 @@ class TestMT5ConnectorAdvanced:
         # Mock successful order_send
         # Set TRADE_RETCODE_DONE constant on mock
         mock_mt5.TRADE_RETCODE_DONE = 10009
-        
+
         class MockOrderResult:
             def __init__(self):
                 self.retcode = mock_mt5.TRADE_RETCODE_DONE

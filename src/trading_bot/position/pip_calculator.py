@@ -33,6 +33,7 @@ class PipCalculator:
         """Lazy load SymbolMapper."""
         if self._symbol_mapper is None:
             from trading_bot.connectors.symbol_mapper import SymbolMapper
+
             self._symbol_mapper = SymbolMapper()
         return self._symbol_mapper
 
@@ -89,7 +90,7 @@ class PipCalculator:
         """
         # Get pip value per lot from SymbolMapper (from YAML config)
         pip_value_per_lot = self.symbol_mapper.get_pip_value_per_lot(symbol)
-        
+
         # Calculate pip value for the given volume
         pip_value = pip_value_per_lot * volume
         return pip_value
@@ -155,7 +156,7 @@ class PipCalculator:
         """
         # Use SymbolMapper to get asset class from YAML config
         asset_class = self.symbol_mapper.get_asset_class(symbol)
-        
+
         # Map YAML asset class names to internal format
         # YAML uses: forex, commodity, crypto, index
         # Internal uses: forex_major, forex_jpy, commodities, crypto, index
@@ -172,7 +173,9 @@ class PipCalculator:
             return asset_class
         else:
             # Default to forex major if not found
-            logger.warning(f"Unknown asset class '{asset_class}' for {symbol}, defaulting to forex_major")
+            logger.warning(
+                f"Unknown asset class '{asset_class}' for {symbol}, defaulting to forex_major"
+            )
             return "forex_major"
 
     def __str__(self) -> str:

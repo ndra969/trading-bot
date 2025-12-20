@@ -378,3 +378,410 @@ class TestZoneManagerEdgeCases:
         zones = manager.get_zones("EURUSD")
         assert len(zones) == 1
         assert zones[0] == zone2
+
+
+class TestZoneManagerZoneMatching:
+    """Test zone matching and similarity detection."""
+
+    @pytest.mark.asyncio
+    async def test_find_similar_zone_overlapping(self):
+        """Test finding similar zone when zones overlap."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        # Overlapping zone
+        zone2 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.0980,
+            lower_bound=1.0930,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone1], "H1")
+        similar = manager._find_similar_zone("EURUSD", zone2)
+        assert similar is not None
+        assert similar == zone1
+
+    @pytest.mark.asyncio
+    async def test_find_similar_zone_close_distance(self):
+        """Test finding similar zone when zones are close (within 5 pips)."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        # Close zone (within 5 pips)
+        zone2 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1005,
+            lower_bound=1.0955,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone1], "H1")
+        similar = manager._find_similar_zone("EURUSD", zone2)
+        assert similar is not None
+
+    @pytest.mark.asyncio
+    async def test_find_similar_zone_different_type(self):
+        """Test that zones with different types are not considered similar."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        zone2 = DetectedZone(
+            zone_type=ZoneType.CONSOLIDATION,  # Different type
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone1], "H1")
+        similar = manager._find_similar_zone("EURUSD", zone2)
+        assert similar is None
+
+    def test_zones_overlap_true(self):
+        """Test zones_overlap returns True when zones overlap."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        zone2 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.0980,
+            lower_bound=1.0930,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        assert manager._zones_overlap(zone1, zone2) is True
+
+    def test_zones_overlap_false(self):
+        """Test zones_overlap returns False when zones don't overlap."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        zone2 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1100,
+            lower_bound=1.1050,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        assert manager._zones_overlap(zone1, zone2) is False
+
+
+class TestZoneManagerExpiration:
+    """Test zone expiration logic."""
+
+    @pytest.mark.asyncio
+    async def test_remove_expired_zones_memory_only(self):
+        """Test removing expired zones from memory."""
+        from datetime import timedelta
+
+        manager = ZoneManager(
+            config={"max_zone_age_hours": 1}, use_database=False
+        )  # 1 hour max age
+
+        # Create old zone (2 hours ago)
+        old_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now() - timedelta(hours=2),
+            last_tested=datetime.now() - timedelta(hours=2),
+        )
+
+        # Create new zone (30 minutes ago)
+        new_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1050,
+            lower_bound=1.1000,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now() - timedelta(minutes=30),
+            last_tested=datetime.now() - timedelta(minutes=30),
+        )
+
+        # Manually add zones to test expiration
+        manager.zones["EURUSD"] = [old_zone, new_zone]
+
+        await manager._remove_expired_zones_memory_only("EURUSD")
+
+        zones = manager.get_zones("EURUSD")
+        assert len(zones) == 1
+        assert zones[0] == new_zone
+
+    @pytest.mark.asyncio
+    async def test_remove_expired_zones_nonexistent_symbol(self):
+        """Test removing expired zones for non-existent symbol."""
+        manager = ZoneManager(use_database=False)
+        # Should not raise error
+        await manager._remove_expired_zones_memory_only("EURUSD")
+
+
+class TestZoneManagerPriceUpdates:
+    """Test updating zones with current price."""
+
+    @pytest.mark.asyncio
+    async def test_update_zones_with_current_price_touches_zone(self):
+        """Test updating zones when price touches a zone."""
+        manager = ZoneManager(use_database=False)
+
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone], "H1")
+
+        initial_touches = zone.touches
+        current_time = datetime.now()
+
+        # Price touches the zone
+        manager.update_zones_with_current_price("EURUSD", 1.0975, current_time)
+
+        assert zone.touches == initial_touches + 1
+        assert zone.last_tested == current_time
+
+    @pytest.mark.asyncio
+    async def test_update_zones_with_current_price_no_touch(self):
+        """Test updating zones when price doesn't touch any zone."""
+        manager = ZoneManager(use_database=False)
+
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone], "H1")
+
+        initial_touches = zone.touches
+        initial_last_tested = zone.last_tested
+
+        # Price doesn't touch the zone
+        manager.update_zones_with_current_price("EURUSD", 1.1100, datetime.now())
+
+        assert zone.touches == initial_touches
+        assert zone.last_tested == initial_last_tested
+
+    def test_update_zones_with_current_price_nonexistent_symbol(self):
+        """Test updating zones for non-existent symbol."""
+        manager = ZoneManager(use_database=False)
+        # Should not raise error
+        manager.update_zones_with_current_price("EURUSD", 1.1000, datetime.now())
+
+
+class TestZoneManagerZoneIdGeneration:
+    """Test zone ID generation."""
+
+    def test_generate_zone_id(self):
+        """Test zone ID generation."""
+        manager = ZoneManager(use_database=False)
+
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        zone_id = manager._generate_zone_id("EURUSD", zone)
+        assert isinstance(zone_id, str)
+        assert "EURUSD" in zone_id
+        assert "rejection" in zone_id.lower()
+        assert "1.10000" in zone_id or "1.1000" in zone_id
+        assert "1.09500" in zone_id or "1.0950" in zone_id
+
+    def test_generate_zone_id_unique_for_different_zones(self):
+        """Test that different zones generate different IDs."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        zone2 = DetectedZone(
+            zone_type=ZoneType.CONSOLIDATION,
+            upper_bound=1.1050,
+            lower_bound=1.1000,
+            strength=70.0,
+            touches=2,
+            volume_confirmed=False,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        id1 = manager._generate_zone_id("EURUSD", zone1)
+        id2 = manager._generate_zone_id("EURUSD", zone2)
+
+        assert id1 != id2
+
+
+class TestZoneManagerZoneLimiting:
+    """Test zone limiting when max_zones_per_symbol is reached."""
+
+    @pytest.mark.asyncio
+    async def test_add_zones_respects_max_limit(self):
+        """Test that adding zones respects max_zones_per_symbol limit."""
+        manager = ZoneManager(
+            config={"max_zones_per_symbol": 3}, use_database=False
+        )  # Max 3 zones
+
+        zones = []
+        for i in range(5):  # Try to add 5 zones
+            # Make zones far apart so they don't overlap (at least 0.01 apart = 100 pips)
+            # This ensures they're not considered similar
+            zone = DetectedZone(
+                zone_type=ZoneType.REJECTION,
+                upper_bound=1.1000 + (i * 0.0100),  # 100 pips apart
+                lower_bound=1.0950 + (i * 0.0100),
+                strength=75.0 - (i * 5),  # Decreasing strength
+                touches=3,
+                volume_confirmed=True,
+                first_detected=datetime.now(),
+                last_tested=datetime.now(),
+            )
+            zones.append(zone)
+
+        await manager.add_zones("EURUSD", zones, "H1")
+
+        # Should only keep top 3 by strength
+        stored_zones = manager.get_zones("EURUSD")
+        assert len(stored_zones) == 3
+        # Should be sorted by strength (descending)
+        assert stored_zones[0].strength >= stored_zones[1].strength
+        assert stored_zones[1].strength >= stored_zones[2].strength
+
+
+class TestZoneManagerZoneUpdates:
+    """Test zone update logic when similar zones are detected."""
+
+    @pytest.mark.asyncio
+    async def test_add_zones_updates_existing_zone(self):
+        """Test that adding similar zone updates existing zone instead of adding new one."""
+        manager = ZoneManager(use_database=False)
+
+        zone1 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone1], "H1")
+
+        # Add similar zone (overlapping)
+        zone2 = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.0980,
+            lower_bound=1.0930,
+            strength=80.0,  # Stronger
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        await manager.add_zones("EURUSD", [zone2], "H1")
+
+        zones = manager.get_zones("EURUSD")
+        assert len(zones) == 1  # Should update, not add new
+        assert zones[0].strength == 80.0  # Should update to stronger strength
+        assert zones[0].touches == 4  # Should increment touches (3 + 1)

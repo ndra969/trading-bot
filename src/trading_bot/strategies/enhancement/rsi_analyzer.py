@@ -86,7 +86,7 @@ class RSIAnalyzer:
         # 2. Check for rising from oversold / falling from overbought (Reversal)
         if len(rsi_values) >= 3:
             prev_rsi = rsi_values[-2]
-            prev2_rsi = rsi_values[-3]
+            # prev2_rsi = rsi_values[-3]  # Not used in current implementation
 
             # Rising from oversold
             if prev_rsi < self.oversold and current_rsi > prev_rsi:

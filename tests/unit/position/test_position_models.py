@@ -169,6 +169,89 @@ class TestPositionValidation:
                 pip_value_per_lot=10.0,
             )
 
+    def test_position_invalid_stop_loss_zero(self):
+        """Test position with invalid stop loss (zero)."""
+        with pytest.raises(ValueError, match="Stop loss must be positive"):
+            Position(
+                position_id="pos_001",
+                symbol="EURUSD",
+                position_type=PositionType.BUY,
+                entry_price=1.1000,
+                stop_loss=0.0,  # Invalid
+                take_profit=1.1150,
+                volume=1.0,
+                pip_size=0.0001,
+                pip_value_per_lot=10.0,
+            )
+
+    def test_position_invalid_take_profit_zero(self):
+        """Test position with invalid take profit (zero)."""
+        with pytest.raises(ValueError, match="Take profit must be positive"):
+            Position(
+                position_id="pos_001",
+                symbol="EURUSD",
+                position_type=PositionType.BUY,
+                entry_price=1.1000,
+                stop_loss=1.0950,
+                take_profit=0.0,  # Invalid
+                volume=1.0,
+                pip_size=0.0001,
+                pip_value_per_lot=10.0,
+            )
+
+    def test_position_invalid_pip_size_zero(self):
+        """Test position with invalid pip size (zero)."""
+        with pytest.raises(ValueError, match="Pip size must be positive"):
+            Position(
+                position_id="pos_001",
+                symbol="EURUSD",
+                position_type=PositionType.BUY,
+                entry_price=1.1000,
+                stop_loss=1.0950,
+                take_profit=1.1150,
+                volume=1.0,
+                pip_size=0.0,  # Invalid
+                pip_value_per_lot=10.0,
+            )
+
+    def test_position_string_to_enum_conversion(self):
+        """Test position converts string position_type and status to enum."""
+        position = Position(
+            position_id="pos_001",
+            symbol="EURUSD",
+            position_type="BUY",  # String instead of enum
+            entry_price=1.1000,
+            stop_loss=1.0950,
+            take_profit=1.1150,
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status="OPEN",  # String instead of enum
+        )
+
+        assert isinstance(position.position_type, PositionType)
+        assert position.position_type == PositionType.BUY
+        assert isinstance(position.status, PositionStatus)
+        assert position.status == PositionStatus.OPEN
+
+    def test_risk_reward_ratio_zero_risk(self):
+        """Test risk/reward ratio when risk is zero or negative."""
+        position = Position(
+            position_id="pos_001",
+            symbol="EURUSD",
+            position_type=PositionType.BUY,
+            entry_price=1.1000,
+            stop_loss=1.1000,  # SL equals entry (zero risk)
+            take_profit=1.1150,
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,  # OPEN allows SL = entry
+        )
+
+        # Should return 0.0 when risk <= 0
+        assert position.risk_reward_ratio == 0.0
+
 
 class TestPositionProperties:
     """Test Position properties."""

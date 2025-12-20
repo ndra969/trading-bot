@@ -1,5 +1,7 @@
 """Tests for PortfolioRiskManager."""
 
+from datetime import datetime
+
 import pytest
 
 from trading_bot.risk.portfolio_risk_manager import PortfolioRiskManager
@@ -156,7 +158,7 @@ class TestCanTakeTrade:
         assert "Risk exceeds limit" in reason
 
     def test_can_take_trade_daily_limit_reached(self, risk_manager):
-        """Test cannot take trade when daily limit reached."""
+        """Test can take trade when daily limit reached (validation disabled)."""
         risk_manager.initialize_balance(10000.0)
 
         # Simulate daily loss of 1% ($100)
@@ -165,8 +167,38 @@ class TestCanTakeTrade:
 
         can_trade, reason = risk_manager.can_take_trade(risk_amount=50.0)
 
-        assert can_trade is False
-        assert "Daily loss limit" in reason
+        # Daily loss validation is disabled, so trade should be allowed
+        assert can_trade is True
+        assert reason == "OK"
+
+    def test_can_take_trade_would_exceed_daily_limit(self, risk_manager):
+        """Test can take trade when adding risk would exceed daily limit (validation disabled)."""
+        risk_manager.initialize_balance(10000.0)
+
+        # Simulate daily loss of $50 (0.5%)
+        risk_manager.update_balance(9950.0)
+        risk_manager.daily_pnl = -50.0
+
+        # Try to add $60 risk - would make total daily loss $110 (1.1% > 1% limit)
+        can_trade, reason = risk_manager.can_take_trade(risk_amount=60.0)
+
+        # Daily loss validation is disabled, so trade should be allowed
+        assert can_trade is True
+        assert reason == "OK"
+
+    def test_can_take_trade_with_profit_allows_trade(self, risk_manager):
+        """Test can take trade when in profit (daily limit check skipped)."""
+        risk_manager.initialize_balance(10000.0)
+
+        # Simulate daily profit
+        risk_manager.update_balance(10100.0)
+        risk_manager.daily_pnl = 100.0
+
+        # Even with large risk, should be OK if in profit
+        can_trade, reason = risk_manager.can_take_trade(risk_amount=200.0)
+
+        assert can_trade is True
+        assert reason == "OK"
 
     def test_can_take_trade_emergency_stop(self, risk_manager):
         """Test cannot take trade when emergency stop triggered."""
@@ -215,6 +247,20 @@ class TestDrawdownCalculation:
         # (12000 - 10800) / 12000 = 10%
         assert risk_manager.get_drawdown_percent() == pytest.approx(10.0, abs=0.1)
 
+    def test_get_drawdown_percent_zero_peak_balance(self, risk_manager):
+        """Test drawdown calculation when peak balance is zero or negative."""
+        # Initialize with zero balance
+        risk_manager.initialize_balance(0.0)
+        assert risk_manager.get_drawdown_percent() == 0.0
+
+        # Or set peak to zero manually (edge case)
+        risk_manager.peak_balance = 0.0
+        assert risk_manager.get_drawdown_percent() == 0.0
+
+        # Negative peak balance (should not happen, but test edge case)
+        risk_manager.peak_balance = -100.0
+        assert risk_manager.get_drawdown_percent() == 0.0
+
 
 class TestEmergencyStop:
     """Test emergency stop functionality."""
@@ -245,11 +291,24 @@ class TestDailyLossLimit:
         assert risk_manager.is_daily_limit_reached() is False
 
     def test_is_daily_limit_reached_true(self, risk_manager):
-        """Test daily limit reached."""
+        """Test daily limit reached (validation disabled, always returns False)."""
         risk_manager.initialize_balance(10000.0)
         risk_manager.update_balance(9900.0)  # 1% daily loss
 
-        assert risk_manager.is_daily_limit_reached() is True
+        # Daily loss validation is disabled, so always returns False
+        assert risk_manager.is_daily_limit_reached() is False
+
+    def test_is_daily_limit_reached_zero_start_balance(self, risk_manager):
+        """Test daily limit check when daily_start_balance is zero or negative."""
+        risk_manager.initialize_balance(10000.0)
+        # Set daily_start_balance to zero (edge case)
+        risk_manager.daily_start_balance = 0.0
+        risk_manager.daily_pnl = -100.0
+        assert risk_manager.is_daily_limit_reached() is False
+
+        # Negative daily_start_balance (should not happen, but test edge case)
+        risk_manager.daily_start_balance = -100.0
+        assert risk_manager.is_daily_limit_reached() is False
 
 
 class TestGetDailyPnlPercent:
@@ -269,6 +328,17 @@ class TestGetDailyPnlPercent:
 
         assert risk_manager.get_daily_pnl_percent() == pytest.approx(-1.0, abs=0.1)
 
+    def test_get_daily_pnl_percent_zero_start_balance(self, risk_manager):
+        """Test daily P&L percentage when daily_start_balance is zero or negative."""
+        risk_manager.initialize_balance(10000.0)
+        # Set daily_start_balance to zero (edge case)
+        risk_manager.daily_start_balance = 0.0
+        assert risk_manager.get_daily_pnl_percent() == 0.0
+
+        # Negative daily_start_balance (should not happen, but test edge case)
+        risk_manager.daily_start_balance = -100.0
+        assert risk_manager.get_daily_pnl_percent() == 0.0
+
 
 class TestGetPortfolioSummary:
     """Test portfolio summary."""
@@ -287,6 +357,49 @@ class TestGetPortfolioSummary:
         assert summary["daily_pnl"] == 500.0
         assert "max_risk_per_trade" in summary
         assert "emergency_stop_triggered" in summary
+
+
+class TestDailyReset:
+    """Test daily reset functionality."""
+
+    def test_daily_reset_on_new_day(self, risk_manager):
+        """Test daily reset when new day starts."""
+        risk_manager.initialize_balance(10000.0)
+        risk_manager.update_balance(9900.0)  # -$100 loss
+        assert risk_manager.daily_pnl == -100.0
+        assert risk_manager.daily_start_balance == 10000.0
+
+        # Manually set last_reset_date to yesterday to trigger reset
+        from datetime import timedelta
+
+        risk_manager.last_reset_date = datetime.now().date() - timedelta(days=1)
+        # Set current_balance to 9950 so reset uses this value
+        risk_manager.current_balance = 9950.0
+
+        # Update balance - should trigger daily reset
+        # _check_daily_reset is called first, which resets daily_start_balance to current_balance
+        risk_manager.update_balance(9950.0)
+
+        # Daily tracking should reset
+        assert risk_manager.daily_start_balance == 9950.0
+        assert risk_manager.daily_pnl == 0.0  # Reset to 0, then updated based on new balance
+        assert risk_manager.last_reset_date == datetime.now().date()
+
+    def test_daily_reset_same_day_no_reset(self, risk_manager):
+        """Test no daily reset on same day."""
+        risk_manager.initialize_balance(10000.0)
+        risk_manager.update_balance(9900.0)  # -$100 loss
+        original_daily_pnl = risk_manager.daily_pnl
+        original_daily_start = risk_manager.daily_start_balance
+        original_reset_date = risk_manager.last_reset_date
+
+        # Update balance on same day
+        risk_manager.update_balance(9950.0)
+
+        # Daily tracking should NOT reset (same day)
+        assert risk_manager.daily_pnl != original_daily_pnl  # Changed due to balance update
+        assert risk_manager.daily_start_balance == original_daily_start
+        assert risk_manager.last_reset_date == original_reset_date
 
 
 class TestResetTracking:

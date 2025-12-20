@@ -134,7 +134,7 @@ class TestOHLCVDataRetrieval:
 
             assert isinstance(df, pd.DataFrame)
             assert len(df) == 100
-            assert "timestamp" in df.columns
+            assert isinstance(df.index, pd.DatetimeIndex)  # timestamp is index
             assert "open" in df.columns
             assert "high" in df.columns
             assert "low" in df.columns
@@ -328,7 +328,7 @@ class TestDataValidation:
 
             data_manager.get_ohlcv("EURUSD", count=100)
 
-            mock_symbol_manager.validate_symbol.assert_called_once_with("EURUSD")
+            mock_symbol_manager.validate_symbol.assert_called_once_with("EURUSD", auto_enable=True)
 
     def test_get_ohlcv_range_validates_symbol(self, data_manager, mock_symbol_manager):
         """Test that get_ohlcv_range validates symbol."""

@@ -95,6 +95,23 @@ class TestUpdateBalance:
         drawdown_protector.update_balance(10500.0)
         assert drawdown_protector.warning_triggered is False
 
+    def test_update_balance_recovery_resets_emergency(self, drawdown_protector):
+        """Test balance recovery resets emergency stop."""
+        drawdown_protector.initialize_balance(10000.0)
+
+        # Trigger emergency
+        drawdown_protector.update_balance(8500.0)  # 15% drawdown
+        assert drawdown_protector.emergency_triggered is True
+
+        # Recover above emergency level (but still below peak)
+        drawdown_protector.update_balance(9000.0)  # Still 10% drawdown
+        assert drawdown_protector.emergency_triggered is True  # Still triggered
+
+        # Recover to new peak
+        drawdown_protector.update_balance(10500.0)  # New peak
+        assert drawdown_protector.emergency_triggered is False
+        assert drawdown_protector.warning_triggered is False
+
 
 class TestGetDrawdownPercent:
     """Test drawdown percentage calculation."""
@@ -120,6 +137,20 @@ class TestGetDrawdownPercent:
 
         # (12000 - 10800) / 12000 = 10%
         assert drawdown_protector.get_drawdown_percent() == pytest.approx(10.0, abs=0.1)
+
+    def test_get_drawdown_percent_zero_peak_balance(self, drawdown_protector):
+        """Test drawdown calculation when peak balance is zero or negative."""
+        # Initialize with zero balance
+        drawdown_protector.initialize_balance(0.0)
+        assert drawdown_protector.get_drawdown_percent() == 0.0
+
+        # Or set peak to zero manually (edge case)
+        drawdown_protector.peak_balance = 0.0
+        assert drawdown_protector.get_drawdown_percent() == 0.0
+
+        # Negative peak balance (should not happen, but test edge case)
+        drawdown_protector.peak_balance = -100.0
+        assert drawdown_protector.get_drawdown_percent() == 0.0
 
 
 class TestGetDrawdownAmount:

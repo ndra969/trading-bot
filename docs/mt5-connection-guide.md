@@ -17,7 +17,7 @@ uv run trading-bot mt5 connect
 # Persistence: ❌ Lost after command ends
 
 # Check status (new process, no connection)
-uv run trading-bot mt5 status  
+uv run trading-bot mt5 status
 # Output: Status: Not Connected
 # Reason: Different process, connection not shared
 ```
@@ -196,7 +196,7 @@ uv run trading-bot --config production start
 ## 🔍 Troubleshooting
 
 ### Issue: "Not Connected" after connect
-**Cause:** Each CLI command is separate process  
+**Cause:** Each CLI command is separate process
 **Solution:** Use `trading-bot start` for persistent connection
 
 ### Issue: Connection fails
@@ -247,4 +247,3 @@ Press Ctrl+C to stop...
 ## 🎉 Success!
 
 MT5 integration is **fully functional**! Connection works perfectly. Untuk persistent connection dan real-time trading, gunakan `trading-bot start` command.
-

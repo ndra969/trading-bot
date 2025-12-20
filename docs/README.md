@@ -28,14 +28,14 @@ Trading Bot ini adalah sistem trading otomatis yang dirancang untuk trading mult
 - **Analytics Real-time**: Dashboard monitoring dan reporting
 
 ### Fitur Utama
-✅ **Trading Loop 1-Menit** - Eksekusi cepat dan responsif  
-✅ **Multi-Asset Support** - Forex, Gold, Silver, Crypto  
-✅ **Position Management** - Breakeven, trailing, partial close otomatis  
-✅ **Risk Management** - Correlation analysis, volatility-based sizing  
-✅ **Market Structure** - BOS/CHoCH detection, order blocks  
-✅ **Real-time Analytics** - SQLite database, performance tracking  
-✅ **Notifications** - Telegram integration untuk alerts  
-✅ **Modular Architecture** - Clean code, easy maintenance  
+✅ **Trading Loop 1-Menit** - Eksekusi cepat dan responsif
+✅ **Multi-Asset Support** - Forex, Gold, Silver, Crypto
+✅ **Position Management** - Breakeven, trailing, partial close otomatis
+✅ **Risk Management** - Correlation analysis, volatility-based sizing
+✅ **Market Structure** - BOS/CHoCH detection, order blocks
+✅ **Real-time Analytics** - SQLite database, performance tracking
+✅ **Notifications** - Telegram integration untuk alerts
+✅ **Modular Architecture** - Clean code, easy maintenance
 
 ### Status Pengembangan
 - **Phase 0**: ✅ Documentation & Planning (Completed)

@@ -1,0 +1,234 @@
+graph TB
+    %% =============================================================================
+    %% OPEN POSITION FLOW - COMPLETE DETAILED DIAGRAM
+    %% Shows complete flow from market data to open position including:
+    %% - Zone Detection (Supply & Demand)
+    %% - Strategy Analysis (Trendline, Fibonacci, Price Action, etc.)
+    %% - Confluence Scoring
+    %% - Signal Generation & Aggregation
+    %% - Position Opening with all validations
+    %% =============================================================================
+
+    START([Trading Loop Iteration]) --> FETCH_DATA[Fetch OHLCV Data from MT5<br/>- Symbol<br/>- Timeframe<br/>- Historical Candles]
+
+    FETCH_DATA --> DATA_VALID{Data Valid?}
+    DATA_VALID -->|No| END_NO_DATA([No Data Available])
+    DATA_VALID -->|Yes| ZONE_DETECT
+
+    subgraph "Zone Detection (Foundation Strategy)"
+        ZONE_DETECT[Foundation Engine: Analyze Symbol] --> ZONE1[Detect Supply & Demand Zones<br/>- Rejection Zones<br/>- Consolidation Zones<br/>- Breakout Origin Zones]
+        ZONE1 --> ZONE2[Calculate Zone Strength<br/>- Strength Score 0-100<br/>- Zone Grade A/B/C/D<br/>- Freshness Bonus<br/>- Volume Confirmation]
+        ZONE2 --> ZONE3[Filter Zones<br/>- Min Strength ≥ 50<br/>- Max Age ≤ 72 hours<br/>- Min Touch Points ≥ 2]
+        ZONE3 --> ZONE4{Zones Found?}
+        ZONE4 -->|No| END_NO_ZONES([No Zones Detected])
+        ZONE4 -->|Yes| CHECK_PRICE[Check Price Position<br/>Relative to Zones]
+        CHECK_PRICE --> PRICE_AT_ZONE{Price at Zone?}
+        PRICE_AT_ZONE -->|No| END_NOT_AT_ZONE([Price Not at Zone])
+        PRICE_AT_ZONE -->|Yes| STRATEGY_ANALYSIS
+    end
+
+    subgraph "Strategy Analysis Layers"
+        STRATEGY_ANALYSIS[Analyze Zone with Enhancement Layers] --> FOUNDATION[Foundation Layer<br/>Weight: 30%<br/>- Zone Strength Score<br/>- Zone Type Validation]
+
+        FOUNDATION --> TRENDLINE[Trendline Analysis<br/>Weight: 20%<br/>- Support/Resistance Lines<br/>- Min 3 Touches<br/>- Trend Alignment]
+
+        TRENDLINE --> PRICE_ACTION[Price Action Analysis<br/>Weight: 15%<br/>- Pinbar Patterns<br/>- Engulfing Patterns<br/>- Inside Bar Patterns]
+
+        PRICE_ACTION --> FIBONACCI[Fibonacci Analysis<br/>Weight: 12%<br/>- Retracement Levels<br/>- 0.382, 0.5, 0.618<br/>- Level Confluence]
+
+        FIBONACCI --> BREAKOUT[Breakout Retest Analysis<br/>Weight: 12%<br/>- Breakout Momentum<br/>- Retest Confirmation<br/>- Volume Validation]
+
+        BREAKOUT --> STRUCTURE[Market Structure Analysis<br/>Weight: 8%<br/>- BOS Break of Structure<br/>- CHoCH Change of Character<br/>- Swing Analysis]
+
+        STRUCTURE --> RSI[RSI Analysis<br/>Weight: 10%<br/>- Overbought/Oversold<br/>- Divergence Detection<br/>- Multi-Timeframe RSI]
+
+        RSI --> MA[Moving Average Analysis<br/>Weight: 8%<br/>- EMA 9/21/50<br/>- SMA 200<br/>- Trend Alignment]
+
+        MA --> CALC_CONFLUENCE
+    end
+
+    subgraph "Confluence Scoring & Signal Generation"
+        CALC_CONFLUENCE[Calculate Weighted Confluence Score] --> CONFLUENCE1[Foundation Score × 0.30]
+        CONFLUENCE1 --> CONFLUENCE2[+ Trendline Score × 0.20]
+        CONFLUENCE2 --> CONFLUENCE3[+ Price Action Score × 0.15]
+        CONFLUENCE3 --> CONFLUENCE4[+ Fibonacci Score × 0.12]
+        CONFLUENCE4 --> CONFLUENCE5[+ Breakout Score × 0.12]
+        CONFLUENCE5 --> CONFLUENCE6[+ Structure Score × 0.08]
+        CONFLUENCE6 --> CONFLUENCE7[+ RSI Score × 0.10]
+        CONFLUENCE7 --> CONFLUENCE8[+ MA Score × 0.08]
+        CONFLUENCE8 --> FINAL_SCORE[Final Confluence Score<br/>0-100]
+
+        FINAL_SCORE --> SCORE_VALID{Score ≥ 65%?}
+        SCORE_VALID -->|No| END_LOW_SCORE([Confluence Too Low])
+        SCORE_VALID -->|Yes| CALC_PRICES[Calculate Entry/SL/TP]
+
+        CALC_PRICES --> PRICE1[Determine Zone Type<br/>Demand = BUY<br/>Supply = SELL]
+        PRICE1 --> PRICE2[Calculate Entry Price<br/>- Demand: Lower Bound<br/>- Supply: Upper Bound]
+        PRICE2 --> PRICE3[Calculate Stop Loss<br/>- Asset-Specific Buffer<br/>- Min SL Distance]
+        PRICE3 --> PRICE4[Calculate Take Profit<br/>- R:R Ratio 1:2<br/>- Based on Risk Distance]
+        PRICE4 --> VALIDATE_RR[Validate R:R Ratio<br/>Min 2.0]
+
+        VALIDATE_RR --> RR_VALID{R:R Valid?}
+        RR_VALID -->|No| END_INVALID_RR([Invalid R:R Ratio])
+        RR_VALID -->|Yes| CREATE_RESULT[Create StrategyResult<br/>- Symbol<br/>- Direction<br/>- Entry/SL/TP<br/>- Score<br/>- Layer Details]
+
+        CREATE_RESULT --> AGGREGATE
+    end
+
+    subgraph "Signal Aggregation"
+        AGGREGATE[Signal Aggregator] --> AGG1[Collect All Strategy Results]
+        AGG1 --> AGG2[Group by Symbol & Direction]
+        AGG2 --> AGG3[Calculate Weighted Confluence<br/>from Multiple Strategies]
+        AGG3 --> AGG4[Calculate Average Entry/SL/TP<br/>Weighted by Strategy Scores]
+        AGG4 --> AGG5[Create TradingSignal<br/>- Signal ID<br/>- Confluence Score<br/>- Strategy Scores<br/>- R:R Ratio]
+        AGG5 --> AGG6{Confluence ≥ 65%?}
+        AGG6 -->|No| END_AGG_REJECT([Signal Rejected])
+        AGG6 -->|Yes| SIGNAL_READY
+    end
+
+    SIGNAL_READY([Trading Signal Ready]) --> LOG1[Log Signal Details<br/>Direction, Symbol, Entry, SL, TP, R:R, Confluence]
+
+    LOG1 --> CHECK1{Position Limit Check}
+
+    subgraph "Position Limit Validation"
+        CHECK1 --> NORM1[Normalize Signal Symbol]
+        NORM1 --> CHECK_DB[Check Database Positions]
+        CHECK_DB --> CHECK_MT5{MT5 Connected?}
+        CHECK_MT5 -->|Yes| CHECK_MT5_POS[Check MT5 Positions]
+        CHECK_MT5 -->|No| SKIP_MT5[Skip MT5 Check]
+        CHECK_MT5_POS --> HAS_POS{Position Exists?}
+        SKIP_MT5 --> HAS_POS
+        HAS_POS -->|Yes| REJECT1[⏭️ Skip Signal<br/>Position Already Exists]
+        HAS_POS -->|No| EXPOSURE_CHECK
+    end
+
+    REJECT1 --> END1([Signal Skipped])
+
+    EXPOSURE_CHECK[Check Exposure Limits] --> EXPOSURE_VALID{Exposure Valid?}
+    EXPOSURE_VALID -->|No| REJECT2[❌ Reject Signal<br/>Exposure Limit Exceeded]
+    EXPOSURE_VALID -->|Yes| RISK_CHECK
+
+    REJECT2 --> END2([Signal Rejected])
+
+    subgraph "Risk Validation"
+        RISK_CHECK[Risk Manager Validation] --> RISK1[Check Portfolio Risk]
+        RISK1 --> RISK2[Check Daily Loss Limit]
+        RISK2 --> RISK3[Check Drawdown Protection]
+        RISK3 --> RISK_VALID{Risk Approved?}
+        RISK_VALID -->|No| REJECT3[❌ Reject Signal<br/>Risk Validation Failed]
+        RISK_VALID -->|Yes| CALC_SIZE
+    end
+
+    REJECT3 --> NOTIFY1[Send Risk Rejection Notification]
+    NOTIFY1 --> END3([Signal Rejected])
+
+    subgraph "Position Size Calculation"
+        CALC_SIZE[Calculate Position Size] --> CALC1[Get Risk Amount from Signal]
+        CALC1 --> CALC2[Get Entry Price & Stop Loss]
+        CALC2 --> CALC3[Calculate Stop Distance in Pips]
+        CALC3 --> CALC4[Calculate Volume using Risk Manager]
+        CALC4 --> SIZE_VALID{Size > 0?}
+        SIZE_VALID -->|No| REJECT4[❌ Invalid Position Size]
+        SIZE_VALID -->|Yes| MT5_EXEC
+    end
+
+    REJECT4 --> END4([Signal Rejected])
+
+    subgraph "MT5 Order Execution"
+        MT5_EXEC{Is Dry-Run?} -->|Yes| DRY_RUN[⚠️ Dry-Run Mode<br/>Skip MT5 Execution]
+        MT5_EXEC -->|No| CHECK_MT5_CONN{MT5 Connected?}
+        CHECK_MT5_CONN -->|No| REJECT5[❌ MT5 Not Connected]
+        CHECK_MT5_CONN -->|Yes| CONVERT_SYMBOL[Convert Symbol to Broker Format]
+
+        CONVERT_SYMBOL --> PLACE_ORDER[Place MT5 Order<br/>- Symbol<br/>- Direction<br/>- Volume<br/>- Entry Price<br/>- Stop Loss<br/>- Take Profit]
+
+        PLACE_ORDER --> ORDER_RESULT{Order Success?}
+        ORDER_RESULT -->|No| REJECT6[❌ MT5 Order Failed]
+        ORDER_RESULT -->|Yes| GET_TICKET[Get Order Ticket]
+        GET_TICKET --> GET_PRICE[Get Execution Price]
+        GET_PRICE --> NOTIFY2[Send Live Order Notification]
+        NOTIFY2 --> CREATE_POS
+
+        DRY_RUN --> NOTIFY3[Send Dry-Run Notification]
+        NOTIFY3 --> CREATE_POS
+    end
+
+    REJECT5 --> END5([Signal Rejected])
+    REJECT6 --> NOTIFY_ERROR[Send Error Notification]
+    NOTIFY_ERROR --> END6([Signal Rejected])
+
+
+    subgraph "Position Object Creation"
+        CREATE_POS[Create Position from Signal] --> POS1[Check Position Limit per Symbol]
+        POS1 --> POS2[Get Pip Size for Symbol]
+        POS2 --> POS3[Calculate Pip Value per Lot]
+        POS3 --> POS4[Create Position Object<br/>- Position ID<br/>- Symbol<br/>- Position Type BUY/SELL<br/>- Entry Price<br/>- Stop Loss<br/>- Take Profit<br/>- Volume<br/>- Pip Size<br/>- Pip Value per Lot<br/>- Status: PENDING<br/>- Metadata: Signal Info]
+        POS4 --> POS5[Store in Position Manager]
+        POS5 --> POS6[Update Symbol Index]
+        POS6 --> STORE_TICKET{MT5 Ticket Available?}
+        STORE_TICKET -->|Yes| TICKET1[Store Ticket in Position Object]
+        STORE_TICKET -->|No| REGISTER_EXPOSURE
+        TICKET1 --> TICKET2[Store Ticket in Metadata]
+        TICKET2 --> REGISTER_EXPOSURE
+    end
+
+    subgraph "Exposure Registration"
+        REGISTER_EXPOSURE[Register with Exposure Manager] --> EXP1[Get Asset Class from Symbol]
+        EXP1 --> EXP2[Register Position<br/>- Symbol<br/>- Asset Class<br/>- Volume]
+        EXP2 --> OPEN_POS
+    end
+
+    subgraph "Open Position (Position Tracker)"
+        OPEN_POS[Open Position] --> OPEN1{Status is PENDING?}
+        OPEN1 -->|No| WARN1[⚠️ Warning: Cannot Open<br/>Status Not PENDING]
+        OPEN1 -->|Yes| OPEN2[Set Status = OPEN]
+        OPEN2 --> OPEN3[Set Open Time = Now]
+        OPEN3 --> OPEN4[Set Current Price = Entry Price]
+        OPEN4 --> OPEN5[Initialize P&L Tracking<br/>- Current Profit Pips = 0<br/>- Current P&L USD = 0]
+        OPEN5 --> OPEN6[Calculate Risk Amount USD<br/>Entry to Stop Loss]
+        OPEN6 --> OPEN7[Calculate Potential Profit USD<br/>Entry to Take Profit]
+        OPEN7 --> OPEN8[Calculate R:R Ratio USD]
+        OPEN8 --> LOG2[Log Position Opened<br/>with Risk & Profit Details]
+        LOG2 --> SAVE_DB
+    end
+
+    WARN1 --> END7([Position Not Opened])
+
+    subgraph "Database Operations"
+        SAVE_DB[Save Position to Database] --> DB1{Position Exists in DB?}
+        DB1 -->|Yes| DB2[Update Existing Position<br/>- Status<br/>- Stop Loss<br/>- Take Profit<br/>- Current Price<br/>- P&L Data<br/>- Metadata with Ticket]
+        DB1 -->|No| DB3[Create New Position Record<br/>- All Position Fields<br/>- Metadata with Ticket]
+        DB2 --> DB4[Commit Transaction]
+        DB3 --> DB4
+        DB4 --> SUCCESS
+    end
+
+    SUCCESS[✅ Position Successfully Opened] --> LOG_FINAL[Log Final Position Details<br/>- Position ID<br/>- Symbol<br/>- Direction<br/>- Volume<br/>- Entry Price<br/>- Risk Amount USD]
+    LOG_FINAL --> MONITORING[Position Now in Monitoring Loop<br/>- Real-time Price Updates<br/>- Breakeven Automation<br/>- Trailing Stop Automation<br/>- Partial Close Automation<br/>- SL/TP Monitoring]
+
+    MONITORING --> END_SUCCESS([Position Open Complete])
+
+    %% Error Handling
+    DB4 -->|Error| DB_ERROR[Log Database Error<br/>Position Still in Memory]
+    DB_ERROR --> MONITORING
+
+    %% Styling
+    classDef startEnd fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    classDef process fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef decision fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    classDef validation fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef rejection fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef success fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
+    classDef notification fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    classDef strategy fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef zone fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
+
+    class START,END1,END2,END3,END4,END5,END6,END7,END_SUCCESS,END_NO_DATA,END_NO_ZONES,END_NOT_AT_ZONE,END_LOW_SCORE,END_INVALID_RR,END_AGG_REJECT startEnd
+    class LOG1,LOG2,LOG_FINAL,NORM1,CONVERT_SYMBOL,PLACE_ORDER,GET_TICKET,GET_PRICE,CREATE_POS,POS1,POS2,POS3,POS4,POS5,POS6,OPEN2,OPEN3,OPEN4,OPEN5,OPEN6,OPEN7,OPEN8,DB2,DB3,DB4,EXP1,EXP2,AGG1,AGG2,AGG3,AGG4,AGG5,PRICE1,PRICE2,PRICE3,PRICE4 process
+    class CHECK1,CHECK_MT5,HAS_POS,EXPOSURE_VALID,RISK_VALID,SIZE_VALID,MT5_EXEC,CHECK_MT5_CONN,ORDER_RESULT,OPEN1,DB1,DATA_VALID,ZONE4,PRICE_AT_ZONE,SCORE_VALID,RR_VALID,AGG6,STORE_TICKET decision
+    class CHECK_DB,CHECK_MT5_POS,EXPOSURE_CHECK,RISK_CHECK,RISK1,RISK2,RISK3,CALC_SIZE,CALC1,CALC2,CALC3,CALC4,VALIDATE_RR validation
+    class REJECT1,REJECT2,REJECT3,REJECT4,REJECT5,REJECT6,WARN1 rejection
+    class SUCCESS,MONITORING success
+    class NOTIFY1,NOTIFY2,NOTIFY3,NOTIFY_ERROR notification
+    class FETCH_DATA,ZONE_DETECT,ZONE1,ZONE2,ZONE3,CHECK_PRICE zone
+    class STRATEGY_ANALYSIS,FOUNDATION,TRENDLINE,PRICE_ACTION,FIBONACCI,BREAKOUT,STRUCTURE,RSI,MA,CALC_CONFLUENCE,CONFLUENCE1,CONFLUENCE2,CONFLUENCE3,CONFLUENCE4,CONFLUENCE5,CONFLUENCE6,CONFLUENCE7,CONFLUENCE8,FINAL_SCORE,CREATE_RESULT strategy

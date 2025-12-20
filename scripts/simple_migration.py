@@ -6,9 +6,10 @@ Creates tables directly without Alembic complexity.
 """
 
 import os
-from dotenv import load_dotenv
+
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
+
 
 def get_connection():
     """Get PostgreSQL connection"""
@@ -25,6 +26,7 @@ def get_connection():
     db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
 
     return psycopg2.connect(db_url)
+
 
 def create_tables():
     """Create all required tables"""
@@ -45,7 +47,8 @@ def create_tables():
 
         # Create supply_demand_zones table
         print("[INFO] Creating supply_demand_zones table...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE supply_demand_zones (
                 id SERIAL PRIMARY KEY,
                 zone_id VARCHAR(50) UNIQUE NOT NULL,
@@ -65,17 +68,23 @@ def create_tables():
                 market_session VARCHAR(20),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
-        """)
+        """
+        )
 
         # Create indexes
         print("[INFO] Creating indexes...")
         cursor.execute("CREATE INDEX idx_supply_demand_zones_symbol ON supply_demand_zones(symbol)")
-        cursor.execute("CREATE INDEX idx_supply_demand_zones_zone_id ON supply_demand_zones(zone_id)")
-        cursor.execute("CREATE INDEX idx_supply_demand_zones_strength ON supply_demand_zones(strength)")
+        cursor.execute(
+            "CREATE INDEX idx_supply_demand_zones_zone_id ON supply_demand_zones(zone_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX idx_supply_demand_zones_strength ON supply_demand_zones(strength)"
+        )
 
         # Create trades table
         print("[INFO] Creating trades table...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE trades (
                 id SERIAL PRIMARY KEY,
                 trade_id VARCHAR(50) UNIQUE NOT NULL,
@@ -106,7 +115,8 @@ def create_tables():
                 FOREIGN KEY (entry_zone_id) REFERENCES supply_demand_zones(id),
                 FOREIGN KEY (exit_zone_id) REFERENCES supply_demand_zones(id)
             )
-        """)
+        """
+        )
 
         # Create trades indexes
         cursor.execute("CREATE INDEX idx_trades_symbol ON trades(symbol)")
@@ -115,7 +125,8 @@ def create_tables():
 
         # Create position_updates table
         print("[INFO] Creating position_updates table...")
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE position_updates (
                 id SERIAL PRIMARY KEY,
                 trade_id INTEGER NOT NULL,
@@ -132,18 +143,23 @@ def create_tables():
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 FOREIGN KEY (trade_id) REFERENCES trades(id) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
         # Create position_updates indexes
         cursor.execute("CREATE INDEX idx_position_updates_trade_id ON position_updates(trade_id)")
-        cursor.execute("CREATE INDEX idx_position_updates_created_at ON position_updates(created_at)")
+        cursor.execute(
+            "CREATE INDEX idx_position_updates_created_at ON position_updates(created_at)"
+        )
 
         conn.commit()
         print("[SUCCESS] All tables created successfully!")
 
         # Show table info
         print("\n[INFO] Database Tables Created:")
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+        cursor.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        )
         tables = cursor.fetchall()
         for table in tables:
             print(f"  - {table[0]}")
@@ -154,6 +170,7 @@ def create_tables():
         raise
     finally:
         conn.close()
+
 
 def test_connection():
     """Test database connection"""
@@ -168,6 +185,7 @@ def test_connection():
     except Exception as e:
         print(f"[ERROR] Failed to connect: {e}")
         return False
+
 
 if __name__ == "__main__":
     if test_connection():

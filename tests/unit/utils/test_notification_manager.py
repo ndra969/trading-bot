@@ -141,3 +141,127 @@ async def test_heartbeat_formatting(notification_manager):
     assert "💓 **Bot Heartbeat**" in item["text"]
     assert "$1,234.56" in item["text"]
     assert "5" in item["text"]
+
+
+@pytest.mark.asyncio
+async def test_start_method(notification_manager):
+    """Test start method initializes worker."""
+    with patch("httpx.AsyncClient") as MockClient:
+        mock_client_instance = AsyncMock()
+        MockClient.return_value.__aenter__.return_value = mock_client_instance
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_client_instance.post.return_value = mock_response
+
+        await notification_manager.start()
+
+        assert notification_manager.is_running is True
+        assert notification_manager.worker_task is not None
+
+        # Cleanup
+        await notification_manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_start_method_disabled():
+    """Test start method does nothing when disabled."""
+    config_dict = {
+        "telegram": {"enabled": False, "bot_token": None, "chat_id": "123"},
+        "env": "test",
+        "trading": {"dry_run": False},
+    }
+    manager = NotificationManager(config_dict)
+
+    await manager.start()
+    assert manager.is_running is False
+    assert manager.worker_task is None
+
+
+@pytest.mark.asyncio
+async def test_stop_method(notification_manager):
+    """Test stop method stops worker."""
+    with patch("httpx.AsyncClient") as MockClient:
+        mock_client_instance = AsyncMock()
+        MockClient.return_value.__aenter__.return_value = mock_client_instance
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_client_instance.post.return_value = mock_response
+
+        await notification_manager.start()
+        assert notification_manager.is_running is True
+
+        await notification_manager.stop()
+        assert notification_manager.is_running is False
+
+
+@pytest.mark.asyncio
+async def test_stop_method_not_running(notification_manager):
+    """Test stop method when not running."""
+    # Should not raise error
+    await notification_manager.stop()
+    assert notification_manager.is_running is False
+
+
+@pytest.mark.asyncio
+async def test_send_message_disabled():
+    """Test send_message when manager is disabled."""
+    config_dict = {
+        "telegram": {"enabled": False, "bot_token": None, "chat_id": "123"},
+        "env": "test",
+        "trading": {"dry_run": False},
+    }
+    manager = NotificationManager(config_dict)
+
+    await manager.send_message("Test")
+    assert manager.queue.qsize() == 0
+
+
+@pytest.mark.asyncio
+async def test_process_queue_error_handling(notification_manager):
+    """Test _process_queue handles errors gracefully."""
+    with patch("httpx.AsyncClient") as MockClient:
+        mock_client_instance = AsyncMock()
+        MockClient.return_value.__aenter__.return_value = mock_client_instance
+        # Simulate error
+        mock_client_instance.post.side_effect = Exception("Network error")
+
+        # Add item to queue
+        await notification_manager.queue.put(
+            {"text": "Test Message", "disable_notification": False}
+        )
+
+        # Start worker temporarily
+        notification_manager.is_running = True
+        worker_task = asyncio.create_task(notification_manager._process_queue())
+
+        # Give it a moment to process
+        await asyncio.sleep(0.1)
+
+        # Stop worker
+        notification_manager.is_running = False
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+
+        # Should have attempted to send
+        mock_client_instance.post.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_send_message_with_sound_disabled(notification_manager):
+    """Test send_message with sound disabled."""
+    await notification_manager.send_message("Test", sound=False)
+
+    item = await notification_manager.queue.get()
+    assert item["disable_notification"] is True
+
+
+@pytest.mark.asyncio
+async def test_send_message_with_sound_enabled(notification_manager):
+    """Test send_message with sound enabled."""
+    await notification_manager.send_message("Test", sound=True)
+
+    item = await notification_manager.queue.get()
+    assert item["disable_notification"] is False

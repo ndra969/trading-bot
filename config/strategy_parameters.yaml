@@ -60,32 +60,32 @@ signal_aggregator:
 supply_demand:
   # Zone Detection Parameters
   zone_detection:
-    min_zone_strength: 50.0      # Minimum strength score (0-100)
-    max_zone_age_hours: 72       # Maximum zone age for consideration (3 days)
-    min_touch_points: 2          # Minimum touches for zone validation
-    volume_confirmation: true    # Require volume confirmation for zones
+    min_zone_strength: 45.0      # Tightening: 30 -> 45 (High quality zones only)
+    max_zone_age_hours: 360      # Keep extended age (allow swing)
+    min_touch_points: 1          # Keep 1 touch
+    volume_confirmation: true    # Tightening: false -> true (Require volume)
     min_zone_size_pips: 5        # Minimum zone size in pips
     max_zone_size_pips: 1000     # Maximum zone size in pips
-  
+
   # Zone Scoring Weights
   scoring_weights:
     strength_weight: 0.4         # Zone strength importance
     freshness_weight: 0.3        # Zone age/freshness importance
     volume_weight: 0.2           # Volume confirmation importance
     touches_weight: 0.1          # Number of touches importance
-  
+
   # Zone Types Configuration
   zone_types:
     rejection:                   # Price rejected strongly from level
       enabled: true
       min_wick_ratio: 0.6       # Minimum wick to body ratio
       max_body_size_pct: 30     # Maximum body size percentage
-    
+
     consolidation:               # Price consolidated in range
       enabled: true
       min_touches: 3            # Minimum touches in consolidation
       max_range_pips: 20        # Maximum range size in pips
-    
+
     breakout_origin:            # Zone where breakout originated
       enabled: true
       min_breakout_momentum: 0.7 # Minimum momentum for valid breakout
@@ -95,17 +95,17 @@ supply_demand:
 signal_generation:
   # Signal Quality Requirements
   quality_thresholds:
-    min_confluence_score: 25.0   # Minimum overall confluence score (Lowered for Testing)
-    min_foundation_score: 20.0   # Minimum foundation S&D score (Lowered for Testing)
+    min_confluence_score: 30.0   # Tightening: 20 -> 30 (Require Confluence)
+    min_foundation_score: 25.0   # Tightening: 15 -> 25
     max_signals_per_symbol: 1    # Maximum signals per symbol
     signal_refresh_interval: 300  # Signal refresh interval (seconds)
-  
+
   # Signal Validation Rules
   validation_rules:
     require_foundation: true     # Foundation strategy required
     conflict_prevention: true    # Prevent conflicting signals
     market_hours_validation: true # Validate market hours
-    
+
   # Risk/Reward Requirements
   risk_reward:
     min_risk_reward_ratio: 2.0   # Minimum R:R ratio (1:2)
@@ -133,19 +133,19 @@ timeframe_analysis:
     scalping:
       primary: "M5"              # Primary analysis timeframe
       confluence: ["M15", "H1"]  # Confluence timeframes
-      
+
     day_trading:
       primary: "H1"
       confluence: ["H4", "D1"]
-      
+
     swing_trading:
       primary: "H4"
       confluence: ["D1", "W1"]
-      
+
     position_trading:
       primary: "D1"
       confluence: ["W1", "MN1"]
-  
+
   # Analysis Parameters
   analysis_settings:
     min_confluence_score: 65.0   # Minimum confluence score for signals
@@ -161,9 +161,51 @@ performance:
   async_processing: true
   max_concurrent_analysis: 5
 
+# Trade Management Configuration
+trade_management:
+  # Default Settings (Forex Majors)
+  defaults:
+    breakeven:
+      enabled: true
+      trigger_pips: 20.0       # 20 pips
+      offset_pips: 2.0         # 2 pips
+
+    trailing_stop:
+      enabled: true
+      activation_pips: 30.0    # 30 pips
+      limit_pips: 10.0         # 10 pips
+
+  # Asset Class Overrides
+  overrides:
+    # Commodities (Gold/XAUUSD) - High Volatility (approx 30x Forex)
+    commodities:
+      breakeven:
+        trigger_pips: 300.0    # 30 pips ($0.30) - Golden 300 Rule
+        offset_pips: 60.0      # 6 pips ($0.06)
+      trailing_stop:
+        activation_pips: 300.0 # 30 pips ($0.30) - Activate at $3
+        limit_pips: 300.0      # 30 pips ($0.30) - Trail by $3
+
+    # Crypto (BTC/ETH) - Extremely High Volatility
+    crypto:
+      breakeven:
+        trigger_pips: 1000.0   # 1000 points
+        offset_pips: 100.0
+      trailing_stop:
+        activation_pips: 2000.0
+        limit_pips: 500.0
+
+    # Forex JPY Pairs (Higher volatility than majors)
+    forex_jpy:
+      breakeven:
+        trigger_pips: 25.0
+        offset_pips: 3.0
+      trailing_stop:
+        activation_pips: 40.0
+        limit_pips: 15.0
+
 # Database Settings
 database:
   zone_retention_days: 7         # Keep zones for 7 days
   cleanup_interval_hours: 24     # Cleanup old zones every 24 hours
   max_zones_per_symbol: 50       # Maximum zones stored per symbol
-

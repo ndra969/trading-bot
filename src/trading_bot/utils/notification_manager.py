@@ -51,12 +51,16 @@ class NotificationManager:
             self.telegram_config = config.telegram
             # Access other props via object
             self.env = getattr(config, "env", "unknown")
-            self.is_dry_run = getattr(config.trading, "dry_run", False)  # Default to False for live trading
+            self.is_dry_run = getattr(
+                config.trading, "dry_run", False
+            )  # Default to False for live trading
         else:
             # It's a dictionary
             self.telegram_config = type("obj", (object,), config.get("telegram", {}))
             self.env = config.get("env", "unknown")
-            self.is_dry_run = config.get("trading", {}).get("dry_run", False)  # Default to False for live trading
+            self.is_dry_run = config.get("trading", {}).get(
+                "dry_run", False
+            )  # Default to False for live trading
 
             # Helper to allow .access for the fake config object
             if isinstance(self.telegram_config, dict):

@@ -11,7 +11,7 @@ Trading bot menggunakan sophisticated multi-timeframe analysis untuk meningkatka
 ```bash
 # Core Analysis Timeframes
 PRIMARY_TIMEFRAME=H1          # Main analysis timeframe
-SECONDARY_TIMEFRAME=H4        # Trend confirmation timeframe  
+SECONDARY_TIMEFRAME=H4        # Trend confirmation timeframe
 TERTIARY_TIMEFRAME=D1         # Major trend direction
 ANALYSIS_TIMEFRAMES=M15,H1,H4 # Structure detection range
 ```
@@ -23,11 +23,11 @@ graph TD
     D1[D1 - Daily] --> H4[H4 - 4 Hour]
     H4 --> H1[H1 - 1 Hour]
     H1 --> M15[M15 - 15 Minute]
-    
+
     D1 -.->|Weight: 3| TREND[Trend Analysis]
     H4 -.->|Weight: 2| TREND
     H1 -.->|Weight: 1| TREND
-    
+
     M15 -.->|Structure| STRUCT[Structure Detection]
     H1 -.->|Structure| STRUCT
     H4 -.->|Structure| STRUCT
@@ -56,25 +56,25 @@ graph TD
 # Trend alignment scoring
 def calculate_trend_score(h1_trend, h4_trend, d1_trend, expected_trend):
     score = 0
-    
+
     # H1 trend (weight: 1) - 30% influence
     if h1_trend == expected_trend:
         score += 1 * 0.30
     elif h1_trend == 'neutral':
         score += 1 * 0.15
-    
-    # H4 trend (weight: 2) - 40% influence  
+
+    # H4 trend (weight: 2) - 40% influence
     if h4_trend == expected_trend:
         score += 2 * 0.40
     elif h4_trend == 'neutral':
         score += 2 * 0.20
-    
+
     # D1 trend (weight: 3) - 30% influence
     if d1_trend == expected_trend:
         score += 3 * 0.30
     elif d1_trend == 'neutral':
         score += 3 * 0.15
-    
+
     return score
 ```
 
@@ -93,19 +93,19 @@ class MultiTimeframeBOSDetector:
             'H1': 0.5,   # Main confirmation
             'H4': 0.3    # Trend confirmation
         }
-    
+
     async def detect_bos_confluence(self, symbol):
         bos_events = {}
-        
+
         for tf in self.timeframes:
             bos_events[tf] = await self.detect_bos(symbol, tf)
-        
+
         # Calculate confluence score
         confluence_score = 0
         for tf, events in bos_events.items():
             if events and self.validate_bos_quality(events[-1]):
                 confluence_score += self.confirmation_weights[tf]
-        
+
         return {
             'confluence_score': confluence_score,
             'events_by_timeframe': bos_events,
@@ -151,20 +151,20 @@ class MultiTimeframeOrderBlocks:
             'H1': 0.7,   # Medium priority - swing levels
             'M15': 0.4   # Lower priority - short-term levels
         }
-    
+
     def detect_order_blocks(self, symbol):
         order_blocks = {}
-        
+
         for tf, priority in self.timeframe_priorities.items():
             blocks = self.find_order_blocks(symbol, tf)
-            
+
             # Apply timeframe-specific scoring
             for block in blocks:
                 block['priority_score'] = block['strength'] * priority
                 block['timeframe'] = tf
-            
+
             order_blocks[tf] = blocks
-        
+
         return self.merge_and_rank_blocks(order_blocks)
 ```
 
@@ -216,17 +216,17 @@ class MultiTimeframeFVG:
                 'crypto': 200
             }
         }
-    
+
     def detect_fvg(self, symbol, timeframe, asset_class):
         min_size = self.min_gap_sizes[timeframe][asset_class]
         gaps = self.find_price_gaps(symbol, timeframe, min_size)
-        
+
         # Calculate fill probability based on timeframe
         for gap in gaps:
             gap['fill_probability'] = self.calculate_fill_probability(
                 gap, timeframe, asset_class
             )
-        
+
         return gaps
 ```
 
@@ -244,30 +244,30 @@ class ConfluenceAnalyzer:
             'fvg_alignment': 0.10,
             'liquidity_context': 0.10
         }
-    
+
     def calculate_confluence_score(self, signal_data):
         total_score = 0
-        
+
         # Trend alignment across timeframes
         trend_score = self.calculate_trend_confluence(signal_data['trends'])
         total_score += trend_score * self.confluence_weights['trend_alignment']
-        
+
         # Structure confluence (BOS/CHoCH alignment)
         structure_score = self.calculate_structure_confluence(signal_data['structure'])
         total_score += structure_score * self.confluence_weights['structure_confluence']
-        
+
         # Order block proximity across timeframes
         ob_score = self.calculate_order_block_confluence(signal_data['order_blocks'])
         total_score += ob_score * self.confluence_weights['order_block_proximity']
-        
+
         # Fair Value Gap alignment
         fvg_score = self.calculate_fvg_confluence(signal_data['fvgs'])
         total_score += fvg_score * self.confluence_weights['fvg_alignment']
-        
+
         # Liquidity context
         liquidity_score = self.calculate_liquidity_confluence(signal_data['liquidity'])
         total_score += liquidity_score * self.confluence_weights['liquidity_context']
-        
+
         return {
             'total_score': total_score,
             'breakdown': {
@@ -326,7 +326,7 @@ STRUCTURE_ANALYSIS_D1_ENABLED=false  # Too slow for real-time
     "trend_timeframes": ["H1", "H4", "D1"],
     "structure_detection_sensitivity": {
       "M15": "high",
-      "H1": "medium", 
+      "H1": "medium",
       "H4": "low"
     }
   },
@@ -366,31 +366,31 @@ class OptimizedMultiTimeframeAnalysis:
             'H4': 7200,   # 2 hours
             'D1': 14400   # 4 hours
         }
-        
+
         self.analysis_cache = {}
-    
+
     async def get_timeframe_analysis(self, symbol, timeframe):
         cache_key = f"{symbol}_{timeframe}"
-        
+
         # Check cache first
         if self.is_cache_valid(cache_key, timeframe):
             return self.analysis_cache[cache_key]
-        
+
         # Perform analysis
         analysis = await self.perform_analysis(symbol, timeframe)
-        
+
         # Cache results
         self.analysis_cache[cache_key] = {
             'data': analysis,
             'timestamp': time.time()
         }
-        
+
         return analysis
-    
+
     def is_cache_valid(self, cache_key, timeframe):
         if cache_key not in self.analysis_cache:
             return False
-        
+
         cache_age = time.time() - self.analysis_cache[cache_key]['timestamp']
         return cache_age < self.cache_duration[timeframe]
 ```
@@ -406,12 +406,12 @@ class TimeframeDataManager:
             'H4': 300,    # ~50 days
             'D1': 200     # ~7 months
         }
-    
+
     def optimize_data_usage(self):
         for tf, max_candles in self.max_candles_per_timeframe.items():
             # Trim old data to prevent memory bloat
             self.trim_timeframe_data(tf, max_candles)
-        
+
         # Force garbage collection
         gc.collect()
 ```
@@ -424,40 +424,40 @@ class TimeframeDataManager:
 class MultiTimeframeMonitor:
     def __init__(self):
         self.performance_metrics = {}
-    
+
     def log_analysis_performance(self, symbol, timeframes, execution_time):
         """Log performance metrics for multi-timeframe analysis."""
-        
+
         metric_key = f"{symbol}_{len(timeframes)}tf"
-        
+
         if metric_key not in self.performance_metrics:
             self.performance_metrics[metric_key] = []
-        
+
         self.performance_metrics[metric_key].append({
             'execution_time': execution_time,
             'timeframes': timeframes,
             'timestamp': time.time()
         })
-        
+
         # Alert if analysis takes too long
         if execution_time > 5.0:  # 5 seconds threshold
             logger.warning(f"Slow multi-timeframe analysis: {execution_time:.2f}s for {symbol}")
-    
+
     def get_performance_summary(self):
         """Get performance summary for all timeframe analyses."""
-        
+
         summary = {}
         for key, metrics in self.performance_metrics.items():
             if metrics:
                 avg_time = sum(m['execution_time'] for m in metrics) / len(metrics)
                 max_time = max(m['execution_time'] for m in metrics)
-                
+
                 summary[key] = {
                     'average_time': avg_time,
                     'max_time': max_time,
                     'total_analyses': len(metrics)
                 }
-        
+
         return summary
 ```
 

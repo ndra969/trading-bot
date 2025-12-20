@@ -7,9 +7,26 @@ from trading_bot.position.position_models import Position, PositionStatus, Posit
 
 
 @pytest.fixture
-def trailing_manager():
+def mock_config():
+    """Create a mock configuration."""
+    return {
+        "trade_management": {
+            "defaults": {
+                "trailing_stop": {"enabled": True, "activation_pips": 20.0, "limit_pips": 10.0}
+            },
+            "overrides": {
+                "forex_jpy": {"trailing_stop": {"activation_pips": 100.0, "limit_pips": 20.0}},
+                "commodities": {"trailing_stop": {"activation_pips": 500.0, "limit_pips": 50.0}},
+                "crypto": {"trailing_stop": {"activation_pips": 1000.0, "limit_pips": 300.0}},
+            },
+        }
+    }
+
+
+@pytest.fixture
+def trailing_manager(mock_config):
     """Create a TrailingStopManager instance."""
-    return TrailingStopManager()
+    return TrailingStopManager(config=mock_config)
 
 
 @pytest.fixture
@@ -47,19 +64,18 @@ class TestShouldActivateTrailing:
     """Test should_activate_trailing method."""
 
     def test_should_activate_forex_threshold_hit(self, trailing_manager, buy_position_forex):
-        """Test trailing should activate when threshold hit (66% of TP)."""
-        # TP distance: 1.1150 - 1.1000 = 0.0150 = 150 pips
-        # Activation threshold: 66% of 150 = 99 pips
-        buy_position_forex.current_price = 1.1099
-        buy_position_forex.current_profit_pips = 99.0
+        """Test trailing should activate when threshold hit."""
+        # Config threshold is 20.0 pips
+        buy_position_forex.current_price = 1.1020
+        buy_position_forex.current_profit_pips = 20.0
 
         assert trailing_manager.should_activate_trailing(buy_position_forex) is True
 
     def test_should_activate_forex_threshold_not_hit(self, trailing_manager, buy_position_forex):
         """Test trailing should not activate when threshold not hit."""
-        # TP distance: 150 pips, threshold: 99 pips (66%)
-        buy_position_forex.current_price = 1.1090
-        buy_position_forex.current_profit_pips = 90.0  # Below threshold
+        # Config threshold is 20.0 pips
+        buy_position_forex.current_price = 1.1015
+        buy_position_forex.current_profit_pips = 15.0
 
         assert trailing_manager.should_activate_trailing(buy_position_forex) is False
 
@@ -103,8 +119,8 @@ class TestShouldUpdateTrailingStop:
         buy_position_forex.current_profit_pips = 25.0
         trailing_manager.activate_trailing(buy_position_forex)
 
-        # Profit stays same
-        buy_position_forex.current_profit_pips = 25.0
+        # Profit decreases (not increased)
+        buy_position_forex.current_profit_pips = 20.0
 
         assert trailing_manager.should_update_trailing_stop(buy_position_forex) is False
 
@@ -216,23 +232,25 @@ class TestGetTrailingParameters:
     def test_get_trailing_distance_jpy(self, trailing_manager):
         """Test get trailing distance for JPY pair."""
         distance = trailing_manager.get_trailing_distance("USDJPY")
-        assert distance == 100.0
+        assert distance == 20.0
 
     def test_get_activation_threshold_forex(self, trailing_manager):
-        """Test get activation threshold for forex (static, for reference)."""
+        """Test get activation threshold for forex."""
         threshold = trailing_manager.get_activation_threshold("EURUSD")
-        assert threshold == 20.0  # Static default value
+        assert threshold == 20.0  # From mock config
 
-    def test_get_activation_threshold_dynamic_forex(self, trailing_manager, buy_position_forex):
-        """Test get activation threshold dynamically based on TP (66% of TP)."""
-        # TP distance: 150 pips, threshold: 66% = 99 pips
+    def test_get_activation_threshold_dynamic_is_deprecated(
+        self, trailing_manager, buy_position_forex
+    ):
+        """Test dynamic activation is no longer used, returns static config."""
+        # Previous logic used TP distance, new logic uses straightforward config
         threshold = trailing_manager.get_activation_threshold("EURUSD", buy_position_forex)
-        assert threshold == pytest.approx(99.0, abs=0.1)
+        assert threshold == 20.0
 
     def test_get_activation_threshold_jpy(self, trailing_manager):
-        """Test get activation threshold for JPY pair (static, for reference)."""
+        """Test get activation threshold for JPY pair."""
         threshold = trailing_manager.get_activation_threshold("USDJPY")
-        assert threshold == 200.0  # Static default value
+        assert threshold == 100.0  # From mock config override
 
 
 class TestGetHighestProfit:
@@ -278,3 +296,126 @@ class TestUtilityMethods:
         str_repr = str(trailing_manager)
         assert "TrailingStopManager" in str_repr
         assert "0 positions trailing" in str_repr
+
+    def test_should_activate_closed_position(self, trailing_manager, buy_position_forex):
+        """Test trailing should not activate for closed position."""
+        buy_position_forex.status = PositionStatus.CLOSED
+        buy_position_forex.current_profit_pips = 25.0
+
+        assert trailing_manager.should_activate_trailing(buy_position_forex) is False
+
+    def test_should_activate_sell_position(self, trailing_manager):
+        """Test trailing activation for SELL position calculates TP correctly."""
+        sell_position = Position(
+            position_id="pos_sell_001",
+            symbol="EURUSD",
+            position_type=PositionType.SELL,
+            entry_price=1.1000,
+            stop_loss=1.1050,
+            take_profit=1.0850,  # TP below entry for SELL
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,
+        )
+        sell_position.current_price = 1.0850
+        # TP distance: 1.1000 - 1.0850 = 0.0150 = 150 pips
+        # Activation: 66% of 150 = 99 pips, but static threshold is 20 pips
+        # Min threshold = 20 pips
+        sell_position.current_profit_pips = 25.0  # Above static threshold
+
+        assert trailing_manager.should_activate_trailing(sell_position) is True
+
+    def test_activate_trailing_closed_position(self, trailing_manager, buy_position_forex):
+        """Test activating trailing for closed position does nothing."""
+        buy_position_forex.status = PositionStatus.CLOSED
+        buy_position_forex.current_profit_pips = 25.0
+
+        trailing_manager.activate_trailing(buy_position_forex)
+
+        # Should not be added to trailing_active
+        assert buy_position_forex.position_id not in trailing_manager.trailing_active
+
+    def test_should_update_closed_position(self, trailing_manager, buy_position_forex):
+        """Test trailing should not update for closed position."""
+        buy_position_forex.status = PositionStatus.CLOSED
+        trailing_manager.trailing_active.add(buy_position_forex.position_id)
+
+        assert trailing_manager.should_update_trailing_stop(buy_position_forex) is False
+
+    def test_should_update_can_improve_sl(self, trailing_manager, buy_position_forex):
+        """Test trailing updates when SL can be improved even if profit same."""
+        # Activate trailing
+        buy_position_forex.current_price = 1.1030
+        buy_position_forex.current_profit_pips = 30.0
+        buy_position_forex.stop_loss = 1.1020
+        trailing_manager.activate_trailing(buy_position_forex)
+        trailing_manager.highest_profit[buy_position_forex.position_id] = 30.0
+
+        # Price moves up slightly, profit stays same but SL can improve
+        buy_position_forex.current_price = 1.1035
+        buy_position_forex.current_profit_pips = 30.0  # Same profit
+
+        # Should update because SL can be improved (and profit >= 90% of highest)
+        assert trailing_manager.should_update_trailing_stop(buy_position_forex) is True
+
+    def test_should_update_can_improve_sl_sell(self, trailing_manager):
+        """Test trailing updates when SL can be improved for SELL position."""
+        sell_position = Position(
+            position_id="pos_sell_001",
+            symbol="EURUSD",
+            position_type=PositionType.SELL,
+            entry_price=1.1000,
+            stop_loss=1.2480,  # Current SL
+            take_profit=1.2350,
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,
+        )
+        sell_position.current_price = 1.2470
+        sell_position.current_profit_pips = 30.0
+        trailing_manager.activate_trailing(sell_position)
+        trailing_manager.highest_profit[sell_position.position_id] = 30.0
+
+        # Price moves down (better for SELL), SL can improve (lower is better for SELL)
+        sell_position.current_price = 1.2465
+        sell_position.current_profit_pips = 30.0  # Same profit
+
+        # Should update because SL can be improved (new SL would be lower, which is better for SELL)
+        assert trailing_manager.should_update_trailing_stop(sell_position) is True
+
+    def test_update_trailing_stop_closed_position(self, trailing_manager, buy_position_forex):
+        """Test updating trailing for closed position raises error."""
+        buy_position_forex.status = PositionStatus.CLOSED
+        trailing_manager.trailing_active.add(buy_position_forex.position_id)
+
+        with pytest.raises(ValueError, match="not open"):
+            trailing_manager.update_trailing_stop(buy_position_forex)
+
+    def test_update_trailing_stop_sell_no_improvement(self, trailing_manager):
+        """Test trailing stop for SELL doesn't move when new SL would be worse."""
+        sell_position = Position(
+            position_id="pos_sell_001",
+            symbol="EURUSD",
+            position_type=PositionType.SELL,
+            entry_price=1.1000,
+            stop_loss=1.2480,  # Already trailed
+            take_profit=1.2350,
+            volume=1.0,
+            pip_size=0.0001,
+            pip_value_per_lot=10.0,
+            status=PositionStatus.OPEN,
+        )
+        sell_position.current_price = 1.2470
+        sell_position.current_profit_pips = 30.0
+        trailing_manager.activate_trailing(sell_position)
+        trailing_manager.highest_profit[sell_position.position_id] = 30.0
+
+        # Price moves up (worse for SELL), new SL would be higher (worse)
+        sell_position.current_price = 1.2485
+        sell_position.current_profit_pips = 25.0
+
+        # Should not move SL (would be worse)
+        new_sl = trailing_manager.update_trailing_stop(sell_position)
+        assert new_sl == 1.2480  # Stays at old SL

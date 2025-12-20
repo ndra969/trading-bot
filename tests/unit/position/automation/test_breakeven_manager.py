@@ -7,9 +7,24 @@ from trading_bot.position.position_models import Position, PositionStatus, Posit
 
 
 @pytest.fixture
-def breakeven_manager():
+def mock_config():
+    """Create a mock configuration."""
+    return {
+        "trade_management": {
+            "defaults": {"breakeven": {"enabled": True, "trigger_pips": 15.0, "offset_pips": 2.0}},
+            "overrides": {
+                "forex_jpy": {"breakeven": {"trigger_pips": 150.0, "offset_pips": 20.0}},
+                "commodities": {"breakeven": {"trigger_pips": 500.0, "offset_pips": 50.0}},
+                "crypto": {"breakeven": {"trigger_pips": 1000.0, "offset_pips": 300.0}},
+            },
+        }
+    }
+
+
+@pytest.fixture
+def breakeven_manager(mock_config):
     """Create a BreakevenManager instance."""
-    return BreakevenManager()
+    return BreakevenManager(config=mock_config)
 
 
 @pytest.fixture
@@ -108,6 +123,13 @@ class TestShouldMoveToBreakeven:
     def test_should_move_closed_position(self, breakeven_manager, buy_position_forex):
         """Test closed position should not trigger breakeven."""
         buy_position_forex.status = PositionStatus.CLOSED
+        buy_position_forex.current_profit_pips = 20.0
+
+        assert breakeven_manager.should_move_to_breakeven(buy_position_forex) is False
+
+    def test_should_move_current_price_none(self, breakeven_manager, buy_position_forex):
+        """Test position with None current_price should not trigger breakeven."""
+        buy_position_forex.current_price = None
         buy_position_forex.current_profit_pips = 20.0
 
         assert breakeven_manager.should_move_to_breakeven(buy_position_forex) is False

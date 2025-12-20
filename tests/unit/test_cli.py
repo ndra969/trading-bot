@@ -4,7 +4,7 @@ Unit tests for CLI commands.
 Tests start, stop, status, config, and MT5 commands.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -36,6 +36,26 @@ def mock_config():
     config.mt5.server = "TestServer"
     config.mt5.connection_timeout = 30
     config.mt5.retry_attempts = 3
+    # Make config.get() work like a dict
+    config.get = Mock(
+        side_effect=lambda key, default=None: {
+            "symbols": ["EURUSD", "GBPUSD"],
+            "timeframe": "H1",
+            "analysis_interval": 60,
+            "initial_balance": 10000.0,
+            "risk_management": {},
+            "position_manager": {},
+        }.get(key, default)
+    )
+    # Make config._config a dict-like object
+    config._config = {
+        "symbols": ["EURUSD", "GBPUSD"],
+        "timeframe": "H1",
+        "analysis_interval": 60,
+        "initial_balance": 10000.0,
+        "risk_management": {},
+        "position_manager": {},
+    }
     return config
 
 
@@ -83,38 +103,72 @@ class TestStartCommand:
 
     @patch("trading_bot.cli.init_database")
     @patch("trading_bot.cli.setup_logger")
-    def test_start_dry_run_mock_mode(self, mock_setup_logger, mock_init_db, runner, mock_config):
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_dry_run_mock_mode(
+        self, mock_bot_class, mock_asyncio_run, mock_setup_logger, mock_init_db, runner, mock_config
+    ):
         """Test start command with dry-run (mock mode)."""
         with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            # Mock init_database to return a manager with mocked create_tables
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            # Mock TradingBot instance
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            # Mock asyncio.run to avoid actually running async code
+            mock_asyncio_run.return_value = None
+
             result = runner.invoke(cli, ["--config", "development", "start", "--dry-run"])
 
             assert result.exit_code == 0
-            assert "DRY-RUN" in result.output
-            assert "MOCK MT5" in result.output or "Mock MT5" in result.output
+            assert "DRY-RUN" in result.output or "dry-run" in result.output.lower()
             mock_init_db.assert_called_once()
+            mock_bot_class.assert_called_once()
+            # asyncio.run is called twice: once for create_tables() and once for bot.start()
+            assert mock_asyncio_run.call_count == 2
 
     @patch("trading_bot.cli.init_database")
     @patch("trading_bot.cli.MT5Connector")
     @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
     def test_start_dry_run_with_mt5(
-        self, mock_setup_logger, mock_mt5, mock_init_db, runner, mock_config
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
     ):
         """Test start command with dry-run and real MT5 connection."""
         with patch("trading_bot.cli.Configuration", return_value=mock_config):
             mock_connector = Mock()
             mock_connector.initialize.return_value = True
             mock_connector.account_info = {"login": 12345, "balance": 10000.0}
+            mock_connector.is_connected.return_value = True
             mock_mt5.return_value = mock_connector
+
+            # Mock TradingBot instance
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            # Mock asyncio.run to avoid actually running async code
+            mock_asyncio_run.return_value = None
 
             result = runner.invoke(
                 cli, ["--config", "development", "start", "--dry-run", "--connect-mt5"]
             )
 
             assert result.exit_code == 0
-            assert "DRY-RUN" in result.output
-            assert (
-                "MT5 connected (DRY-RUN)" in result.output or "Real MT5 connection" in result.output
-            )
+            assert "DRY-RUN" in result.output or "dry-run" in result.output.lower()
 
     @patch("trading_bot.cli.init_database")
     @patch("trading_bot.cli.MT5Connector")

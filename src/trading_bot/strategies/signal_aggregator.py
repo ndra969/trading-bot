@@ -44,15 +44,15 @@ class SignalAggregator:
         if not self.confluence_weights:
             # Default weights (Phase 5: Enhanced Architecture)
             self.confluence_weights = {
-                "foundation": 0.30,      # Foundation (S&D Zones)
-                "trendline": 0.20,       # Trendline Confluence
-                "price_action": 0.15,    # Price Action
-                "fibonacci": 0.12,       # Fibonacci
-                "breakout_retest": 0.12, # Breakout/Retest
-                "rsi": 0.10,             # RSI Analysis
-                "structure": 0.08,       # Market Structure
-                "ma": 0.08,              # Moving Average
-                "market_structure": 0.08, # Alias for structure
+                "foundation": 0.30,  # Foundation (S&D Zones)
+                "trendline": 0.20,  # Trendline Confluence
+                "price_action": 0.15,  # Price Action
+                "fibonacci": 0.12,  # Fibonacci
+                "breakout_retest": 0.12,  # Breakout/Retest
+                "rsi": 0.10,  # RSI Analysis
+                "structure": 0.08,  # Market Structure
+                "ma": 0.08,  # Moving Average
+                "market_structure": 0.08,  # Alias for structure
                 "volume_profile": 0.05,
                 "multi_timeframe": 0.05,
             }

@@ -227,9 +227,9 @@ class TestConsolidationZoneDetection:
         zones = detector.detect_zones(consolidation_data, zone_types=[ZoneType.CONSOLIDATION])
 
         consolidation_zones = [z for z in zones if z.zone_type == ZoneType.CONSOLIDATION]
-        assert (
-            len(consolidation_zones) > 0
-        ), f"Expected consolidation zones, got {len(consolidation_zones)}"
+        assert len(consolidation_zones) > 0, (
+            f"Expected consolidation zones, got {len(consolidation_zones)}"
+        )
 
     def test_consolidation_zone_touch_count(self, consolidation_data):
         """Test consolidation zone has minimum touches."""

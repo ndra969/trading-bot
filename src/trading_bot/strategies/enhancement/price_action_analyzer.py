@@ -59,13 +59,11 @@ class PriceActionAnalyzer:
         # Basic calculations
         curr_range = curr_high - curr_low
         curr_body = abs(curr_close - curr_open)
-        prev_range = prev_high - prev_low
-        prev_body = abs(prev_close - prev_open)
+        # prev_range = prev_high - prev_low  # Not used
+        # prev_body = abs(prev_close - prev_open)  # Not used
 
         if curr_range == 0:
             return None  # Invalid candle
-
-        signal = None
 
         # 1. Pinbar Detection
         # Long wick, small body

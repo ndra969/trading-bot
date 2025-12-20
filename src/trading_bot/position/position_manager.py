@@ -74,14 +74,14 @@ class PositionManager:
                     try:
                         # Convert DB model to Position object
                         metadata = db_pos.meta_data or {}
-                        
+
                         # Pre-validate data before creating Position object
                         position_type = PositionType(db_pos.position_type)
                         position_status = PositionStatus(db_pos.status)
                         entry_price = db_pos.entry_price
                         stop_loss = db_pos.stop_loss
                         take_profit = db_pos.take_profit
-                        
+
                         # Validate price relationships
                         # For PENDING positions: strict validation (SL must be below/above entry)
                         # For OPEN positions: allow breakeven (SL can be above/below entry)
@@ -134,7 +134,7 @@ class PositionManager:
                                 )
                                 invalid_count += 1
                                 continue
-                        
+
                         # Create Position object (will validate other fields)
                         position = Position(
                             position_id=db_pos.position_id,
@@ -159,9 +159,11 @@ class PositionManager:
                         )
 
                         # Extract ticket from metadata and set to position object
-                        if 'ticket' in metadata:
-                            position.ticket = int(metadata['ticket'])
-                            logger.debug(f"Loaded ticket {position.ticket} for position {position.position_id}")
+                        if "ticket" in metadata:
+                            position.ticket = int(metadata["ticket"])
+                            logger.debug(
+                                f"Loaded ticket {position.ticket} for position {position.position_id}"
+                            )
 
                         # Store in memory
                         self.positions[position.position_id] = position
@@ -171,7 +173,7 @@ class PositionManager:
                         self.positions_by_symbol[position.symbol].append(position.position_id)
 
                         count += 1
-                        
+
                     except ValueError as e:
                         # Handle validation errors from Position.__post_init__
                         logger.warning(
@@ -183,7 +185,7 @@ class PositionManager:
                         # Handle any other unexpected errors
                         logger.error(
                             f"Error loading position {db_pos.position_id} ({db_pos.symbol}): {e}",
-                            exc_info=True
+                            exc_info=True,
                         )
                         invalid_count += 1
                         continue
@@ -203,11 +205,11 @@ class PositionManager:
         """Save or update position in database."""
         try:
             # Sync ticket from position object to metadata if exists
-            if hasattr(position, 'ticket') and position.ticket:
+            if hasattr(position, "ticket") and position.ticket:
                 if not position.metadata:
                     position.metadata = {}
-                position.metadata['ticket'] = position.ticket
-            
+                position.metadata["ticket"] = position.ticket
+
             async with get_session() as session:
                 # Check if position exists
                 stmt = select(DBPosition).where(DBPosition.position_id == position.position_id)
@@ -250,7 +252,7 @@ class PositionManager:
                         raise ValueError("Stop loss must be positive")
                     if position.take_profit <= 0:
                         raise ValueError("Take profit must be positive")
-                    
+
                     # Update existing
                     db_pos.status = position.status.value
                     db_pos.stop_loss = position.stop_loss  # Update SL (for breakeven/trailing)

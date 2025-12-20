@@ -5,14 +5,15 @@ Safe Live Trading Test Script
 Tests foundation strategy with real market data but minimal risk.
 """
 
-import asyncio
 import os
 import sys
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from dotenv import load_dotenv
 
 # Add src to path
-sys.path.append('src')
+sys.path.append("src")
+
 
 def setup_environment():
     """Setup environment variables"""
@@ -24,27 +25,25 @@ def setup_environment():
     print(f"[INFO] Using {env_file}")
     return env
 
+
 def test_foundation_strategy():
     """Test foundation strategy with real data"""
     try:
         from trading_bot.strategies.foundation.foundation_engine import FoundationEngine
-        from trading_bot.data.models.zone import SupplyDemandZone
-        from trading_bot.strategies.supply_demand import ZoneType
 
         print("[INFO] Testing Foundation Strategy...")
 
         # Initialize foundation engine
-        engine = FoundationEngine({
-            "zone_detection": {
-                "min_zone_height_pips": 10.0,  # Conservative
-                "max_zone_age_hours": 24.0,
-                "min_touch_points": 2
-            },
-            "risk_management": {
-                "max_zones_per_symbol": 5,
-                "zone_quality_threshold": 70.0
+        engine = FoundationEngine(
+            {
+                "zone_detection": {
+                    "min_zone_height_pips": 10.0,  # Conservative
+                    "max_zone_age_hours": 24.0,
+                    "min_touch_points": 2,
+                },
+                "risk_management": {"max_zones_per_symbol": 5, "zone_quality_threshold": 70.0},
             }
-        })
+        )
 
         print("[SUCCESS] Foundation Engine initialized")
         return engine
@@ -53,12 +52,13 @@ def test_foundation_strategy():
         print(f"[ERROR] Failed to initialize Foundation Engine: {e}")
         return None
 
+
 def display_symbol_info():
     """Display comprehensive symbol information"""
     try:
         import yaml
 
-        with open('config/symbol_mapping.yaml', 'r') as f:
+        with open("config/symbol_mapping.yaml") as f:
             symbol_config = yaml.safe_load(f)
 
         print("=" * 60)
@@ -97,17 +97,17 @@ def display_symbol_info():
 
         # Display supported brokers
         print("[INFO] Supported Brokers:")
-        brokers = list(symbol_config['brokers'].keys())
+        brokers = list(symbol_config["brokers"].keys())
         for i, broker in enumerate(brokers, 1):
             print(f"  {i:2d}. {broker}")
         print()
 
         # Display example symbol mappings
         print("[INFO] Example Symbol Mappings (EURUSD):")
-        example_brokers = ['exness_standard', 'exness_cent', 'xm_standard', 'oanda', 'ic_markets']
+        example_brokers = ["exness_standard", "exness_cent", "xm_standard", "oanda", "ic_markets"]
         for broker in example_brokers:
-            if broker in symbol_config['brokers']:
-                mapping = symbol_config['brokers'][broker].get('EURUSD', 'N/A')
+            if broker in symbol_config["brokers"]:
+                mapping = symbol_config["brokers"][broker].get("EURUSD", "N/A")
                 print(f"  {broker:20s}: {mapping}")
 
         print("=" * 60)
@@ -117,18 +117,19 @@ def display_symbol_info():
         print(f"[ERROR] Failed to load symbol configuration: {e}")
         return None
 
+
 def test_zone_detection(engine):
     """Test zone detection with sample data"""
     try:
-        import pandas as pd
         import numpy as np
+        import pandas as pd
         import yaml
         from trading_bot.strategies.supply_demand import ZoneType
 
         print("[INFO] Testing zone detection with sample data...")
 
         # Load symbol configuration
-        with open('config/symbol_mapping.yaml', 'r') as f:
+        with open("config/symbol_mapping.yaml") as f:
             symbol_config = yaml.safe_load(f)
 
         print("[INFO] Available trading symbols by asset class:")
@@ -141,7 +142,7 @@ def test_zone_detection(engine):
         print(f"[INFO] Default broker: {symbol_config['default_broker']}")
 
         # Load active symbols configuration
-        with open('config/active_symbols.yaml', 'r') as f:
+        with open("config/active_symbols.yaml") as f:
             active_symbols_config = yaml.safe_load(f)
 
         print("[INFO] Active Trading Symbols Configuration:")
@@ -151,27 +152,31 @@ def test_zone_detection(engine):
 
         # Get enabled symbols
         enabled_symbols = []
-        for symbol, config in active_symbols_config['symbols'].items():
-            if config['enabled']:
-                enabled_symbols.append({
-                    'symbol': symbol,
-                    'priority': config['priority'],
-                    'asset_class': config['asset_class'],
-                    'timeframes': config['timeframes'],
-                    'sessions': config['trading_sessions']
-                })
+        for symbol, config in active_symbols_config["symbols"].items():
+            if config["enabled"]:
+                enabled_symbols.append(
+                    {
+                        "symbol": symbol,
+                        "priority": config["priority"],
+                        "asset_class": config["asset_class"],
+                        "timeframes": config["timeframes"],
+                        "sessions": config["trading_sessions"],
+                    }
+                )
 
         print(f"[INFO] Enabled Symbols ({len(enabled_symbols)}):")
-        for symbol_info in sorted(enabled_symbols, key=lambda x: x['priority']):
-            print(f"  {symbol_info['symbol']:8s} - {symbol_info['asset_class']:15s} (Priority: {symbol_info['priority']})")
+        for symbol_info in sorted(enabled_symbols, key=lambda x: x["priority"]):
+            print(
+                f"  {symbol_info['symbol']:8s} - {symbol_info['asset_class']:15s} (Priority: {symbol_info['priority']})"
+            )
 
         if not enabled_symbols:
             print("[WARNING] No symbols enabled in configuration!")
             return False
 
         # Select highest priority symbol for testing
-        selected_symbol_info = min(enabled_symbols, key=lambda x: x['priority'])
-        selected_symbol = selected_symbol_info['symbol']
+        selected_symbol_info = min(enabled_symbols, key=lambda x: x["priority"])
+        selected_symbol = selected_symbol_info["symbol"]
 
         print(f"\n[INFO] Testing with symbol: {selected_symbol}")
         print(f"[INFO] Asset Class: {selected_symbol_info['asset_class']}")
@@ -180,14 +185,14 @@ def test_zone_detection(engine):
         print(f"[INFO] Trading Sessions: {', '.join(selected_symbol_info['sessions'])}")
 
         # Get symbol-specific pip value
-        if selected_symbol_info['asset_class'] == 'forex_majors':
-            if 'JPY' in selected_symbol:
+        if selected_symbol_info["asset_class"] == "forex_majors":
+            if "JPY" in selected_symbol:
                 pip_value = 0.01
                 pip_description = "0.01 (JPY pairs)"
             else:
                 pip_value = 0.0001
                 pip_description = "0.0001 (Standard pairs)"
-        elif selected_symbol_info['asset_class'] == 'commodities':
+        elif selected_symbol_info["asset_class"] == "commodities":
             pip_value = 0.1
             pip_description = "0.1 (Gold/Silver)"
         else:
@@ -198,7 +203,7 @@ def test_zone_detection(engine):
 
         # Show broker mappings for this symbol
         print(f"[INFO] Broker symbol mappings for {selected_symbol}:")
-        for broker, mappings in symbol_config['brokers'].items():
+        for broker, mappings in symbol_config["brokers"].items():
             if selected_symbol in mappings:
                 print(f"  {broker}: {mappings[selected_symbol]}")
 
@@ -206,9 +211,7 @@ def test_zone_detection(engine):
         np.random.seed(42)  # For consistent results
 
         dates = pd.date_range(
-            start=datetime.now(UTC).replace(hour=0, minute=0, second=0),
-            periods=100,
-            freq='5min'
+            start=datetime.now(UTC).replace(hour=0, minute=0, second=0), periods=100, freq="5min"
         )
 
         # Simulate price movement based on symbol
@@ -217,7 +220,7 @@ def test_zone_detection(engine):
             "GBPUSD": 1.2650,
             "USDJPY": 149.50,
             "XAUUSD": 2650.0,
-            "BTCUSD": 65000.0
+            "BTCUSD": 65000.0,
         }
 
         pip_sizes = {
@@ -225,7 +228,7 @@ def test_zone_detection(engine):
             "GBPUSD": 0.0001,
             "USDJPY": 0.01,
             "XAUUSD": 0.1,
-            "BTCUSD": 1.0
+            "BTCUSD": 1.0,
         }
 
         base_price = base_prices[selected_symbol]
@@ -246,14 +249,16 @@ def test_zone_detection(engine):
             if low > high:
                 high, low = low, high
 
-            data.append({
-                'timestamp': timestamp,
-                'open': current_price,
-                'high': high,
-                'low': low,
-                'close': current_price + np.random.normal(0, 0.0001),
-                'volume': max(100, int(np.random.normal(500, 100)))
-            })
+            data.append(
+                {
+                    "timestamp": timestamp,
+                    "open": current_price,
+                    "high": high,
+                    "low": low,
+                    "close": current_price + np.random.normal(0, 0.0001),
+                    "volume": max(100, int(np.random.normal(500, 100))),
+                }
+            )
 
         df = pd.DataFrame(data)
         print(f"[INFO] Generated {len(df)} candlesticks of sample data")
@@ -261,18 +266,20 @@ def test_zone_detection(engine):
 
         # Test zone detection - convert DataFrame to proper format
         ohlcv_data = {
-            'timestamp': df['timestamp'].tolist(),
-            'open': df['open'].tolist(),
-            'high': df['high'].tolist(),
-            'low': df['low'].tolist(),
-            'close': df['close'].tolist(),
-            'volume': df['volume'].tolist()
+            "timestamp": df["timestamp"].tolist(),
+            "open": df["open"].tolist(),
+            "high": df["high"].tolist(),
+            "low": df["low"].tolist(),
+            "close": df["close"].tolist(),
+            "volume": df["volume"].tolist(),
         }
 
         demand_zones = engine.zone_detector.detect_zones(ohlcv_data, ZoneType.DEMAND)
         supply_zones = engine.zone_detector.detect_zones(ohlcv_data, ZoneType.SUPPLY)
 
-        print(f"[SUCCESS] Detected {len(demand_zones)} demand zones and {len(supply_zones)} supply zones")
+        print(
+            f"[SUCCESS] Detected {len(demand_zones)} demand zones and {len(supply_zones)} supply zones"
+        )
 
         # Show some zone examples
         if demand_zones:
@@ -292,8 +299,10 @@ def test_zone_detection(engine):
     except Exception as e:
         print(f"[ERROR] Zone detection failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_database_storage(engine):
     """Test database storage of zones"""
@@ -316,6 +325,7 @@ def test_database_storage(engine):
         print(f"[ERROR] Database storage test failed: {e}")
         return False
 
+
 def test_strategy_analysis(engine):
     """Test strategy analysis capabilities"""
     try:
@@ -335,6 +345,7 @@ def test_strategy_analysis(engine):
         print(f"[ERROR] Strategy analysis failed: {e}")
         return False
 
+
 def test_configuration():
     """Test environment configuration"""
     try:
@@ -350,6 +361,7 @@ def test_configuration():
     except Exception as e:
         print(f"[ERROR] Configuration test failed: {e}")
         return False
+
 
 def main():
     """Main test function"""
@@ -375,7 +387,8 @@ def main():
     print("=" * 60)
     try:
         import yaml
-        with open('config/active_symbols.yaml', 'r') as f:
+
+        with open("config/active_symbols.yaml") as f:
             active_config = yaml.safe_load(f)
 
         print(f"[INFO] Active Trading Enabled: {active_config['enabled']}")
@@ -384,9 +397,9 @@ def main():
 
         # Count enabled symbols by asset class
         enabled_by_asset = {}
-        for symbol, config in active_config['symbols'].items():
-            if config['enabled']:
-                asset_class = config['asset_class']
+        for symbol, config in active_config["symbols"].items():
+            if config["enabled"]:
+                asset_class = config["asset_class"]
                 if asset_class not in enabled_by_asset:
                     enabled_by_asset[asset_class] = []
                 enabled_by_asset[asset_class].append(symbol)
@@ -448,6 +461,7 @@ def main():
 
     return True
 
+
 if __name__ == "__main__":
     try:
         success = main()
@@ -459,5 +473,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] Unexpected error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

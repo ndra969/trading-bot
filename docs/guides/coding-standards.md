@@ -1,7 +1,7 @@
 # Coding Standards & Best Practices
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-11-29  
+**Version**: 1.0.0
+**Last Updated**: 2025-11-29
 **Status**: Mandatory for all code contributions
 
 ## 📋 Table of Contents
@@ -317,13 +317,13 @@ def calculate_position_size(
 ) -> float:
     """
     Calculate position size based on risk.
-    
+
     Args:
         account_balance: Current account balance in USD
         risk_percentage: Risk as decimal (0.01 = 1%)
         stop_loss_pips: Stop loss distance in pips
         pip_value: Value per pip
-        
+
     Returns:
         Position size in lots
     """
@@ -347,21 +347,21 @@ def calculate_position_size(account_balance, risk_percentage, stop_loss_pips, pi
 class MT5Connector:
     """
     MetaTrader5 platform connector.
-    
+
     Manages connection lifecycle, health monitoring, and basic MT5 operations.
     Supports automatic reconnection and connection pooling.
-    
+
     Attributes:
         terminal_path: Path to MT5 terminal executable
         login: Trading account login ID
         timeout: Connection timeout in seconds
-        
+
     Example:
         >>> connector = MT5Connector(login=12345, password="secret")
         >>> connector.initialize()
         >>> print(connector.account_info)
     """
-    
+
     def __init__(
         self,
         terminal_path: Optional[str] = None,
@@ -371,13 +371,13 @@ class MT5Connector:
     ) -> None:
         """
         Initialize MT5 connector.
-        
+
         Args:
             terminal_path: Path to MT5 terminal (auto-detect if None)
             login: Trading account login
             password: Trading account password
             timeout: Connection timeout in seconds
-            
+
         Raises:
             ImportError: If MetaTrader5 package not available
         """
@@ -386,7 +386,7 @@ class MT5Connector:
 # ❌ WRONG - Missing or incomplete docstring
 class MT5Connector:
     """MT5 connector"""
-    
+
     def __init__(self, terminal_path=None, login=None, password=None, timeout=30):
         pass
 ```
@@ -405,12 +405,12 @@ async def get_market_data(
 ) -> pd.DataFrame:
     """
     Fetch market data asynchronously.
-    
+
     Args:
         symbol: Trading symbol
         timeframe: Timeframe (H1, H4, D1)
         count: Number of bars
-        
+
     Returns:
         DataFrame with OHLCV data
     """
@@ -430,45 +430,45 @@ def get_market_data(symbol, timeframe, count=100):
 # ✅ CORRECT - Organized class structure
 class TradingStrategy:
     """Base trading strategy class."""
-    
+
     # Class constants
     MAX_POSITIONS = 5
     DEFAULT_RISK = 0.01
-    
+
     def __init__(self, config: Dict[str, Any]) -> None:
         """Initialize strategy."""
         # Public attributes
         self.config = config
         self.active = True
-        
+
         # Private attributes
         self._positions: List[Dict] = []
         self._signals: List[Dict] = []
-    
+
     # Public methods
     def analyze_market(self) -> Dict[str, Any]:
         """Analyze market conditions."""
         pass
-    
+
     def generate_signal(self) -> Optional[Dict]:
         """Generate trading signal."""
         pass
-    
+
     # Private methods
     def _validate_signal(self, signal: Dict) -> bool:
         """Validate trading signal."""
         pass
-    
+
     def _calculate_size(self, risk: float) -> float:
         """Calculate position size."""
         pass
-    
+
     # Properties
     @property
     def is_active(self) -> bool:
         """Check if strategy is active."""
         return self.active
-    
+
     # Magic methods
     def __repr__(self) -> str:
         return f"TradingStrategy(active={self.active})"
@@ -477,15 +477,15 @@ class TradingStrategy:
 class TradingStrategy:
     def generate_signal(self):
         pass
-    
+
     def __init__(self, config):
         self._positions = []
         self.config = config
-    
+
     @property
     def is_active(self):
         return self.active
-    
+
     def _validate_signal(self, signal):
         pass
 ```
@@ -514,7 +514,7 @@ Example:
     >>> from trading_bot.connectors import MT5Connector
     >>> connector = MT5Connector(login=12345)
     >>> connector.initialize()
-    
+
 See Also:
     - account_manager.py: Account operations
     - order_manager.py: Order execution
@@ -545,27 +545,27 @@ def calculate_risk_amount(
     """Calculate risk amount in USD."""
     # Convert risk percentage to decimal (1% = 0.01)
     risk_decimal = risk_percent / 100
-    
+
     # Calculate maximum loss amount based on account balance
     max_loss = balance * risk_decimal
-    
+
     # Account for pip value in final calculation
     # Note: Pip value varies by symbol (0.0001 for EUR/USD, 0.01 for USD/JPY)
     risk_per_pip = max_loss / stop_loss_pips
-    
+
     return risk_per_pip
 
 # ❌ WRONG - Obvious or misleading comments
 def calculate_risk_amount(balance, risk_percent, stop_loss_pips):
     # Calculate risk
     risk_decimal = risk_percent / 100  # Divide by 100
-    
+
     # Calculate loss
     max_loss = balance * risk_decimal  # Multiply
-    
+
     # Calculate
     risk_per_pip = max_loss / stop_loss_pips  # Division
-    
+
     return risk_per_pip  # Return value
 ```
 
@@ -589,34 +589,34 @@ from trading_bot.connectors import MT5Connector
 
 class TestMT5Connector:
     """Test MT5Connector class."""
-    
+
     @pytest.fixture
     def connector(self):
         """Create MT5 connector instance for testing."""
         return MT5Connector(login=12345, password="test")
-    
+
     def test_initialization_success(self, connector):
         """Test successful MT5 initialization."""
         # Arrange
         expected_login = 12345
-        
+
         # Act
         result = connector.initialize()
-        
+
         # Assert
         assert result is True
         assert connector.account_info["login"] == expected_login
-    
+
     def test_initialization_failure_retry(self, connector):
         """Test initialization retry mechanism on failure."""
         # Arrange
         connector.retry_attempts = 3
-        
+
         # Act & Assert
         with patch("MetaTrader5.initialize", return_value=False):
             with pytest.raises(MT5ConnectionError):
                 connector.initialize()
-    
+
     @pytest.mark.parametrize(
         "timeout,expected",
         [
@@ -748,11 +748,11 @@ def connect_to_mt5(login: int, password: str) -> bool:
         if not result:
             raise MT5ConnectionError("MT5 initialization failed")
         return True
-        
+
     except MT5ConnectionError as e:
         logger.error(f"Connection error: {e}")
         raise
-        
+
     except Exception as e:
         logger.error(f"Unexpected error during MT5 connection: {e}")
         raise MT5ConnectionError(f"Failed to connect: {e}") from e
@@ -772,7 +772,7 @@ def connect_to_mt5(login, password):
 # ✅ CORRECT - Informative custom exceptions
 class MT5OrderError(Exception):
     """Exception for MT5 order-related errors."""
-    
+
     def __init__(self, message: str, error_code: int = 0):
         self.message = message
         self.error_code = error_code
@@ -780,7 +780,7 @@ class MT5OrderError(Exception):
 
 class MT5SymbolError(Exception):
     """Exception for MT5 symbol-related errors."""
-    
+
     def __init__(self, symbol: str, message: str):
         self.symbol = symbol
         self.message = message
@@ -806,14 +806,14 @@ from pydantic import BaseModel, Field, validator
 
 class MT5Config(BaseModel):
     """MT5 configuration."""
-    
+
     terminal_path: Optional[str] = None
     login: Optional[int] = None
     password: Optional[str] = None
     server: Optional[str] = None
     connection_timeout: int = Field(default=30, ge=5, le=120)
     retry_attempts: int = Field(default=3, ge=1, le=10)
-    
+
     @validator("login")
     def validate_login(cls, v):
         if v is not None and v <= 0:
@@ -867,7 +867,7 @@ logger = get_logger(__name__)
 def execute_trade(symbol: str, volume: float, order_type: str) -> Dict:
     """Execute trade order."""
     logger.info(f"Executing trade: {order_type} {volume} {symbol}")
-    
+
     try:
         result = send_order(symbol, volume, order_type)
         logger.info(
@@ -876,7 +876,7 @@ def execute_trade(symbol: str, volume: float, order_type: str) -> Dict:
             f"Price: {result['price']:.5f}"
         )
         return result
-        
+
     except Exception as e:
         logger.error(
             f"Trade execution failed - "
@@ -944,36 +944,36 @@ logger = get_logger(__name__)
 class AccountManager:
     """
     MT5 Account Manager.
-    
+
     Provides account information, balance monitoring, and margin tracking.
-    
+
     Attributes:
         connector: MT5Connector instance for platform communication
-        
+
     Example:
         >>> connector = MT5Connector()
         >>> manager = AccountManager(connector)
         >>> balance = manager.get_balance()
         >>> print(f"Balance: ${balance:,.2f}")
     """
-    
+
     def __init__(self, mt5_connector) -> None:
         """
         Initialize Account Manager.
-        
+
         Args:
             mt5_connector: MT5Connector instance
-            
+
         Raises:
             ImportError: If MetaTrader5 package not available
         """
         self.connector = mt5_connector
         logger.info("Account Manager initialized")
-    
+
     def get_account_info(self) -> Dict[str, Any]:
         """
         Get complete account information.
-        
+
         Returns:
             Dictionary with account details including:
                 - login: Account number
@@ -981,10 +981,10 @@ class AccountManager:
                 - equity: Current equity
                 - margin: Used margin
                 - free_margin: Available margin
-                
+
         Raises:
             MT5ConnectionError: If not connected to MT5
-            
+
         Example:
             >>> info = manager.get_account_info()
             >>> print(f"Balance: ${info['balance']:,.2f}")
@@ -992,10 +992,10 @@ class AccountManager:
         if not self.connector.is_connected():
             logger.error("Attempted to get account info without MT5 connection")
             raise MT5ConnectionError("MT5 not connected")
-        
+
         try:
             account_info = mt5.account_info()
-            
+
             if account_info is None:
                 error_code, error_msg = mt5.last_error()
                 logger.error(
@@ -1005,23 +1005,23 @@ class AccountManager:
                 raise MT5ConnectionError(
                     f"Failed to get account info: {error_msg} (code: {error_code})"
                 )
-            
+
             logger.debug(f"Retrieved account info for login: {account_info.login}")
             return account_info._asdict()
-            
+
         except MT5ConnectionError:
             raise
         except Exception as e:
             logger.error(f"Unexpected error getting account info: {e}")
             raise MT5ConnectionError(f"Failed to retrieve account info: {e}")
-    
+
     def get_balance(self) -> float:
         """
         Get current account balance.
-        
+
         Returns:
             Account balance in account currency
-            
+
         Example:
             >>> balance = manager.get_balance()
             >>> print(f"${balance:,.2f}")
@@ -1030,7 +1030,7 @@ class AccountManager:
         balance = account_info.get("balance", 0.0)
         logger.debug(f"Current balance: ${balance:,.2f}")
         return balance
-    
+
     def __repr__(self) -> str:
         """String representation of AccountManager."""
         return f"AccountManager(connected={self.connector.is_connected()})"
@@ -1054,27 +1054,27 @@ from trading_bot.exceptions import MT5ConnectionError
 
 class TestAccountManager:
     """Test AccountManager class."""
-    
+
     @pytest.fixture
     def mock_connector(self):
         """Create mock MT5 connector."""
         connector = Mock()
         connector.is_connected.return_value = True
         return connector
-    
+
     @pytest.fixture
     def account_manager(self, mock_connector):
         """Create AccountManager instance with mock connector."""
         return AccountManager(mock_connector)
-    
+
     def test_initialization(self, mock_connector):
         """Test AccountManager initialization."""
         # Act
         manager = AccountManager(mock_connector)
-        
+
         # Assert
         assert manager.connector == mock_connector
-    
+
     def test_get_account_info_success(self, account_manager):
         """Test successful account info retrieval."""
         # Arrange
@@ -1085,37 +1085,37 @@ class TestAccountManager:
             "login": 12345,
             "balance": 10000.0,
         }
-        
+
         with patch("mt5.account_info", return_value=mock_account):
             # Act
             result = account_manager.get_account_info()
-            
+
             # Assert
             assert result["login"] == 12345
             assert result["balance"] == 10000.0
-    
+
     def test_get_account_info_not_connected(self, account_manager):
         """Test account info retrieval when not connected."""
         # Arrange
         account_manager.connector.is_connected.return_value = False
-        
+
         # Act & Assert
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             account_manager.get_account_info()
-    
+
     def test_get_balance(self, account_manager):
         """Test balance retrieval."""
         # Arrange
         account_manager.get_account_info = Mock(
             return_value={"balance": 5000.0}
         )
-        
+
         # Act
         balance = account_manager.get_balance()
-        
+
         # Assert
         assert balance == 5000.0
-    
+
     @pytest.mark.parametrize(
         "balance,expected",
         [
@@ -1135,10 +1135,10 @@ class TestAccountManager:
         account_manager.get_account_info = Mock(
             return_value={"balance": balance}
         )
-        
+
         # Act
         result = account_manager.get_balance()
-        
+
         # Assert
         assert result == expected
 ```
@@ -1239,7 +1239,7 @@ def process(data: List[float]) -> List[float]:
 # DO: Comprehensive docstrings
 class Strategy:
     """Base strategy for trading."""
-    
+
     def run(self) -> Dict[str, Any]:
         """Execute strategy logic."""
         pass
@@ -1269,4 +1269,3 @@ def validate_symbol(symbol: str) -> bool:
 
 **Version History**:
 - v1.0.0 (2025-11-29): Initial release
-

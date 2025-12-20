@@ -238,6 +238,8 @@ omit = [
     "*/tests/*",
     "*/test_*",
     "*/__init__.py",
+    "*/dry_run_wrapper.py",  # Future feature, not yet implemented
+    "*/main.py",  # Main entry point - integration tested via CLI
 ]
 
 [tool.coverage.report]

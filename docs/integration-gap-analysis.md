@@ -141,16 +141,16 @@ async def _trading_cycle(self):
     for symbol in self.symbols:
         # 1. Fetch market data
         data = await self.data_manager.get_ohlcv(symbol, timeframe)
-        
+
         # 2. Run strategy analysis via StrategyManager
         strategies_results = await self.strategy_manager.analyze(symbol, data)
-        
+
         # 3. Aggregate signals via SignalAggregator
         signals = await self.signal_aggregator.aggregate(strategies_results)
-        
+
         # 4. Validate signals (risk management)
         validated_signals = await self.risk_manager.validate_signals(signals)
-        
+
         # 5. Log signals (Phase 2.5)
         # 6. Execute positions (Phase 3)
 ```
@@ -256,7 +256,7 @@ async def _initialize_strategy_system(self):
     """Initialize strategy manager and signal aggregator."""
     self.strategy_manager = StrategyManager(self.config)
     self.signal_aggregator = SignalAggregator(self.config)
-    
+
     # Register foundation strategy
     await self.strategy_manager.register_strategy(
         "foundation",
@@ -267,13 +267,13 @@ async def _initialize_strategy_system(self):
 async def _analyze_symbol(self, symbol: str):
     # 1. Get market data (existing)
     data = self.data_manager.get_ohlcv(...)
-    
+
     # 2. NEW: Run strategy analysis
     strategy_results = await self.strategy_manager.analyze_symbol(symbol, data)
-    
+
     # 3. NEW: Aggregate signals
     signals = await self.signal_aggregator.aggregate_signals(strategy_results)
-    
+
     # 4. NEW: Log signals
     for signal in signals:
         logger.info(f"Signal: {signal.direction} {signal.symbol} @ {signal.entry_price}")
@@ -288,19 +288,19 @@ async def generate_signals(
 ) -> list[StrategyResult]:
     """
     Generate trading signals from detected zones.
-    
+
     Returns:
         List of StrategyResult objects
     """
     zones = await self.analyze_symbol(symbol, data)
     signals = []
-    
+
     for zone in zones:
         # Check if price is touching zone
         if self._is_price_at_zone(current_price, zone):
             signal = self._create_signal_from_zone(symbol, zone, current_price)
             signals.append(signal)
-    
+
     return signals
 ```
 
@@ -361,7 +361,7 @@ signal_generation:
     min_confluence_score: 65.0        # ✅ Available
     min_foundation_score: 70.0        # ✅ Available
     max_signals_per_symbol: 1         # ✅ Available
-  
+
   risk_reward:
     min_risk_reward_ratio: 2.0        # ✅ Available
     max_stop_loss_pips: 50            # ✅ Available
@@ -375,7 +375,7 @@ strategy_manager:
   max_concurrent_strategies: 8        # Foundation + 7 enhancements
   conflict_prevention: true
   health_check_interval: 300          # 5 minutes
-  
+
 confluence_weights:
   foundation: 0.30                    # S&D zones (Foundation)
   trendline: 0.20                     # Future enhancement
@@ -607,4 +607,3 @@ Data Flow:
 **Last Updated**: December 4, 2025
 **Author**: Integration Team
 **Review Status**: Ready for Implementation
-

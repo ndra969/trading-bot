@@ -259,7 +259,7 @@ class SymbolMapper:
         # This handles cases like BTCUSDC -> BTCUSD, EURUSDc -> EURUSD
         try:
             # Try with default broker first
-            universal_symbol = self.convert_to_universal_symbol(normalized_symbol)
+            universal_symbol = self.convert_to_universal_symbol(symbol)
             # Try lookup again with universal symbol
             for asset_class, symbols in self.asset_classes.items():
                 if universal_symbol in symbols:
@@ -284,7 +284,8 @@ class SymbolMapper:
             Pip size value
         """
         normalized_symbol = self.normalize_symbol(symbol)
-        asset_class = self.get_asset_class(normalized_symbol)
+        asset_class = self.get_asset_class(symbol)
+        logger.info(f"DEBUG: SymbolMapper.get_pip_size({symbol}) Asset Class: {asset_class}")
 
         if asset_class == "forex":
             # Check if it's a JPY pair

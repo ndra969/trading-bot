@@ -73,7 +73,7 @@ class TechnicalIndicatorCalculator:
         )
 
         try:
-            import pandas_ta as ta
+            import pandas_ta  # noqa: F401
 
             # Calculate all indicators at once
             # RSI (14)

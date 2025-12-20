@@ -98,9 +98,7 @@ class PortfolioRiskManager:
         if new_balance > self.peak_balance:
             self.peak_balance = new_balance
 
-        logger.debug(
-            f"Balance updated: ${new_balance:,.2f} " f"(Daily P&L: ${self.daily_pnl:,.2f})"
-        )
+        logger.debug(f"Balance updated: ${new_balance:,.2f} (Daily P&L: ${self.daily_pnl:,.2f})")
 
     def calculate_position_size(
         self,
@@ -172,21 +170,21 @@ class PortfolioRiskManager:
         if drawdown_pct >= self.emergency_stop_pct:
             return False, f"Emergency stop triggered: {drawdown_pct:.1f}% drawdown"
 
-        # Check daily loss limit
-        daily_loss_limit = self.daily_start_balance * (self.daily_loss_limit_pct / 100.0)
-        if abs(self.daily_pnl) >= daily_loss_limit and self.daily_pnl < 0:
-            return False, f"Daily loss limit reached: ${abs(self.daily_pnl):,.2f}"
+        # Check daily loss limit - DISABLED
+        # daily_loss_limit = self.daily_start_balance * (self.daily_loss_limit_pct / 100.0)
+        # if abs(self.daily_pnl) >= daily_loss_limit and self.daily_pnl < 0:
+        #     return False, f"Daily loss limit reached: ${abs(self.daily_pnl):,.2f}"
 
         # Check risk per trade
         max_risk = self.calculate_max_risk_amount(self.current_balance)
         if risk_amount > max_risk:
             return False, f"Risk exceeds limit: ${risk_amount:.2f} > ${max_risk:.2f}"
 
-        # Check if adding this risk would violate daily limit (only if currently in loss)
-        if self.daily_pnl < 0:
-            potential_daily_loss = abs(self.daily_pnl) + risk_amount
-            if potential_daily_loss > daily_loss_limit:
-                return False, "Would exceed daily loss limit"
+        # Check if adding this risk would violate daily limit (only if currently in loss) - DISABLED
+        # if self.daily_pnl < 0:
+        #     potential_daily_loss = abs(self.daily_pnl) + risk_amount
+        #     if potential_daily_loss > daily_loss_limit:
+        #         return False, "Would exceed daily loss limit"
 
         return True, "OK"
 
@@ -231,11 +229,8 @@ class PortfolioRiskManager:
         Returns:
             True if daily limit reached
         """
-        if self.daily_start_balance <= 0:
-            return False
-
-        daily_loss_limit = self.daily_start_balance * (self.daily_loss_limit_pct / 100.0)
-        return abs(self.daily_pnl) >= daily_loss_limit and self.daily_pnl < 0
+        # Daily loss limit validation is currently disabled
+        return False
 
     def get_portfolio_summary(self) -> dict:
         """
@@ -268,8 +263,7 @@ class PortfolioRiskManager:
 
         if today > self.last_reset_date:
             logger.info(
-                f"Daily reset: P&L was ${self.daily_pnl:,.2f} "
-                f"({self.get_daily_pnl_percent():.2f}%)"
+                f"Daily reset: P&L was ${self.daily_pnl:,.2f} ({self.get_daily_pnl_percent():.2f}%)"
             )
             self.daily_start_balance = self.current_balance
             self.daily_pnl = 0.0

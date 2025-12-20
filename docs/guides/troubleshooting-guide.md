@@ -302,13 +302,13 @@ import os
 def cleanup_memory():
     # Force garbage collection
     gc.collect()
-    
+
     # Get current memory usage
     process = psutil.Process(os.getpid())
     memory_mb = process.memory_info().rss / 1024 / 1024
-    
+
     print(f"Memory usage after cleanup: {memory_mb:.2f} MB")
-    
+
     return memory_mb
 
 # Run cleanup every hour
@@ -573,18 +573,18 @@ from src.config.configuration_manager import ConfigurationManager
 
 def validate_config():
     config_manager = ConfigurationManager()
-    
+
     # Load and validate configuration
     config = config_manager.load_configuration()
     result = config_manager.validate_configuration(config)
-    
+
     if not result.is_valid:
         print("Configuration errors:")
         for error in result.errors:
             print(f"- {error}")
     else:
         print("Configuration is valid")
-    
+
     return result.is_valid
 
 if __name__ == "__main__":
@@ -712,10 +712,10 @@ from src.position_manager import PositionManager
 def emergency_close_all():
     connector = MT5Connector()
     position_manager = PositionManager({}, connector)
-    
+
     # Get all open positions
     positions = connector.positions_get()
-    
+
     for position in positions:
         # Close position immediately
         result = position_manager.close_position_immediately(position.ticket)
@@ -804,32 +804,32 @@ from src.database.sqlite_manager import SQLiteManager
 
 def monitor_performance():
     db = SQLiteManager()
-    
+
     while True:
         # CPU usage
         cpu_percent = psutil.cpu_percent(interval=1)
-        
+
         # Memory usage
         memory = psutil.virtual_memory()
         memory_percent = memory.percent
-        
+
         # Disk usage
         disk = psutil.disk_usage('/')
         disk_percent = (disk.used / disk.total) * 100
-        
+
         # Database performance
         start_time = time.time()
         db.execute_query("SELECT COUNT(*) FROM trades")
         db_response_time = (time.time() - start_time) * 1000
-        
+
         # Log metrics
         print(f"CPU: {cpu_percent}%, Memory: {memory_percent}%, "
               f"Disk: {disk_percent:.1f}%, DB: {db_response_time:.2f}ms")
-        
+
         # Alert if thresholds exceeded
         if cpu_percent > 80 or memory_percent > 80 or db_response_time > 100:
             print("⚠️ Performance threshold exceeded!")
-        
+
         time.sleep(60)
 
 if __name__ == "__main__":

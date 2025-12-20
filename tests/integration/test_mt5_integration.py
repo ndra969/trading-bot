@@ -390,5 +390,7 @@ class TestErrorHandlingIntegration:
 
             with pytest.raises(MT5OrderError):
                 order_manager.send_market_order(
-                    symbol="EURUSD", order_type="BUY", volume=0.001  # Below minimum
+                    symbol="EURUSD",
+                    order_type="BUY",
+                    volume=0.001,  # Below minimum
                 )

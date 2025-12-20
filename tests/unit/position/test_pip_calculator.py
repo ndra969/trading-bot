@@ -1,5 +1,7 @@
 """Tests for PipCalculator."""
 
+from unittest.mock import patch
+
 import pytest
 
 from trading_bot.position.pip_calculator import PipCalculator
@@ -146,7 +148,8 @@ class TestCalculatePipValue:
         """Test pip value for JPY pair."""
         calculator = PipCalculator()
         pip_value = calculator.calculate_pip_value("USDJPY", volume=1.0)
-        assert pip_value == pytest.approx(10.0, abs=0.01)
+        # JPY pairs use 9.09 per lot (from config) due to exchange rate calculation
+        assert pip_value == pytest.approx(9.09, abs=0.01)
 
     def test_pip_value_gold(self):
         """Test pip value for Gold."""
@@ -184,7 +187,8 @@ class TestCalculateUSDAmount:
             target_price=151.00,  # 100 pips
             volume=1.0,
         )
-        assert usd == pytest.approx(1000.0, abs=1.0)  # 100 pips * $10 = $1000
+        # JPY pairs use 9.09 per lot (from config) due to exchange rate calculation
+        assert usd == pytest.approx(909.0, abs=1.0)  # 100 pips * $9.09 = $909
 
     def test_usd_amount_gold(self):
         """Test USD amount calculation for Gold."""
@@ -225,8 +229,9 @@ class TestCalculateRiskRewardUSD:
             take_profit=151.00,  # 100 pips reward
             volume=1.0,
         )
-        assert risk == pytest.approx(500.0, abs=1.0)
-        assert reward == pytest.approx(1000.0, abs=1.0)
+        # JPY pairs use 9.09 per lot (from config) due to exchange rate calculation
+        assert risk == pytest.approx(454.5, abs=1.0)  # 50 pips * $9.09 = $454.5
+        assert reward == pytest.approx(909.0, abs=1.0)  # 100 pips * $9.09 = $909
         assert rr_ratio == pytest.approx(2.0, abs=0.01)
 
     def test_risk_reward_usd_gold(self):
@@ -279,7 +284,19 @@ class TestUtilityMethods:
         """Test string representation."""
         calculator = PipCalculator()
         str_repr = str(calculator)
-        assert "0.0001" in str_repr  # forex
-        assert "0.01" in str_repr  # jpy
-        assert "0.1" in str_repr  # gold
-        assert "1.0" in str_repr  # crypto
+        # String representation should indicate it uses SymbolMapper
+        assert "PipCalculator" in str_repr
+        assert "SymbolMapper" in str_repr or "YAML" in str_repr
+
+    def test_determine_asset_class_unknown(self):
+        """Test asset class determination for unknown symbol defaults to forex_major."""
+        calculator = PipCalculator()
+        # Mock the symbol_mapper's methods directly
+        original_mapper = calculator.symbol_mapper
+        with (
+            patch.object(original_mapper, "get_asset_class", return_value="unknown"),
+            patch.object(original_mapper, "normalize_symbol", return_value="UNKNOWN"),
+        ):
+            # Should default to forex_major and log warning
+            asset_class = calculator._determine_asset_class("UNKNOWN")
+            assert asset_class == "forex_major"

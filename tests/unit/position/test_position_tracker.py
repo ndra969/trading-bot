@@ -262,6 +262,20 @@ class TestCheckTakeProfit:
 
         assert tracker.check_take_profit(sell_position) is False
 
+    def test_check_take_profit_not_open(self, tracker, buy_position):
+        """Test take profit check for non-open position returns False."""
+        buy_position.status = PositionStatus.PENDING
+        buy_position.current_price = None
+
+        assert tracker.check_take_profit(buy_position) is False
+
+    def test_check_take_profit_current_price_none(self, tracker, buy_position):
+        """Test take profit check when current_price is None returns False."""
+        tracker.open_position(buy_position)
+        buy_position.current_price = None
+
+        assert tracker.check_take_profit(buy_position) is False
+
 
 class TestGetPositionSummary:
     """Test position summary."""

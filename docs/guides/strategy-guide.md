@@ -15,7 +15,7 @@ Trading bot ini menggunakan pendekatan multi-strategy dengan fokus pada **instit
 class EnhancedZoneAnalyzer:
     def detect_zones(self, data, lookback=300):
         zones = []
-        
+
         # Identify potential zones
         for i in range(lookback, len(data)):
             # Look for strong rejection patterns
@@ -23,7 +23,7 @@ class EnhancedZoneAnalyzer:
                 zone = self.create_zone(data, i)
                 if self.validate_zone_quality(zone):
                     zones.append(zone)
-        
+
         return self.filter_overlapping_zones(zones)
 ```
 
@@ -123,11 +123,11 @@ class BreakoutDetector:
 class BOSDetector:
     def detect_bos(self, data, timeframe):
         swing_points = self.identify_swing_points(data)
-        
+
         for i in range(1, len(swing_points)):
             current_swing = swing_points[i]
             previous_swing = swing_points[i-1]
-            
+
             if self.is_structure_break(current_swing, previous_swing):
                 bos_event = {
                     'type': 'BOS',
@@ -160,7 +160,7 @@ class BOSDetector:
 class CHoCHDetector:
     def detect_choch(self, data, trend_data):
         momentum_shifts = self.identify_momentum_shifts(data)
-        
+
         for shift in momentum_shifts:
             if self.validate_character_change(shift, trend_data):
                 choch_event = {
@@ -183,11 +183,11 @@ class CHoCHDetector:
 class OrderBlockDetector:
     def identify_order_blocks(self, data, bos_events):
         order_blocks = []
-        
+
         for bos in bos_events:
             # Find last opposite candle before BOS
             ob_candle = self.find_last_opposite_candle(data, bos)
-            
+
             if self.validate_order_block(ob_candle, bos):
                 order_block = {
                     'high': ob_candle['high'],
@@ -197,7 +197,7 @@ class OrderBlockDetector:
                     'timestamp': ob_candle['timestamp']
                 }
                 order_blocks.append(order_block)
-        
+
         return order_blocks
 ```
 
@@ -216,12 +216,12 @@ class OrderBlockDetector:
 class FairValueGapDetector:
     def detect_fvg(self, data):
         fvgs = []
-        
+
         for i in range(2, len(data)):
             candle1 = data[i-2]
             candle2 = data[i-1]  # Gap candle
             candle3 = data[i]
-            
+
             # Check for bullish FVG
             if candle1['high'] < candle3['low']:
                 gap = {
@@ -232,7 +232,7 @@ class FairValueGapDetector:
                     'fill_probability': self.calculate_fill_probability(gap_data)
                 }
                 fvgs.append(gap)
-            
+
             # Check for bearish FVG
             elif candle1['low'] > candle3['high']:
                 gap = {
@@ -243,7 +243,7 @@ class FairValueGapDetector:
                     'fill_probability': self.calculate_fill_probability(gap_data)
                 }
                 fvgs.append(gap)
-        
+
         return fvgs
 ```
 
@@ -255,27 +255,27 @@ class FairValueGapDetector:
 class EnhancedEntryValidator:
     def calculate_entry_score(self, signal, market_data):
         score = 0
-        
+
         # Zone quality (30% weight)
         zone_score = self.calculate_zone_score(signal.zone)
         score += zone_score * 0.30
-        
+
         # Pattern recognition (25% weight)
         pattern_score = self.calculate_pattern_score(signal, market_data)
         score += pattern_score * 0.25
-        
+
         # Volume confirmation (20% weight)
         volume_score = self.calculate_volume_score(market_data)
         score += volume_score * 0.20
-        
+
         # Market structure (15% weight)
         structure_score = self.calculate_structure_score(signal)
         score += structure_score * 0.15
-        
+
         # Timing context (10% weight)
         timing_score = self.calculate_timing_score(signal)
         score += timing_score * 0.10
-        
+
         return min(100, max(0, score))
 ```
 
@@ -342,12 +342,12 @@ class ZoneBasedSLCalculator:
         else:
             # Place SL above zone high with buffer
             sl_price = zone.high + (self.get_buffer_pips(signal.symbol) * self.get_pip_value(signal.symbol))
-        
+
         # Validate SL distance
         sl_distance = abs(signal.entry_price - sl_price)
         if not self.validate_sl_distance(sl_distance, signal.symbol):
             return self.calculate_fallback_sl(signal)
-        
+
         return sl_price
 ```
 
@@ -356,7 +356,7 @@ class ZoneBasedSLCalculator:
 class StructureBasedSLCalculator:
     def calculate_sl(self, signal, structure_data):
         recent_structure = self.get_recent_structure_level(signal.symbol, signal.direction)
-        
+
         if recent_structure:
             buffer = self.get_structure_buffer(signal.symbol)
             if signal.direction == 'buy':
@@ -366,7 +366,7 @@ class StructureBasedSLCalculator:
         else:
             # Fallback to ATR-based SL
             sl_price = self.calculate_atr_based_sl(signal)
-        
+
         return sl_price
 ```
 
@@ -378,14 +378,14 @@ class RiskRewardTPCalculator:
     def calculate_tp(self, signal, sl_price):
         sl_distance = abs(signal.entry_price - sl_price)
         min_rr_ratio = self.get_min_rr_ratio(signal.symbol)
-        
+
         tp_distance = sl_distance * min_rr_ratio
-        
+
         if signal.direction == 'buy':
             tp_price = signal.entry_price + tp_distance
         else:
             tp_price = signal.entry_price - tp_distance
-        
+
         return tp_price
 ```
 
@@ -394,7 +394,7 @@ class RiskRewardTPCalculator:
 class StructureBasedTPCalculator:
     def calculate_tp(self, signal, structure_data):
         target_levels = self.identify_target_levels(signal, structure_data)
-        
+
         # Use nearest significant level as TP
         if target_levels:
             return target_levels[0]  # Nearest level
@@ -439,11 +439,11 @@ class DynamicTrailingManager:
     def update_trailing_stop(self, position):
         current_profit_pips = self.calculate_profit_pips(position)
         asset_params = self.get_asset_parameters(position.symbol)
-        
+
         # Check if trailing should start
         if current_profit_pips >= asset_params['trailing']['start_pips_from_sl']:
             new_sl = self.calculate_trailing_sl(position, asset_params)
-            
+
             # Only move SL in favorable direction
             if self.is_favorable_move(position, new_sl):
                 self.update_stop_loss(position, new_sl)
@@ -457,10 +457,10 @@ class PartialCloseManager:
     def check_partial_close(self, position):
         profit_pips = self.calculate_profit_pips(position)
         asset_params = self.get_asset_parameters(position.symbol)
-        
+
         partial_levels = asset_params['partial_close']['levels']
         partial_percentages = asset_params['partial_close']['percentages']
-        
+
         for i, level in enumerate(partial_levels):
             if profit_pips >= level and not position.partial_closes[i]:
                 close_percentage = partial_percentages[i]
@@ -482,7 +482,7 @@ class SignalQualityTracker:
             'trade_outcome': trade_result.profit_loss,
             'win_rate_contribution': 1 if trade_result.profit_loss > 0 else 0
         }
-        
+
         self.update_quality_database(quality_metrics)
         self.adjust_scoring_weights(quality_metrics)
 ```
@@ -493,7 +493,7 @@ class SignalQualityTracker:
 class StrategyPerformanceAnalyzer:
     def analyze_strategy_performance(self, strategy_name, period_days=30):
         trades = self.get_strategy_trades(strategy_name, period_days)
-        
+
         metrics = {
             'total_trades': len(trades),
             'win_rate': self.calculate_win_rate(trades),
@@ -502,7 +502,7 @@ class StrategyPerformanceAnalyzer:
             'max_drawdown': self.calculate_max_drawdown(trades),
             'sharpe_ratio': self.calculate_sharpe_ratio(trades)
         }
-        
+
         return StrategyPerformanceReport(metrics)
 ```
 

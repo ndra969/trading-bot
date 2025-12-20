@@ -95,7 +95,7 @@ class DataManager:
                 raise MT5DataError(
                     f"Symbol {symbol} is not enabled in configuration",
                     symbol=symbol,
-                    timeframe=timeframe
+                    timeframe=timeframe,
                 )
 
         # Validate symbol (but don't auto-enable if not in enabled list)
