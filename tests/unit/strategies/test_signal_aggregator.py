@@ -235,6 +235,88 @@ class TestSignalAggregation:
         signals = await signal_aggregator.aggregate_signals([result])
         assert len(signals) == 0
 
+    @pytest.mark.asyncio
+    async def test_aggregate_missing_critical_prices(self, signal_aggregator):
+        """Test aggregating with missing critical prices (line 218-223)."""
+        result = StrategyResult(
+            strategy_name="foundation",
+            symbol="EURUSD",
+            score=75.0,
+            direction=SignalDirection.BUY,
+            entry_price=None,  # Missing
+            stop_loss=1.0950,
+            take_profit=1.1150,
+        )
+
+        signals = await signal_aggregator.aggregate_signals([result])
+        # Should handle missing prices gracefully
+        assert len(signals) == 0  # Or might return None/empty
+
+    @pytest.mark.asyncio
+    async def test_aggregate_invalid_risk(self, signal_aggregator):
+        """Test aggregating with invalid risk (risk <= 0) (line 234-235)."""
+        result = StrategyResult(
+            strategy_name="foundation",
+            symbol="EURUSD",
+            score=75.0,
+            direction=SignalDirection.BUY,
+            entry_price=1.1000,
+            stop_loss=1.1050,  # Stop loss above entry (invalid for BUY)
+            take_profit=1.1150,
+        )
+
+        signals = await signal_aggregator.aggregate_signals([result])
+        # Should return None or empty list due to invalid risk
+        assert len(signals) == 0
+
+    @pytest.mark.asyncio
+    async def test_aggregate_value_error_handling(self, signal_aggregator):
+        """Test ValueError exception handling (line 274-276)."""
+        # Create a result that might cause ValueError in TradingSignal creation
+        result = StrategyResult(
+            strategy_name="foundation",
+            symbol="EURUSD",
+            score=75.0,
+            direction=SignalDirection.BUY,
+            entry_price=1.1000,
+            stop_loss=1.0950,
+            take_profit=1.1150,
+        )
+
+        # Mock TradingSignal to raise ValueError
+        from unittest.mock import patch
+
+        with patch("trading_bot.strategies.signal_aggregator.TradingSignal") as mock_signal:
+            mock_signal.side_effect = ValueError("Invalid signal data")
+
+            signals = await signal_aggregator.aggregate_signals([result])
+            # Should handle ValueError gracefully
+            assert len(signals) == 0
+
+    def test_calculate_default_tp_buy(self, signal_aggregator):
+        """Test default TP calculation for BUY (line 382-383)."""
+        entry = 1.1000
+        stop_loss = 1.0950
+        tp = signal_aggregator._calculate_default_tp(SignalDirection.BUY, entry, stop_loss)
+
+        risk = abs(entry - stop_loss)  # 0.0050
+        expected_reward = risk * signal_aggregator.min_risk_reward_ratio  # 0.0050 * 2.0 = 0.0100
+        expected_tp = entry + expected_reward  # 1.1000 + 0.0100 = 1.1100
+
+        assert tp == pytest.approx(expected_tp, abs=0.0001)
+
+    def test_calculate_default_tp_sell(self, signal_aggregator):
+        """Test default TP calculation for SELL (line 384-385)."""
+        entry = 1.1000
+        stop_loss = 1.1050
+        tp = signal_aggregator._calculate_default_tp(SignalDirection.SELL, entry, stop_loss)
+
+        risk = abs(entry - stop_loss)  # 0.0050
+        expected_reward = risk * signal_aggregator.min_risk_reward_ratio  # 0.0050 * 2.0 = 0.0100
+        expected_tp = entry - expected_reward  # 1.1000 - 0.0100 = 1.0900
+
+        assert tp == pytest.approx(expected_tp, abs=0.0001)
+
 
 class TestConfluenceScoring:
     """Test confluence score calculation."""

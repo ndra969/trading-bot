@@ -488,12 +488,29 @@ class TradingBot:
                     comment=f"Signal {signal.signal_id}",
                 )
 
-                if not order_result:
-                    logger.error(f"  ❌ MT5 Order Execution Failed for {signal.symbol}")
-                    await self.notification_manager.send_message(
+                if order_result.get("success") is False:
+                    error_msg = order_result.get("error", "Unknown error")
+                    error_code = order_result.get("error_code", 0)
+                    error_description = order_result.get(
+                        "error_description", "No description available"
+                    )
+
+                    logger.error(
+                        f"  ❌ MT5 Order Execution Failed for {signal.symbol}: {error_msg} (code: {error_code})"
+                    )
+
+                    notification_text = (
                         f"❌ **MT5 Order Failed**\n"
                         f"Symbol: `{signal.symbol}`\n"
-                        f"Direction: `{signal.direction.value}`",
+                        f"Direction: `{signal.direction.value}`\n"
+                        f"Volume: `{position_size}`\n"
+                        f"Error: `{error_msg}`\n"
+                        f"Error Code: `{error_code}`\n"
+                        f"Description: `{error_description}`"
+                    )
+
+                    await self.notification_manager.send_message(
+                        notification_text,
                         level=NotificationLevel.ERROR,
                     )
                     return
@@ -674,7 +691,7 @@ class TradingBot:
             for asset_class, symbols in self._asset_classes.items():
                 if symbol in symbols:
                     # Map to the expected format for position/risk managers
-                    if asset_class == "commodity":
+                    if asset_class == "commodities":
                         return "commodities"
                     elif asset_class == "forex":
                         # Further classify forex pairs
@@ -821,63 +838,146 @@ class TradingBot:
                                     )
                                     break
 
-                    if not ticket:
-                        logger.warning(
-                            f"  ⚠️ Position {position.position_id} has no ticket - skipping reconciliation"
-                        )
-                        continue
-
                     # Check if position is closed in MT5
-                    if ticket not in mt5_tickets:
-                        logger.info(
-                            f"  👻 Position {position.position_id} (Ticket {ticket}) not found in MT5 - Assuming CLOSED"
-                        )
-
-                        # Get closing details from history (limited query)
-                        deal = self.mt5.get_history_deal(ticket)
-                        close_price = position.entry_price  # Default fallback
-                        pnl = 0.0
-                        comment = "Closed in MT5"
-
-                        if deal:
-                            close_price = deal.get("price", close_price)
-                            pnl = (
-                                deal.get("profit", 0.0)
-                                + deal.get("swap", 0.0)
-                                + deal.get("commission", 0.0)
+                    # Case 1: Position has ticket - check if ticket exists in MT5
+                    if ticket:
+                        if ticket not in mt5_tickets:
+                            logger.info(
+                                f"  👻 Position {position.position_id} (Ticket {ticket}) not found in MT5 - Assuming CLOSED"
                             )
-                            comment = f"MT5 History: {deal.get('comment', '')}"
-                            logger.debug(f"  📝 Deal found: Price {close_price:.5f}, P&L ${pnl:.2f}")
+
+                            # Get closing details from history (limited query)
+                            deal = self.mt5.get_history_deal(ticket)
+                            close_price = position.entry_price  # Default fallback
+                            pnl = 0.0
+                            comment = "Closed in MT5"
+
+                            if deal:
+                                close_price = deal.get("price", close_price)
+                                pnl = (
+                                    deal.get("profit", 0.0)
+                                    + deal.get("swap", 0.0)
+                                    + deal.get("commission", 0.0)
+                                )
+                                comment = f"MT5 History: {deal.get('comment', '')}"
+                                logger.debug(
+                                    f"  📝 Deal found: Price {close_price:.5f}, P&L ${pnl:.2f}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"  ⚠️ No deal history found for ticket {ticket} - using estimated close"
+                                )
+
+                            # Close position in DB
+                            self.position_manager.close_position(
+                                position.position_id, close_price, f"Sync: {comment}"
+                            )
+
+                            # Save to database
+                            await self.position_manager.save_position(position)
+
+                            # Update portfolio balance
+                            if self.portfolio_risk:
+                                self.portfolio_risk.update_balance(
+                                    self.portfolio_risk.current_balance + pnl
+                                )
+
+                            # Unregister exposure
+                            if self.exposure_manager:
+                                asset_class = self._get_asset_class(position.symbol)
+                                self.exposure_manager.unregister_position(
+                                    position.symbol, asset_class, position.volume
+                                )
+
+                            logger.info(
+                                f"  ✅ Synced Close: {position.position_id} | P&L: ${pnl:.2f}"
+                            )
+
+                            # Continue to next position (this one is processed)
+                            continue
+                        # else: Position has ticket and still exists in MT5 - continue to next position
                         else:
+                            # Position still exists in MT5, continue
+                            continue
+                    # Case 2: Position has no ticket - check if symbol exists in MT5
+                    else:
+                        # No ticket found - check if position exists by symbol matching
+                        broker_symbol = position.symbol
+                        if self.symbol_mapper:
+                            try:
+                                broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
+                                    position.symbol, self.active_broker
+                                )
+                            except Exception:
+                                pass
+
+                        # Check if any position with this symbol exists in MT5
+                        mt5_positions_by_symbol = [
+                            p for p in mt5_positions if p.get("symbol") == broker_symbol
+                        ]
+
+                        if not mt5_positions_by_symbol:
+                            # No position found in MT5 for this symbol - assume closed
+                            logger.info(
+                                f"  👻 Position {position.position_id} ({position.symbol}) not found in MT5 "
+                                f"(no ticket, no matching symbol) - Assuming CLOSED"
+                            )
+
+                            # Use current price as close price (best estimate)
+                            current_price = await self._get_current_price(position.symbol)
+                            close_price = (
+                                current_price
+                                if current_price
+                                else position.current_price or position.entry_price
+                            )
+
+                            # Calculate estimated P&L
+                            pip_calc = PipCalculator()
+                            pips = pip_calc.calculate_pips(
+                                symbol=position.symbol,
+                                entry_price=position.entry_price,
+                                current_price=close_price,
+                                position_type=position.position_type.value,
+                            )
+                            pnl = pips * position.pip_value_per_lot * position.volume
+
+                            # Close position in DB
+                            self.position_manager.close_position(
+                                position.position_id, close_price, "Sync: Closed in MT5 (no ticket)"
+                            )
+
+                            # Save to database
+                            await self.position_manager.save_position(position)
+
+                            # Update portfolio balance
+                            if self.portfolio_risk:
+                                self.portfolio_risk.update_balance(
+                                    self.portfolio_risk.current_balance + pnl
+                                )
+
+                            # Unregister exposure
+                            if self.exposure_manager:
+                                asset_class = self._get_asset_class(position.symbol)
+                                self.exposure_manager.unregister_position(
+                                    position.symbol, asset_class, position.volume
+                                )
+
+                            logger.info(
+                                f"  ✅ Synced Close (no ticket): {position.position_id} | "
+                                f"P&L: ${pnl:.2f} | Close Price: {close_price:.5f}"
+                            )
+
+                            # Continue to next position
+                            continue
+                        else:
+                            # Position might exist but we couldn't match it - log warning
                             logger.warning(
-                                f"  ⚠️ No deal history found for ticket {ticket} - using estimated close"
+                                f"  ⚠️ Position {position.position_id} has no ticket but symbol "
+                                f"{broker_symbol} exists in MT5 - cannot reconcile. "
+                                f"Please check manually or add ticket to metadata."
                             )
-
-                        # Close position in DB
-                        self.position_manager.close_position(
-                            position.position_id, close_price, f"Sync: {comment}"
-                        )
-
-                        # Save to database
-                        await self.position_manager.save_position(position)
-
-                        # Update portfolio balance
-                        if self.portfolio_risk:
-                            self.portfolio_risk.update_balance(
-                                self.portfolio_risk.current_balance + pnl
-                            )
-
-                        # Unregister exposure
-                        if self.exposure_manager:
-                            asset_class = self._get_asset_class(position.symbol)
-                            self.exposure_manager.unregister_position(
-                                position.symbol, asset_class, position.volume
-                            )
-
-                        logger.info(f"  ✅ Synced Close: {position.position_id} | P&L: ${pnl:.2f}")
-
-                        # Continue to next position (this one is processed)
-                        continue
+                            # Continue to next position (don't close if we're not sure)
+                            continue
                 else:
                     logger.debug(f"  ✅ All {len(open_positions)} positions still open in MT5")
 
@@ -990,14 +1090,95 @@ class TradingBot:
                             )
 
             # Update positions with current prices
-            # Re-fetch open positions after reconciliation to exclude closed ones and include newly synced ones
+            # CRITICAL: Re-fetch open positions after reconciliation to exclude closed ones
+            # This ensures positions closed during sync are not processed in the update loop
             open_positions = self.position_manager.get_open_positions()
             logger.debug(
-                f"  📊 Updating {len(open_positions)} open positions with current prices..."
+                f"  📊 Updating {len(open_positions)} open positions with current prices "
+                f"(after sync reconciliation)..."
             )
 
             for position in open_positions:
                 try:
+                    # CRITICAL: Double-check position is still open (may have been closed during sync)
+                    # This prevents automation from running on positions that were just closed
+                    if not position.is_open:
+                        logger.debug(
+                            f"  ⚠️ Position {position.position_id} is no longer open - skipping update"
+                        )
+                        continue
+
+                    # CRITICAL: Verify position still exists in MT5 (for live trading)
+                    # This prevents automation from running on positions closed manually in MT5
+                    if not is_dry_run and self.mt5 and self.mt5.is_connected():
+                        ticket = getattr(position, "ticket", None)
+                        if not ticket and position.metadata:
+                            ticket = position.metadata.get("ticket")
+
+                        if ticket:
+                            # Check if position still exists in MT5
+                            mt5_positions = self.mt5.get_positions()
+                            mt5_tickets = {
+                                p.get("ticket") for p in mt5_positions if p.get("ticket")
+                            }
+                            if ticket not in mt5_tickets:
+                                logger.warning(
+                                    f"  ⚠️ Position {position.position_id} (Ticket {ticket}) not found in MT5 "
+                                    f"during update - closing position"
+                                )
+                                # Position was closed in MT5 - close it in DB
+                                current_price = await self._get_current_price(position.symbol)
+                                close_price = (
+                                    current_price
+                                    if current_price
+                                    else position.current_price or position.entry_price
+                                )
+
+                                # Get closing details from history
+                                deal = self.mt5.get_history_deal(ticket)
+                                pnl = 0.0
+                                if deal:
+                                    close_price = deal.get("price", close_price)
+                                    pnl = (
+                                        deal.get("profit", 0.0)
+                                        + deal.get("swap", 0.0)
+                                        + deal.get("commission", 0.0)
+                                    )
+
+                                self.position_manager.close_position(
+                                    position.position_id,
+                                    close_price,
+                                    "Sync: Closed in MT5 (during update)",
+                                )
+                                await self.position_manager.save_position(position)
+
+                                # Update portfolio balance
+                                if self.portfolio_risk:
+                                    self.portfolio_risk.update_balance(
+                                        self.portfolio_risk.current_balance + pnl
+                                    )
+
+                                # Unregister exposure
+                                if self.exposure_manager:
+                                    asset_class = self._get_asset_class(position.symbol)
+                                    self.exposure_manager.unregister_position(
+                                        position.symbol, asset_class, position.volume
+                                    )
+
+                                logger.info(
+                                    f"  ✅ Closed position {position.position_id} during update check | P&L: ${pnl:.2f}"
+                                )
+                                # CRITICAL: Skip automation check - position is now CLOSED
+                                continue
+
+                    # CRITICAL: Re-check position is still open after MT5 verification
+                    # Position may have been closed during MT5 check above
+                    if not position.is_open:
+                        logger.debug(
+                            f"  ⚠️ Position {position.position_id} is no longer open after MT5 check - skipping update"
+                        )
+                        continue
+
                     # Get current price (in production, this would be from MT5)
                     current_price = await self._get_current_price(position.symbol)
                     if current_price is None:
@@ -1016,7 +1197,15 @@ class TradingBot:
                     # Save update to database
                     await self.position_manager.save_position(position)
 
-                    # Check automation triggers
+                    # CRITICAL: Final check before automation - position must still be OPEN
+                    # This prevents automation from running on positions that were closed during update
+                    if not position.is_open:
+                        logger.debug(
+                            f"  ⚠️ Position {position.position_id} closed during update - skipping automation"
+                        )
+                        continue
+
+                    # Check automation triggers (only if position is still open)
                     await self._check_position_automation(position)
 
                 except Exception as e:
@@ -1098,6 +1287,39 @@ class TradingBot:
     async def _check_position_automation(self, position):
         """Check and apply automation features for a position."""
         try:
+            # CRITICAL: Verify position is still open before running automation
+            # This prevents automation from running on positions that were closed during sync
+            if not position.is_open:
+                logger.debug(
+                    f"Skipping automation for {position.position_id} ({position.symbol}): "
+                    f"Position is {position.status.value}, not OPEN"
+                )
+                return
+
+            # CRITICAL: Double-check position still exists in MT5 (for live trading)
+            # This prevents automation from running on positions closed manually in MT5
+            is_dry_run = self.config.get("trading", {}).get("dry_run", False)
+            if not is_dry_run and self.mt5 and self.mt5.is_connected():
+                ticket = getattr(position, "ticket", None)
+                if not ticket and position.metadata:
+                    ticket = position.metadata.get("ticket")
+
+                if ticket:
+                    mt5_positions = self.mt5.get_positions()
+                    mt5_tickets = {p.get("ticket") for p in mt5_positions if p.get("ticket")}
+                    if ticket not in mt5_tickets:
+                        logger.warning(
+                            f"  ⚠️ SKIPPING AUTOMATION: Position {position.position_id} (Ticket {ticket}) "
+                            f"not found in MT5 - position was closed. "
+                            f"This should have been detected during sync reconciliation."
+                        )
+                        return
+                else:
+                    # No ticket - log warning but continue (position might be valid but no ticket)
+                    logger.debug(
+                        f"  ⚠️ Position {position.position_id} has no ticket - cannot verify in MT5"
+                    )
+
             # Log position status for debugging
             logger.debug(
                 f"Checking automation for {position.position_id} ({position.symbol}): "

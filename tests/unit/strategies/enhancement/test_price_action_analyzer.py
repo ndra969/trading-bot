@@ -113,3 +113,69 @@ async def test_no_pattern(analyzer):
 
     # So should be None
     assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_insufficient_data(analyzer):
+    """Test with insufficient data (line 45)."""
+    # Less than 3 candles
+    opens = [100.0] * 2
+    highs = [105.0] * 2
+    lows = [95.0] * 2
+    closes = [100.0] * 2
+
+    signal = await analyzer.analyze_pattern("EURUSD", opens, highs, lows, closes)
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_zero_range_candle(analyzer):
+    """Test with zero range candle (line 66)."""
+    # Candle with zero range (high == low)
+    opens = [100.0] * 5 + [100.0]
+    highs = [105.0] * 5 + [100.0]
+    lows = [95.0] * 5 + [100.0]
+    closes = [100.0] * 5 + [100.0]
+
+    signal = await analyzer.analyze_pattern("EURUSD", opens, highs, lows, closes)
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_inside_bar(analyzer):
+    """Test Inside Bar pattern (line 120)."""
+    # Current candle is inside previous candle
+    # Prev: High=105, Low=95
+    # Curr: High=103, Low=97 (inside prev)
+    opens = [100.0] * 4 + [100.0, 100.0]
+    highs = [105.0] * 4 + [105.0, 103.0]
+    lows = [95.0] * 4 + [95.0, 97.0]
+    closes = [100.0] * 4 + [100.0, 100.0]
+
+    signal = await analyzer.analyze_pattern("EURUSD", opens, highs, lows, closes)
+
+    assert signal is not None
+    assert signal.pattern_type == "INSIDE_BAR"
+    assert signal.direction == "NEUTRAL"
+    assert signal.confidence == 50.0
+
+
+@pytest.mark.asyncio
+async def test_doji(analyzer):
+    """Test Doji pattern (line 124)."""
+    # Very small body relative to range
+    # Open=100, High=105, Low=95, Close=100.1
+    # Body = 0.1, Range = 10, Ratio = 0.01 (< 0.1)
+    opens = [100.0] * 5 + [100.0]
+    highs = [105.0] * 5 + [105.0]
+    lows = [95.0] * 5 + [95.0]
+    closes = [100.0] * 5 + [100.1]
+
+    signal = await analyzer.analyze_pattern("EURUSD", opens, highs, lows, closes)
+
+    assert signal is not None
+    assert signal.pattern_type == "DOJI"
+    assert signal.direction == "NEUTRAL"
+    assert signal.confidence == 60.0

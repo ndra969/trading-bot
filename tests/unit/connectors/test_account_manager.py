@@ -352,3 +352,14 @@ class TestErrorHandling:
 
             with pytest.raises(MT5ConnectionError, match="Failed to retrieve account info"):
                 account_manager.get_account_info()
+
+    def test_get_account_info_mt5_connection_error_re_raise(self, account_manager):
+        """Test MT5ConnectionError re-raise (line 64-65)."""
+        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+            # Simulate MT5ConnectionError being raised
+            original_error = MT5ConnectionError("Original error")
+            mock_mt5.account_info.side_effect = original_error
+
+            # Should re-raise the same error
+            with pytest.raises(MT5ConnectionError, match="Original error"):
+                account_manager.get_account_info()

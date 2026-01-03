@@ -222,6 +222,53 @@ class MT5Connector:
 
         return health
 
+    def _get_error_description(self, retcode: int) -> str:
+        """
+        Get human-readable error description for MT5 return codes.
+
+        Args:
+            retcode: MT5 return code
+
+        Returns:
+            Human-readable error description
+        """
+        error_codes = {
+            10004: "Requote",
+            10006: "Request rejected",
+            10007: "Request canceled by trader",
+            10008: "Order placed",
+            10009: "Request completed",
+            10010: "Only part of the request was completed",
+            10011: "Request processing error",
+            10012: "Request canceled by timeout",
+            10013: "Invalid request",
+            10014: "Invalid volume in the request",
+            10015: "Invalid price in the request",
+            10016: "Invalid stops in the request",
+            10017: "Trade is disabled",
+            10018: "Market is closed",
+            10019: "There is not enough money to complete the request",
+            10020: "Prices changed",
+            10021: "There are no quotes to process the request",
+            10025: "No changes",
+            10027: "Off quotes",
+            10028: "Broker is busy",
+            10029: "Order expired",
+            10030: "Invalid order",
+            10031: "Invalid volume",
+            10032: "Invalid price",
+            10033: "Invalid stops",
+            10034: "Trade is disabled",
+            10035: "Market is closed",
+            10036: "There is not enough money",
+            10038: "Requote",
+            10039: "Order is locked",
+            10040: "Long positions only allowed",
+            10041: "Too many requests",
+        }
+
+        return error_codes.get(retcode, f"Unknown error code: {retcode}")
+
     def place_order(
         self,
         symbol: str,
@@ -232,7 +279,7 @@ class MT5Connector:
         tp: float,
         comment: str = "",
         magic: int = 0,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         """
         Place a trade order.
 
@@ -247,11 +294,21 @@ class MT5Connector:
             magic: Magic number
 
         Returns:
-            Dictionary with order result or None if failed
+            Dictionary with order result. On success, contains order details.
+            On failure, contains:
+                - success: False
+                - error: Error message
+                - error_code: MT5 error code
+                - error_description: Human-readable error description
         """
         if not self._is_connected:
             logger.error("Cannot place order: MT5 not connected")
-            return None
+            return {
+                "success": False,
+                "error": "MT5 not connected",
+                "error_code": 0,
+                "error_description": "MT5 connection not established",
+            }
 
         try:
             # Prepare request
@@ -262,8 +319,14 @@ class MT5Connector:
             # Check symbol filling modes
             symbol_info = mt5.symbol_info(symbol)
             if symbol_info is None:
-                logger.error(f"Symbol {symbol} not found")
-                return None
+                error_msg = f"Symbol {symbol} not found"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "error_code": 0,
+                    "error_description": "Symbol not found in MT5",
+                }
 
             # Determine appropriate filling mode
             filling_mode = mt5.ORDER_FILLING_FOK  # Default fallback
@@ -300,19 +363,43 @@ class MT5Connector:
             result = mt5.order_send(request)
 
             if result is None:
-                logger.error("Order failed: result is None")
-                return None
+                error_code, error_msg = mt5.last_error()
+                error_description = (
+                    self._get_error_description(error_code) if error_code else "Unknown error"
+                )
+                logger.error(f"Order failed: {error_msg} (code: {error_code})")
+                return {
+                    "success": False,
+                    "error": error_msg or "Order send returned None",
+                    "error_code": error_code,
+                    "error_description": error_description,
+                }
 
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logger.error(f"Order failed: {result.comment} (code: {result.retcode})")
-                return None
+                error_description = self._get_error_description(result.retcode)
+                error_msg = result.comment or error_description
+                logger.error(f"Order failed: {error_msg} (code: {result.retcode})")
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "error_code": result.retcode,
+                    "error_description": error_description,
+                }
 
             logger.info(f"Order placed successfully: {result.order}")
-            return result._asdict()
+            order_dict = result._asdict()
+            order_dict["success"] = True
+            return order_dict
 
         except Exception as e:
-            logger.error(f"Error placing order: {e}")
-            return None
+            error_msg = str(e)
+            logger.error(f"Error placing order: {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "error_code": 10000,
+                "error_description": "Exception occurred during order placement",
+            }
 
     def get_positions(self, symbol: str = None) -> list[dict[str, Any]]:
         """

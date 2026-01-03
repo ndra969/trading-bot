@@ -1231,3 +1231,60 @@ class TestDatabaseOperations:
 
             # Position should not be loaded
             assert len(position_manager.positions) == 0
+
+
+class TestAutomationLogic:
+    """Test automation logic (breakeven and trailing stop) within PositionManager."""
+
+    def test_manage_automation_pending_position(self, position_manager, buy_signal):
+        """Test that automation is skipped for PENDING positions."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        # Position is PENDING by default
+
+        # Mock automation managers to verify they are NOT called
+        position_manager.breakeven_manager.should_move_to_breakeven = MagicMock()
+        position_manager.trailing_stop_manager.should_activate_trailing = MagicMock()
+
+        position_manager._manage_automation(position)
+
+        position_manager.breakeven_manager.should_move_to_breakeven.assert_not_called()
+        position_manager.trailing_stop_manager.should_activate_trailing.assert_not_called()
+
+    def test_manage_automation_breakeven_exception(self, position_manager, buy_signal):
+        """Test handling exception during breakeven update."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Mock breakeven manager to raise exception
+        position_manager.breakeven_manager.should_move_to_breakeven = MagicMock(return_value=True)
+        position_manager.breakeven_manager.move_to_breakeven = MagicMock(
+            side_effect=ValueError("Breakeven failed")
+        )
+
+        # Should catch exception and log error, not crash
+        position_manager._manage_automation(position)
+
+        # Verify it tried to move to breakeven
+        position_manager.breakeven_manager.move_to_breakeven.assert_called_once()
+
+    def test_manage_automation_trailing_stop_update_exception(self, position_manager, buy_signal):
+        """Test handling exception during trailing stop update."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Mock trailing stop manager to raise exception
+        position_manager.trailing_stop_manager.should_activate_trailing = MagicMock(
+            return_value=False
+        )
+        position_manager.trailing_stop_manager.should_update_trailing_stop = MagicMock(
+            return_value=True
+        )
+        position_manager.trailing_stop_manager.update_trailing_stop = MagicMock(
+            side_effect=ValueError("Trailing update failed")
+        )
+
+        # Should catch exception and log error, not crash
+        position_manager._manage_automation(position)
+
+        # Verify it tried to update trailing stop
+        position_manager.trailing_stop_manager.update_trailing_stop.assert_called_once()

@@ -224,6 +224,14 @@ class TestHistoricalDataFetching:
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             data_manager.get_ohlcv_range("EURUSD", "H1", date_from, date_to)
 
+    def test_get_ohlcv_range_invalid_timeframe(self, data_manager):
+        """Test getting OHLCV range with invalid timeframe (line 178)."""
+        date_from = datetime.now() - timedelta(days=7)
+        date_to = datetime.now()
+
+        with pytest.raises(MT5DataError, match="Invalid timeframe"):
+            data_manager.get_ohlcv_range("EURUSD", "INVALID", date_from, date_to)
+
 
 class TestTickData:
     """Test tick data retrieval."""
@@ -290,6 +298,14 @@ class TestTickData:
 
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             data_manager.get_ticks("EURUSD")
+
+    def test_get_ticks_exception(self, data_manager):
+        """Test exception handling in get_ticks (line 282-284)."""
+        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+            mock_mt5.copy_ticks_from_pos.side_effect = Exception("Unexpected error")
+
+            with pytest.raises(MT5DataError):
+                data_manager.get_ticks("EURUSD", count=100)
 
 
 class TestMultiTimeframeSupport:
@@ -392,3 +408,65 @@ class TestErrorHandling:
 
             with pytest.raises(MT5DataError):
                 data_manager.get_last_tick("EURUSD")
+
+    def test_get_last_tick_not_connected(self, data_manager, mock_mt5_connector):
+        """Test getting last tick fails when not connected (line 225)."""
+        mock_mt5_connector.is_connected.return_value = False
+
+        with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
+            data_manager.get_last_tick("EURUSD")
+
+    def test_get_ohlcv_enabled_symbols_check(self, data_manager):
+        """Test enabled_symbols validation (line 93-95)."""
+        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+            mock_rates = create_mock_rates(100)
+            mock_mt5.copy_rates_from_pos.return_value = mock_rates
+
+            if MT5_AVAILABLE:
+                mock_mt5.TIMEFRAME_H1 = mt5.TIMEFRAME_H1
+            else:
+                mock_mt5.TIMEFRAME_H1 = 60
+
+            # Test with enabled_symbols list - symbol not in list
+            enabled_symbols = ["GBPUSD", "USDJPY"]
+
+            with pytest.raises(MT5DataError, match="is not enabled"):
+                data_manager.get_ohlcv("EURUSD", enabled_symbols=enabled_symbols)
+
+    def test_get_ohlcv_enabled_symbols_success(self, data_manager):
+        """Test enabled_symbols validation - symbol in list."""
+        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+            mock_rates = create_mock_rates(100)
+            mock_mt5.copy_rates_from_pos.return_value = mock_rates
+
+            if MT5_AVAILABLE:
+                mock_mt5.TIMEFRAME_H1 = mt5.TIMEFRAME_H1
+            else:
+                mock_mt5.TIMEFRAME_H1 = 60
+
+            # Test with enabled_symbols list - symbol in list
+            enabled_symbols = ["EURUSD", "GBPUSD"]
+
+            df = data_manager.get_ohlcv("EURUSD", enabled_symbols=enabled_symbols)
+
+            assert isinstance(df, pd.DataFrame)
+            assert len(df) == 100
+
+    def test_get_ohlcv_enabled_symbols_with_broker_suffix(self, data_manager):
+        """Test enabled_symbols validation with broker symbol suffix."""
+        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+            mock_rates = create_mock_rates(100)
+            mock_mt5.copy_rates_from_pos.return_value = mock_rates
+
+            if MT5_AVAILABLE:
+                mock_mt5.TIMEFRAME_H1 = mt5.TIMEFRAME_H1
+            else:
+                mock_mt5.TIMEFRAME_H1 = 60
+
+            # Test with broker symbol (EURUSDm) but universal symbol (EURUSD) in enabled list
+            enabled_symbols = ["EURUSD", "GBPUSD"]
+
+            df = data_manager.get_ohlcv("EURUSDm", enabled_symbols=enabled_symbols)
+
+            assert isinstance(df, pd.DataFrame)
+            assert len(df) == 100

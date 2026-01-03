@@ -10,6 +10,8 @@ from sqlalchemy import select
 
 from trading_bot.data.database import get_session
 from trading_bot.data.models import Position as DBPosition
+from trading_bot.position.automation.breakeven_manager import BreakevenManager
+from trading_bot.position.automation.trailing_stop_manager import TrailingStopManager
 from trading_bot.position.pip_calculator import PipCalculator
 from trading_bot.position.position_models import Position, PositionStatus, PositionType
 from trading_bot.position.position_tracker import PositionTracker
@@ -43,6 +45,10 @@ class PositionManager:
         self.pip_calculator = PipCalculator()
         self.tracker = PositionTracker()
 
+        # Automation managers
+        self.breakeven_manager = BreakevenManager(config)
+        self.trailing_stop_manager = TrailingStopManager(config)
+
         # Position storage
         self.positions: dict[str, Position] = {}  # position_id -> Position
         self.positions_by_symbol: dict[str, list[str]] = {}  # symbol -> list of position_ids
@@ -53,7 +59,7 @@ class PositionManager:
         )
 
         logger.info(
-            f"PositionManager initialized "
+            f"PositionManager initialized with automation "
             f"(max positions per symbol: {self.max_positions_per_symbol})"
         )
 
@@ -505,6 +511,9 @@ class PositionManager:
             # Update position price first
             self.tracker.update_position_price(position, current_price)
 
+            # Manage automation (Breakeven & Trailing Stop)
+            self._manage_automation(position)
+
             # Check stop loss
             if self.tracker.check_stop_loss(position):
                 logger.info(f"Stop loss hit for {position.position_id}: {position.symbol}")
@@ -521,6 +530,40 @@ class PositionManager:
                 closed_positions.append(position)
 
         return closed_positions
+
+    def _manage_automation(self, position: Position) -> None:
+        """
+        Manage automated position adjustments (Breakeven & Trailing Stop).
+
+        Args:
+            position: Position to manage
+        """
+        if not position.is_open:
+            return
+
+        # Breakeven Management
+        if self.breakeven_manager.should_move_to_breakeven(position):
+            try:
+                new_sl = self.breakeven_manager.move_to_breakeven(position)
+                logger.info(
+                    f"📍 BREAKEVEN activated for {position.position_id}: "
+                    f"SL moved to {new_sl:.5f}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to move {position.position_id} to breakeven: {e}")
+
+        # Trailing Stop Management
+        # First check if we should activate trailing
+        if self.trailing_stop_manager.should_activate_trailing(position):
+            self.trailing_stop_manager.activate_trailing(position)
+
+        # Then check if we should update trailing stop
+        if self.trailing_stop_manager.should_update_trailing_stop(position):
+            try:
+                new_sl = self.trailing_stop_manager.update_trailing_stop(position)
+                # Logging is already done in TrailingStopManager
+            except Exception as e:
+                logger.error(f"Failed to update trailing stop for {position.position_id}: {e}")
 
     def get_portfolio_summary(self) -> dict:
         """

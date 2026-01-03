@@ -89,3 +89,46 @@ async def test_invalid_swing_direction(analyzer):
     signal = await analyzer.analyze_fibonacci("EURUSD", highs, lows, 150.0, "DEMAND")
 
     assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_insufficient_data(analyzer):
+    """Test fibonacci analysis with insufficient data (line 54)."""
+    # Less than lookback (20) candles
+    highs = [200.0] * 15
+    lows = [100.0] * 15
+
+    signal = await analyzer.analyze_fibonacci("EURUSD", highs, lows, 150.0, "DEMAND")
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_invalid_zone_type(analyzer):
+    """Test fibonacci analysis with invalid zone type (line 94-97)."""
+    # Valid data
+    lows = [100.0] * 10 + [150.0] * 10
+    highs = [110.0] * 10 + [200.0] * 10
+
+    # Invalid zone type (not DEMAND or SUPPLY)
+    signal = await analyzer.analyze_fibonacci("EURUSD", highs, lows, 150.0, "INVALID")
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_supply_zone_invalid_swing(analyzer):
+    """Test supply zone with invalid swing direction (line 94)."""
+    # Create data where High happens AFTER Low (invalid for SUPPLY zone)
+    # For SUPPLY zone, we need High BEFORE Low (downtrend)
+    # But here Low happens before High (uptrend)
+    lows = [100.0] * 10 + [150.0] * 10  # Low at index 0-9
+    highs = [110.0] * 10 + [200.0] * 10  # High at index 10-19 (after low)
+
+    # Supply Zone at 150.0
+    zone_price = 150.0
+
+    signal = await analyzer.analyze_fibonacci("EURUSD", highs, lows, zone_price, "SUPPLY")
+
+    # Should return None because high_idx >= low_idx (invalid for SUPPLY)
+    assert signal is None

@@ -492,3 +492,74 @@ class TestTradingSignal:
                 confluence_score=75.0,
                 risk_reward_ratio=3.0,
             )
+
+    def test_strategy_result_direction_string_conversion(self):
+        """Test StrategyResult direction conversion from string."""
+        # Test with string direction (line 55)
+        result = StrategyResult(
+            strategy_name="test",
+            symbol="EURUSD",
+            score=75.0,
+            direction="BUY",  # String instead of enum
+            entry_price=1.1000,
+            stop_loss=1.0950,
+        )
+        assert result.direction == SignalDirection.BUY
+        assert isinstance(result.direction, SignalDirection)
+
+    def test_strategy_result_risk_reward_ratio_zero_risk(self):
+        """Test risk_reward_ratio returns None when risk is zero or negative (line 80)."""
+        # Risk is zero (entry == stop_loss)
+        result = StrategyResult(
+            strategy_name="test",
+            symbol="EURUSD",
+            score=75.0,
+            direction=SignalDirection.BUY,
+            entry_price=1.1000,
+            stop_loss=1.1000,  # Same as entry
+            take_profit=1.1100,
+        )
+        assert result.risk_reward_ratio is None
+
+        # Risk is negative (stop_loss > entry for BUY)
+        result = StrategyResult(
+            strategy_name="test",
+            symbol="EURUSD",
+            score=75.0,
+            direction=SignalDirection.BUY,
+            entry_price=1.1000,
+            stop_loss=1.1050,  # Above entry (invalid but test the code path)
+            take_profit=1.1100,
+        )
+        assert result.risk_reward_ratio is None
+
+    def test_trading_signal_direction_string_conversion(self):
+        """Test TradingSignal direction conversion from string (line 133)."""
+        signal = TradingSignal(
+            signal_id="sig_001",
+            symbol="EURUSD",
+            direction="BUY",  # String instead of enum
+            entry_price=1.1000,
+            stop_loss=1.0950,
+            take_profit=1.1150,
+            confluence_score=75.0,
+            risk_reward_ratio=3.0,
+        )
+        assert signal.direction == SignalDirection.BUY
+        assert isinstance(signal.direction, SignalDirection)
+
+    def test_trading_signal_status_string_conversion(self):
+        """Test TradingSignal status conversion from string (line 136)."""
+        signal = TradingSignal(
+            signal_id="sig_001",
+            symbol="EURUSD",
+            direction=SignalDirection.BUY,
+            entry_price=1.1000,
+            stop_loss=1.0950,
+            take_profit=1.1150,
+            confluence_score=75.0,
+            risk_reward_ratio=3.0,
+            status="VALIDATED",  # String instead of enum
+        )
+        assert signal.status == SignalStatus.VALIDATED
+        assert isinstance(signal.status, SignalStatus)

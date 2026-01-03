@@ -362,6 +362,59 @@ class TestOrderModification:
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             order_manager.modify_position(ticket=12345, sl=1.09950)
 
+    def test_modify_position_none_result(self, order_manager):
+        """Test modify position when MT5 returns None (line 291-292)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.sl = 1.10000
+            mock_position.tp = 1.10100
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            mock_mt5.order_send.return_value = None
+            mock_mt5.last_error.return_value = (10001, "Connection error")
+
+            with pytest.raises(MT5OrderError, match="Position modification failed"):
+                order_manager.modify_position(ticket=12345, sl=1.09950)
+
+    def test_modify_position_rejected(self, order_manager):
+        """Test modify position rejection (line 297-299)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            if MT5_AVAILABLE:
+                mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
+            else:
+                mock_mt5.TRADE_RETCODE_DONE = 10009
+
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.sl = 1.10000
+            mock_position.tp = 1.10100
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            mock_result = Mock()
+            mock_result._asdict.return_value = {
+                "retcode": 10004,  # Rejected
+                "comment": "Invalid SL/TP",
+            }
+            mock_mt5.order_send.return_value = mock_result
+
+            with pytest.raises(MT5OrderError, match="Modification rejected"):
+                order_manager.modify_position(ticket=12345, sl=1.09950)
+
+    def test_modify_position_exception_handling(self, order_manager):
+        """Test exception handling in modify_position (line 304-308)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.sl = 1.10000
+            mock_position.tp = 1.10100
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            mock_mt5.order_send.side_effect = Exception("Unexpected error")
+
+            with pytest.raises(MT5OrderError):
+                order_manager.modify_position(ticket=12345, sl=1.09950)
+
 
 class TestPositionClosure:
     """Test position closure."""
@@ -436,6 +489,47 @@ class TestPositionClosure:
 
             assert result["retcode"] == retcode
 
+    def test_close_position_sell_type(self, order_manager, mock_symbol_manager):
+        """Test closing SELL position (line 347, 352)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            if MT5_AVAILABLE:
+                mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
+                mock_mt5.POSITION_TYPE_SELL = mt5.POSITION_TYPE_SELL
+                mock_mt5.ORDER_TYPE_BUY = mt5.ORDER_TYPE_BUY
+            else:
+                mock_mt5.TRADE_RETCODE_DONE = 10009
+                mock_mt5.POSITION_TYPE_SELL = 1
+                mock_mt5.ORDER_TYPE_BUY = 0
+
+            # Mock SELL position
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.volume = 0.01
+            mock_position.type = mock_mt5.POSITION_TYPE_SELL
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            # Mock close result
+            mock_result = Mock()
+            retcode = mock_mt5.TRADE_RETCODE_DONE
+            mock_result._asdict.return_value = {
+                "retcode": retcode,
+                "deal": 12351,
+                "comment": "Closed",
+            }
+            mock_mt5.order_send.return_value = mock_result
+
+            # For SELL position, close_type should be ORDER_TYPE_BUY, so price should be ask
+            mock_symbol_manager.get_symbol_info.return_value = {
+                "bid": 1.10000,
+                "ask": 1.10010,
+            }
+
+            result = order_manager.close_position(ticket=12346)
+
+            assert result["retcode"] == retcode
+            # Verify that ask price was used (for BUY close type)
+            mock_symbol_manager.get_symbol_info.assert_called_once_with("EURUSD")
+
     def test_close_position_not_found(self, order_manager):
         """Test closure when position not found."""
         with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
@@ -450,6 +544,86 @@ class TestPositionClosure:
 
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             order_manager.close_position(ticket=12345)
+
+    def test_close_position_none_result(self, order_manager, mock_symbol_manager):
+        """Test close position when MT5 returns None (line 375-377)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            if MT5_AVAILABLE:
+                mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
+            else:
+                mock_mt5.POSITION_TYPE_BUY = 0
+
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.volume = 0.01
+            mock_position.type = mock_mt5.POSITION_TYPE_BUY
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            mock_mt5.order_send.return_value = None
+            mock_mt5.last_error.return_value = (10001, "Connection error")
+
+            mock_symbol_manager.get_symbol_info.return_value = {
+                "bid": 1.10000,
+                "ask": 1.10010,
+            }
+
+            with pytest.raises(MT5OrderError, match="Position close failed"):
+                order_manager.close_position(ticket=12345)
+
+    def test_close_position_rejected(self, order_manager, mock_symbol_manager):
+        """Test close position rejection (line 381-384)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            if MT5_AVAILABLE:
+                mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
+                mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
+            else:
+                mock_mt5.TRADE_RETCODE_DONE = 10009
+                mock_mt5.POSITION_TYPE_BUY = 0
+
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.volume = 0.01
+            mock_position.type = mock_mt5.POSITION_TYPE_BUY
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            mock_result = Mock()
+            mock_result._asdict.return_value = {
+                "retcode": 10004,  # Rejected
+                "comment": "Market closed",
+            }
+            mock_mt5.order_send.return_value = mock_result
+
+            mock_symbol_manager.get_symbol_info.return_value = {
+                "bid": 1.10000,
+                "ask": 1.10010,
+            }
+
+            with pytest.raises(MT5OrderError, match="Close rejected"):
+                order_manager.close_position(ticket=12345)
+
+    def test_close_position_exception_handling(self, order_manager, mock_symbol_manager):
+        """Test exception handling in close_position (line 389-393)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            if MT5_AVAILABLE:
+                mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
+            else:
+                mock_mt5.POSITION_TYPE_BUY = 0
+
+            mock_position = Mock()
+            mock_position.symbol = "EURUSD"
+            mock_position.volume = 0.01
+            mock_position.type = mock_mt5.POSITION_TYPE_BUY
+            mock_mt5.positions_get.return_value = [mock_position]
+
+            mock_mt5.order_send.side_effect = Exception("Unexpected error")
+
+            mock_symbol_manager.get_symbol_info.return_value = {
+                "bid": 1.10000,
+                "ask": 1.10010,
+            }
+
+            with pytest.raises(MT5OrderError):
+                order_manager.close_position(ticket=12345)
 
 
 class TestOrderErrorHandling:
@@ -473,6 +647,43 @@ class TestOrderErrorHandling:
             mock_mt5.order_send.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5OrderError):
+                order_manager.send_pending_order(
+                    symbol="EURUSD",
+                    order_type="BUY_LIMIT",
+                    volume=0.01,
+                    price=1.09900,
+                )
+
+    def test_send_pending_order_none_result(self, order_manager):
+        """Test pending order when MT5 returns None (line 228-229)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            mock_mt5.order_send.return_value = None
+            mock_mt5.last_error.return_value = (10001, "Connection error")
+
+            with pytest.raises(MT5OrderError, match="Pending order failed"):
+                order_manager.send_pending_order(
+                    symbol="EURUSD",
+                    order_type="BUY_LIMIT",
+                    volume=0.01,
+                    price=1.09900,
+                )
+
+    def test_send_pending_order_rejected(self, order_manager):
+        """Test pending order rejection (line 234-236)."""
+        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+            if MT5_AVAILABLE:
+                mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
+            else:
+                mock_mt5.TRADE_RETCODE_DONE = 10009
+
+            mock_result = Mock()
+            mock_result._asdict.return_value = {
+                "retcode": 10004,  # Rejected
+                "comment": "Invalid price",
+            }
+            mock_mt5.order_send.return_value = mock_result
+
+            with pytest.raises(MT5OrderError, match="Pending order rejected"):
                 order_manager.send_pending_order(
                     symbol="EURUSD",
                     order_type="BUY_LIMIT",

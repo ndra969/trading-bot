@@ -422,6 +422,16 @@ class TestSymbolSelection:
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             symbol_manager.select_symbol("EURUSD")
 
+    def test_select_symbol_exception(self, symbol_manager):
+        """Test exception handling in select_symbol (line 204-206)."""
+        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+            mock_mt5.symbol_select.side_effect = Exception("Unexpected error")
+
+            result = symbol_manager.select_symbol("EURUSD")
+
+            # Should return False on exception
+            assert result is False
+
 
 class TestSymbolSearch:
     """Test symbol search functionality."""

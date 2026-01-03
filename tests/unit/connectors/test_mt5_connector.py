@@ -512,3 +512,218 @@ class TestMT5ConnectorAdvanced:
         assert result["success"] is False
         assert result["modified"] is False
         assert "error" in result["message"].lower() or "rejected" in result["message"].lower()
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_place_order_success(self, mock_mt5):
+        """Test successful order placement."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock symbol info
+        class MockSymbolInfo:
+            def __init__(self):
+                self.filling_mode = 1  # FOK supported
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+        mock_mt5.TRADE_RETCODE_DONE = 10009
+        mock_mt5.ORDER_FILLING_FOK = 1
+        mock_mt5.ORDER_FILLING_IOC = 2
+        mock_mt5.TRADE_ACTION_DEAL = 1
+        mock_mt5.ORDER_TYPE_BUY = 0
+        mock_mt5.ORDER_TIME_GTC = 0
+
+        # Mock successful order result
+        class MockOrderResult:
+            def __init__(self):
+                self.order = 12345
+                self.retcode = 10009
+                self.price = 1.10000
+                self.volume = 0.01
+                self.comment = "Success"
+
+            def _asdict(self):
+                return {
+                    "order": self.order,
+                    "retcode": self.retcode,
+                    "price": self.price,
+                    "volume": self.volume,
+                    "comment": self.comment,
+                }
+
+        mock_mt5.order_send.return_value = MockOrderResult()
+
+        result = connector.place_order(
+            symbol="EURUSD",
+            order_type="BUY",
+            volume=0.01,
+            price=1.10000,
+            sl=1.09500,
+            tp=1.11000,
+        )
+
+        assert result["success"] is True
+        assert result["order"] == 12345
+        assert result["price"] == 1.10000
+        assert result["volume"] == 0.01
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_place_order_not_connected(self, mock_mt5):
+        """Test place_order when not connected."""
+        connector = MT5Connector()
+        connector._is_connected = False
+
+        result = connector.place_order(
+            symbol="EURUSD",
+            order_type="BUY",
+            volume=0.01,
+            price=1.10000,
+            sl=1.09500,
+            tp=1.11000,
+        )
+
+        assert result["success"] is False
+        assert result["error"] == "MT5 not connected"
+        assert result["error_code"] == 0
+        assert "MT5 connection not established" in result["error_description"]
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_place_order_symbol_not_found(self, mock_mt5):
+        """Test place_order when symbol not found."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        mock_mt5.symbol_info.return_value = None
+
+        result = connector.place_order(
+            symbol="INVALID",
+            order_type="BUY",
+            volume=0.01,
+            price=1.10000,
+            sl=1.09500,
+            tp=1.11000,
+        )
+
+        assert result["success"] is False
+        assert "not found" in result["error"]
+        assert result["error_code"] == 0
+        assert "Symbol not found in MT5" in result["error_description"]
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_place_order_none_result(self, mock_mt5):
+        """Test place_order when MT5 returns None."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock symbol info
+        class MockSymbolInfo:
+            def __init__(self):
+                self.filling_mode = 1
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+        mock_mt5.ORDER_FILLING_FOK = 1
+        mock_mt5.TRADE_ACTION_DEAL = 1
+        mock_mt5.ORDER_TYPE_BUY = 0
+        mock_mt5.ORDER_TIME_GTC = 0
+        mock_mt5.order_send.return_value = None
+        mock_mt5.last_error.return_value = (10004, "Requote")
+
+        result = connector.place_order(
+            symbol="EURUSD",
+            order_type="BUY",
+            volume=0.01,
+            price=1.10000,
+            sl=1.09500,
+            tp=1.11000,
+        )
+
+        assert result["success"] is False
+        assert result["error_code"] == 10004
+        assert "Requote" in result["error_description"]
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_place_order_retcode_error(self, mock_mt5):
+        """Test place_order when MT5 returns error retcode."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock symbol info
+        class MockSymbolInfo:
+            def __init__(self):
+                self.filling_mode = 1
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+        mock_mt5.ORDER_FILLING_FOK = 1
+        mock_mt5.TRADE_ACTION_DEAL = 1
+        mock_mt5.ORDER_TYPE_BUY = 0
+        mock_mt5.ORDER_TIME_GTC = 0
+        mock_mt5.TRADE_RETCODE_DONE = 10009
+
+        # Mock error result
+        class MockOrderResult:
+            def __init__(self):
+                self.retcode = 10019  # Not enough money
+                self.comment = "Not enough money"
+
+        mock_mt5.order_send.return_value = MockOrderResult()
+
+        result = connector.place_order(
+            symbol="EURUSD",
+            order_type="BUY",
+            volume=0.01,
+            price=1.10000,
+            sl=1.09500,
+            tp=1.11000,
+        )
+
+        assert result["success"] is False
+        assert result["error_code"] == 10019
+        assert "not enough money" in result["error_description"].lower()
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_place_order_exception(self, mock_mt5):
+        """Test place_order when exception occurs."""
+        connector = MT5Connector()
+        connector._is_connected = True
+
+        # Mock symbol info
+        class MockSymbolInfo:
+            def __init__(self):
+                self.filling_mode = 1
+
+        mock_mt5.symbol_info.return_value = MockSymbolInfo()
+        mock_mt5.ORDER_FILLING_FOK = 1
+        mock_mt5.TRADE_ACTION_DEAL = 1
+        mock_mt5.ORDER_TYPE_BUY = 0
+        mock_mt5.ORDER_TIME_GTC = 0
+        mock_mt5.order_send.side_effect = Exception("Unexpected error")
+
+        result = connector.place_order(
+            symbol="EURUSD",
+            order_type="BUY",
+            volume=0.01,
+            price=1.10000,
+            sl=1.09500,
+            tp=1.11000,
+        )
+
+        assert result["success"] is False
+        assert result["error_code"] == 10000
+        assert "Unexpected error" in result["error"]
+        assert "Exception occurred during order placement" in result["error_description"]
+
+    @patch("trading_bot.connectors.mt5_connector.mt5")
+    def test_get_error_description(self, mock_mt5):
+        """Test _get_error_description helper method."""
+        connector = MT5Connector()
+
+        # Test known error codes
+        assert connector._get_error_description(10004) == "Requote"
+        assert (
+            connector._get_error_description(10019)
+            == "There is not enough money to complete the request"
+        )
+        assert connector._get_error_description(10018) == "Market is closed"
+        assert connector._get_error_description(10013) == "Invalid request"
+
+        # Test unknown error code
+        assert "Unknown error code: 99999" in connector._get_error_description(99999)

@@ -4,14 +4,15 @@ Tests for MTFAnalyzer - Multi-Timeframe Analysis Engine.
 TDD Approach: Uses mocks to isolate MTF logic from FoundationEngine complexity.
 """
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-import pandas as pd
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
-from trading_bot.strategies.mtf_analyzer import MTFAnalyzer
-from trading_bot.strategies.models import StrategyResult, SignalDirection
+import pandas as pd
+import pytest
+
 from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+from trading_bot.strategies.models import SignalDirection, StrategyResult
+from trading_bot.strategies.mtf_analyzer import MTFAnalyzer
 
 
 # Create dummy zone class if actual one is hard to instantiate or depends on complex types

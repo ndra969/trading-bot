@@ -71,6 +71,25 @@ class TestDetectedZone:
         )
         assert zone.size_pips == pytest.approx(50.0, rel=0.1)
 
+    def test_detected_zone_repr(self):
+        """Test DetectedZone __repr__ method."""
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=datetime.now(),
+        )
+
+        repr_str = repr(zone)
+        assert "DetectedZone" in repr_str
+        assert "rejection" in repr_str
+        assert "strength=75.0" in repr_str
+        assert "touches=3" in repr_str
+
 
 class TestZoneDetectorInitialization:
     """Test ZoneDetector initialization."""
@@ -227,9 +246,9 @@ class TestConsolidationZoneDetection:
         zones = detector.detect_zones(consolidation_data, zone_types=[ZoneType.CONSOLIDATION])
 
         consolidation_zones = [z for z in zones if z.zone_type == ZoneType.CONSOLIDATION]
-        assert len(consolidation_zones) > 0, (
-            f"Expected consolidation zones, got {len(consolidation_zones)}"
-        )
+        assert (
+            len(consolidation_zones) > 0
+        ), f"Expected consolidation zones, got {len(consolidation_zones)}"
 
     def test_consolidation_zone_touch_count(self, consolidation_data):
         """Test consolidation zone has minimum touches."""
@@ -417,6 +436,46 @@ class TestZoneExpirationLogic:
 
         assert fresh_score > old_score
 
+    def test_calculate_zone_strength_zero_range(self):
+        """Test zone strength calculation with zero range (line 457-458)."""
+        detector = ZoneDetector()
+
+        dates = pd.date_range(start="2024-01-01", periods=50, freq="1H")
+        data = pd.DataFrame(
+            {
+                "open": [1.1000] * 50,
+                "high": [1.1010] * 50,
+                "low": [1.0990] * 50,
+                "close": [1.1000] * 50,
+                "volume": [1000] * 50,
+            },
+            index=dates,
+        )
+
+        # Test with zero range
+        strength = detector._calculate_zone_strength(data, 25, 1.1000, 1.1000, True, 1)
+        assert strength == 0.0
+
+    def test_freshness_score_boost_recent(self):
+        """Test freshness score boost for very recent zones (line 573-574)."""
+        detector = ZoneDetector(config={"max_zone_age_hours": 72})
+
+        # Very recent zone (< 12 hours)
+        recent_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1000,
+            lower_bound=1.0950,
+            strength=75.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now() - timedelta(hours=6),
+            last_tested=datetime.now(),
+        )
+
+        freshness = detector.calculate_freshness_score(recent_zone)
+        # Should have boost (score > 100 * (1 - 6/72) = 91.67)
+        assert freshness > 90.0
+
 
 class TestZoneValidation:
     """Test zone validation and quality checks."""
@@ -512,6 +571,85 @@ class TestEdgeCases:
 
         # Should handle empty zone_types list gracefully
         zones = detector.detect_zones(data, zone_types=[])
+        assert isinstance(zones, list)
+        assert zones == []  # Should return empty list (line 185)
+
+    def test_detect_zones_exception_handling(self):
+        """Test exception handling in detect_zones (line 212-214)."""
+        detector = ZoneDetector()
+
+        dates = pd.date_range(start="2024-01-01", periods=50, freq="1H")
+        data = pd.DataFrame(
+            {
+                "open": [1.1000] * 50,
+                "high": [1.1010] * 50,
+                "low": [1.0990] * 50,
+                "close": [1.1000] * 50,
+                "volume": [1000] * 50,
+            },
+            index=dates,
+        )
+
+        # Mock _detect_rejection_zones to raise exception
+        from unittest.mock import patch
+
+        from trading_bot.exceptions.strategy_exceptions import ZoneDetectionError
+
+        with patch.object(detector, "_detect_rejection_zones", side_effect=Exception("Test error")):
+            with pytest.raises(ZoneDetectionError, match="Failed to detect zones"):
+                detector.detect_zones(data, zone_types=[ZoneType.REJECTION])
+
+    def test_rejection_zone_zero_range(self):
+        """Test rejection zone detection with zero range candle (line 232-233)."""
+        detector = ZoneDetector()
+
+        dates = pd.date_range(start="2024-01-01", periods=50, freq="1H")
+        data = pd.DataFrame(
+            {
+                "open": [1.1000] * 50,
+                "high": [1.1010] * 50,
+                "low": [1.0990] * 50,
+                "close": [1.1000] * 50,
+                "volume": [1000] * 50,
+            },
+            index=dates,
+        )
+
+        # Add zero range candle at index 30
+        data.loc[data.index[30], "high"] = 1.1000
+        data.loc[data.index[30], "low"] = 1.1000
+        data.loc[data.index[30], "open"] = 1.1000
+        data.loc[data.index[30], "close"] = 1.1000
+
+        zones = detector.detect_zones(data, zone_types=[ZoneType.REJECTION])
+        # Should skip zero range candle
+        assert isinstance(zones, list)
+
+    def test_breakout_zone_zero_range(self):
+        """Test breakout zone detection with zero range consolidation (line 381-382)."""
+        detector = ZoneDetector()
+
+        dates = pd.date_range(start="2024-01-01", periods=50, freq="1H")
+        data = pd.DataFrame(
+            {
+                "open": [1.1000] * 50,
+                "high": [1.1010] * 50,
+                "low": [1.0990] * 50,
+                "close": [1.1000] * 50,
+                "volume": [1000] * 50,
+            },
+            index=dates,
+        )
+
+        # Create zero range consolidation
+        for i in range(30, 40):
+            data.loc[data.index[i], "high"] = 1.1000
+            data.loc[data.index[i], "low"] = 1.1000
+            data.loc[data.index[i], "open"] = 1.1000
+            data.loc[data.index[i], "close"] = 1.1000
+
+        zones = detector.detect_zones(data, zone_types=[ZoneType.BREAKOUT_ORIGIN])
+        # Should skip zero range consolidation
         assert isinstance(zones, list)
 
 

@@ -188,3 +188,41 @@ async def test_bearish_choch(analyzer):
     # Let's fix this expectation in the test first (it will likely fail as BOS).
     # Or better: Fix the analyzer logic now.
     pass
+
+
+@pytest.mark.asyncio
+async def test_insufficient_data(analyzer):
+    """Test structure analysis with insufficient data (line 41)."""
+    # Less than lookback (20) candles
+    highs = [105.0] * 15
+    lows = [95.0] * 15
+    closes = [100.0] * 15
+
+    signal = await analyzer.analyze_structure("EURUSD", highs, lows, closes)
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_insufficient_swings(analyzer):
+    """Test structure analysis with insufficient swings (line 48)."""
+    # Need at least 2 swing highs and 2 swing lows
+    # Create data with only 1 swing high and 1 swing low
+    length = 50
+    highs = [100.0] * length
+    lows = [90.0] * length
+    closes = [95.0] * length
+
+    # Only 1 swing high
+    highs[25] = 105.0
+    highs[24] = 100.0
+    highs[26] = 100.0
+
+    # Only 1 swing low
+    lows[30] = 85.0
+    lows[29] = 90.0
+    lows[31] = 90.0
+
+    signal = await analyzer.analyze_structure("EURUSD", highs, lows, closes)
+
+    assert signal is None

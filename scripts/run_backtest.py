@@ -83,11 +83,10 @@ class MockTrade:
         if not self.exit_price:
             return 0.0
 
-        # Determine pip size based on price
-        # Heuristic: < 50 = 0.0001 (Forex), > 50 = 0.01 (JPY)
-        pip_size = 0.0001
-        if self.entry_price > 50:
-            pip_size = 0.01
+        # Determine pip size based on PipCalculator for accuracy
+        from trading_bot.position.pip_calculator import PipCalculator
+        pip_calc = PipCalculator()
+        pip_size = pip_calc.get_pip_size(self.symbol)
 
         raw_pnl = 0.0
         if self.direction == SignalDirection.BUY:
@@ -189,32 +188,54 @@ class BacktestEngine:
         if not trade:
             return
 
-        # Simple High/Low check
-        # In reality, we don't know if High or Low happened first within the bar.
-        # WORST CASE assumption: If both SL and TP are hit in same candle, assume SL hit.
+        # Determine pip size using PipCalculator
+        from trading_bot.position.pip_calculator import PipCalculator
+        pip_calc = PipCalculator()
+        pip_size = pip_calc.get_pip_size(self.symbol)
 
         high = candle["high"]
         low = candle["low"]
 
-        # Check SL/TP based on direction
-        sl_hit = False
-        tp_hit = False
-        exit_price = 0.0
+        # UPDATE AUTOMATION FIRST (more realistic - mirrors live trading)
+        # This ensures SL is adjusted BEFORE we check if it was hit
+        self._update_automation(candle, pip_size)
 
-        # Check High/Low for Take Profit / Stop Loss / Trailing
-
-        # Determine pip size (Standardize)
-        pip_size = 0.0001
-        if self.active_trade.entry_price > 50:
-            pip_size = 0.01
-
+        # Check SL/TP based on UPDATED stop loss
+        if self.active_trade.direction == SignalDirection.BUY:
+            if low <= self.active_trade.stop_loss:
+                self._close_trade(self.active_trade.stop_loss, current_time, "SL/Trailing")
+                return
+            if high >= self.active_trade.take_profit:
+                self._close_trade(self.active_trade.take_profit, current_time, "TP")
+                return
+        else:  # SELL
+            if high >= self.active_trade.stop_loss:
+                self._close_trade(self.active_trade.stop_loss, current_time, "SL/Trailing")
+                return
+            if low <= self.active_trade.take_profit:
+                self._close_trade(self.active_trade.take_profit, current_time, "TP")
+                return
+    
+    def _update_automation(self, candle: pd.Series, pip_size: float) -> None:
+        """
+        Update Breakeven and Trailing Stop for active trade.
+        
+        Called every candle to mirror live trading behavior.
+        
+        Args:
+            candle: Current candle data
+            pip_size: Pip size for the symbol
+        """
+        if not self.active_trade:
+            return
+            
+        high = candle["high"]
+        low = candle["low"]
+        
         # --- Load Trade Management Config based on Asset Class ---
         tm_config_root = self.config.get("trade_management", {})
 
         # 1. Get Asset Class
-        # We can use a simple heuristic or try to import SymbolMapper
-        # For backtest simplicity, let's use the mapped asset class from config/symbol_mapping.yaml logic
-        # OR just a robust heuristic:
         asset_class = "defaults"  # Default to forex logic
         symbol_upper = self.symbol.upper()
 
@@ -245,16 +266,8 @@ class BacktestEngine:
         ts_activation = ts_settings.get("activation_pips", 30.0)
         ts_limit = ts_settings.get("limit_pips", 10.0)
 
-        # --- Check SL/TP first (Standard execution) ---
+        # --- Breakeven & Trailing Logic ---
         if self.active_trade.direction == SignalDirection.BUY:
-            if low <= self.active_trade.stop_loss:
-                self._close_trade(self.active_trade.stop_loss, current_time, "SL/Trailing")
-                return
-            if high >= self.active_trade.take_profit:
-                self._close_trade(self.active_trade.take_profit, current_time, "TP")
-                return
-
-            # --- Trailing Stop & Breakeven Logic (BUY) ---
             current_profit = high - self.active_trade.entry_price
             current_profit_pips = current_profit / pip_size
 
@@ -263,7 +276,12 @@ class BacktestEngine:
                 be_price = self.active_trade.entry_price + (be_offset * pip_size)
                 # Check if profit reached trigger AND SL is below BE
                 if current_profit_pips >= be_trigger and self.active_trade.stop_loss < be_price:
+                    old_sl = self.active_trade.stop_loss
                     self.active_trade.stop_loss = be_price
+                    logger.debug(
+                        f"📍 Breakeven: SL moved {old_sl:.5f} → {be_price:.5f} "
+                        f"(+{current_profit_pips:.1f} pips)"
+                    )
 
             # 2. Trailing Stop
             if ts_enabled:
@@ -272,17 +290,14 @@ class BacktestEngine:
                     potential_sl = high - (ts_limit * pip_size)
                     # Only move SL UP
                     if potential_sl > self.active_trade.stop_loss:
+                        old_sl = self.active_trade.stop_loss
                         self.active_trade.stop_loss = potential_sl
+                        logger.debug(
+                            f"🔄 Trailing: SL {old_sl:.5f} → {potential_sl:.5f} "
+                            f"(High: {high:.5f}, +{current_profit_pips:.1f} pips)"
+                        )
 
         else:  # SELL
-            if high >= self.active_trade.stop_loss:
-                self._close_trade(self.active_trade.stop_loss, current_time, "SL/Trailing")
-                return
-            if low <= self.active_trade.take_profit:
-                self._close_trade(self.active_trade.take_profit, current_time, "TP")
-                return
-
-            # --- Trailing Stop & Breakeven Logic (SELL) ---
             current_profit = self.active_trade.entry_price - low
             current_profit_pips = current_profit / pip_size
 
@@ -291,7 +306,12 @@ class BacktestEngine:
                 be_price = self.active_trade.entry_price - (be_offset * pip_size)
                 # Check if profit reached trigger AND SL is above BE (for Sell, SL is higher)
                 if current_profit_pips >= be_trigger and self.active_trade.stop_loss > be_price:
+                    old_sl = self.active_trade.stop_loss
                     self.active_trade.stop_loss = be_price
+                    logger.debug(
+                        f"📍 Breakeven: SL moved {old_sl:.5f} → {be_price:.5f} "
+                        f"(+{current_profit_pips:.1f} pips)"
+                    )
 
             # 2. Trailing Stop
             if ts_enabled:
@@ -300,17 +320,12 @@ class BacktestEngine:
                     potential_sl = low + (ts_limit * pip_size)
                     # Only move SL DOWN (for Sell)
                     if potential_sl < self.active_trade.stop_loss:
+                        old_sl = self.active_trade.stop_loss
                         self.active_trade.stop_loss = potential_sl
-
-        # Execute Exit
-        # The new logic handles exits directly with `return` statements,
-        # so these original `if sl_hit:` and `elif tp_hit:` checks are no longer needed.
-        # They are effectively replaced by the direct `_close_trade` calls above.
-        # Keeping them commented out for clarity that they were removed.
-        # if sl_hit:
-        #     self._close_trade(exit_price, current_time, "SL")
-        # elif tp_hit:
-        #     self._close_trade(exit_price, current_time, "TP")
+                        logger.debug(
+                            f"🔄 Trailing: SL {old_sl:.5f} → {potential_sl:.5f} "
+                            f"(Low: {low:.5f}, +{current_profit_pips:.1f} pips)"
+                        )
 
     async def _process_entry(self, data: pd.DataFrame, current_time: datetime):
         """Get signal from strategy and open trade."""
@@ -318,6 +333,11 @@ class BacktestEngine:
         results = await self.engine.generate_signals(self.symbol, data, self.timeframe)
 
         if not results:
+            # No signals generated - could be due to:
+            # 1. No zones detected
+            # 2. Chase protection (price too far from zone)
+            # 3. Low confluence score
+            logger.debug(f"No signal at {current_time} (no zones or rejected by filters)")
             return
 
         # Get Thresholds from Config
@@ -331,12 +351,13 @@ class BacktestEngine:
                 continue
 
             if r.score < min_score:
-                # logger.debug(f"Signal filtered: Score {r.score:.1f} < {min_score}")
+                logger.debug(f"Signal filtered: Score {r.score:.1f} < {min_score}")
                 continue
 
             valid_signals.append(r)
 
         if not valid_signals:
+            logger.debug(f"No valid signal at {current_time} (all filtered by score/RR)")
             return
 
         # Take the best signal

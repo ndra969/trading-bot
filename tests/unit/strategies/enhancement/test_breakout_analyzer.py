@@ -160,3 +160,47 @@ async def test_no_breakout(analyzer):
     )
 
     assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_insufficient_data(analyzer):
+    """Test breakout analysis with insufficient data (line 61)."""
+    # Less than 20 candles
+    opens = [100.0] * 15
+    highs = [105.0] * 15
+    lows = [95.0] * 15
+    closes = [100.0] * 15
+    volumes = [1000.0] * 15
+
+    signal = await analyzer.analyze_breakout(
+        "EURUSD",
+        opens,
+        highs,
+        lows,
+        closes,
+        volumes,
+        level_price=102.0,
+        expected_direction="BULLISH",
+    )
+
+    assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_zero_candle_range(analyzer):
+    """Test breakout analysis with zero candle range (line 98)."""
+    # Candle with zero range (high == low)
+    opens, highs, lows, closes, volumes = create_breakout_data((100.0, 100.0, 100.0, 100.0), 2000.0)
+
+    signal = await analyzer.analyze_breakout(
+        "EURUSD",
+        opens,
+        highs,
+        lows,
+        closes,
+        volumes,
+        level_price=99.0,
+        expected_direction="BULLISH",
+    )
+
+    assert signal is None

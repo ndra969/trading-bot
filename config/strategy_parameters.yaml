@@ -60,10 +60,10 @@ signal_aggregator:
 supply_demand:
   # Zone Detection Parameters
   zone_detection:
-    min_zone_strength: 45.0      # Tightening: 30 -> 45 (High quality zones only)
-    max_zone_age_hours: 360      # Keep extended age (allow swing)
-    min_touch_points: 1          # Keep 1 touch
-    volume_confirmation: true    # Tightening: false -> true (Require volume)
+    min_zone_strength: 50.0      # Minimum strength score (0-100)
+    max_zone_age_hours: 72       # Maximum zone age for consideration (3 days)
+    min_touch_points: 2          # Minimum touches for zone validation
+    volume_confirmation: true    # Require volume confirmation for zones
     min_zone_size_pips: 5        # Minimum zone size in pips
     max_zone_size_pips: 1000     # Maximum zone size in pips
 
@@ -95,8 +95,8 @@ supply_demand:
 signal_generation:
   # Signal Quality Requirements
   quality_thresholds:
-    min_confluence_score: 30.0   # Tightening: 20 -> 30 (Require Confluence)
-    min_foundation_score: 25.0   # Tightening: 15 -> 25
+    min_confluence_score: 25.0   # Minimum overall confluence score (Lowered for Testing)
+    min_foundation_score: 20.0   # Minimum foundation S&D score (Lowered for Testing)
     max_signals_per_symbol: 1    # Maximum signals per symbol
     signal_refresh_interval: 300  # Signal refresh interval (seconds)
 
@@ -116,7 +116,7 @@ signal_generation:
     min_stop_loss_distance:
       forex_major: 15.0          # 15 pips (150 points for 5-digit broker) for EURUSD, GBPUSD, etc.
       forex_jpy: 15.0            # 15 pips (150 points for 5-digit broker) for USDJPY, EURJPY, etc.
-      commodities: 50.0           # 50 pips for XAUUSD (Gold)
+      commodities: 40.0           # 40 pips for XAUUSD (Gold) - reduced for more flexibility
       crypto: 50.0                # 50 pips for BTCUSD, ETHUSD, etc.
     # Maximum Take Profit Distance (in pips)
     # Prevents TP from being too far and unreachable
@@ -160,49 +160,6 @@ performance:
   max_analysis_time_seconds: 10
   async_processing: true
   max_concurrent_analysis: 5
-
-# Trade Management Configuration
-trade_management:
-  # Default Settings (Forex Majors)
-  defaults:
-    breakeven:
-      enabled: true
-      trigger_pips: 20.0       # 20 pips
-      offset_pips: 2.0         # 2 pips
-
-    trailing_stop:
-      enabled: true
-      activation_pips: 30.0    # 30 pips
-      limit_pips: 10.0         # 10 pips
-
-  # Asset Class Overrides
-  overrides:
-    # Commodities (Gold/XAUUSD) - High Volatility (approx 30x Forex)
-    commodities:
-      breakeven:
-        trigger_pips: 300.0    # 30 pips ($0.30) - Golden 300 Rule
-        offset_pips: 60.0      # 6 pips ($0.06)
-      trailing_stop:
-        activation_pips: 300.0 # 30 pips ($0.30) - Activate at $3
-        limit_pips: 300.0      # 30 pips ($0.30) - Trail by $3
-
-    # Crypto (BTC/ETH) - Extremely High Volatility
-    crypto:
-      breakeven:
-        trigger_pips: 1000.0   # 1000 points
-        offset_pips: 100.0
-      trailing_stop:
-        activation_pips: 2000.0
-        limit_pips: 500.0
-
-    # Forex JPY Pairs (Higher volatility than majors)
-    forex_jpy:
-      breakeven:
-        trigger_pips: 25.0
-        offset_pips: 3.0
-      trailing_stop:
-        activation_pips: 40.0
-        limit_pips: 15.0
 
 # Database Settings
 database:

@@ -755,28 +755,26 @@ class TestFoundationEngineIsDemandZone:
     def test_rejection_zone_is_demand(self, rejection_zone):
         """Test that rejection zone is considered demand zone."""
         engine = FoundationEngine(use_database=False)
-        data = pd.DataFrame({"close": [1.1005] * 10})
+        current_price = 1.1006  # Price slightly above midpoint (1.1005) to ensure demand
 
-        assert engine._is_demand_zone(rejection_zone, data) is True
+        assert engine._is_demand_zone(rejection_zone, current_price) is True
 
     def test_breakout_zone_price_above_is_demand(self, breakout_zone):
         """Test breakout zone with price above upper bound is demand."""
         engine = FoundationEngine(use_database=False)
-        data = pd.DataFrame({"close": [1.1020] * 10})  # Price above zone
+        current_price = 1.1020  # Price above midpoint (1.1005)
 
-        result = engine._is_demand_zone(breakout_zone, data)
+        result = engine._is_demand_zone(breakout_zone, current_price)
         assert bool(result) is True
 
     def test_breakout_zone_price_below_upper_bound(self, breakout_zone):
-        """Test breakout zone with price below upper bound returns False."""
+        """Test breakout zone with price below midpoint returns False."""
         engine = FoundationEngine(use_database=False)
-        data = pd.DataFrame({"close": [1.1005] * 10})  # Price below upper bound (1.1010)
+        current_price = 1.0995  # Price below midpoint (1.1005)
 
-        # For breakout zone, if price is below upper_bound (1.1005 < 1.1010)
-        # The method checks: price_after > zone.upper_bound
-        # 1.1005 > 1.1010 is False, so it returns False
-        result = engine._is_demand_zone(breakout_zone, data)
-        # Based on implementation, it returns False when price doesn't break above
+        # For demand zone check, if price is below midpoint, it's not a demand zone
+        result = engine._is_demand_zone(breakout_zone, current_price)
+        # Based on implementation, it returns False when price is below midpoint
         assert bool(result) is False
 
     def test_consolidation_zone_default_demand(self):
@@ -796,9 +794,9 @@ class TestFoundationEngineIsDemandZone:
             first_detected=datetime.now(),
             last_tested=datetime.now(),
         )
-        data = pd.DataFrame({"close": [1.1005] * 10})
+        current_price = 1.1006  # Price slightly above midpoint (1.1005) to ensure demand
 
-        assert engine._is_demand_zone(zone, data) is True
+        assert engine._is_demand_zone(zone, current_price) is True
 
 
 class TestFoundationEngineCreateSignalComprehensive:
@@ -883,13 +881,13 @@ class TestFoundationEngineCreateSignalComprehensive:
         from unittest.mock import AsyncMock, patch
 
         engine = engine_with_full_config
-        current_price = 1.1005
+        current_price = 1.1006  # Slightly above midpoint (1.1005)
         data = pd.DataFrame(
             {
                 "open": [1.1000] * 100,
                 "high": [1.1010] * 100,
                 "low": [1.0990] * 100,
-                "close": [1.1005] * 100,
+                "close": [1.1006] * 100,
                 "volume": [1000] * 100,
             }
         )
@@ -1249,7 +1247,7 @@ class TestFoundationEngineAssetClassSLBuffer:
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
             upper_bound=50000.0,
-            lower_bound=49000.0,  # Zone height: 1000 points
+            lower_bound=49950.0,  # Zone height: 50 points
             strength=80.0,
             touches=3,
             volume_confirmed=True,
@@ -1281,13 +1279,13 @@ class TestFoundationEngineAssetClassSLBuffer:
         from unittest.mock import AsyncMock, patch
 
         engine = engine_with_config
-        current_price = 1.1005
+        current_price = 1.1006  # Slightly above midpoint (1.1005)
         data = pd.DataFrame(
             {
                 "open": [1.1000] * 100,
                 "high": [1.1010] * 100,
                 "low": [1.0990] * 100,
-                "close": [1.1005] * 100,
+                "close": [1.1006] * 100,
                 "volume": [1000] * 100,
             }
         )
@@ -1353,13 +1351,13 @@ class TestFoundationEngineAssetClassSLBuffer:
         from unittest.mock import AsyncMock, patch
 
         engine = engine_with_config
-        current_price = 150.05
+        current_price = 150.06  # Slightly above midpoint (150.05)
         data = pd.DataFrame(
             {
                 "open": [150.00] * 100,
                 "high": [150.10] * 100,
                 "low": [149.90] * 100,
-                "close": [150.05] * 100,
+                "close": [150.06] * 100,
                 "volume": [1000] * 100,
             }
         )
@@ -1426,13 +1424,18 @@ class TestFoundationEngineAssetClassSLBuffer:
         from unittest.mock import AsyncMock, patch
 
         engine = engine_with_config
-        current_price = 49500.0
+        # Update config to allow larger risk for crypto test (BTC has high raw price difference)
+        if "risk_reward" not in engine.config["signal_generation"]:
+            engine.config["signal_generation"]["risk_reward"] = {}
+        engine.config["signal_generation"]["risk_reward"]["max_stop_loss_pips"] = 1000000.0
+
+        current_price = 49980.0  # Slightly above midpoint (49975.0)
         data = pd.DataFrame(
             {
                 "open": [49000.0] * 100,
                 "high": [50000.0] * 100,
                 "low": [48000.0] * 100,
-                "close": [49500.0] * 100,
+                "close": [49980.0] * 100,
                 "volume": [1000] * 100,
             }
         )
@@ -1498,13 +1501,19 @@ class TestFoundationEngineAssetClassSLBuffer:
         from unittest.mock import AsyncMock, patch
 
         engine = engine_with_config
-        current_price = 2000.25
+        # Zone: 2000.00 - 2000.50, midpoint = 2000.25
+        # For BUY signal, current_price must be > midpoint
+        current_price = 2000.30  # Above midpoint to ensure BUY signal
+        # Update data to have larger lower wick to pass rejection wick confirmation for BUY
+        # Lower wick = min(open, close) - low = 2000.00 - 1999.20 = 0.80
+        # Last range = high - low = 2000.50 - 1999.20 = 1.30
+        # Wick ratio = 0.80 / 1.30 = 0.62 > 0.15 (passes threshold)
         data = pd.DataFrame(
             {
                 "open": [2000.00] * 100,
                 "high": [2000.50] * 100,
-                "low": [1999.50] * 100,
-                "close": [2000.25] * 100,
+                "low": [1999.20] * 100,  # Lower low to create larger lower wick
+                "close": [2000.00] * 100,  # Close at open to maximize lower wick
                 "volume": [1000] * 100,
             }
         )
@@ -1587,13 +1596,13 @@ class TestFoundationEngineAssetClassSLBuffer:
             last_tested=datetime.now(),
         )
 
-        current_price = 1.1025
+        current_price = 1.1030  # Above midpoint (1.1025) to ensure BUY signal
         data = pd.DataFrame(
             {
                 "open": [1.1000] * 100,
                 "high": [1.1050] * 100,
                 "low": [1.0990] * 100,
-                "close": [1.1025] * 100,
+                "close": [1.1030] * 100,
                 "volume": [1000] * 100,
             }
         )

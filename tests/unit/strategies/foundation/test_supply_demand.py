@@ -325,3 +325,10 @@ class TestSupplyDemandStrategyEdgeCases:
         zones = strategy.get_zones("EURUSD")
         assert isinstance(zones, list)
         assert len(zones) == 0
+
+    @pytest.mark.asyncio
+    async def test_load_zones(self):
+        """Test loading zones from database."""
+        strategy = SupplyDemandStrategy(use_database=False)  # Disable database for unit tests
+        # Should not raise error even if database is disabled
+        await strategy.load_zones("EURUSD")

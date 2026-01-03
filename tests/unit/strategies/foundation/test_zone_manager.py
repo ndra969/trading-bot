@@ -716,9 +716,7 @@ class TestZoneManagerZoneLimiting:
     @pytest.mark.asyncio
     async def test_add_zones_respects_max_limit(self):
         """Test that adding zones respects max_zones_per_symbol limit."""
-        manager = ZoneManager(
-            config={"max_zones_per_symbol": 3}, use_database=False
-        )  # Max 3 zones
+        manager = ZoneManager(config={"max_zones_per_symbol": 3}, use_database=False)  # Max 3 zones
 
         zones = []
         for i in range(5):  # Try to add 5 zones

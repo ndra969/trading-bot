@@ -1,5 +1,7 @@
 """Supply & Demand Strategy - Main foundation strategy."""
 
+from datetime import datetime
+
 import pandas as pd
 
 from trading_bot.strategies.foundation.zone_analyzer import ZoneAnalyzer
@@ -37,7 +39,11 @@ class SupplyDemandStrategy:
         logger.info(f"SupplyDemandStrategy initialized (database: {use_database})")
 
     async def analyze(
-        self, symbol: str, data: pd.DataFrame, timeframe: str = "H1"
+        self,
+        symbol: str,
+        data: pd.DataFrame,
+        timeframe: str = "H1",
+        reference_time: datetime | None = None,
     ) -> list[DetectedZone]:
         """
         Analyze market data for supply/demand zones.
@@ -46,13 +52,14 @@ class SupplyDemandStrategy:
             symbol: Trading symbol
             data: OHLCV DataFrame
             timeframe: Timeframe for zones
+            reference_time: Reference time for zone age calculation (for backtest)
 
         Returns:
             List of detected high-quality zones
         """
         try:
-            # Detect zones
-            zones = self.detector.detect_zones(data)
+            # Detect zones with reference time (for backtest mode)
+            zones = self.detector.detect_zones(data, reference_time=reference_time)
 
             # Store zones (async - saves to database)
             await self.manager.add_zones(symbol, zones, timeframe)

@@ -293,7 +293,7 @@ class SymbolMapper:
                 return self.pip_values["forex_jpy"]
             else:
                 return self.pip_values["forex_major"]
-        elif asset_class == "commodity":
+        elif asset_class == "commodities":
             return self.pip_values["commodities"]
         elif asset_class == "crypto":
             return self.pip_values["crypto"]
@@ -320,7 +320,7 @@ class SymbolMapper:
                 return self.pip_values_per_lot["forex_jpy"]
             else:
                 return self.pip_values_per_lot["forex_major"]
-        elif asset_class == "commodity":
+        elif asset_class == "commodities":
             return self.pip_values_per_lot["commodities"]
         elif asset_class == "crypto":
             return self.pip_values_per_lot["crypto"]

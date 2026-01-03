@@ -200,6 +200,140 @@ class TestStartCommand:
             assert result.exit_code != 0
             assert "Invalid" in result.output or "Error" in result.output
 
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_connect_mt5_without_dry_run(
+        self, mock_bot_class, mock_asyncio_run, mock_setup_logger, mock_init_db, runner, mock_config
+    ):
+        """Test start command with --connect-mt5 without --dry-run (line 77-79)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(cli, ["--config", "development", "start", "--connect-mt5"])
+
+            assert result.exit_code == 0
+            assert "WARNING" in result.output or "ignored" in result.output.lower()
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_mt5_connection_failed(
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
+    ):
+        """Test start command when MT5 connection fails (line 155-160)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_connector = Mock()
+            mock_connector.initialize.return_value = False
+            mock_mt5.return_value = mock_connector
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(
+                cli, ["--config", "development", "start", "--dry-run", "--connect-mt5"]
+            )
+
+            assert result.exit_code == 0
+            assert "WARNING" in result.output or "failed" in result.output.lower()
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_mt5_import_error(
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
+    ):
+        """Test start command when MT5 ImportError occurs (line 162-164)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_mt5.side_effect = ImportError("MetaTrader5 not available")
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(
+                cli, ["--config", "development", "start", "--dry-run", "--connect-mt5"]
+            )
+
+            assert result.exit_code == 0
+            assert "WARNING" in result.output or "not available" in result.output.lower()
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_mt5_exception(
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
+    ):
+        """Test start command when MT5 exception occurs (line 165-170)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_mt5.side_effect = Exception("MT5 connection error")
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(
+                cli, ["--config", "development", "start", "--dry-run", "--connect-mt5"]
+            )
+
+            assert result.exit_code == 0
+            assert "WARNING" in result.output or "error" in result.output.lower()
+
 
 class TestStatusCommand:
     """Test status command."""
@@ -307,6 +441,29 @@ class TestMT5Commands:
                     )
 
     @patch("trading_bot.cli.setup_logger")
+    def test_mt5_disconnect_exception(self, mock_setup_logger, runner, mock_config):
+        """Test MT5 disconnect command with exception (line 379-382)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector") as mock_mt5_connector:
+                mock_mt5_connector.shutdown.side_effect = Exception("Disconnect error")
+
+                result = runner.invoke(cli, ["--config", "development", "mt5", "disconnect"])
+
+                assert result.exit_code == 0
+                assert "Warning" in result.output or "error" in result.output.lower()
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_mt5_disconnect_no_connection(self, mock_setup_logger, runner, mock_config):
+        """Test MT5 disconnect when no connection exists (line 381-382)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector", None):
+
+                result = runner.invoke(cli, ["--config", "development", "mt5", "disconnect"])
+
+                assert result.exit_code == 0
+                assert "No active connection" in result.output
+
+    @patch("trading_bot.cli.setup_logger")
     def test_mt5_info(self, mock_setup_logger, runner, mock_config):
         """Test MT5 info command."""
         with patch("trading_bot.cli.Configuration", return_value=mock_config):
@@ -325,6 +482,17 @@ class TestMT5Commands:
 
                 assert result.exit_code == 0
                 assert "Connected" in result.output or "12345" in result.output
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_mt5_status_not_connected(self, mock_setup_logger, runner, mock_config):
+        """Test MT5 status when not connected (line 413-415)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector", None):
+
+                result = runner.invoke(cli, ["--config", "development", "mt5", "status"])
+
+                assert result.exit_code == 0
+                assert "Not Connected" in result.output
 
 
 class TestVersionCommand:
@@ -361,3 +529,97 @@ class TestErrorHandling:
 
             assert result.exit_code != 0
             assert "Error" in result.output or "error" in result.output.lower()
+
+
+class TestAccountCommands:
+    """Test account commands."""
+
+    @patch("trading_bot.cli.AccountManager")
+    @patch("trading_bot.cli.setup_logger")
+    def test_account_info_success(
+        self, mock_setup_logger, mock_account_manager, runner, mock_config
+    ):
+        """Test account info command success."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector") as mock_mt5_connector:
+                mock_mt5_connector.is_connected.return_value = True
+
+                mock_manager = Mock()
+                mock_manager.get_summary.return_value = {
+                    "balance": 10000.0,
+                    "equity": 10000.0,
+                    "margin": 0.0,
+                    "free_margin": 10000.0,
+                    "margin_level": 0.0,
+                    "profit": 0.0,
+                    "leverage": 100,
+                    "currency": "USD",
+                    "server": "TestServer",
+                    "company": "TestBroker",
+                    "account_type": "DEMO",
+                    "trade_allowed": True,
+                }
+                mock_account_manager.return_value = mock_manager
+
+                result = runner.invoke(cli, ["--config", "development", "account", "info"])
+
+                assert result.exit_code == 0
+                assert "Account Information" in result.output
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_account_info_not_connected(self, mock_setup_logger, runner, mock_config):
+        """Test account info when not connected (line 430-435)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector", None):
+
+                result = runner.invoke(cli, ["--config", "development", "account", "info"])
+
+                assert result.exit_code == 0
+                assert "not connected" in result.output.lower()
+
+    @patch("trading_bot.cli.AccountManager")
+    @patch("trading_bot.cli.setup_logger")
+    def test_account_info_exception(
+        self, mock_setup_logger, mock_account_manager, runner, mock_config
+    ):
+        """Test account info with exception (line 462-464)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector") as mock_mt5_connector:
+                mock_mt5_connector.is_connected.return_value = True
+
+                mock_manager = Mock()
+                mock_manager.get_summary.side_effect = Exception("Account error")
+                mock_account_manager.return_value = mock_manager
+
+                result = runner.invoke(cli, ["--config", "development", "account", "info"])
+
+                assert result.exit_code == 0
+                assert "Error" in result.output
+
+
+class TestStopCommand:
+    """Test stop command."""
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_stop_with_connector(self, mock_setup_logger, runner, mock_config):
+        """Test stop command with MT5 connector."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector") as mock_mt5_connector:
+                mock_mt5_connector.shutdown = Mock()
+
+                result = runner.invoke(cli, ["--config", "development", "stop"])
+
+                assert result.exit_code == 0
+                assert "stopped" in result.output.lower()
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_stop_exception(self, mock_setup_logger, runner, mock_config):
+        """Test stop command with exception (line 253-255)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            with patch("trading_bot.cli._mt5_connector") as mock_mt5_connector:
+                mock_mt5_connector.shutdown.side_effect = Exception("Shutdown error")
+
+                result = runner.invoke(cli, ["--config", "development", "stop"])
+
+                assert result.exit_code == 0
+                assert "stopped" in result.output.lower()

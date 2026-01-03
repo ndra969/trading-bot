@@ -16,7 +16,7 @@ class CommodityPositionManager(BaseAssetManager):
 
     def get_asset_class(self) -> str:
         """Get asset class name."""
-        return "Commodity"
+        return "commodities"
 
     def get_pip_size(self) -> float:
         """Get pip size for commodities."""

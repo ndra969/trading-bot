@@ -74,7 +74,7 @@ class PriceActionAnalyzer:
         upper_wick = curr_high - max(curr_open, curr_close)
         lower_wick = min(curr_open, curr_close) - curr_low
 
-        is_pinbar = body_ratio < 0.3  # Small body
+        is_pinbar = body_ratio < 0.35  # Small body (relaxed from 0.3 for volatility)
 
         if is_pinbar:
             # Bullish Pinbar (Hammer)

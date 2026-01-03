@@ -87,7 +87,10 @@ class DetectedZone:
     @property
     def age_hours(self) -> float:
         """Calculate zone age in hours."""
-        return (datetime.now() - self.first_detected).total_seconds() / 3600
+        # For backtest mode, use a reference time if provided, otherwise use now
+        # This allows backtesting with historical data without zones being filtered as expired
+        reference_time = getattr(self, "_reference_time", None) or datetime.now()
+        return (reference_time - self.first_detected).total_seconds() / 3600
 
     def __repr__(self) -> str:
         return (
@@ -149,6 +152,7 @@ class ZoneDetector:
         self,
         data: pd.DataFrame,
         zone_types: list[ZoneType] | None = None,
+        reference_time: datetime | None = None,
     ) -> list[DetectedZone]:
         """
         Detect supply/demand zones from OHLCV data.
@@ -199,6 +203,12 @@ class ZoneDetector:
             if ZoneType.BREAKOUT_ORIGIN in zone_types:
                 breakout_zones = self._detect_breakout_origin_zones(data)
                 detected_zones.extend(breakout_zones)
+
+            # Set reference time for zone age calculation (for backtest mode)
+            # If reference_time is provided, use it; otherwise zones will use datetime.now()
+            if reference_time is not None:
+                for zone in detected_zones:
+                    zone._reference_time = reference_time
 
             # Filter zones by quality thresholds
             detected_zones = self._filter_zones(detected_zones)
@@ -551,6 +561,9 @@ class ZoneDetector:
         Returns:
             True if zone is expired
         """
+        # For backtest mode, disable expiration check if max_zone_age_hours is very large
+        if self.max_zone_age_hours >= 100000:
+            return False
         return zone.age_hours > self.max_zone_age_hours
 
     def calculate_freshness_score(self, zone: DetectedZone) -> float:

@@ -111,6 +111,16 @@ class TestPositionDiscovery:
         with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
             position_manager.get_all_positions()
 
+    def test_get_all_positions_exception(self, position_manager):
+        """Test exception handling in get_all_positions (line 64-66)."""
+        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+            mock_mt5.positions_get.side_effect = Exception("Unexpected error")
+
+            positions = position_manager.get_all_positions()
+
+            # Should return empty list on exception
+            assert positions == []
+
     def test_get_positions_by_symbol_success(self, position_manager):
         """Test getting positions by symbol."""
         with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
@@ -138,6 +148,23 @@ class TestPositionDiscovery:
 
             assert positions == []
 
+    def test_get_positions_by_symbol_not_connected(self, position_manager, mock_mt5_connector):
+        """Test getting positions by symbol fails when not connected (line 79)."""
+        mock_mt5_connector.is_connected.return_value = False
+
+        with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
+            position_manager.get_positions_by_symbol("EURUSD")
+
+    def test_get_positions_by_symbol_exception(self, position_manager):
+        """Test exception handling in get_positions_by_symbol (line 87-89)."""
+        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+            mock_mt5.positions_get.side_effect = Exception("Unexpected error")
+
+            positions = position_manager.get_positions_by_symbol("EURUSD")
+
+            # Should return empty list on exception
+            assert positions == []
+
     def test_get_position_by_ticket_success(self, position_manager):
         """Test getting position by ticket."""
         with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
@@ -163,6 +190,23 @@ class TestPositionDiscovery:
 
             position = position_manager.get_position_by_ticket(99999)
 
+            assert position is None
+
+    def test_get_position_by_ticket_not_connected(self, position_manager, mock_mt5_connector):
+        """Test getting position by ticket fails when not connected (line 102)."""
+        mock_mt5_connector.is_connected.return_value = False
+
+        with pytest.raises(MT5ConnectionError, match="MT5 not connected"):
+            position_manager.get_position_by_ticket(12345)
+
+    def test_get_position_by_ticket_exception(self, position_manager):
+        """Test exception handling in get_position_by_ticket (line 109-111)."""
+        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+            mock_mt5.positions_get.side_effect = Exception("Unexpected error")
+
+            position = position_manager.get_position_by_ticket(12345)
+
+            # Should return None on exception
             assert position is None
 
 
@@ -275,6 +319,15 @@ class TestProfitLossCalculation:
             pips = position_manager.calculate_position_pips(12346)
 
             assert pips == pytest.approx(50.0, abs=0.01)  # (1.10050 - 1.10000) / 0.00001
+
+    def test_calculate_position_pips_not_found(self, position_manager):
+        """Test calculating pips when position not found (line 164)."""
+        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+            mock_mt5.positions_get.return_value = None
+
+            pips = position_manager.calculate_position_pips(99999)
+
+            assert pips == 0.0
 
     def test_get_total_profit(self, position_manager):
         """Test getting total profit from all positions."""

@@ -5,19 +5,18 @@ Verifies that the MTFAnalyzer works correctly with REAL backtest data files,
 ensuring end-to-end functionality of the strategy engine.
 """
 
-import pytest
-import pandas as pd
+import logging
+import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
-from trading_bot.strategies.mtf_analyzer import MTFAnalyzer
+
+import pandas as pd
+import pytest
+
 from trading_bot.strategies.models import StrategyResult
+from trading_bot.strategies.mtf_analyzer import MTFAnalyzer
 
 # Define path to backtest data
 DATA_DIR = Path("d:/Workspaces/trading-bot/data/backtest")
-
-import logging
-import sys
 
 # Configure logging to see ZoneDetector output
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, force=True)
@@ -101,8 +100,6 @@ class TestMTFIntegration:
         # 2. Mock datetime to match the data timestamp
         # Zones are detected based on age relative to "now".
         # We need "now" to be slightly after the last candle.
-        last_timestamp = h1_data.index[-1].to_pydatetime()
-        mock_now = last_timestamp + timedelta(hours=1)
 
         # We need to patch datetime in the module where it's used (zone_detector)
         # However, patching built-in datetime is tricky.

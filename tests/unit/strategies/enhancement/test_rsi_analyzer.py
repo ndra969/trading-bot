@@ -130,3 +130,99 @@ async def test_neutral_signal(analyzer):
 
         assert signal.signal_type == "NEUTRAL"
         assert signal.confidence == 0
+
+
+@pytest.mark.asyncio
+async def test_no_rsi_data(analyzer):
+    """Test when no RSI data is available (line 64)."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        mock_calc.return_value = {"rsi": []}  # Empty RSI values
+
+        prices = [100.0] * 20
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1")
+
+        assert signal.signal_type == "NEUTRAL"
+        assert signal.confidence == 0
+        assert "error" in signal.details
+        assert "No RSI data" in signal.details["error"]
+
+
+@pytest.mark.asyncio
+async def test_rising_from_oversold(analyzer):
+    """Test rising from oversold reversal (line 93-96)."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI rising from oversold: 25 -> 35
+        rsi_values = [50] * 10 + [25, 35]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 12
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+        assert signal.signal_type == "BUY"
+        assert signal.confidence >= 15
+        assert "reversal" in signal.details
+        assert "Bullish Reversal" in signal.details["reversal"]
+
+
+@pytest.mark.asyncio
+async def test_falling_from_overbought(analyzer):
+    """Test falling from overbought reversal (line 100-103)."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI falling from overbought: 75 -> 65
+        rsi_values = [50] * 10 + [75, 65]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 12
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "SUPPLY")
+
+        assert signal.signal_type == "SELL"
+        assert signal.confidence >= 15
+        assert "reversal" in signal.details
+        assert "Bearish Reversal" in signal.details["reversal"]
+
+
+@pytest.mark.asyncio
+async def test_bullish_momentum_trend(analyzer):
+    """Test bullish momentum trend context (line 116-118)."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI between 50-70 for DEMAND zone
+        rsi_values = [50] * 10 + [60]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 11
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+        assert "trend" in signal.details
+        assert "Bullish Momentum" in signal.details["trend"]
+        assert signal.confidence >= 8
+
+
+@pytest.mark.asyncio
+async def test_bearish_momentum_trend(analyzer):
+    """Test bearish momentum trend context (line 119-121)."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI between 30-50 for SUPPLY zone
+        rsi_values = [50] * 10 + [40]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 11
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "SUPPLY")
+
+        assert "trend" in signal.details
+        assert "Bearish Momentum" in signal.details["trend"]
+        assert signal.confidence >= 8

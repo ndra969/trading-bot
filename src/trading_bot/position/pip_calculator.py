@@ -167,7 +167,7 @@ class PipCalculator:
                 return "forex_jpy"
             else:
                 return "forex_major"
-        elif asset_class == "commodity":
+        elif asset_class == "commodities":
             return "commodities"
         elif asset_class in ["crypto", "index"]:
             return asset_class

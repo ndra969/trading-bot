@@ -87,7 +87,7 @@ class TestCommodityPositionManager:
         """Test commodity Gold parameters."""
         manager = CommodityPositionManager()
 
-        assert manager.get_asset_class() == "Commodity"
+        assert manager.get_asset_class() == "commodities"  # Updated to match actual return value
         assert manager.get_pip_size() == 0.1
         assert manager.get_breakeven_distance() == 500.0
         assert manager.get_breakeven_buffer() == 50.0
@@ -108,7 +108,7 @@ class TestCommodityPositionManager:
         manager = CommodityPositionManager()
         params = manager.get_parameters()
 
-        assert params["asset_class"] == "Commodity"
+        assert params["asset_class"] == "commodities"  # Updated to match actual return value
         assert params["pip_size"] == 0.1
         assert params["trailing"]["distance"] == 300.0
 
@@ -229,7 +229,7 @@ class TestAssetManagerStringRepresentation:
         """Test commodity manager string representation."""
         manager = CommodityPositionManager()
         str_repr = str(manager)
-        assert "Commodity" in str_repr
+        assert "commodities" in str_repr.lower()  # Updated to match actual return value
 
     def test_string_representation_crypto(self):
         """Test crypto manager string representation."""
