@@ -159,9 +159,11 @@ class FoundationEngine:
             True if price is at zone
         """
         # Price is "at zone" if it's within the zone boundaries
-        # or within 20% of the zone size above/below the zone
+        # or within 10% of the zone size above/below the zone (tightened from 20% for better precision)
         zone_size = zone.upper_bound - zone.lower_bound
-        tolerance = zone_size * 0.2
+        tolerance = (
+            zone_size * 0.1
+        )  # Reduced from 0.2 (20%) to 0.1 (10%) for tighter entry validation
 
         # Check if price is within zone boundaries (with tolerance)
         return zone.lower_bound - tolerance <= current_price <= zone.upper_bound + tolerance
@@ -179,9 +181,31 @@ class FoundationEngine:
         """
         midpoint = (zone.upper_bound + zone.lower_bound) / 2
 
-        # If price is approaching from above, it's a DEMAND zone (Support)
-        # If price is approaching from below, it's a SUPPLY zone (Resistance)
-        return current_price > midpoint
+        # IMPROVED LOGIC: Consider zone type and price position
+        # For REJECTION zones: Zone type indicates rejection direction
+        # - Lower wick rejection = DEMAND (support)
+        # - Upper wick rejection = SUPPLY (resistance)
+        # For other zone types: Use price position relative to midpoint
+
+        if zone.zone_type.value == "rejection":
+            # For rejection zones, check if price is near lower bound (demand) or upper bound (supply)
+            zone_size = zone.upper_bound - zone.lower_bound
+            lower_third = zone.lower_bound + (zone_size * 0.33)
+            upper_third = zone.upper_bound - (zone_size * 0.33)
+
+            # If price is in lower third, it's likely a DEMAND zone (support)
+            # If price is in upper third, it's likely a SUPPLY zone (resistance)
+            if current_price <= lower_third:
+                return True  # DEMAND (support)
+            elif current_price >= upper_third:
+                return False  # SUPPLY (resistance)
+            # If in middle third, use midpoint logic as fallback
+            return current_price > midpoint
+        else:
+            # For consolidation/breakout_origin zones, use midpoint logic
+            # If price is approaching from above, it's a DEMAND zone (Support)
+            # If price is approaching from below, it's a SUPPLY zone (Resistance)
+            return current_price > midpoint
 
     async def _create_signal_from_zone(
         self,
@@ -289,7 +313,7 @@ class FoundationEngine:
 
                 # If zone is too large, cap it and use smaller buffer
                 if zone_height > max_zone_height:
-                    logger.warning(
+                    logger.debug(
                         f"{symbol}: Zone height {zone_height_pips:.1f} pips exceeds maximum {max_zone_height_pips} pips. "
                         f"Capping zone height for SL calculation."
                     )
@@ -546,21 +570,45 @@ class FoundationEngine:
                 # ═══════════════════════════════════════════════════════
                 # ENTRY QUALITY VALIDATION (PHASE 5.1)
                 # ═══════════════════════════════════════════════════════
+                # Anti-Chase Validation: For BUY at DEMAND zone, entry should be near zone LOWER bound (support)
+                # NOT near upper bound (that would be chasing price above the zone)
                 if asset_class == "commodities":
-                    # 1. Anti-Chase: Entry must be near zone upper bound
+                    # 1. Anti-Chase: Entry must be near zone LOWER bound (support level)
                     # RELAXED: Increased max deviation to 25 pips for XAUUSD backtest
-                    # Allow max 25 pips deviation from zone top (increased from 15.0)
+                    # Allow max 25 pips deviation from zone BOTTOM (support level)
                     max_entry_dev_pips = 25.0  # Increased from 15.0
                     max_entry_dev = max_entry_dev_pips * pip_size
-                    entry_dist_from_zone = entry_price - zone.upper_bound
+                    # Entry distance from zone LOWER bound (support level)
+                    entry_dist_from_zone_bottom = entry_price - zone.lower_bound
 
-                    if entry_dist_from_zone > max_entry_dev:
+                    # Check if entry is too far above zone bottom (chasing price)
+                    if entry_dist_from_zone_bottom > max_entry_dev:
                         logger.warning(
-                            f"{symbol}: REJECTED - Chasing price too far from zone. "
-                            f"Price {entry_price:.5f} is {entry_dist_from_zone/pip_size:.1f} pips "
-                            f"above zone top {zone.upper_bound:.5f}. Max allowed: {max_entry_dev_pips}"
+                            f"{symbol}: REJECTED - Chasing price too far from zone BOTTOM (support). "
+                            f"Price {entry_price:.5f} is {entry_dist_from_zone_bottom/pip_size:.1f} pips "
+                            f"above zone BOTTOM {zone.lower_bound:.5f}. Max allowed: {max_entry_dev_pips}. "
+                            f"Zone range: {zone.lower_bound:.5f} - {zone.upper_bound:.5f}"
                         )
                         return None
+
+                    # Additional validation: Entry should not be above zone upper bound
+                    # If entry is above zone upper bound, it means we're chasing price (not at support)
+                    entry_dist_from_zone_top = entry_price - zone.upper_bound
+                    if entry_dist_from_zone_top > max_entry_dev:
+                        logger.warning(
+                            f"{symbol}: REJECTED - Entry {entry_price:.5f} is ABOVE zone upper bound "
+                            f"{zone.upper_bound:.5f} by {entry_dist_from_zone_top/pip_size:.1f} pips. "
+                            f"This is chasing price, not trading at support. "
+                            f"Zone range: {zone.lower_bound:.5f} - {zone.upper_bound:.5f}"
+                        )
+                        return None
+
+                    # Ideal entry: Should be within zone boundaries or slightly above lower bound
+                    if entry_price < zone.lower_bound:
+                        logger.debug(
+                            f"{symbol}: Entry {entry_price:.5f} is below zone lower bound "
+                            f"{zone.lower_bound:.5f}. This is acceptable (price at support)."
+                        )
 
                 # ENFORCE MINIMUM SL DISTANCE (from config)
                 # This ensures SL isn't too tight for the asset class
@@ -585,7 +633,7 @@ class FoundationEngine:
 
                 current_risk = entry_price - stop_loss
                 if current_risk > max_risk_pips * pip_size:
-                    logger.warning(
+                    logger.debug(
                         f"{symbol}: REJECTED - Net Risk too high. "
                         f"Risk: {current_risk/pip_size:.1f} pips > Max {max_risk_pips} pips."
                     )
@@ -732,7 +780,7 @@ class FoundationEngine:
 
                 current_risk = stop_loss - entry_price
                 if current_risk > max_risk_pips * pip_size:
-                    logger.warning(
+                    logger.debug(
                         f"{symbol}: REJECTED - Net Risk too high. "
                         f"Risk: {current_risk/pip_size:.1f} pips > Max {max_risk_pips} pips."
                     )
@@ -770,7 +818,44 @@ class FoundationEngine:
             # TP distance is determined by:
             # 1. Risk distance (entry to SL) - controlled by zone height and min SL distance
             # 2. Risk-Reward ratio (default 2.0 = 1:2)
-            # 3. No maximum limit - TP follows the RR ratio naturally
+            # 3. Maximum TP distance limit (for intraday trading - prevents unreachable targets)
+
+            # Validate maximum TP distance (for intraday trading - prevents unreachable targets)
+            max_tp_distance_pips = (
+                self.config.get("signal_generation", {})
+                .get("risk_reward", {})
+                .get("max_take_profit_distance", {})
+                .get(asset_class, 100.0)  # Default 100 pips if not specified
+            )
+
+            if reward_pips > max_tp_distance_pips:
+                # Cap TP to maximum distance, adjust RR ratio accordingly
+                capped_reward_pips = max_tp_distance_pips
+                capped_reward = capped_reward_pips * pip_size
+
+                if direction == SignalDirection.BUY:
+                    take_profit = entry_price + capped_reward
+                else:  # SELL
+                    take_profit = entry_price - capped_reward
+
+                # Recalculate actual RR with capped TP
+                if direction == SignalDirection.BUY:
+                    actual_reward = take_profit - entry_price
+                else:  # SELL
+                    actual_reward = entry_price - take_profit
+
+                actual_rr = actual_reward / risk if risk > 0 else 0.0
+                actual_reward_pips = actual_reward / pip_size
+
+                logger.warning(
+                    f"{symbol} {direction.value}: TP distance capped from {reward_pips:.1f} to {capped_reward_pips:.1f} pips "
+                    f"(max for {asset_class} intraday trading). R:R adjusted from {calculated_rr:.2f} to {actual_rr:.2f}"
+                )
+
+                # Update variables for validation
+                reward_pips = actual_reward_pips
+                calculated_rr = actual_rr
+                reward = actual_reward
 
             # Validate R:R ratio is close to target (allow 20% tolerance for flexibility)
             rr_tolerance = 0.2  # 20% tolerance (more flexible)
@@ -876,15 +961,65 @@ class FoundationEngine:
                 layer_scores["trendline"] = score
                 layer_details["trendline"] = tl_res.details
 
-            # 4. Price Action (Weight: 0.15)
+            # 4. Price Action (Weight: 0.15) - REQUIRED for entry quality
             pa_res = await self.price_action_analyzer.analyze_pattern(
                 symbol, opens, highs, lows, closes, zone_type_str
             )
-            if pa_res and pa_res.direction == direction.name:
-                score = pa_res.confidence * 0.15
-                enhancement_score += score
-                layer_scores["price_action"] = score
-                layer_details["price_action"] = pa_res.details
+            price_action_score = 0.0
+            if pa_res:
+                # Accept pattern if direction matches OR if pattern is NEUTRAL (Inside Bar, Doji)
+                # NEUTRAL patterns can work for both BUY and SELL, but with lower confidence
+                if pa_res.direction == direction.name:
+                    price_action_score = pa_res.confidence * 0.15
+                    enhancement_score += price_action_score
+                    layer_scores["price_action"] = price_action_score
+                    layer_details["price_action"] = {
+                        **pa_res.details,
+                        "pattern_type": pa_res.pattern_type,
+                        "direction": pa_res.direction,
+                        "confidence": pa_res.confidence,
+                        "status": "detected",
+                    }
+                    logger.debug(
+                        f"{symbol}: Price action pattern detected: {pa_res.pattern_type} "
+                        f"({pa_res.direction}, confidence: {pa_res.confidence:.1f}%)"
+                    )
+                elif pa_res.direction == "NEUTRAL":
+                    # NEUTRAL patterns (Inside Bar, Doji) can be used but with reduced score
+                    # Use 50% of original confidence for NEUTRAL patterns
+                    price_action_score = (pa_res.confidence * 0.5) * 0.15
+                    enhancement_score += price_action_score
+                    layer_scores["price_action"] = price_action_score
+                    layer_details["price_action"] = {
+                        **pa_res.details,
+                        "pattern_type": pa_res.pattern_type,
+                        "direction": pa_res.direction,
+                        "confidence": pa_res.confidence,
+                        "status": "neutral_pattern",
+                        "original_confidence": pa_res.confidence,
+                    }
+                    logger.debug(
+                        f"{symbol}: Price action NEUTRAL pattern detected: {pa_res.pattern_type} "
+                        f"(confidence: {pa_res.confidence:.1f}%, reduced to {pa_res.confidence * 0.5:.1f}% for NEUTRAL)"
+                    )
+                else:
+                    # Wrong direction - log for debugging
+                    layer_scores["price_action"] = 0.0
+                    layer_details["price_action"] = {
+                        "status": "wrong_direction",
+                        "detected_pattern": pa_res.pattern_type,
+                        "detected_direction": pa_res.direction,
+                        "required_direction": direction.name,
+                    }
+                    logger.debug(
+                        f"{symbol}: Price action pattern detected but wrong direction: "
+                        f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name}"
+                    )
+            else:
+                # No price action pattern detected
+                layer_scores["price_action"] = 0.0
+                layer_details["price_action"] = {"status": "no_pattern"}
+                logger.debug(f"{symbol}: No price action pattern detected")
 
             # 5. Fibonacci (Weight: 0.12)
             fib_res = await self.fibonacci_analyzer.analyze_fibonacci(
@@ -977,7 +1112,7 @@ class FoundationEngine:
                 add_weighted_layer("ma", ma_res.confidence)
             if "trendline" in layer_scores:
                 add_weighted_layer("trendline", tl_res.confidence)
-            if "price_action" in layer_scores:
+            if "price_action" in layer_scores and pa_res is not None:
                 add_weighted_layer("price_action", pa_res.confidence)
 
             # Fibonacci score was normalized to 0-100 in previous step
@@ -998,8 +1133,66 @@ class FoundationEngine:
             final_score = min(final_score, 100.0)
 
             # ═══════════════════════════════════════════════════════
-            # QUALITY FILTER: Minimum Score (Confluence Filter)
-            # Require multiple confirmation layers for commodities
+            # QUALITY FILTER: UNIVERSAL Minimum Score (Week 15.5.3)
+            # Apply strict confluence filter to ALL asset classes
+            # ═══════════════════════════════════════════════════════
+
+            # Get minimum confluence from config (default: 75%)
+            min_confluence_global = (
+                self.config.get("signal_generation", {})
+                .get("quality_thresholds", {})
+                .get("min_confluence_score", 75.0)
+            )
+
+            # Apply UNIVERSAL minimum confluence check
+            if final_score < min_confluence_global:
+                logger.info(
+                    f"{symbol}: REJECTED - Confluence too low ({final_score:.1f}% < {min_confluence_global}%). "
+                    f"Active layers: {list(layer_scores.keys())}, "
+                    f"Foundation: {weighted_foundation_score:.1f}%, "
+                    f"Enhancement: {weighted_enhancement_score:.1f}%"
+                )
+                return None
+
+            # ═══════════════════════════════════════════════════════
+            # PRICE ACTION CONFIRMATION REQUIREMENT (NEW)
+            # Require price action confirmation to prevent premature entries
+            # ═══════════════════════════════════════════════════════
+            require_price_action = (
+                self.config.get("signal_generation", {})
+                .get("validation_rules", {})
+                .get("require_price_action", False)
+            )
+
+            if require_price_action:
+                min_price_action_score = (
+                    self.config.get("signal_generation", {})
+                    .get("quality_thresholds", {})
+                    .get("min_price_action_score", 10.0)
+                )
+
+                # Check if price action score meets minimum requirement
+                price_action_raw_score = layer_scores.get("price_action", 0.0)
+                # Convert back to raw confidence (0-100) from weighted score
+                # price_action_score = raw_confidence * 0.15, so raw = price_action_score / 0.15
+                price_action_raw_confidence = (
+                    (price_action_raw_score / 0.15) if price_action_raw_score > 0 else 0.0
+                )
+
+                if price_action_raw_confidence < min_price_action_score:
+                    logger.warning(
+                        f"{symbol}: REJECTED - Price action confirmation required but insufficient "
+                        f"(score: {price_action_raw_confidence:.1f}% < min: {min_price_action_score}%). "
+                        f"No clear rejection pattern detected. Waiting for price action confirmation."
+                    )
+                    return None
+                else:
+                    logger.debug(
+                        f"{symbol}: ✅ Price action confirmed (score: {price_action_raw_confidence:.1f}% ≥ {min_price_action_score}%)"
+                    )
+
+            # ═══════════════════════════════════════════════════════
+            # ADDITIONAL QUALITY FILTERS: Asset-specific refinements
             # ═══════════════════════════════════════════════════════
             if asset_class == "commodities":
                 # === DYNAMIC SCORE THRESHOLD (PHASE 5.8) ===
@@ -1071,6 +1264,15 @@ class FoundationEngine:
             # Generate zone_id
             zone_id = (
                 f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
+            )
+
+            # Log successful signal creation with detailed confluence breakdown
+            logger.info(
+                f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
+                f"Confluence: {final_score:.1f}% (Foundation: {weighted_foundation_score:.1f}%, "
+                f"Enhancement: {weighted_enhancement_score:.1f}%) | "
+                f"Layers: {list(layer_scores.keys())} | "
+                f"Price: {current_price:.5f}"
             )
 
             # Create result

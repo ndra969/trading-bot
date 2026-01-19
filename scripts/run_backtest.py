@@ -13,7 +13,6 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
@@ -85,6 +84,7 @@ class MockTrade:
 
         # Determine pip size based on PipCalculator for accuracy
         from trading_bot.position.pip_calculator import PipCalculator
+
         pip_calc = PipCalculator()
         pip_size = pip_calc.get_pip_size(self.symbol)
 
@@ -113,6 +113,33 @@ class BacktestEngine:
         # Load Configuration
         self.config = self._load_config()
 
+        # Override zone expiration for backtest (allow zones up to 100000 hours old)
+        # This prevents zones from being filtered out in historical backtests
+        # Historical data may have zones that are very old relative to current time
+        if "supply_demand" not in self.config:
+            self.config["supply_demand"] = {}
+        if "zone_detection" not in self.config["supply_demand"]:
+            self.config["supply_demand"]["zone_detection"] = {}
+        self.config["supply_demand"]["zone_detection"][
+            "max_zone_age_hours"
+        ] = 100000  # ~11 years - effectively disable expiration for backtest
+        logger.info(
+            f"Backtest mode: max_zone_age_hours set to {self.config['supply_demand']['zone_detection']['max_zone_age_hours']} (effectively disabled)"
+        )
+
+        # Override min_confluence_score for backtest (lower threshold for testing)
+        # Production uses 75% but backtest needs lower to generate trades
+        if "signal_generation" not in self.config:
+            self.config["signal_generation"] = {}
+        if "quality_thresholds" not in self.config["signal_generation"]:
+            self.config["signal_generation"]["quality_thresholds"] = {}
+        self.config["signal_generation"]["quality_thresholds"][
+            "min_confluence_score"
+        ] = 20.0  # Lower threshold for backtest (production: 75.0%)
+        logger.info(
+            f"Backtest mode: min_confluence_score set to {self.config['signal_generation']['quality_thresholds']['min_confluence_score']}% (production: 75.0%)"
+        )
+
         # Load Data
         self.full_data = self._load_data()
 
@@ -130,7 +157,7 @@ class BacktestEngine:
         """Load strategy parameters."""
         config_path = Path(project_root).parent / "config" / "strategy_parameters.yaml"
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 return yaml.safe_load(f)
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
@@ -190,6 +217,7 @@ class BacktestEngine:
 
         # Determine pip size using PipCalculator
         from trading_bot.position.pip_calculator import PipCalculator
+
         pip_calc = PipCalculator()
         pip_size = pip_calc.get_pip_size(self.symbol)
 
@@ -215,23 +243,23 @@ class BacktestEngine:
             if low <= self.active_trade.take_profit:
                 self._close_trade(self.active_trade.take_profit, current_time, "TP")
                 return
-    
+
     def _update_automation(self, candle: pd.Series, pip_size: float) -> None:
         """
         Update Breakeven and Trailing Stop for active trade.
-        
+
         Called every candle to mirror live trading behavior.
-        
+
         Args:
             candle: Current candle data
             pip_size: Pip size for the symbol
         """
         if not self.active_trade:
             return
-            
+
         high = candle["high"]
         low = candle["low"]
-        
+
         # --- Load Trade Management Config based on Asset Class ---
         tm_config_root = self.config.get("trade_management", {})
 

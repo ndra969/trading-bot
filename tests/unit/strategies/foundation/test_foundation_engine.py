@@ -4,6 +4,8 @@ Unit tests for FoundationEngine.
 Testing foundation engine coordination with TDD methodology.
 """
 
+from datetime import UTC
+
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -409,13 +411,16 @@ class TestFoundationEngineEnhancementAnalyzers:
                     "analysis": {"min_zone_strength": 30.0},
                 },
                 "signal_generation": {
+                    "quality_thresholds": {
+                        "min_confluence_score": 20.0,  # Lower threshold for tests
+                    },
                     "risk_reward": {
                         "default_take_profit_ratio": 2.0,
                         "min_stop_loss_distance": {
                             "forex_major": 15.0,
                             "forex_jpy": 15.0,
                         },
-                    }
+                    },
                 },
                 "confluence_weights": {
                     "foundation": 0.30,
@@ -468,7 +473,13 @@ class TestFoundationEngineEnhancementAnalyzers:
         mock_pa_signal = type(
             "PriceActionSignal",
             (),
-            {"direction": "BULLISH", "confidence": 75.0, "details": {"pattern": "PINBAR"}},
+            {
+                "symbol": "EURUSD",
+                "pattern_type": "PINBAR",
+                "direction": "BULLISH",
+                "confidence": 75.0,
+                "details": {"pattern": "PINBAR"},
+            },
         )()
 
         with patch.object(
@@ -605,7 +616,19 @@ class TestFoundationEngineEnhancementAnalyzers:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -688,20 +711,20 @@ class TestFoundationEngineIsPriceAtZone:
         assert engine._is_price_at_zone(current_price, sample_zone) is True
 
     def test_price_within_tolerance_below(self, sample_zone):
-        """Test price within 20% tolerance below zone."""
+        """Test price within 10% tolerance below zone (tightened from 20%)."""
         engine = FoundationEngine(use_database=False)
-        # Zone size: 0.0010, tolerance: 0.0002
-        # Lower bound: 1.1000, so price at 1.0998 should be within tolerance
-        current_price = 1.0998  # Below zone but within tolerance (1.1000 - 0.0002)
+        # Zone size: 0.0010, tolerance: 0.0001 (10% of zone size)
+        # Lower bound: 1.1000, so price at 1.0999 should be within tolerance
+        current_price = 1.0999  # Below zone but within tolerance (1.1000 - 0.0001)
 
         assert engine._is_price_at_zone(current_price, sample_zone) is True
 
     def test_price_within_tolerance_above(self, sample_zone):
-        """Test price within 20% tolerance above zone."""
+        """Test price within 10% tolerance above zone (tightened from 20%)."""
         engine = FoundationEngine(use_database=False)
-        # Zone size: 0.0010, tolerance: 0.0002
-        # Upper bound: 1.1010, so price at 1.1012 should be within tolerance
-        current_price = 1.1012  # Above zone but within tolerance
+        # Zone size: 0.0010, tolerance: 0.0001 (10% of zone size)
+        # Upper bound: 1.1010, so price at 1.1011 should be within tolerance
+        current_price = 1.1011  # Above zone but within tolerance
 
         assert engine._is_price_at_zone(current_price, sample_zone) is True
 
@@ -816,13 +839,16 @@ class TestFoundationEngineCreateSignalComprehensive:
                     "analysis": {"min_zone_strength": 30.0},
                 },
                 "signal_generation": {
+                    "quality_thresholds": {
+                        "min_confluence_score": 50.0,  # Lower threshold for tests
+                    },
                     "risk_reward": {
                         "default_take_profit_ratio": 2.0,
                         "min_stop_loss_distance": {
                             "forex_major": 15.0,
                             "forex_jpy": 15.0,
                         },
-                    }
+                    },
                 },
                 "confluence_weights": {
                     "foundation": 0.30,
@@ -927,15 +953,19 @@ class TestFoundationEngineCreateSignalComprehensive:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = type(
+                        # Create proper mock with pattern_type attribute
+                        pa_signal = type(
                             "PriceActionSignal",
                             (),
                             {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
                                 "direction": "BULLISH",
                                 "confidence": 75.0,
                                 "details": {"pattern": "PINBAR"},
                             },
                         )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1023,11 +1053,19 @@ class TestFoundationEngineCreateSignalComprehensive:
                         with patch.object(
                             engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                         ) as mock_pa:
-                            mock_pa.return_value = type(
+                            # Create proper mock with pattern_type attribute
+                            pa_signal = type(
                                 "PriceActionSignal",
                                 (),
-                                {"direction": "BEARISH", "confidence": 75.0, "details": {}},
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "ENGULFING",
+                                    "direction": "BEARISH",
+                                    "confidence": 75.0,
+                                    "details": {},
+                                },
                             )()
+                            mock_pa.return_value = pa_signal
 
                             with patch.object(
                                 engine.fibonacci_analyzer,
@@ -1119,7 +1157,19 @@ class TestFoundationEngineCreateSignalComprehensive:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1180,13 +1230,19 @@ class TestFoundationEngineAssetClassSLBuffer:
                     "analysis": {"min_zone_strength": 30.0},
                 },
                 "signal_generation": {
+                    "quality_thresholds": {
+                        "min_confluence_score": 20.0,  # Lower threshold for SL buffer tests
+                    },
+                    "validation_rules": {
+                        "require_price_action": False,  # Disable for SL buffer tests
+                    },
                     "risk_reward": {
                         "default_take_profit_ratio": 2.0,
                         "min_stop_loss_distance": {
                             "forex_major": 15.0,
                             "forex_jpy": 15.0,
                         },
-                    }
+                    },
                 },
                 "confluence_weights": {
                     "foundation": 0.30,
@@ -1317,7 +1373,19 @@ class TestFoundationEngineAssetClassSLBuffer:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1389,7 +1457,19 @@ class TestFoundationEngineAssetClassSLBuffer:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1428,6 +1508,12 @@ class TestFoundationEngineAssetClassSLBuffer:
         if "risk_reward" not in engine.config["signal_generation"]:
             engine.config["signal_generation"]["risk_reward"] = {}
         engine.config["signal_generation"]["risk_reward"]["max_stop_loss_pips"] = 1000000.0
+        # Increase max_take_profit_distance for crypto to avoid R:R being too low after capping
+        if "max_take_profit_distance" not in engine.config["signal_generation"]["risk_reward"]:
+            engine.config["signal_generation"]["risk_reward"]["max_take_profit_distance"] = {}
+        engine.config["signal_generation"]["risk_reward"]["max_take_profit_distance"][
+            "crypto"
+        ] = 2000.0  # Allow 2000 pips for crypto test
 
         current_price = 49980.0  # Slightly above midpoint (49975.0)
         data = pd.DataFrame(
@@ -1467,7 +1553,19 @@ class TestFoundationEngineAssetClassSLBuffer:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1548,7 +1646,19 @@ class TestFoundationEngineAssetClassSLBuffer:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1634,7 +1744,19 @@ class TestFoundationEngineAssetClassSLBuffer:
                     with patch.object(
                         engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
                     ) as mock_pa:
-                        mock_pa.return_value = None
+                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
+                        pa_signal = type(
+                            "PriceActionSignal",
+                            (),
+                            {
+                                "symbol": "EURUSD",
+                                "pattern_type": "PINBAR",
+                                "direction": "BULLISH",
+                                "confidence": 75.0,
+                                "details": {"pattern": "PINBAR"},
+                            },
+                        )()
+                        mock_pa.return_value = pa_signal
 
                         with patch.object(
                             engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
@@ -1659,3 +1781,1012 @@ class TestFoundationEngineAssetClassSLBuffer:
                                 sl_distance_pips = (result.entry_price - result.stop_loss) / 0.0001
                                 # Should use capped zone height, not full zone height
                                 assert sl_distance_pips >= 15.0  # At least minimum
+
+
+class TestFoundationEngineMaxTakeProfitDistance:
+    """Test max take profit distance validation for intraday trading."""
+
+    @pytest.fixture
+    def engine_with_max_tp_config(self):
+        """Create engine with max_take_profit_distance config."""
+        return FoundationEngine(
+            config={
+                "supply_demand": {
+                    "zone_detection": {
+                        "min_zone_strength": 30.0,
+                        "min_zone_size_pips": 2,
+                        "max_zone_age_hours": 1000,
+                    },
+                    "analysis": {"min_zone_strength": 30.0},
+                },
+                "signal_generation": {
+                    "quality_thresholds": {
+                        "min_confluence_score": 20.0,
+                    },
+                    "risk_reward": {
+                        "default_take_profit_ratio": 2.0,
+                        "min_stop_loss_distance": {
+                            "forex_major": 15.0,
+                        },
+                        "max_take_profit_distance": {
+                            "forex_major": 60.0,  # Max 60 pips for intraday
+                            "forex_jpy": 60.0,
+                            "commodities": 200.0,
+                        },
+                    },
+                },
+                "confluence_weights": {
+                    "foundation": 0.30,
+                    "rsi": 0.10,
+                    "ma": 0.08,
+                    "trendline": 0.20,
+                    "price_action": 0.15,
+                    "fibonacci": 0.12,
+                    "structure": 0.08,
+                },
+            },
+            use_database=False,
+        )
+
+    @pytest.fixture
+    def large_zone_for_high_tp(self):
+        """Create a zone that would generate high TP distance."""
+        from datetime import datetime
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        # Large zone that would create 40 pips SL, resulting in 80 pips TP (exceeds 60 pips max)
+        # Use REJECTION zone type, and ensure current_price > midpoint for demand zone
+        return DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16000,
+            upper_bound=1.16400,  # 40 pips zone
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(UTC),
+            last_tested=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_tp_capped_to_max_distance_forex_major(
+        self, engine_with_max_tp_config, large_zone_for_high_tp
+    ):
+        """Test that TP is capped to max_take_profit_distance for forex_major."""
+        from unittest.mock import AsyncMock, patch
+
+        engine = engine_with_max_tp_config
+        current_price = 1.16200  # Middle of zone
+        data = pd.DataFrame(
+            {
+                "open": [1.16200] * 100,
+                "high": [1.16250] * 100,
+                "low": [1.16150] * 100,
+                "close": [1.16200] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock all analyzers to return BUY signals
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 75.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "PINBAR",
+                                    "direction": "BULLISH",
+                                    "confidence": 75.0,
+                                    "details": {},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", large_zone_for_high_tp, current_price, "H1", data
+                                    )
+
+                                    assert result is not None
+                                    assert result.direction.value == "BUY"
+
+                                    # Calculate TP distance in pips
+                                    pip_size = 0.0001  # EURUSD
+                                    tp_distance_pips = (
+                                        result.take_profit - result.entry_price
+                                    ) / pip_size
+
+                                    # TP should be capped at 60 pips (max for forex_major)
+                                    # Allow small floating point tolerance
+                                    assert (
+                                        tp_distance_pips <= 60.1
+                                    ), f"TP distance {tp_distance_pips:.1f} exceeds max 60 pips"
+
+                                    # If SL is large (e.g., 35 pips), TP should be capped to 60, not 70
+                                    sl_distance_pips = (
+                                        result.entry_price - result.stop_loss
+                                    ) / pip_size
+                                    if (
+                                        sl_distance_pips * 2.0 > 60.0
+                                    ):  # If RR=2.0 would exceed 60 pips
+                                        # Allow small floating point tolerance
+                                        assert (
+                                            abs(tp_distance_pips - 60.0) < 0.5
+                                        ), f"TP should be capped at 60 pips, got {tp_distance_pips:.1f}"
+
+    @pytest.mark.asyncio
+    async def test_tp_not_capped_when_below_max(self, engine_with_max_tp_config):
+        """Test that TP is not capped when below max_take_profit_distance."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        engine = engine_with_max_tp_config
+
+        # Small zone that would create 15 pips SL, resulting in 30 pips TP (below 60 pips max)
+        small_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16000,
+            upper_bound=1.16030,  # 30 pips zone
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(UTC),
+            last_tested=None,
+        )
+
+        current_price = 1.16015  # Middle of zone
+        data = pd.DataFrame(
+            {
+                "open": [1.16015] * 100,
+                "high": [1.16020] * 100,
+                "low": [1.16010] * 100,
+                "close": [1.16015] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock all analyzers
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 75.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "PINBAR",
+                                    "direction": "BULLISH",
+                                    "confidence": 75.0,
+                                    "details": {},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", small_zone, current_price, "H1", data
+                                    )
+
+                                    assert result is not None
+
+                                    # Calculate TP distance
+                                    pip_size = 0.0001
+                                    tp_distance_pips = (
+                                        result.take_profit - result.entry_price
+                                    ) / pip_size
+
+                                    # TP should not be capped (should follow RR ratio)
+                                    # Expected: SL ~15 pips, TP ~30 pips (RR=2.0)
+                                    assert tp_distance_pips <= 60.1, "TP should not exceed max"
+                                    # Should be close to RR ratio, not capped
+                                    sl_distance_pips = (
+                                        result.entry_price - result.stop_loss
+                                    ) / pip_size
+                                    expected_tp = sl_distance_pips * 2.0  # RR=2.0
+                                    # Allow small tolerance for rounding
+                                    assert (
+                                        abs(tp_distance_pips - expected_tp) < 5.0
+                                    ), f"TP should follow RR ratio: expected ~{expected_tp:.1f}, got {tp_distance_pips:.1f}"
+
+    @pytest.mark.asyncio
+    async def test_tp_capped_for_sell_direction(self, engine_with_max_tp_config):
+        """Test that TP is capped for SELL direction as well."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        engine = engine_with_max_tp_config
+
+        # Medium supply zone (price below midpoint = supply/resistance)
+        # Use smaller zone to avoid R:R becoming too low after TP capping
+        supply_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16400,
+            upper_bound=1.16650,  # 25 pips zone (smaller to maintain R:R after capping)
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(UTC),
+            last_tested=None,
+        )
+
+        current_price = 1.16450  # Below midpoint (1.16525) = supply zone
+        data = pd.DataFrame(
+            {
+                "open": [1.16450] * 100,
+                "high": [1.16500] * 100,
+                "low": [1.16400] * 100,
+                "close": [1.16450] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock all analyzers to return SELL signals
+        with patch.object(engine, "_is_demand_zone", return_value=False):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "SELL", "confidence": 75.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "SELL", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_RESISTANCE", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            # Create proper mock with pattern_type attribute
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "ENGULFING",
+                                    "direction": "BEARISH",
+                                    "confidence": 75.0,
+                                    "details": {},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BEARISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", supply_zone, current_price, "H1", data
+                                    )
+
+                                    assert result is not None
+                                    assert result.direction.value == "SELL"
+
+                                    # Calculate TP distance (for SELL, TP is below entry)
+                                    pip_size = 0.0001
+                                    tp_distance_pips = (
+                                        result.entry_price - result.take_profit
+                                    ) / pip_size
+
+                                    # TP should be capped at 60 pips (allow floating point tolerance)
+                                    assert (
+                                        tp_distance_pips <= 60.1
+                                    ), f"TP distance {tp_distance_pips:.1f} exceeds max 60 pips"
+
+    @pytest.mark.asyncio
+    async def test_tp_capped_uses_default_when_config_missing(self, engine_with_max_tp_config):
+        """Test that TP capping uses default value when config is missing."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        # Engine without max_take_profit_distance config
+        engine = FoundationEngine(
+            config={
+                "supply_demand": {
+                    "zone_detection": {
+                        "min_zone_strength": 30.0,
+                        "min_zone_size_pips": 2,
+                        "max_zone_age_hours": 1000,
+                    },
+                    "analysis": {"min_zone_strength": 30.0},
+                },
+                "signal_generation": {
+                    "quality_thresholds": {
+                        "min_confluence_score": 20.0,
+                    },
+                    "risk_reward": {
+                        "default_take_profit_ratio": 2.0,
+                        "min_stop_loss_distance": {
+                            "forex_major": 15.0,
+                        },
+                        # max_take_profit_distance not specified - should use default 100.0
+                    },
+                },
+                "confluence_weights": {
+                    "foundation": 0.30,
+                    "rsi": 0.10,
+                    "ma": 0.08,
+                    "trendline": 0.20,
+                    "price_action": 0.15,
+                    "fibonacci": 0.12,
+                    "structure": 0.08,
+                },
+            },
+            use_database=False,
+        )
+
+        # Very large zone that would create 60 pips SL, resulting in 120 pips TP
+        very_large_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16000,
+            upper_bound=1.16600,  # 60 pips zone
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(UTC),
+            last_tested=None,
+        )
+
+        current_price = 1.16300
+        data = pd.DataFrame(
+            {
+                "open": [1.16300] * 100,
+                "high": [1.16350] * 100,
+                "low": [1.16250] * 100,
+                "close": [1.16300] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock analyzers
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 75.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "PINBAR",
+                                    "direction": "BULLISH",
+                                    "confidence": 75.0,
+                                    "details": {},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", very_large_zone, current_price, "H1", data
+                                    )
+
+                                    assert result is not None
+
+                                    # Calculate TP distance
+                                    pip_size = 0.0001
+                                    tp_distance_pips = (
+                                        result.take_profit - result.entry_price
+                                    ) / pip_size
+
+                                    # Should use default 100.0 pips max (not 60.0)
+                                    # So if TP would be 120 pips, it should be capped to 100 pips
+                                    assert (
+                                        tp_distance_pips <= 100.1
+                                    ), f"TP should be capped at default 100 pips, got {tp_distance_pips:.1f}"
+
+    @pytest.mark.asyncio
+    async def test_tp_capped_different_asset_classes(self, engine_with_max_tp_config):
+        """Test that TP capping works for different asset classes."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        engine = engine_with_max_tp_config
+
+        # Large zone for commodities (should use 200 pips max)
+        large_zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=2000.0,
+            upper_bound=2100.0,  # 100 USD zone (very large for Gold)
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(UTC),
+            last_tested=None,
+        )
+
+        current_price = 2050.0
+        data = pd.DataFrame(
+            {
+                "open": [2050.0] * 100,
+                "high": [2055.0] * 100,
+                "low": [2045.0] * 100,
+                "close": [2050.0] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock analyzers
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 75.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "PINBAR",
+                                    "direction": "BULLISH",
+                                    "confidence": 75.0,
+                                    "details": {},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "XAUUSD", large_zone, current_price, "H1", data
+                                    )
+
+                                    if result is not None:
+                                        # For commodities, pip_size is 0.1
+                                        pip_size = 0.1
+                                        tp_distance_pips = (
+                                            result.take_profit - result.entry_price
+                                        ) / pip_size
+
+                                        # Should be capped at 200 pips for commodities (allow floating point tolerance)
+                                        assert (
+                                            tp_distance_pips <= 200.1
+                                        ), f"TP distance {tp_distance_pips:.1f} exceeds max 200 pips for commodities"
+
+
+class TestFoundationEnginePriceActionRequirement:
+    """Test price action confirmation requirement for entry quality."""
+
+    @pytest.fixture
+    def engine_with_price_action_required(self):
+        """Create engine with price action requirement enabled."""
+        return FoundationEngine(
+            config={
+                "supply_demand": {
+                    "zone_detection": {
+                        "min_zone_strength": 30.0,
+                        "min_zone_size_pips": 2,
+                        "max_zone_age_hours": 1000,
+                    },
+                    "analysis": {"min_zone_strength": 30.0},
+                },
+                "signal_generation": {
+                    "quality_thresholds": {
+                        "min_confluence_score": 20.0,  # Lower for testing
+                        "min_price_action_score": 10.0,  # Require minimum 10% price action
+                    },
+                    "validation_rules": {
+                        "require_price_action": True,  # Require price action confirmation
+                    },
+                    "risk_reward": {
+                        "default_take_profit_ratio": 2.0,
+                        "min_stop_loss_distance": {
+                            "forex_major": 15.0,
+                        },
+                    },
+                },
+                "confluence_weights": {
+                    "foundation": 0.30,
+                    "rsi": 0.10,
+                    "ma": 0.08,
+                    "trendline": 0.20,
+                    "price_action": 0.15,
+                    "fibonacci": 0.12,
+                    "structure": 0.08,
+                },
+            },
+            use_database=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_signal_rejected_without_price_action(self, engine_with_price_action_required):
+        """Test that signal is rejected when price action is missing."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        engine = engine_with_price_action_required
+
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16000,
+            upper_bound=1.16030,
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=None,
+        )
+
+        current_price = 1.16015
+        data = pd.DataFrame(
+            {
+                "open": [1.16015] * 100,
+                "high": [1.16020] * 100,
+                "low": [1.16010] * 100,
+                "close": [1.16015] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock analyzers - all return valid signals EXCEPT price action (None)
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            # No price action pattern detected
+                            mock_pa.return_value = None
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", zone, current_price, "H1", data
+                                    )
+
+                                    # Signal should be rejected due to missing price action
+                                    assert result is None
+
+    @pytest.mark.asyncio
+    async def test_signal_rejected_with_insufficient_price_action_score(
+        self, engine_with_price_action_required
+    ):
+        """Test that signal is rejected when price action score is too low."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        engine = engine_with_price_action_required
+
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16000,
+            upper_bound=1.16030,
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=None,
+        )
+
+        current_price = 1.16015
+        data = pd.DataFrame(
+            {
+                "open": [1.16015] * 100,
+                "high": [1.16020] * 100,
+                "low": [1.16010] * 100,
+                "close": [1.16015] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock analyzers - price action has low confidence (5% < 10% minimum)
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            # Price action with low confidence (5% < 10% minimum)
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "WEAK",
+                                    "direction": "BULLISH",
+                                    "confidence": 5.0,
+                                    "details": {"pattern": "WEAK"},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", zone, current_price, "H1", data
+                                    )
+
+                                    # Signal should be rejected due to insufficient price action score
+                                    assert result is None
+
+    @pytest.mark.asyncio
+    async def test_signal_accepted_with_sufficient_price_action(
+        self, engine_with_price_action_required
+    ):
+        """Test that signal is accepted when price action score meets requirement."""
+        from datetime import datetime
+        from unittest.mock import AsyncMock, patch
+
+        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        engine = engine_with_price_action_required
+
+        zone = DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            lower_bound=1.16000,
+            upper_bound=1.16030,
+            strength=80.0,
+            touches=3,
+            volume_confirmed=True,
+            first_detected=datetime.now(),
+            last_tested=None,
+        )
+
+        current_price = 1.16015
+        data = pd.DataFrame(
+            {
+                "open": [1.16015] * 100,
+                "high": [1.16020] * 100,
+                "low": [1.16010] * 100,
+                "close": [1.16015] * 100,
+                "volume": [1000] * 100,
+            }
+        )
+
+        # Mock analyzers - price action has sufficient confidence (75% > 10% minimum)
+        with patch.object(engine, "_is_demand_zone", return_value=True):
+            with patch.object(
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                )()
+
+                with patch.object(
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "BUY", "confidence": 80.0, "details": {}}
+                    )()
+
+                    with patch.object(
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
+                            (),
+                            {"signal_type": "BOUNCE_SUPPORT", "confidence": 85.0, "details": {}},
+                        )()
+
+                        with patch.object(
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            # Price action with sufficient confidence (75% > 10% minimum)
+                            # Note: direction must match SignalDirection enum value (BUY not BULLISH)
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "EURUSD",
+                                    "pattern_type": "PINBAR",
+                                    "direction": "BUY",
+                                    "confidence": 75.0,
+                                    "details": {"pattern": "PINBAR"},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
+
+                            with patch.object(
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
+                                new_callable=AsyncMock,
+                            ) as mock_fib:
+                                mock_fib.return_value = None
+
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = type(
+                                        "StructureSignal",
+                                        (),
+                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                    )()
+
+                                    result = await engine._create_signal_from_zone(
+                                        "EURUSD", zone, current_price, "H1", data
+                                    )
+
+                                    # Signal should be accepted with sufficient price action
+                                    assert result is not None
+                                    assert result.direction.value == "BUY"

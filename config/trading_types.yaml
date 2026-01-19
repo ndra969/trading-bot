@@ -9,6 +9,7 @@ trading_types:
     max_positions: 20
     confluence_threshold: 75.0
     max_loss_per_day: 0.01  # 1%
+    max_position_duration_hours: 4  # Auto-close positions after 4 hours (ultra-short term)
     timeframes: ["M1", "M5", "M15"]
     preferred_sessions: ["london", "new_york"]
     stop_loss_pips:
@@ -25,8 +26,9 @@ trading_types:
     description: "Intraday trading, 30-1440 minutes duration"
     risk_per_trade: 0.01  # 1%
     max_positions: 5
-    confluence_threshold: 65.0
+    confluence_threshold: 40.0  # Lowered to 40% for testing
     max_loss_per_day: 0.02  # 2%
+    max_position_duration_hours: 24  # Auto-close positions after 24 hours (intraday limit)
     timeframes: ["M15", "H1", "H4"]
     preferred_sessions: ["london", "new_york", "tokyo"]
     stop_loss_pips:

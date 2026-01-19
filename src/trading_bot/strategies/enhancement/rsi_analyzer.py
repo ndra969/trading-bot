@@ -113,12 +113,26 @@ class RSIAnalyzer:
 
         # 4. Trend Context (RSI > 50 in Uptrend)
         # Simple trend check using RSI level
-        if zone_type == "DEMAND" and current_rsi > 50 and current_rsi < 70:
-            confidence += 8
-            details["trend"] = "Bullish Momentum"
-        elif zone_type == "SUPPLY" and current_rsi < 50 and current_rsi > 30:
-            confidence += 8
-            details["trend"] = "Bearish Momentum"
+        # CRITICAL: RSI approaching overbought (>65) should NOT support BUY signals
+        # RSI approaching oversold (<35) should NOT support SELL signals
+        if zone_type == "DEMAND":
+            if current_rsi > 50 and current_rsi < 65:  # Changed from < 70 to < 65
+                confidence += 8
+                details["trend"] = "Bullish Momentum"
+            elif current_rsi >= 65:  # RSI approaching overbought - reduce or block BUY
+                if signal_type == "BUY":
+                    signal_type = "NEUTRAL"  # Block BUY when RSI too high
+                    confidence = max(0, confidence - 10)  # Reduce confidence
+                details["trend"] = "Overbought Warning"
+        elif zone_type == "SUPPLY":
+            if current_rsi < 50 and current_rsi > 35:  # Changed from > 30 to > 35
+                confidence += 8
+                details["trend"] = "Bearish Momentum"
+            elif current_rsi <= 35:  # RSI approaching oversold - reduce or block SELL
+                if signal_type == "SELL":
+                    signal_type = "NEUTRAL"  # Block SELL when RSI too low
+                    confidence = max(0, confidence - 10)  # Reduce confidence
+                details["trend"] = "Oversold Warning"
 
         return RSISignal(
             symbol=symbol,

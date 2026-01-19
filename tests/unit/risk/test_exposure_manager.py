@@ -185,3 +185,99 @@ class TestUtilityMethods:
         str_repr = str(exposure_manager)
         assert "ExposureManager" in str_repr
         assert "1 positions" in str_repr
+
+
+class TestCorrelationGroups:
+    """Test correlation groups loading from config."""
+
+    def test_correlation_groups_from_config(self):
+        """Test correlation groups loaded from config YAML."""
+        config = {
+            "risk_management": {
+                "correlation_management": {
+                    "enabled": True,
+                    "correlation_groups": {
+                        "EURUSD": ["GBPUSD", "AUDUSD"],
+                        "GBPUSD": ["EURUSD"],
+                    },
+                }
+            }
+        }
+        manager = ExposureManager(config)
+
+        # Check that EURUSD has GBPUSD and AUDUSD as correlated
+        assert "GBPUSD" in manager.correlated_pairs.get("EURUSD", [])
+        assert "AUDUSD" in manager.correlated_pairs.get("EURUSD", [])
+
+        # Check bidirectional mapping (GBPUSD should have EURUSD)
+        assert "EURUSD" in manager.correlated_pairs.get("GBPUSD", [])
+
+    def test_correlation_groups_fallback_to_defaults(self):
+        """Test correlation groups fallback to hardcoded defaults when config not provided."""
+        config = {
+            "risk_management": {
+                "correlation_management": {
+                    "enabled": True,
+                    # No correlation_groups in config
+                }
+            }
+        }
+        manager = ExposureManager(config)
+
+        # Should use hardcoded defaults
+        assert "EURUSD" in manager.correlated_pairs
+        assert "GBPUSD" in manager.correlated_pairs.get("EURUSD", [])
+
+    def test_correlation_conflict_detection(self):
+        """Test correlation conflict detection prevents conflicting positions."""
+        config = {
+            "risk_management": {
+                "correlation_management": {
+                    "enabled": True,
+                    "correlation_groups": {
+                        "EURUSD": ["GBPUSD"],
+                        "GBPUSD": ["EURUSD"],
+                    },
+                }
+            }
+        }
+        manager = ExposureManager(config)
+
+        # Register GBPUSD BUY position
+        manager.register_position("GBPUSD", "forex_major", 1.0, direction="BUY")
+
+        # Try to open EURUSD SELL (conflicting direction)
+        can_open, reason = manager.can_open_position(
+            symbol="EURUSD", asset_class="forex_major", risk_amount=200.0, direction="SELL"
+        )
+
+        assert can_open is False
+        assert "Positive correlation conflict" in reason or "Correlation conflict" in reason
+        assert "GBPUSD" in reason
+        assert "BUY" in reason
+
+    def test_correlation_same_direction_allowed(self):
+        """Test that same direction on correlated pairs is allowed."""
+        config = {
+            "risk_management": {
+                "correlation_management": {
+                    "enabled": True,
+                    "correlation_groups": {
+                        "EURUSD": ["GBPUSD"],
+                        "GBPUSD": ["EURUSD"],
+                    },
+                }
+            }
+        }
+        manager = ExposureManager(config)
+
+        # Register GBPUSD BUY position
+        manager.register_position("GBPUSD", "forex_major", 1.0, direction="BUY")
+
+        # Try to open EURUSD BUY (same direction - should be allowed)
+        can_open, reason = manager.can_open_position(
+            symbol="EURUSD", asset_class="forex_major", risk_amount=200.0, direction="BUY"
+        )
+
+        assert can_open is True
+        assert reason == "OK"

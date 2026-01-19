@@ -77,6 +77,7 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.11.0",
+    "freezegun>=1.2.2",        # Time mocking for tests
     "black>=23.7.0",             # Code formatting
     "ruff>=0.0.287",             # Fast linting
     "mypy>=1.5.0",              # Type checking

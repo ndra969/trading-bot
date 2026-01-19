@@ -63,6 +63,16 @@ class TradingBot:
         self.exposure_manager = None
         self.drawdown_protector = None
 
+        # Account Management components
+        self.account_sync_service = None
+        self.account_selector = None
+        self.current_account = None
+
+        # Session & Config Management components
+        self.session_repository = None
+        self.config_repository = None
+        self.current_session = None
+
         # Initialize symbol mapper for broker symbol conversion
         try:
             self.symbol_mapper = SymbolMapper()
@@ -146,6 +156,13 @@ class TradingBot:
                             "❌ CRITICAL: MT5 failed but dry_run=False - bot will not work properly in live mode!"
                         )
 
+            # Initialize account management (if MT5 is connected)
+            if not is_dry_run and self.mt5 and self.mt5.is_connected():
+                await self._initialize_account_management()
+
+            # Initialize session and config management
+            await self._initialize_session_management(is_dry_run)
+
             # Initialize foundation strategy
             await self._initialize_foundation_strategy()
 
@@ -171,12 +188,40 @@ class TradingBot:
 
     async def stop(self):
         """Stop trading bot."""
-        logger.info("🛑 Stopping trading bot...")
+        try:
+            logger.info("🛑 Stopping trading bot...")
+        except Exception:
+            # If logger fails, just print to console
+            print("🛑 Stopping trading bot...")
+
         self.is_running = False
 
         # Stop notification manager
         if self.notification_manager:
-            await self.notification_manager.stop()
+            try:
+                await self.notification_manager.stop()
+            except Exception as e:
+                print(f"⚠️ Error stopping notification manager: {e}")
+
+        # Close trading session
+        if self.current_session and self.session_repository:
+            try:
+                # Get ending balance
+                ending_balance = self.config.get("initial_balance", 10000.0)
+                if self.mt5 and self.mt5.is_connected():
+                    account_info = self.mt5.account_info
+                    mt5_balance = account_info.get("balance")
+                    if mt5_balance is not None and mt5_balance > 0:
+                        ending_balance = float(mt5_balance)
+
+                # Close session
+                await self.session_repository.close_session(
+                    session_id=self.current_session.session_id,
+                    ending_balance=ending_balance,
+                )
+                logger.info(f"✅ Trading session closed: {self.current_session.session_id}")
+            except Exception as e:
+                logger.warning(f"Error closing trading session: {e}")
 
         # Cleanup MT5 connection
         if self.mt5:
@@ -285,6 +330,199 @@ class TradingBot:
 
         logger.info("✅ Strategy system initialized")
 
+    async def _initialize_account_management(self):
+        """Initialize account management system."""
+        try:
+            from .data.services.account_selector import AccountSelector
+            from .data.services.account_sync_service import AccountSyncService
+
+            # Initialize account sync service
+            self.account_sync_service = AccountSyncService(mt5_connector=self.mt5)
+
+            # Ensure current MT5 account exists in database
+            logger.info("📊 Checking/creating trading account in database...")
+            account = await self.account_sync_service.ensure_account_exists(self.mt5)
+
+            if account:
+                self.current_account = account
+                logger.info(
+                    f"✅ Account management initialized: Account {account.account_id} "
+                    f"({account.broker_name}, {account.account_type})"
+                )
+            else:
+                logger.warning(
+                    "⚠️ Failed to ensure account exists - continuing without account tracking"
+                )
+
+            # Initialize account selector
+            self.account_selector = AccountSelector()
+            if account:
+                await self.account_selector.switch_account(account.account_id)
+                logger.info(f"✅ Active account set: {account.account_id}")
+
+        except Exception as e:
+            logger.warning(
+                f"Account management initialization failed: {e} - continuing without account tracking"
+            )
+            self.account_sync_service = None
+            self.account_selector = None
+
+    async def _initialize_session_management(self, is_dry_run: bool):
+        """Initialize session and config management system."""
+        try:
+            from .data.repositories.config_repository import ConfigRepository
+            from .data.repositories.session_repository import SessionRepository
+            from .utils.config_hasher import hash_config
+
+            # Initialize repositories
+            self.session_repository = SessionRepository()
+            self.config_repository = ConfigRepository()
+
+            # Step 1: Create ConfigSnapshot from current config
+            logger.info("📸 Creating config snapshot...")
+            # Convert config to dict safely
+            if hasattr(self.config, "_config"):
+                config_dict = self.config._config.copy()
+            elif hasattr(self.config, "__dict__"):
+                config_dict = dict(self.config.__dict__)
+            else:
+                config_dict = dict(self.config) if isinstance(self.config, dict) else {}
+
+            # Step 1: Create ConfigSnapshot from current config
+            try:
+                result = await self.config_repository.get_or_create(
+                    config_data=config_dict,
+                    description=f"Bot start - {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}",
+                    environment="development" if is_dry_run else "production",
+                )
+                # Unpack tuple (ConfigSnapshot, bool)
+                if isinstance(result, tuple) and len(result) == 2:
+                    config_snapshot, created = result
+                else:
+                    # Fallback if result is not tuple (shouldn't happen, but safety check)
+                    config_snapshot = result if not isinstance(result, tuple) else result[0]
+                    created = True
+
+                if not config_snapshot:
+                    raise ValueError("Config snapshot is None after get_or_create")
+
+                if created:
+                    logger.info(f"✅ Config snapshot created: {config_snapshot.config_hash[:12]}...")
+                else:
+                    logger.info(
+                        f"✅ Config snapshot already exists: {config_snapshot.config_hash[:12]}..."
+                    )
+            except Exception as e:
+                logger.error(f"❌ Failed to create config snapshot: {e}", exc_info=True)
+                raise
+
+            # Step 2: Get trading type from config
+            trading_type = self.config.get("trading", {}).get("trading_type", "day_trading")
+            if not trading_type or trading_type not in [
+                "scalping",
+                "day_trading",
+                "swing_trading",
+                "position_trading",
+            ]:
+                trading_type = "day_trading"
+
+            # Step 3: Get account_id if available
+            account_id = None
+            if self.current_account:
+                account_id = self.current_account.account_id
+
+            # Step 4: Get starting balance
+            starting_balance = self.config.get("initial_balance", 10000.0)
+            if self.mt5 and self.mt5.is_connected():
+                account_info = self.mt5.account_info
+                mt5_balance = account_info.get("balance")
+                if mt5_balance is not None and mt5_balance > 0:
+                    starting_balance = float(mt5_balance)
+
+            # Step 5: Generate unique session_id
+            try:
+                config_hash_short = hash_config(config_dict)[:8]
+            except Exception as e:
+                logger.warning(f"Failed to hash config for session_id: {e}, using timestamp only")
+                config_hash_short = datetime.now(UTC).strftime("%H%M%S")
+
+            session_id = (
+                f"session_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{config_hash_short}"
+            )
+
+            # Step 6: Create TradingSession
+            logger.info(f"📊 Creating trading session: {session_id}...")
+            session_data = {
+                "session_id": session_id,
+                "account_id": account_id,
+                "config_hash": config_snapshot.config_hash,
+                "trading_type": trading_type,
+                "is_backtest": False,
+                "is_dry_run": is_dry_run,
+                "starting_balance": starting_balance,
+                "status": "ACTIVE",
+            }
+
+            try:
+                self.current_session = await self.session_repository.create(session_data)
+                logger.info(
+                    f"✅ Trading session created: {session_id} "
+                    f"(type: {trading_type}, account: {account_id}, dry_run: {is_dry_run})"
+                )
+                # Verify session was saved by querying database
+                if self.current_session and self.current_session.session_id:
+                    verified_session = await self.session_repository.get_by_session_id(session_id)
+                    if verified_session:
+                        logger.info(
+                            f"✅ Session verified in database: ID={verified_session.id}, session_id={verified_session.session_id}"
+                        )
+                    else:
+                        logger.error(f"❌ Session created but not found in database: {session_id}")
+                else:
+                    logger.error("❌ Session created but session_id is None!")
+            except Exception as e:
+                logger.error(f"❌ Failed to create trading session: {e}", exc_info=True)
+                raise
+
+        except Exception as e:
+            logger.error(
+                f"❌ Session management initialization failed: {e} - continuing without session tracking",
+                exc_info=True,
+            )
+            self.session_repository = None
+            self.config_repository = None
+            self.current_session = None
+
+    async def _update_session_on_position_close(self, position: Position, result: dict | None):
+        """
+        Update session aggregations when a position closes.
+
+        Args:
+            position: Closed position
+            result: Close result dict with pnl_usd and pips
+        """
+        if not self.current_session or not self.session_repository or not result:
+            return
+
+        try:
+            pnl_usd = result.get("pnl_usd", 0.0)
+            is_winner = pnl_usd > 0
+            gross_profit = pnl_usd if is_winner else 0.0
+            gross_loss = abs(pnl_usd) if not is_winner else 0.0
+
+            await self.session_repository.update_aggregations(
+                session_id=self.current_session.session_id,
+                pnl=pnl_usd,
+                is_winner=is_winner,
+                gross_profit=gross_profit,
+                gross_loss=gross_loss,
+            )
+            logger.debug(
+                f"  📊 Session aggregations updated: " f"P&L=${pnl_usd:.2f}, Winner={is_winner}"
+            )
+        except Exception as e:
+            logger.warning(f"Error updating session aggregations: {e}")
+
     async def _initialize_position_risk_system(self):
         """Initialize position and risk management system."""
         logger.info("Initializing position and risk management system...")
@@ -318,6 +556,20 @@ class TradingBot:
 
             # Load active positions from database
             await self.position_manager.load_positions_from_db()
+
+            # Register loaded positions with exposure manager (for correlation tracking)
+            open_positions = self.position_manager.get_open_positions()
+            for position in open_positions:
+                asset_class = self._get_asset_class(position.symbol)
+                self.exposure_manager.register_position(
+                    position.symbol,
+                    asset_class,
+                    position.volume,
+                    direction=position.position_type.value,
+                )
+                logger.debug(
+                    f"Registered existing position: {position.symbol} ({position.position_type.value})"
+                )
 
             logger.info("✅ Position and risk management system initialized")
 
@@ -459,8 +711,58 @@ class TradingBot:
             real_entry_price = signal.entry_price  # Default to signal price
 
             if not is_dry_run:
+                # Detailed MT5 connection check with logging
+                mt5_status = "unknown"
+                if self.mt5 is None:
+                    mt5_status = "MT5 connector is None"
+                    logger.warning(f"  ⚠️ MT5 connector not initialized: {mt5_status}")
+                elif not hasattr(self.mt5, "is_connected"):
+                    mt5_status = "MT5 connector missing is_connected method"
+                    logger.warning(f"  ⚠️ MT5 connector invalid: {mt5_status}")
+                elif not self.mt5.is_connected():
+                    # Get detailed connection status
+                    try:
+                        health = (
+                            self.mt5.health_check() if hasattr(self.mt5, "health_check") else {}
+                        )
+                        mt5_status = (
+                            f"is_connected()=False, "
+                            f"_is_connected={getattr(self.mt5, '_is_connected', 'unknown')}, "
+                            f"terminal_connected={health.get('connected', 'unknown')}, "
+                            f"trade_allowed={health.get('trade_allowed', 'unknown')}"
+                        )
+                    except Exception as e:
+                        mt5_status = f"Error checking connection: {e}"
+                    logger.warning(f"  ⚠️ MT5 connection check failed: {mt5_status}")
+                else:
+                    # MT5 is connected - proceed with trade
+                    logger.debug("  ✅ MT5 connection verified: ready for trade execution")
+
                 if not self.mt5 or not self.mt5.is_connected():
-                    logger.error("  ❌ Cannot execute trade: MT5 not connected")
+                    error_msg = f"  ⚠️ Cannot execute trade: MT5 not connected ({mt5_status})"
+                    logger.warning(error_msg)
+
+                    # Send notification to Telegram
+                    if self.notification_manager:
+                        try:
+                            notification_text = (
+                                f"❌ **MT5 Connection Error**\n"
+                                f"📊 Symbol: `{signal.symbol}`\n"
+                                f"📈 Direction: `{signal.direction.value}`\n"
+                                f"💰 Entry: `{signal.entry_price:.5f}`\n"
+                                f"🛑 SL: `{signal.stop_loss:.5f}`\n"
+                                f"🎯 TP: `{signal.take_profit:.5f}`\n"
+                                f"⚠️ **Error**: MT5 is not connected. Trade execution skipped."
+                            )
+                            await self.notification_manager.send_message(
+                                notification_text,
+                                level=NotificationLevel.ERROR,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"  ⚠️ Failed to send MT5 connection error notification: {e}"
+                            )
+
                     return
 
                 logger.info(f"  🚀 Executing LIVE order for {signal.symbol}...")
@@ -524,6 +826,79 @@ class TradingBot:
                         f"  📝 Execution Price Updated: {signal.entry_price:.5f} -> {real_entry_price:.5f}"
                     )
 
+                # Format confluence breakdown
+                confluence_text = f"\n📊 Confluence: **{signal.confluence_score:.1f}%**"
+
+                # Add strategy scores breakdown
+                if signal.strategy_scores:
+                    active_layers = []
+                    layer_names = {
+                        "foundation": "S&D Zones",
+                        "rsi": "RSI",
+                        "ma": "MA",
+                        "trendline": "Trendline",
+                        "price_action": "Price Action",
+                        "fibonacci": "Fibonacci",
+                        "structure": "Structure",
+                        "breakout_retest": "Breakout",
+                    }
+
+                    for layer, score in sorted(
+                        signal.strategy_scores.items(), key=lambda x: x[1], reverse=True
+                    ):
+                        if score > 0:
+                            layer_display = layer_names.get(layer, layer.title())
+                            active_layers.append(f"{layer_display}: {score:.1f}%")
+
+                    if active_layers:
+                        confluence_text += f"\n   └─ {' | '.join(active_layers[:5])}"  # Max 5 layers to avoid too long
+                        if len(active_layers) > 5:
+                            confluence_text += f" (+{len(active_layers) - 5} more)"
+
+                # Extract price action info from signal metadata
+                price_action_text = ""
+                if signal.metadata and "price_action" in signal.metadata:
+                    pa_info = signal.metadata["price_action"]
+                    pattern_type = pa_info.get("pattern_type", "UNKNOWN")
+                    direction = pa_info.get("direction", "")
+                    confidence = pa_info.get("confidence", 0.0)
+                    status = pa_info.get("status", "detected")
+
+                    if status == "detected" or status == "neutral_pattern":
+                        direction_emoji = (
+                            "🟢"
+                            if direction == "BULLISH"
+                            else "🔴"
+                            if direction == "BEARISH"
+                            else "⚪"
+                        )
+                        pattern_emoji = "📊"
+                        # Add specific emoji for common patterns
+                        if "PINBAR" in pattern_type:
+                            pattern_emoji = "📌"
+                        elif "ENGULFING" in pattern_type:
+                            pattern_emoji = "🔄"
+                        elif "HARAMI" in pattern_type:
+                            pattern_emoji = "🔀"
+                        elif "MORNING_STAR" in pattern_type or "EVENING_STAR" in pattern_type:
+                            pattern_emoji = "⭐"
+                        elif "PULLBACK" in pattern_type:
+                            pattern_emoji = "↩️"
+                        elif "ORDER_BLOCK" in pattern_type:
+                            pattern_emoji = "📦"
+                        elif "LIQUIDITY_SWEEP" in pattern_type:
+                            pattern_emoji = "🌊"
+
+                        neutral_note = " (neutral)" if status == "neutral_pattern" else ""
+                        price_action_text = f"\n{pattern_emoji} Price Action: {direction_emoji} **{pattern_type}** ({direction}, {confidence:.0f}%){neutral_note}"
+                    elif status == "wrong_direction":
+                        detected_pattern = pa_info.get("detected_pattern", "UNKNOWN")
+                        price_action_text = (
+                            f"\n⚠️ Price Action: **{detected_pattern}** (wrong direction)"
+                        )
+                    else:
+                        price_action_text = "\n📈 Price Action: No pattern detected"
+
                 await self.notification_manager.send_message(
                     f"✅ **LIVE ORDER EXECUTED**\n"
                     f"🎫 Ticket: `{order_result.get('order')}`\n"
@@ -531,16 +906,94 @@ class TradingBot:
                     f"📊 Size: `{position_size:.2f}` lots\n"
                     f"📉 Price: `{real_entry_price:.5f}`\n"
                     f"🛑 SL: `{signal.stop_loss:.5f}`\n"
-                    f"🎯 TP: `{signal.take_profit:.5f}`",
+                    f"🎯 TP: `{signal.take_profit:.5f}`"
+                    f"{confluence_text}"
+                    f"{price_action_text}",
                     level=NotificationLevel.SUCCESS,
                 )
             else:
                 logger.info(f"  ⚠️ Dry-Run Mode: Skipping MT5 execution for {signal.symbol}")
+
+                # Format confluence breakdown
+                confluence_text = f"\n📊 Confluence: **{signal.confluence_score:.1f}%**"
+
+                # Add strategy scores breakdown
+                if signal.strategy_scores:
+                    active_layers = []
+                    layer_names = {
+                        "foundation": "S&D Zones",
+                        "rsi": "RSI",
+                        "ma": "MA",
+                        "trendline": "Trendline",
+                        "price_action": "Price Action",
+                        "fibonacci": "Fibonacci",
+                        "structure": "Structure",
+                        "breakout_retest": "Breakout",
+                    }
+
+                    for layer, score in sorted(
+                        signal.strategy_scores.items(), key=lambda x: x[1], reverse=True
+                    ):
+                        if score > 0:
+                            layer_display = layer_names.get(layer, layer.title())
+                            active_layers.append(f"{layer_display}: {score:.1f}%")
+
+                    if active_layers:
+                        confluence_text += f"\n   └─ {' | '.join(active_layers[:5])}"  # Max 5 layers to avoid too long
+                        if len(active_layers) > 5:
+                            confluence_text += f" (+{len(active_layers) - 5} more)"
+
+                # Extract price action info from signal metadata
+                price_action_text = ""
+                if signal.metadata and "price_action" in signal.metadata:
+                    pa_info = signal.metadata["price_action"]
+                    pattern_type = pa_info.get("pattern_type", "UNKNOWN")
+                    direction = pa_info.get("direction", "")
+                    confidence = pa_info.get("confidence", 0.0)
+                    status = pa_info.get("status", "detected")
+
+                    if status == "detected" or status == "neutral_pattern":
+                        direction_emoji = (
+                            "🟢"
+                            if direction == "BULLISH"
+                            else "🔴"
+                            if direction == "BEARISH"
+                            else "⚪"
+                        )
+                        pattern_emoji = "📊"
+                        # Add specific emoji for common patterns
+                        if "PINBAR" in pattern_type:
+                            pattern_emoji = "📌"
+                        elif "ENGULFING" in pattern_type:
+                            pattern_emoji = "🔄"
+                        elif "HARAMI" in pattern_type:
+                            pattern_emoji = "🔀"
+                        elif "MORNING_STAR" in pattern_type or "EVENING_STAR" in pattern_type:
+                            pattern_emoji = "⭐"
+                        elif "PULLBACK" in pattern_type:
+                            pattern_emoji = "↩️"
+                        elif "ORDER_BLOCK" in pattern_type:
+                            pattern_emoji = "📦"
+                        elif "LIQUIDITY_SWEEP" in pattern_type:
+                            pattern_emoji = "🌊"
+
+                        neutral_note = " (neutral)" if status == "neutral_pattern" else ""
+                        price_action_text = f"\n{pattern_emoji} Price Action: {direction_emoji} **{pattern_type}** ({direction}, {confidence:.0f}%){neutral_note}"
+                    elif status == "wrong_direction":
+                        detected_pattern = pa_info.get("detected_pattern", "UNKNOWN")
+                        price_action_text = (
+                            f"\n⚠️ Price Action: **{detected_pattern}** (wrong direction)"
+                        )
+                    else:
+                        price_action_text = "\n📈 Price Action: No pattern detected"
+
                 await self.notification_manager.send_message(
                     f"⚠️ **Dry-Run Order**\n"
                     f"💱 **{signal.symbol}** | **{signal.direction.value}**\n"
                     f"📊 Size: `{position_size:.2f}` lots\n"
-                    f"📉 Price: `{signal.entry_price:.5f}`",
+                    f"📉 Price: `{signal.entry_price:.5f}`"
+                    f"{confluence_text}"
+                    f"{price_action_text}",
                     level=NotificationLevel.INFO,
                     sound=False,
                 )
@@ -555,25 +1008,46 @@ class TradingBot:
             # Restore signal price (good practice not to mutate passed objects permanently)
             signal.entry_price = original_signal_price
 
+            # Add confluence_score from signal (always available)
+            position.confluence_score = signal.confluence_score
+            if not position.metadata:
+                position.metadata = {}
+            position.metadata["confluence_score"] = signal.confluence_score
+            logger.debug(
+                f"  📊 Confluence Score: {signal.confluence_score:.1f}% (saved to position)"
+            )
+
             # Add ticket if available (store in metadata for persistence)
             if not is_dry_run and "order_result" in locals() and order_result:
                 ticket_value = int(order_result.get("order"))
                 # Store ticket in both position object and metadata
                 position.ticket = ticket_value
-                if not position.metadata:
-                    position.metadata = {}
                 position.metadata["ticket"] = ticket_value
                 logger.info(f"  🎫 Position Ticket: {ticket_value} (saved to position and metadata)")
 
+            # Link position to current active account (multi-account support)
+            if self.account_selector:
+                active_account = await self.account_selector.get_active_account()
+                if active_account:
+                    position.account_id = active_account.account_id
+                    logger.debug(f"  🏦 Position linked to account: {active_account.account_id}")
+
+            # Link position to current trading session
+            if self.current_session:
+                position.session_id = self.current_session.session_id
+                logger.debug(f"  📊 Position linked to session: {self.current_session.session_id}")
+
             # Step 5: Register with exposure manager
             asset_class = self._get_asset_class(signal.symbol)
-            self.exposure_manager.register_position(signal.symbol, asset_class, position_size)
+            self.exposure_manager.register_position(
+                signal.symbol, asset_class, position_size, direction=signal.direction.value
+            )
 
             # Step 6: Open position
             self.position_manager.open_position(position.position_id)
 
-            # Save to database
-            await self.position_manager.save_position(position)
+            # Save to database (skip in dry-run mode)
+            await self.position_manager.save_position(position, is_dry_run=is_dry_run)
 
             logger.info(
                 f"  ✅ POSITION OPENED: {position.position_id} | "
@@ -621,10 +1095,10 @@ class TradingBot:
                 self.portfolio_risk.current_balance
             )
 
-            # Check symbol exposure limits
+            # Check symbol exposure limits (including correlation conflicts)
             asset_class = self._get_asset_class(signal.symbol)
             can_open, reason = self.exposure_manager.can_open_position(
-                signal.symbol, asset_class, max_risk_amount
+                signal.symbol, asset_class, max_risk_amount, signal.direction.value
             )
 
             if not can_open:
@@ -640,38 +1114,39 @@ class TradingBot:
     async def _calculate_position_size(self, signal):
         """Calculate appropriate position size for the signal."""
         try:
-            # TEMPORARY: Hardcode volume to 0.01 lot until SL calculation is fixed
-            logger.info("  ⚠️ Using hardcoded volume: 0.01 lot (SL calculation debugging)")
-            return 0.01
+            from trading_bot.position.pip_calculator import PipCalculator
 
-            # Original calculation (commented out for debugging)
-            # from trading_bot.position.pip_calculator import PipCalculator
-            #
-            # # Calculate max risk amount (2% of portfolio)
-            # max_risk_amount = self.portfolio_risk.calculate_max_risk_amount(
-            #     self.portfolio_risk.current_balance
-            # )
-            #
-            # # Get pip calculator to determine pip size and value
-            # pip_calculator = PipCalculator()
-            # pip_size = pip_calculator.get_pip_size(signal.symbol)
-            #
-            # # Calculate stop loss distance in pips
-            # # signal.risk_pips is already the price difference, convert to pips
-            # stop_distance_pips = signal.risk_pips / pip_size
-            #
-            # # Calculate pip value per lot
-            # pip_value_per_lot = pip_calculator.calculate_pip_value(signal.symbol, 1.0)  # 1 lot
-            #
-            # # Calculate position size using portfolio risk manager
-            # position_size = self.portfolio_risk.calculate_position_size(
-            #     account_balance=self.portfolio_risk.current_balance,
-            #     risk_amount_usd=max_risk_amount,
-            #     stop_distance_pips=stop_distance_pips,
-            #     pip_value_per_lot=pip_value_per_lot,
-            # )
-            #
-            # return position_size
+            # Calculate max risk amount (2% of portfolio)
+            max_risk_amount = self.portfolio_risk.calculate_max_risk_amount(
+                self.portfolio_risk.current_balance
+            )
+
+            # Get pip calculator to determine pip size and value
+            pip_calculator = PipCalculator()
+            pip_size = pip_calculator.get_pip_size(signal.symbol)
+
+            # Calculate stop loss distance in pips
+            # signal.risk_pips is already the price difference, convert to pips
+            stop_distance_pips = signal.risk_pips / pip_size
+
+            # Calculate pip value per lot
+            pip_value_per_lot = pip_calculator.calculate_pip_value(signal.symbol, 1.0)  # 1 lot
+
+            # Calculate position size using portfolio risk manager
+            position_size = self.portfolio_risk.calculate_position_size(
+                account_balance=self.portfolio_risk.current_balance,
+                risk_amount_usd=max_risk_amount,
+                stop_distance_pips=stop_distance_pips,
+                pip_value_per_lot=pip_value_per_lot,
+            )
+
+            logger.info(
+                f"  📊 Position sizing: Balance=${self.portfolio_risk.current_balance:.2f}, "
+                f"Risk=${max_risk_amount:.2f}, SL={stop_distance_pips:.1f} pips, "
+                f"PipValue=${pip_value_per_lot:.2f}, Size={position_size:.2f} lots"
+            )
+
+            return position_size
 
         except Exception as e:
             logger.error(f"  Position size calculation error: {e}")
@@ -838,6 +1313,45 @@ class TradingBot:
                                     )
                                     break
 
+                    # CRITICAL: If still no ticket after all lookup attempts, close the position
+                    # This position is ORPHANED/INVALID and should not remain OPEN
+                    if not ticket:
+                        logger.error(
+                            f"  ❌ Position {position.position_id} ({position.symbol}) has NO TICKET "
+                            f"after all lookup attempts - CLOSING as ORPHANED position. "
+                            f"This position cannot be validated against MT5."
+                        )
+
+                        # Close position with current market price
+                        current_price = await self._get_current_price(position.symbol)
+                        if current_price:
+                            close_price = current_price
+                        else:
+                            # Fallback to entry price if can't get current price
+                            close_price = position.entry_price
+                            logger.warning(
+                                f"  ⚠️ Could not get current price for {position.symbol}, "
+                                f"using entry price {close_price:.5f} for closing"
+                            )
+
+                        # Close position in DB
+                        result = self.position_manager.close_position(
+                            position.position_id, close_price, "Orphaned position: No ticket found"
+                        )
+
+                        # Save to database
+                        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+
+                        # Update session aggregations
+                        await self._update_session_on_position_close(position, result)
+
+                        logger.info(
+                            f"  🚫 Closed orphaned position {position.position_id} at {close_price:.5f}"
+                        )
+
+                        # Skip to next position
+                        continue
+
                     # Check if position is closed in MT5
                     # Case 1: Position has ticket - check if ticket exists in MT5
                     if ticket:
@@ -869,12 +1383,20 @@ class TradingBot:
                                 )
 
                             # Close position in DB
-                            self.position_manager.close_position(
+                            result = self.position_manager.close_position(
                                 position.position_id, close_price, f"Sync: {comment}"
                             )
+                            # Update result with actual P&L from deal
+                            if result:
+                                result["pnl_usd"] = pnl
 
                             # Save to database
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
+
+                            # Update session aggregations
+                            await self._update_session_on_position_close(position, result)
 
                             # Update portfolio balance
                             if self.portfolio_risk:
@@ -942,12 +1464,20 @@ class TradingBot:
                             pnl = pips * position.pip_value_per_lot * position.volume
 
                             # Close position in DB
-                            self.position_manager.close_position(
+                            result = self.position_manager.close_position(
                                 position.position_id, close_price, "Sync: Closed in MT5 (no ticket)"
                             )
+                            # Update result with calculated P&L
+                            if result:
+                                result["pnl_usd"] = pnl
 
                             # Save to database
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
+
+                            # Update session aggregations
+                            await self._update_session_on_position_close(position, result)
 
                             # Update portfolio balance
                             if self.portfolio_risk:
@@ -1078,7 +1608,9 @@ class TradingBot:
                             )
 
                             # Save to database
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
 
                             logger.info(
                                 f"  ✅ Synced MT5 position {mt5_ticket} ({universal_symbol}) to database"
@@ -1150,7 +1682,9 @@ class TradingBot:
                                     close_price,
                                     "Sync: Closed in MT5 (during update)",
                                 )
-                                await self.position_manager.save_position(position)
+                                await self.position_manager.save_position(
+                                    position, is_dry_run=is_dry_run
+                                )
 
                                 # Update portfolio balance
                                 if self.portfolio_risk:
@@ -1195,7 +1729,7 @@ class TradingBot:
                     )
 
                     # Save update to database
-                    await self.position_manager.save_position(position)
+                    await self.position_manager.save_position(position, is_dry_run=is_dry_run)
 
                     # CRITICAL: Final check before automation - position must still be OPEN
                     # This prevents automation from running on positions that were closed during update
@@ -1315,20 +1849,38 @@ class TradingBot:
                         )
                         return
                 else:
-                    # No ticket - log warning but continue (position might be valid but no ticket)
-                    logger.debug(
-                        f"  ⚠️ Position {position.position_id} has no ticket - cannot verify in MT5"
+                    # CRITICAL: No ticket - this position is INVALID and should have been closed
+                    # during sync reconciliation. Skip automation to prevent errors.
+                    logger.error(
+                        f"  ❌ SKIPPING AUTOMATION: Position {position.position_id} has NO TICKET! "
+                        f"This is an ORPHANED position that should have been closed. "
+                        f"Check _manage_positions sync reconciliation logic."
                     )
+                    return
 
             # Log position status for debugging
             logger.debug(
                 f"Checking automation for {position.position_id} ({position.symbol}): "
                 f"profit={position.current_profit_pips:.1f} pips, "
                 f"price={position.current_price}, "
-                f"status={position.status.value}"
+                f"status={position.status.value}, "
+                f"entry={position.entry_price:.5f}, "
+                f"sl={position.stop_loss:.5f}"
             )
 
+            # Validate position has required data
+            if position.current_price is None:
+                logger.warning(
+                    f"  ⚠️ Cannot check automation for {position.position_id}: current_price is None"
+                )
+                return
+
             # Breakeven check
+            be_should_move = self.breakeven_manager.should_move_to_breakeven(position)
+            logger.debug(
+                f"  Breakeven check for {position.position_id}: should_move={be_should_move}, "
+                f"profit={position.current_profit_pips:.1f} pips"
+            )
             if self.breakeven_manager.should_move_to_breakeven(position):
                 new_sl = self.breakeven_manager.move_to_breakeven(position)
                 if new_sl:
@@ -1425,47 +1977,74 @@ class TradingBot:
                         )
 
                         # Only save to DB and send notification if MT5 was actually modified
-                        # (or if we're in dry-run mode where MT5 modification is skipped)
                         # AND position is not already at breakeven (to avoid duplicate notifications)
-                        if (mt5_modified or is_dry_run) and not is_already_at_breakeven:
+                        # CRITICAL: Skip notifications in dry-run mode
+                        if mt5_modified and not is_already_at_breakeven:
                             logger.info(
                                 f"  🔄 BREAKEVEN: {position.position_id} SL moved to {new_sl:.5f}"
                             )
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
                             logger.info(f"  💾 Breakeven SL saved to database: {new_sl:.5f}")
-                            await self.notification_manager.send_message(
-                                f"🛡️ **BREAKEVEN SECURED**\n"
-                                f"📊 Symbol: `{position.symbol}`\n"
-                                f"🆔 Position: `{position.position_id}`\n"
-                                f"🛑 SL Moved: `{new_sl:.5f}`\n"
-                                f"🔒 Risk Free",
-                                level=NotificationLevel.INFO,
-                                sound=False,
+
+                            # Only send notification in LIVE trading (not dry-run)
+                            if not is_dry_run and self.notification_manager:
+                                await self.notification_manager.send_message(
+                                    f"🛡️ **BREAKEVEN SECURED**\n"
+                                    f"📊 Symbol: `{position.symbol}`\n"
+                                    f"🆔 Position: `{position.position_id}`\n"
+                                    f"🛑 SL Moved: `{new_sl:.5f}`\n"
+                                    f"🔒 Risk Free",
+                                    level=NotificationLevel.INFO,
+                                    sound=False,
+                                )
+                        elif is_dry_run and not is_already_at_breakeven:
+                            # Dry-run: Save to DB but skip notification
+                            logger.info(
+                                f"  🔄 BREAKEVEN (DRY-RUN): {position.position_id} SL moved to {new_sl:.5f}"
+                            )
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
+                            logger.info(
+                                "  💾 Breakeven SL saved to database (dry-run, no notification)"
                             )
                         elif mt5_modified or is_dry_run:
                             # MT5 modified but already at breakeven (duplicate check)
                             logger.debug(
                                 f"  ℹ️ Breakeven already set for {position.position_id}, skipping notification"
                             )
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
                             logger.debug("  💾 Position saved to database (already at breakeven)")
                         else:
                             # MT5 not modified (already at breakeven or modification failed)
                             # Still save to DB to keep in sync, but no notification
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
                             logger.debug(
                                 f"  💾 Position saved to database (MT5 not modified: {res.get('message') if ticket else 'no ticket'})"
                             )
 
             # Trailing stop activation check (first time)
-            if self.trailing_manager.should_activate_trailing(position):
+            ts_should_activate = self.trailing_manager.should_activate_trailing(position)
+            logger.debug(
+                f"  Trailing activation check for {position.position_id}: "
+                f"should_activate={ts_should_activate}, "
+                f"profit={position.current_profit_pips:.1f} pips, "
+                f"already_active={position.position_id in self.trailing_manager.trailing_active}"
+            )
+            if ts_should_activate:
                 self.trailing_manager.activate_trailing(position)
                 logger.info(
                     f"  🎯 TRAILING ACTIVATED: {position.position_id} at {position.current_profit_pips:.1f} pips"
                 )
-                await self.position_manager.save_position(position)
-                # Notify trailing activation
-                if self.notification_manager:
+                await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+                # Notify trailing activation (only in LIVE trading, skip in dry-run)
+                if not is_dry_run and self.notification_manager:
                     await self.notification_manager.send_message(
                         f"🎯 **TRAILING STOP ACTIVATED**\n"
                         f"📊 Symbol: `{position.symbol}`\n"
@@ -1477,12 +2056,54 @@ class TradingBot:
                     )
 
             # Trailing stop update check (after activation)
-            if self.trailing_manager.should_update_trailing_stop(position):
+            ts_should_update = self.trailing_manager.should_update_trailing_stop(position)
+            logger.debug(
+                f"  Trailing update check for {position.position_id}: "
+                f"should_update={ts_should_update}, "
+                f"profit={position.current_profit_pips:.1f} pips, "
+                f"current_price={position.current_price:.5f}, "
+                f"current_sl={position.stop_loss:.5f}"
+            )
+            if ts_should_update:
                 old_sl = position.stop_loss
                 new_sl = self.trailing_manager.update_trailing_stop(position)
 
                 # Check if SL actually changed (update_trailing_stop may return same SL if no improvement)
                 if new_sl and new_sl != old_sl:
+                    # Validate pip_size before calculation
+                    if position.pip_size <= 0:
+                        logger.error(
+                            f"  ❌ Invalid pip_size {position.pip_size} for {position.position_id} "
+                            f"({position.symbol}) - cannot calculate movement"
+                        )
+                        return  # Skip this position's trailing update
+
+                    # Calculate SL movement in pips for notification threshold
+                    sl_movement_pips = abs(new_sl - old_sl) / position.pip_size
+
+                    # Validate movement is reasonable (prevent huge movements from incorrect data)
+                    # For forex major: max 500 pips, for JPY: max 5000 pips, for commodities: max 10000 pips
+                    max_movement_pips = {
+                        "forex_major": 500.0,
+                        "forex_jpy": 5000.0,
+                        "commodities": 10000.0,
+                        "crypto": 1000.0,
+                    }
+                    asset_class = self._get_asset_class(position.symbol)
+                    max_allowed = max_movement_pips.get(asset_class, 1000.0)
+
+                    if sl_movement_pips > max_allowed:
+                        logger.error(
+                            f"  ❌ SUSPICIOUS TRAILING MOVEMENT: {position.position_id} ({position.symbol})\n"
+                            f"     SL: {old_sl:.5f} → {new_sl:.5f}\n"
+                            f"     Movement: {sl_movement_pips:.1f} pips (max allowed: {max_allowed:.1f})\n"
+                            f"     pip_size: {position.pip_size}, current_price: {position.current_price}\n"
+                            f"     This suggests incorrect old_sl or pip_size - skipping notification"
+                        )
+                        # Still save the position but don't send notification
+                        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+                        return  # Skip notification for suspicious movement
+
                     # Sync with MT5 if live
                     is_dry_run = self.config.get("trading", {}).get(
                         "dry_run", False
@@ -1522,25 +2143,43 @@ class TradingBot:
                                 logger.warning(
                                     f"  ⚠️ MT5 Trailing SL Update Failed: {res.get('message')}"
                                 )
+                        else:
+                            logger.warning(
+                                f"  ⚠️ No ticket found for {position.position_id} - cannot update MT5"
+                            )
 
                     # Always save to DB if SL changed (even if MT5 didn't modify)
                     logger.info(f"  🔄 TRAILING: {position.position_id} SL moved to {new_sl:.5f}")
-                    await self.position_manager.save_position(position)
+                    await self.position_manager.save_position(position, is_dry_run=is_dry_run)
                     logger.info(f"  💾 Trailing SL saved to database: {new_sl:.5f}")
 
-                    # Calculate SL movement in pips for notification threshold
-                    sl_movement_pips = abs(new_sl - old_sl) / position.pip_size
+                    # Notify trailing update - ONLY if MT5 was successfully modified (for live trading)
+                    # CRITICAL: Skip notifications in dry-run mode
+                    # CRITICAL: Don't send "success" notification if MT5 update failed
 
-                    # Notify trailing update (with sound=False to avoid spam)
-                    # Always notify if:
-                    # 1. MT5 was modified (live trading - important update), OR
-                    # 2. SL moved significantly (>= 5 pips), OR
-                    # 3. Dry-run mode (for testing)
-                    should_notify = (
-                        mt5_modified
-                        or sl_movement_pips >= 5.0  # Always notify if MT5 was modified
-                        or is_dry_run
-                    )
+                    # Early return if dry-run mode - skip all notifications
+                    if is_dry_run:
+                        logger.debug(
+                            f"  🧪 Dry-run mode: Skipping trailing stop notification for {position.position_id}"
+                        )
+                        return  # Exit early - no notification in dry-run
+
+                    # Only proceed with notifications if NOT in dry-run mode
+                    should_notify = False
+                    mt5_status = ""
+
+                    if mt5_modified:
+                        # Live trading: only notify if MT5 was successfully modified
+                        should_notify = True
+                        mt5_status = "✅ MT5 Updated"
+                    elif self.mt5 and self.mt5.is_connected():
+                        # Live trading but MT5 update failed or no ticket
+                        should_notify = False
+                        mt5_status = "❌ MT5 Update Failed"
+                        logger.warning(
+                            f"  ⚠️ Not sending notification for {position.position_id}: "
+                            f"MT5 update failed or no ticket found"
+                        )
 
                     if self.notification_manager and should_notify:
                         try:
@@ -1551,12 +2190,13 @@ class TradingBot:
                                 f"🛑 SL: `{old_sl:.5f}` → `{new_sl:.5f}`\n"
                                 f"📈 Movement: `{sl_movement_pips:.1f} pips`\n"
                                 f"💰 Profit: `{position.current_profit_pips:.1f} pips`\n"
-                                f"💵 P&L: `${position.current_pnl_usd:.2f}`",
+                                f"💵 P&L: `${position.current_pnl_usd:.2f}`\n"
+                                f"🔧 Status: {mt5_status}",
                                 level=NotificationLevel.INFO,
                                 sound=False,
                             )
                             logger.debug(
-                                f"  📱 Trailing stop notification sent for {position.position_id}"
+                                f"  📱 Trailing stop notification sent for {position.position_id} ({mt5_status})"
                             )
                         except Exception as e:
                             logger.warning(f"  ⚠️ Failed to send trailing stop notification: {e}")
@@ -1619,14 +2259,16 @@ class TradingBot:
                             f"Closed {closed_volume:.3f} at {current_price:.5f} "
                             f"P&L: ${result['profit_usd']:.2f}"
                         )
-                        await self.position_manager.save_position(position)
-                        await self.notification_manager.send_message(
-                            f"💰 **PARTIAL PROFIT TAKEN**\n"
-                            f"🆔 `{position.position_id}`\n"
-                            f"📊 Closed: `{closed_volume:.3f}` lots\n"
-                            f"💵 Profit: **${result['profit_usd']:.2f}**",
-                            level=NotificationLevel.SUCCESS,
-                        )
+                        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+                        # Only send notification in LIVE trading (not dry-run)
+                        if not is_dry_run and self.notification_manager:
+                            await self.notification_manager.send_message(
+                                f"💰 **PARTIAL PROFIT TAKEN**\n"
+                                f"🆔 `{position.position_id}`\n"
+                                f"📊 Closed: `{closed_volume:.3f}` lots\n"
+                                f"💵 Profit: **${result['profit_usd']:.2f}**",
+                                level=NotificationLevel.SUCCESS,
+                            )
                 except ValueError as e:
                     # Volume too small for partial close - this is expected for small positions
                     logger.debug(f"  ⏭️ Skipping partial close for {position.position_id}: {e}")
@@ -1643,6 +2285,9 @@ class TradingBot:
         try:
             if not self.data_manager:
                 return
+
+            # Get dry-run mode
+            is_dry_run = self.config.get("trading", {}).get("dry_run", False)
 
             open_positions = self.position_manager.get_open_positions()
             for position in open_positions:
@@ -1690,7 +2335,12 @@ class TradingBot:
                             )
 
                             # Save closed state to database
-                            await self.position_manager.save_position(position)
+                            await self.position_manager.save_position(
+                                position, is_dry_run=is_dry_run
+                            )
+
+                            # Update session aggregations
+                            await self._update_session_on_position_close(position, result)
 
                             logger.info(
                                 f"  ✅ POSITION CLOSED: {position.position_id} | "
@@ -1730,6 +2380,30 @@ class TradingBot:
 
         while self.is_running:
             try:
+                # CRITICAL: Verify MT5 server hasn't changed (prevent auto-switch)
+                if self.mt5 and not self.config.get("trading", {}).get("dry_run", False):
+                    health = self.mt5.health_check()
+                    if not health.get("server_match", True):
+                        logger.error(
+                            f"🚨 CRITICAL: MT5 server changed to '{health.get('current_server')}' "
+                            f"(expected '{health.get('expected_server')}'). "
+                            f"Stopping bot to prevent trading on wrong server!"
+                        )
+                        # Send emergency notification
+                        if self.notification_manager:
+                            await self.notification_manager.send_message(
+                                f"🚨 **CRITICAL: Server Mismatch Detected!**\n"
+                                f"Expected: `{health.get('expected_server')}`\n"
+                                f"Current: `{health.get('current_server')}`\n"
+                                f"⚠️ Bot stopped to prevent trading on wrong server.",
+                                level=NotificationLevel.ERROR,
+                            )
+                        # Stop the bot
+                        self.is_running = False
+                        break
+
+                logger.info(f"🔄 Trading loop iteration - analyzing {len(self.symbols)} symbol(s)")
+
                 # Analyze each symbol
                 for symbol in self.symbols:
                     await self._analyze_symbol(symbol)
@@ -1738,7 +2412,7 @@ class TradingBot:
                 await self._manage_positions()
 
                 # Wait before next analysis
-                logger.debug(f"Waiting {self.analysis_interval}s before next analysis...")
+                logger.info(f"⏳ Waiting {self.analysis_interval}s before next analysis cycle...")
                 await asyncio.sleep(self.analysis_interval)
 
             except KeyboardInterrupt:

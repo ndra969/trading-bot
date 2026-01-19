@@ -64,6 +64,8 @@ def setup_logger(
         backtrace=True,
         diagnose=True,
         enqueue=True,  # Thread-safe logging
+        catch=True,  # Catch exceptions in logging handler
+        serialize=False,  # Don't serialize (faster)
     )
 
     logger.info(f"Logger initialized - Level: {level}, File: {log_file}")

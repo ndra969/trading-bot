@@ -1,0 +1,61 @@
+# Backtest Configuration - BEFORE Week 15.5 Fixes
+# This represents the system state that produced 39% win rate and losses
+
+# Position Management (OLD - PROBLEMATIC SETTINGS)
+position_management:
+  forex_major:
+    # OLD: Fixed 10 pips (too tight!)
+    trailing_activation: 10
+    trailing_distance: 10
+
+    # Breakeven (keep same)
+    breakeven_trigger: 15
+    breakeven_offset: 2
+
+    # ATR-based NOT enabled
+    use_atr_trailing: false
+    use_tiered_trailing: false
+
+  forex_jpy:
+    trailing_activation: 100
+    trailing_distance: 100
+    breakeven_trigger: 150
+    breakeven_offset: 20
+
+# Strategy Configuration (OLD - LOW STANDARDS)
+strategy:
+  # OLD: 65% minimum (too low!)
+  min_confluence_score: 65.0
+
+  # OLD: No filters
+  trend_alignment_required: false
+  volatility_filter_enabled: false
+  news_event_filter_enabled: false
+  spread_filter_enabled: false
+
+# Risk Management (OLD - TOO AGGRESSIVE)
+risk_management:
+  # OLD: 1% per trade (too high for 39% win rate)
+  max_risk_per_trade: 1.0
+
+  # OLD: 2% portfolio risk
+  max_portfolio_risk: 2.0
+
+  # OLD: 1.5% daily loss limit
+  max_daily_loss: 1.5
+
+  # OLD: 5 positions (too many)
+  max_total_positions: 5
+  max_positions_per_symbol: 1
+
+  # OLD: No recovery mode
+  recovery_mode:
+    enabled: false
+
+# Expected Results (Baseline):
+# - Win Rate: ~39%
+# - Risk:Reward: 1.23:1
+# - Profit Factor: Negative
+# - Avg Win: +2.98 pips
+# - Avg Loss: -2.42 pips
+# - Total P&L: -$9.82 per week

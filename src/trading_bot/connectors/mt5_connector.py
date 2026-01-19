@@ -143,6 +143,27 @@ class MT5Connector:
                 logger.info(f"Terminal: {self._terminal_info.get('name', 'Unknown')}")
                 logger.info(f"Account: {self._account_info.get('login', 'Unknown')}")
 
+                # Log server information for debugging
+                account_info_obj = mt5.account_info()
+                if account_info_obj:
+                    server_used = (
+                        account_info_obj.server
+                        if hasattr(account_info_obj, "server")
+                        else "Unknown"
+                    )
+                    logger.info(f"MT5 Server: {server_used} (from account info)")
+                    if self.server:
+                        logger.info(f"Config Server: {self.server} (from config/env)")
+                        if server_used.lower() != self.server.lower():
+                            logger.warning(
+                                f"⚠️ Server mismatch: Config specifies '{self.server}' but MT5 is using '{server_used}'. "
+                                f"This may happen if MT5 terminal was already logged in to a different server."
+                            )
+                    else:
+                        logger.info(
+                            f"⚠️ No server specified in config - MT5 using existing connection: {server_used}"
+                        )
+
                 return True
 
             except (MT5ConnectionError, MT5TerminalNotRunningError, MT5VersionIncompatibleError):
@@ -169,18 +190,45 @@ class MT5Connector:
 
     def is_connected(self) -> bool:
         """
-        Check if MT5 is connected.
+        Check if MT5 is connected and on correct server.
 
         Returns:
             True if connected and terminal is responsive
         """
         if not self._is_connected:
+            logger.debug("MT5 is_connected() check: _is_connected=False")
             return False
 
         try:
             # Check if terminal is still responsive
             terminal_info = mt5.terminal_info()
-            return terminal_info is not None and terminal_info.connected
+            if terminal_info is None:
+                logger.warning("MT5 is_connected() check: terminal_info is None")
+                return False
+
+            is_terminal_connected = terminal_info.connected
+            if not is_terminal_connected:
+                logger.warning(
+                    f"MT5 is_connected() check: terminal_info.connected=False "
+                    f"(terminal_running={terminal_info.connected}, trade_allowed={getattr(terminal_info, 'trade_allowed', 'unknown')})"
+                )
+                return False
+
+            # CRITICAL: Check if server changed (prevent auto-switch to test server)
+            if self.server:
+                account_info = mt5.account_info()
+                if account_info and hasattr(account_info, "server"):
+                    current_server = account_info.server
+                    if current_server.lower() != self.server.lower():
+                        logger.error(
+                            f"🚨 SERVER MISMATCH DETECTED! "
+                            f"Expected: '{self.server}', Current: '{current_server}'. "
+                            f"MT5 may have auto-switched servers. Marking as disconnected."
+                        )
+                        self._is_connected = False
+                        return False
+
+            return is_terminal_connected
         except Exception as e:
             logger.error(f"Error checking connection status: {e}")
             return False
@@ -196,6 +244,9 @@ class MT5Connector:
             "connected": False,
             "terminal_running": False,
             "trade_allowed": False,
+            "server_match": True,
+            "expected_server": self.server,
+            "current_server": None,
             "terminal_info": {},
             "account_info": {},
         }
@@ -212,10 +263,19 @@ class MT5Connector:
                 health["trade_allowed"] = terminal_info.trade_allowed
                 health["terminal_info"] = terminal_info._asdict()
 
-            # Check account
+            # Check account and server
             account_info = mt5.account_info()
             if account_info:
                 health["account_info"] = account_info._asdict()
+                if hasattr(account_info, "server"):
+                    health["current_server"] = account_info.server
+                    # Check server mismatch
+                    if self.server and account_info.server.lower() != self.server.lower():
+                        health["server_match"] = False
+                        logger.warning(
+                            f"⚠️ Server mismatch in health check: "
+                            f"Expected '{self.server}', Current '{account_info.server}'"
+                        )
 
         except Exception as e:
             logger.error(f"Health check failed: {e}")

@@ -159,6 +159,13 @@ class Configuration:
                     if enabled_symbols:
                         self._config["symbols"] = enabled_symbols
 
+        # Load trading types configuration
+        trading_types_path = self.config_dir / "trading_types.yaml"
+        if trading_types_path.exists():
+            with open(trading_types_path) as f:
+                trading_types_config = yaml.safe_load(f) or {}
+                self._deep_merge(self._config, trading_types_config)
+
         # Load environment-specific configuration
         env_path = self.config_dir / f"{self.env}.yaml"
         if env_path.exists():

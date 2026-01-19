@@ -1,0 +1,81 @@
+# Backtest Configuration - AFTER Week 15.5 Fixes
+# This represents the improved system targeting 50%+ win rate
+
+# Position Management (NEW - WEEK 15.5.2 ATR-BASED IMPROVEMENTS)
+position_management:
+  forex_major:
+    # NEW: ATR-based dynamic trailing (Week 15.5.2)
+    use_atr_trailing: true
+    trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR profit
+    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # NEW: Increased fallback values (from 10 to 20/15)
+    trailing_activation: 20  # Fallback if ATR unavailable
+    trailing_distance: 15    # Fallback if ATR unavailable
+
+    # NEW: Tiered trailing enabled
+    use_tiered_trailing: true
+    tier_thresholds: [10, 20, 30]  # Profit levels
+    tier_distances: [8, 12, 15]    # Progressive distances
+
+    # Breakeven (keep improved values)
+    breakeven_trigger: 20    # More conservative
+    breakeven_offset: 5      # Wider buffer
+
+  forex_jpy:
+    use_atr_trailing: true
+    trailing_activation_multiplier: 1.5
+    trailing_distance_multiplier: 1.0
+    trailing_activation: 150
+    trailing_distance: 100
+    breakeven_trigger: 200
+    breakeven_offset: 50
+
+# Strategy Configuration (NEW - WEEK 15.5.3 STRICT FILTERS)
+strategy:
+  # NEW: 75% minimum confluence (raised from 65%)
+  min_confluence_score: 75.0
+
+  # NEW: Trend alignment REQUIRED (Week 15.5.3)
+  trend_alignment_required: true
+
+  # NEW: Volatility filter ENABLED (Week 15.5.3)
+  volatility_filter_enabled: true
+  max_atr_multiplier: 1.5  # Reject if ATR > 1.5x average
+
+  # NEW: Market condition filters
+  news_event_filter_enabled: true
+  spread_filter_enabled: true
+  max_spread_pips: 3.0
+
+# Risk Management (NEW - WEEK 15.5.4 CONSERVATIVE)
+risk_management:
+  # NEW: 0.5% per trade (reduced from 1.0%)
+  max_risk_per_trade: 0.5
+
+  # NEW: 1.5% portfolio risk (reduced from 2.0%)
+  max_portfolio_risk: 1.5
+
+  # NEW: 1.0% daily loss limit (reduced from 1.5%)
+  max_daily_loss: 1.0
+
+  # NEW: 3 positions (reduced from 5)
+  max_total_positions: 3
+  max_positions_per_symbol: 1
+
+  # NEW: Recovery mode ENABLED (Week 15.5.4)
+  recovery_mode:
+    enabled: true
+    trigger_drawdown: 5.0      # Activate at 5% drawdown
+    reduced_risk: 0.25         # Ultra-conservative 0.25%
+    max_positions: 1           # Only 1 position during recovery
+    exit_drawdown: 3.0         # Exit when drawdown < 3%
+
+# Expected Results (Target):
+# - Win Rate: 50%+ (improved from 39%)
+# - Risk:Reward: 2:1+ (improved from 1.23:1)
+# - Profit Factor: 1.5+ (improved from negative)
+# - Avg Win: +10 pips (improved from +2.98)
+# - Avg Loss: -5 pips max (controlled)
+# - Total P&L: Positive (breakeven at minimum)
+# - Max Risk Exposure: $150 (reduced from $500)

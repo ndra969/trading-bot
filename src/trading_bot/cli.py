@@ -125,6 +125,14 @@ def start(ctx, dry_run, connect_mt5):
 
             try:
                 mt5_config = config.mt5
+
+                # Log MT5 config for debugging (without sensitive data)
+                logger.debug(
+                    f"MT5 Config: login={'***' if mt5_config.login else None}, "
+                    f"server={mt5_config.server or 'None (will use existing MT5 connection)'}, "
+                    f"terminal_path={mt5_config.terminal_path or 'Auto-detect'}"
+                )
+
                 _mt5_connector = MT5Connector(
                     terminal_path=mt5_config.terminal_path,
                     login=mt5_config.login,
@@ -535,6 +543,118 @@ def version():
     from . import __version__
 
     console.print(f"[bold cyan]Trading Bot v{__version__}[/bold cyan]")
+
+
+def _display_claude_rules(format: str):
+    """Helper function to display CLAUDE.md rules"""
+    import sys
+    from pathlib import Path
+
+    # Fix Windows console encoding for Unicode characters
+    if sys.platform == "win32":
+        try:
+            # Try to set UTF-8 encoding for Windows console
+            if hasattr(sys.stdout, "reconfigure"):
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            if hasattr(sys.stderr, "reconfigure"):
+                sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass  # Ignore if reconfiguration fails
+
+    # Get project root directory
+    project_root = Path(__file__).parent.parent.parent
+    claude_md_path = project_root / "CLAUDE.md"
+
+    if not claude_md_path.exists():
+        console.print("[bold red]Error:[/bold red] CLAUDE.md not found!")
+        return
+
+    try:
+        with open(claude_md_path, encoding="utf-8") as f:
+            content = f.read()
+
+        if format == "summary":
+            # Extract key sections
+            console.print("[bold cyan]Trading Bot Project Rules - Summary[/bold cyan]\n")
+            console.print("[bold yellow]Quick Reference:[/bold yellow]\n")
+
+            # Extract key rules
+            sections = {
+                "Critical Implementation Rules": content.find("## Critical Implementation Rules"),
+                "Code Quality Standards": content.find("## Code Quality Standards"),
+                "Testing Requirements": content.find("## Testing Requirements"),
+                "TDD Workflow": content.find("## Test-Driven Development"),
+            }
+
+            for section_name, pos in sections.items():
+                if pos != -1:
+                    end_pos = content.find("\n## ", pos + 1)
+                    if end_pos == -1:
+                        end_pos = len(content)
+                    section_content = content[pos:end_pos]
+                    # Show first 500 chars of each section, clean up markdown
+                    preview = section_content[:500].replace("#", "").strip()
+                    # Remove problematic Unicode characters for Windows console
+                    preview = preview.encode("ascii", "ignore").decode("ascii")
+                    console.print(f"[bold green]{section_name}[/bold green]")
+                    console.print(preview + "...\n")
+
+        elif format == "rules-only":
+            # Extract only critical rules
+            console.print("[bold cyan]Critical Project Rules[/bold cyan]\n")
+            rules_start = content.find("## Critical Implementation Rules")
+            if rules_start != -1:
+                rules_end = content.find("\n## ", rules_start + 1)
+                if rules_end == -1:
+                    rules_end = len(content)
+                rules_section = content[rules_start:rules_end]
+                # Use print() directly for better Windows compatibility
+                print(rules_section)
+            else:
+                console.print("[yellow]Critical rules section not found[/yellow]")
+
+        else:  # full
+            console.print("[bold cyan]Complete Project Rules & Guidelines[/bold cyan]\n")
+            # Use print() directly for full content to avoid encoding issues
+            print(content)
+
+        console.print(
+            "\n[dim]Tip: Use 'trading-bot rules --format summary' for quick reference[/dim]"
+        )
+        console.print(
+            "[dim]Tip: Use 'trading-bot rules --format rules-only' for critical rules only[/dim]"
+        )
+        console.print(
+            "[dim]Tip: Use 'trading-bot claude' as an alias for 'trading-bot rules'[/dim]"
+        )
+
+    except Exception as e:
+        # Use print() for error messages to avoid encoding issues
+        print(f"Error reading CLAUDE.md: {e}", file=sys.stderr)
+
+
+@cli.command()
+@click.option(
+    "--format",
+    type=click.Choice(["full", "summary", "rules-only"], case_sensitive=False),
+    default="full",
+    help="Display format: full (complete guide), summary (key points), rules-only (critical rules only)",
+)
+def rules(format):
+    """Display project rules and guidelines from CLAUDE.md"""
+    _display_claude_rules(format)
+
+
+@cli.command()
+@click.option(
+    "--format",
+    type=click.Choice(["full", "summary", "rules-only"], case_sensitive=False),
+    default="full",
+    help="Display format: full (complete guide), summary (key points), rules-only (critical rules only)",
+)
+def claude(format):
+    """Display project rules and guidelines from CLAUDE.md (alias for 'rules' command)"""
+    _display_claude_rules(format)
 
 
 if __name__ == "__main__":

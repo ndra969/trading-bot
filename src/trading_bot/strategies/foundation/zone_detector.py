@@ -518,7 +518,7 @@ class ZoneDetector:
 
             # Check age
             if self.is_zone_expired(zone):
-                logger.debug(f"Zone filtered: expired (age {zone.age_hours:.1f} hours)")
+                # Zone filtered: expired - log removed per user request
                 continue
 
             filtered.append(zone)

@@ -192,11 +192,11 @@ async def test_falling_from_overbought(analyzer):
 
 @pytest.mark.asyncio
 async def test_bullish_momentum_trend(analyzer):
-    """Test bullish momentum trend context (line 116-118)."""
+    """Test bullish momentum trend context (RSI 50-65 for DEMAND zone)."""
     with patch(
         "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
-        # RSI between 50-70 for DEMAND zone
+        # RSI between 50-65 for DEMAND zone (should support BUY)
         rsi_values = [50] * 10 + [60]
         mock_calc.return_value = {"rsi": rsi_values}
 
@@ -211,11 +211,11 @@ async def test_bullish_momentum_trend(analyzer):
 
 @pytest.mark.asyncio
 async def test_bearish_momentum_trend(analyzer):
-    """Test bearish momentum trend context (line 119-121)."""
+    """Test bearish momentum trend context (RSI 35-50 for SUPPLY zone)."""
     with patch(
         "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
-        # RSI between 30-50 for SUPPLY zone
+        # RSI between 35-50 for SUPPLY zone (should support SELL)
         rsi_values = [50] * 10 + [40]
         mock_calc.return_value = {"rsi": rsi_values}
 
@@ -226,3 +226,85 @@ async def test_bearish_momentum_trend(analyzer):
         assert "trend" in signal.details
         assert "Bearish Momentum" in signal.details["trend"]
         assert signal.confidence >= 8
+
+
+@pytest.mark.asyncio
+async def test_overbought_warning_blocks_buy(analyzer):
+    """Test that RSI >= 65 blocks BUY signal for DEMAND zone."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI 69.75 (approaching overbought) - should block BUY
+        rsi_values = [50] * 10 + [69.75]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 11
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+        # Should be NEUTRAL (not BUY) when RSI >= 65
+        assert signal.signal_type == "NEUTRAL"
+        assert "trend" in signal.details
+        assert "Overbought Warning" in signal.details["trend"]
+        # Confidence should be reduced or zero
+        assert signal.confidence <= 10  # Should be low or negative
+
+
+@pytest.mark.asyncio
+async def test_oversold_warning_blocks_sell(analyzer):
+    """Test that RSI <= 35 blocks SELL signal for SUPPLY zone."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI 25 (approaching oversold) - should block SELL
+        rsi_values = [50] * 10 + [25]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 11
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "SUPPLY")
+
+        # Should be NEUTRAL (not SELL) when RSI <= 35
+        assert signal.signal_type == "NEUTRAL"
+        assert "trend" in signal.details
+        assert "Oversold Warning" in signal.details["trend"]
+        # Confidence should be reduced or zero
+        assert signal.confidence <= 10  # Should be low or negative
+
+
+@pytest.mark.asyncio
+async def test_rsi_65_boundary_demand_zone(analyzer):
+    """Test RSI exactly at 65 boundary for DEMAND zone."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI exactly 65 - should trigger overbought warning
+        rsi_values = [50] * 10 + [65.0]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 11
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+        # At boundary, should block BUY
+        assert signal.signal_type == "NEUTRAL"
+        assert "Overbought Warning" in signal.details.get("trend", "")
+
+
+@pytest.mark.asyncio
+async def test_rsi_35_boundary_supply_zone(analyzer):
+    """Test RSI exactly at 35 boundary for SUPPLY zone."""
+    with patch(
+        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+    ) as mock_calc:
+        # RSI exactly 35 - should trigger oversold warning
+        rsi_values = [50] * 10 + [35.0]
+        mock_calc.return_value = {"rsi": rsi_values}
+
+        prices = [100.0] * 11
+
+        signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "SUPPLY")
+
+        # At boundary, should block SELL
+        assert signal.signal_type == "NEUTRAL"
+        assert "Oversold Warning" in signal.details.get("trend", "")

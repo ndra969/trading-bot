@@ -10,17 +10,23 @@ trading:
 
   watchlist:
     - symbol: XAUUSD
-      enabled: false
+      enabled: true
     - symbol: EURUSD
       enabled: true
     - symbol: GBPUSD
       enabled: true
     - symbol: USDJPY
       enabled: true
+    - symbol: USDCHF
+      enabled: true
+    - symbol: AUDUSD
+      enabled: true
+    - symbol: USDCAD
+      enabled: true
 
   risk_per_trade: 0.005
   max_concurrent_positions: 5
-  confluence_threshold: 65.0
+  confluence_threshold: 75.0  # Raised from 65% (Week 15.5.3 improvement)
   active_broker: exness_cent
 
 database:
@@ -42,3 +48,171 @@ logging:
   max_file_size: "10 MB"
   backup_count: 5
   format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"
+
+# Position Management Configuration (Breakeven & Trailing Stop)
+# Structure matches docs/position-management-architecture.md
+position_management:
+  forex_major:  # EURUSD, GBPUSD, etc.
+    # ATR-based trailing (Week 15.5 improvement)
+    use_atr_trailing: true
+    trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
+    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # Fallback to fixed pips if ATR not available
+    breakeven_trigger: 15      # More aggressive protection (realistic for day trading)
+    breakeven_offset: 3        # Tighter buffer for quicker protection
+    trailing_activation: 20    # Lower threshold for more frequent trailing
+    trailing_distance: 12      # Balanced trailing distance
+
+    # Tiered trailing
+    use_tiered_trailing: true
+    tier_thresholds: [10, 20, 30]  # Profit levels in pips
+    tier_distances: [8, 12, 15]    # Trailing distance per tier
+
+  forex_jpy:  # USDJPY, EURJPY, etc.
+    # ATR-based trailing (Week 15.5 improvement)
+    use_atr_trailing: true
+    trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
+    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # Fallback to fixed pips if ATR not available
+    breakeven_trigger: 25     # Pips (Adjusted for realistic day trading)
+    breakeven_offset: 5       # Buffer for breakeven
+    trailing_activation: 30   # Pips profit to activate trailing
+    trailing_distance: 15     # Pips trailing distance
+
+    # Tiered trailing
+    use_tiered_trailing: true
+    tier_thresholds: [15, 30, 50]  # Profit levels in pips
+    tier_distances: [10, 15, 20]   # Trailing distance per tier
+
+  commodities:  # XAUUSD (Gold)
+    # ATR-based trailing (Week 15.5 improvement)
+    use_atr_trailing: true
+    trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
+    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # Fallback to fixed pips if ATR not available
+    breakeven_trigger: 100    # More realistic for day trading (down from 500)
+    breakeven_offset: 20      # Reasonable buffer for Gold volatility
+    trailing_activation: 150  # More responsive (down from 600)
+    trailing_distance: 50     # Tighter trailing (down from 300)
+
+    # Tiered trailing
+    use_tiered_trailing: true
+    tier_thresholds: [100, 200, 300]  # Profit levels in pips
+    tier_distances: [40, 60, 80]      # Trailing distance per tier
+
+  crypto:  # BTCUSD, ETHUSD
+    # ATR-based trailing (Week 15.5 improvement)
+    use_atr_trailing: true
+    trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
+    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # Fallback to fixed pips if ATR not available
+    breakeven_trigger: 40     # More aggressive (down from 50)
+    breakeven_offset: 5       # Buffer for breakeven
+    trailing_activation: 50   # More responsive (down from 60)
+    trailing_distance: 25     # Tighter trailing (down from 30)
+
+    # Tiered trailing
+    use_tiered_trailing: true
+    tier_thresholds: [30, 60, 100]  # Profit levels in USD
+    tier_distances: [20, 30, 40]    # Trailing distance per tier
+
+# Risk Management Configuration
+risk_management:
+  max_positions_per_symbol: 1
+  max_total_positions: 10
+  max_leverage: 10.0
+  max_asset_class_exposure_percent: 40.0
+
+  # Correlation Management
+  # Prevents conflicting positions on correlated pairs
+  correlation_management:
+    enabled: true
+
+    # Positive Correlation Groups
+    # Pairs that typically move together (correlation > 0.7)
+    # Correlated pairs should have the same direction (both BUY or both SELL)
+    correlation_groups:
+      # Major USD pairs (positive correlation ~0.7-0.9)
+      EURUSD:
+        - GBPUSD
+        - AUDUSD
+        - NZDUSD
+      GBPUSD:
+        - EURUSD
+        - AUDUSD
+        - NZDUSD
+      AUDUSD:
+        - EURUSD
+        - GBPUSD
+        - NZDUSD
+      NZDUSD:
+        - EURUSD
+        - GBPUSD
+        - AUDUSD
+
+      # USD pairs (positive correlation ~0.6-0.8)
+      USDJPY:
+        - USDCHF
+        - USDCAD
+      USDCHF:
+        - USDJPY
+        - USDCAD
+      USDCAD:
+        - USDJPY
+        - USDCHF
+
+      # JPY pairs (positive correlation ~0.7-0.9)
+      EURJPY:
+        - GBPJPY
+        - AUDJPY
+      GBPJPY:
+        - EURJPY
+        - AUDJPY
+      AUDJPY:
+        - EURJPY
+        - GBPJPY
+
+    # Negative Correlation Groups
+    # Pairs that move in opposite directions (correlation < -0.7)
+    # Negatively correlated pairs should have opposite directions
+    # Example: USDCAD BUY (USD strong) vs EURUSD SELL (USD weak vs EUR)
+    negative_correlation_groups:
+      # USD pairs vs Major pairs (negative correlation ~-0.7 to -0.9)
+      # When USD is strong (USDCAD/USDJPY/USDCHF BUY), major pairs should be weak (EURUSD/GBPUSD SELL)
+      USDCAD:
+        - EURUSD
+        - GBPUSD
+        - AUDUSD
+        - NZDUSD
+      USDJPY:
+        - EURUSD
+        - GBPUSD
+        - AUDUSD
+        - NZDUSD
+      USDCHF:
+        - EURUSD
+        - GBPUSD
+        - AUDUSD
+        - NZDUSD
+
+      # Reverse mapping: Major pairs vs USD pairs
+      EURUSD:
+        - USDCAD
+        - USDJPY
+        - USDCHF
+      GBPUSD:
+        - USDCAD
+        - USDJPY
+        - USDCHF
+      AUDUSD:
+        - USDCAD
+        - USDJPY
+        - USDCHF
+      NZDUSD:
+        - USDCAD
+        - USDJPY
+        - USDCHF

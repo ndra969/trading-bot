@@ -5,6 +5,7 @@ Coordinates position lifecycle, tracking, and management.
 """
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 
@@ -153,6 +154,8 @@ class PositionManager:
                             pip_size=db_pos.pip_size,
                             pip_value_per_lot=db_pos.pip_value_per_lot,
                             status=PositionStatus(db_pos.status),
+                            account_id=db_pos.account_id,  # Load account_id from DB
+                            session_id=db_pos.session_id,  # Load session_id from DB
                             open_time=db_pos.open_time,
                             close_time=db_pos.close_time,
                             close_price=db_pos.close_price,
@@ -170,6 +173,37 @@ class PositionManager:
                             logger.debug(
                                 f"Loaded ticket {position.ticket} for position {position.position_id}"
                             )
+                        # Also check ticket field directly (new field)
+                        elif db_pos.ticket:
+                            position.ticket = db_pos.ticket
+                            logger.debug(
+                                f"Loaded ticket {position.ticket} from ticket field for position {position.position_id}"
+                            )
+
+                        # CRITICAL: Skip positions without ticket (orphaned/invalid positions)
+                        # These should not be loaded into memory - they're invalid
+                        if not position.ticket and position.status == PositionStatus.OPEN:
+                            logger.error(
+                                f"❌ SKIPPING ORPHANED POSITION: {position.position_id} ({position.symbol}) "
+                                f"has NO TICKET but status is OPEN. This position is invalid and will be closed."
+                            )
+
+                            # Close position immediately in database
+                            position.status = PositionStatus.CLOSED
+                            position.close_time = datetime.now()
+                            position.close_price = position.entry_price  # Use entry as fallback
+
+                            # Update in database
+                            db_pos.status = PositionStatus.CLOSED.value
+                            db_pos.close_time = position.close_time
+                            db_pos.close_price = position.close_price
+                            await session.commit()
+
+                            logger.info(
+                                f"🚫 Closed orphaned position {position.position_id} in database (no ticket)"
+                            )
+                            invalid_count += 1
+                            continue  # Skip adding to memory
 
                         # Store in memory
                         self.positions[position.position_id] = position
@@ -207,14 +241,41 @@ class PositionManager:
         except Exception as e:
             logger.error(f"Error loading positions from database: {e}")
 
-    async def save_position(self, position: Position):
-        """Save or update position in database."""
+    async def save_position(self, position: Position, is_dry_run: bool = False):
+        """
+        Save or update position in database.
+
+        Args:
+            position: Position to save
+            is_dry_run: If True, skip saving to database (dry-run mode)
+        """
+        # CRITICAL: Skip saving to database in dry-run mode
+        if is_dry_run:
+            logger.debug(
+                f"🧪 Dry-run mode: Skipping database save for position {position.position_id}"
+            )
+            return
+
         try:
-            # Sync ticket from position object to metadata if exists
+            # Extract confluence_score and ticket from position
+            confluence_score = 0.0
+            ticket = None
+
+            # Get confluence_score from position object or metadata
+            if hasattr(position, "confluence_score") and position.confluence_score:
+                confluence_score = position.confluence_score
+            elif position.metadata and "confluence_score" in position.metadata:
+                confluence_score = position.metadata.get("confluence_score", 0.0)
+
+            # Get ticket from position object or metadata
             if hasattr(position, "ticket") and position.ticket:
+                ticket = position.ticket
+                # Sync to metadata for backward compatibility
                 if not position.metadata:
                     position.metadata = {}
-                position.metadata["ticket"] = position.ticket
+                position.metadata["ticket"] = ticket
+            elif position.metadata and "ticket" in position.metadata:
+                ticket = position.metadata.get("ticket")
 
             async with get_session() as session:
                 # Check if position exists
@@ -269,7 +330,11 @@ class PositionManager:
                     db_pos.current_pnl_usd = position.current_pnl_usd
                     db_pos.open_time = position.open_time
                     db_pos.close_time = position.close_time
-                    db_pos.meta_data = position.metadata  # This includes ticket
+                    db_pos.confluence_score = confluence_score  # Update confluence score
+                    db_pos.ticket = ticket  # Update MT5 ticket
+                    db_pos.account_id = position.account_id  # Update account_id
+                    db_pos.session_id = position.session_id  # Update session_id
+                    db_pos.meta_data = position.metadata  # Keep metadata for backward compatibility
                 else:
                     # Create new
                     db_pos = DBPosition(
@@ -288,6 +353,10 @@ class PositionManager:
                         current_pnl_usd=position.current_pnl_usd,
                         risk_amount_usd=position.risk_amount_usd,
                         potential_profit_usd=position.potential_profit_usd,
+                        confluence_score=confluence_score,  # Add confluence score
+                        ticket=ticket,  # Add MT5 ticket
+                        account_id=position.account_id,  # Add account_id
+                        session_id=position.session_id,  # Add session_id
                         open_time=position.open_time,
                         meta_data=position.metadata,
                     )
@@ -329,6 +398,27 @@ class PositionManager:
         # Calculate pip value
         pip_value_per_lot = self.pip_calculator.calculate_pip_value(signal.symbol, volume)
 
+        # Extract price action info from signal metadata (if available)
+        price_action_info = signal.metadata.get("price_action") if signal.metadata else None
+
+        # Create position metadata
+        position_metadata = {
+            "signal_id": signal.signal_id,
+            "confluence_score": signal.confluence_score,
+            "strategy_scores": signal.strategy_scores,
+        }
+
+        # Add price action pattern info to position metadata for tracking
+        if price_action_info:
+            position_metadata["price_action"] = {
+                "pattern_type": price_action_info.get("desc", "UNKNOWN"),
+                "status": price_action_info.get("status", "detected"),
+                "pattern_details": price_action_info,
+            }
+            logger.debug(
+                f"Position {signal.symbol}: Price action pattern saved: {price_action_info.get('desc', 'UNKNOWN')}"
+            )
+
         # Create position
         position = Position(
             position_id=self._generate_position_id(),
@@ -341,11 +431,7 @@ class PositionManager:
             pip_size=pip_size,
             pip_value_per_lot=pip_value_per_lot,
             status=PositionStatus.PENDING,
-            metadata={
-                "signal_id": signal.signal_id,
-                "confluence_score": signal.confluence_score,
-                "strategy_scores": signal.strategy_scores,
-            },
+            metadata=position_metadata,
         )
 
         # Store position
@@ -492,7 +578,7 @@ class PositionManager:
 
     def check_and_close_positions(self, prices: dict[str, float]) -> list[Position]:
         """
-        Check and auto-close positions that hit SL or TP.
+        Check and auto-close positions that hit SL, TP, or max duration.
 
         Args:
             prices: Dictionary of symbol -> current_price
@@ -514,6 +600,14 @@ class PositionManager:
             # Manage automation (Breakeven & Trailing Stop)
             self._manage_automation(position)
 
+            # Check max position duration (for intraday trading)
+            if self._check_max_duration(position, current_price):
+                logger.info(
+                    f"Max duration exceeded for {position.position_id}: {position.symbol} - auto-closing"
+                )
+                closed_positions.append(position)
+                continue
+
             # Check stop loss
             if self.tracker.check_stop_loss(position):
                 logger.info(f"Stop loss hit for {position.position_id}: {position.symbol}")
@@ -530,6 +624,79 @@ class PositionManager:
                 closed_positions.append(position)
 
         return closed_positions
+
+    def _check_max_duration(self, position: Position, current_price: float) -> bool:
+        """
+        Check if position exceeds maximum duration and close if needed.
+
+        IMPORTANT: Only closes position if it's in profit to avoid forced losses.
+        If position is in loss, let SL/TP handle the closure.
+
+        Args:
+            position: Position to check
+            current_price: Current market price
+
+        Returns:
+            True if position was closed due to max duration
+        """
+        if not position.open_time:
+            return False
+
+        # Get max duration from trading type config
+        trading_types = self.config.get("trading_types", {})
+        # Get active trading type from config (can be in root or trading_types section)
+        active_type = (
+            self.config.get("active_trading_type")
+            or self.config.get("trading_types", {}).get("active_trading_type")
+            or "day_trading"
+        )
+        type_config = trading_types.get(active_type, {})
+
+        max_duration_hours = type_config.get("max_position_duration_hours")
+        if max_duration_hours is None:
+            # No max duration configured, skip check
+            return False
+
+        # Calculate position duration
+        duration_seconds = position.duration_seconds
+        if duration_seconds is None:
+            return False
+
+        duration_hours = duration_seconds / 3600.0
+
+        # Check if exceeded max duration
+        if duration_hours >= max_duration_hours:
+            # CRITICAL: Only close if position is in profit
+            # If position is in loss, let SL/TP handle the closure
+
+            # Get current profit/loss values (should be updated by update_position_price)
+            profit_pips = position.current_profit_pips or 0.0
+            pnl_usd = position.current_pnl_usd or 0.0
+
+            # Check if position is in profit (either pips or USD)
+            is_profit = profit_pips > 0 or pnl_usd > 0
+
+            if not is_profit:
+                # Position is in loss - don't force close, let SL/TP handle it
+                logger.debug(
+                    f"Position {position.position_id} ({position.symbol}) exceeded max duration "
+                    f"({duration_hours:.2f}h >= {max_duration_hours}h) but is in loss "
+                    f"({profit_pips:.1f} pips, ${pnl_usd:.2f}) - skipping auto-close, "
+                    f"waiting for SL/TP"
+                )
+                return False
+
+            # Position is in profit - safe to close
+            logger.info(
+                f"Position {position.position_id} ({position.symbol}) exceeded max duration: "
+                f"{duration_hours:.2f}h >= {max_duration_hours}h and is in profit "
+                f"({profit_pips:.1f} pips, ${pnl_usd:.2f}) - closing position"
+            )
+            self.tracker.close_position(position, current_price)
+            position.metadata["close_reason"] = f"Max Duration ({max_duration_hours}h) - Profit"
+            return True
+
+        return False
 
     def _manage_automation(self, position: Position) -> None:
         """

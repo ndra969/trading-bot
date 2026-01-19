@@ -1,387 +1,405 @@
 # Trading Bot Database ERD (Entity Relationship Diagram)
 
-## Overview
+## ⚠️ Database Status: **MINIMAL IMPLEMENTATION**
 
-Database schema untuk Advanced Trading Bot System dengan Position Management, Strategy Analysis, dan Risk Management. Schema dirancang untuk mendukung multi-asset trading dengan pip tracking, automated position management, dan comprehensive audit trail.
+**Current State**: Production database has **2 tables only**
+**Target State**: 14 tables for full dashboard functionality
+**Gap**: 12 tables + multiple missing fields
 
-## Entity Relationship Diagram
+---
+
+## 📊 Current Database Schema (Actual Implementation)
+
+### Actual Tables in Production:
+1. ✅ `supply_demand_zones` - Supply & Demand zone tracking
+2. ✅ `positions` - Basic position management
+
+**Last Updated**: January 6, 2026 (Verified from Alembic migrations)
+
+---
+
+## Entity Relationship Diagram (Current State)
 
 ```mermaid
 erDiagram
-    %% Core Trading Entities
-    TRADING_SESSIONS {
-        string session_id PK
-        string trading_type
-        string config_profile
-        boolean dry_run
-        datetime start_time
-        datetime end_time
-        string status
-        json session_metadata
-        datetime created_at
-        datetime updated_at
-    }
+    %% ACTUAL TABLES IN PRODUCTION
 
-    %% Position Management Entities
-    POSITIONS {
-        string position_id PK
-        string session_id FK
+    SUPPLY_DEMAND_ZONES {
+        int id PK
+        string zone_id UK
         string symbol
-        string asset_class
-        string direction
-        float entry_price
-        datetime entry_time
-        float volume
-        float current_stop_loss
-        float current_take_profit
-        float current_price
-        string status
-        boolean breakeven_activated
-        boolean trailing_activated
-        float pip_size
-        float pip_value_per_lot
-        float entry_to_sl_pips
-        float entry_to_tp_pips
-        float current_profit_pips
-        float risk_amount_usd
-        float potential_profit_usd
-        float current_pnl_usd
-        datetime created_at
-        datetime updated_at
-    }
-
-    POSITION_MODIFICATIONS {
-        string modification_id PK
-        string position_id FK
-        string modification_type
-        float old_value
-        float new_value
-        string reason
-        boolean success
-        string error_message
-        datetime executed_at
-    }
-
-    PARTIAL_CLOSES {
-        string partial_close_id PK
-        string position_id FK
-        float close_price
-        float volume_closed
-        float profit_pips
-        float profit_usd
-        float remaining_volume
-        datetime close_time
-        string reason
-    }
-
-    %% Strategy Analysis Entities
-    ZONES {
-        string zone_id PK
-        string session_id FK
-        string symbol
-        string timeframe
-        string trading_type
         string zone_type
-        float price_level
-        float strength_score
-        float volume_confirmation
-        int test_count
-        float freshness_score
-        boolean is_valid
-        datetime first_formed
-        datetime last_tested
+        float high_price
+        float low_price
+        float entry_price
+        float strength
+        float confluence_score
+        int touched_count
+        boolean volume_confirmed
+        string timeframe
+        datetime first_detected
+        datetime last_touched
+        boolean is_active
+        string trend_direction
+        string market_session
         datetime created_at
         datetime updated_at
     }
 
-    TRADING_SIGNALS {
-        string signal_id PK
-        string session_id FK
-        string zone_id FK
+    POSITIONS {
+        int id PK
+        string position_id UK
         string symbol
-        string timeframe
-        string trading_type
-        string direction
+        string position_type
+        string status
         float entry_price
         float stop_loss
         float take_profit
-        float foundation_score
-        json enhancement_scores
-        float final_confidence
-        float risk_reward_ratio
-        string signal_status
-        datetime generated_at
-        datetime expires_at
-    }
-
-    SIGNAL_EXECUTIONS {
-        string execution_id PK
-        string signal_id FK
-        string position_id FK
-        string execution_type
-        boolean success
-        string failure_reason
-        float execution_price
-        float slippage
-        datetime execution_time
-    }
-
-    %% Market Data Entities
-    MARKET_DATA {
-        string data_id PK
-        string symbol
-        string timeframe
-        datetime timestamp
-        float open_price
-        float high_price
-        float low_price
+        float current_price
         float close_price
         float volume
-        float spread
-        json technical_indicators
-        datetime created_at
-    }
-
-    SYMBOL_INFO {
-        string symbol PK
-        string asset_class
-        string description
         float pip_size
         float pip_value_per_lot
-        int digits
-        float min_volume
-        float max_volume
-        float volume_step
-        boolean is_active
-        json market_hours
-        datetime last_updated
-    }
-
-    %% Risk Management Entities
-    RISK_METRICS {
-        string risk_id PK
-        string session_id FK
-        string position_id FK
-        float account_balance
-        float total_exposure
-        float used_margin
-        float free_margin
-        float daily_pnl
-        float max_drawdown
-        float risk_percentage
-        int active_positions
-        json risk_limits
-        datetime calculated_at
-    }
-
-    RISK_VIOLATIONS {
-        string violation_id PK
-        string risk_id FK
-        string violation_type
-        string severity
-        string description
-        json violation_details
-        boolean resolved
-        datetime occurred_at
-        datetime resolved_at
-    }
-
-    %% System Health & Monitoring
-    SYSTEM_HEALTH {
-        string health_id PK
-        string session_id FK
-        int active_positions
-        boolean mt5_connection_status
-        boolean database_status
-        float cpu_usage
-        float memory_usage
-        json component_status
-        datetime last_data_update
-        datetime recorded_at
-    }
-
-    AUDIT_LOG {
-        string log_id PK
-        string session_id FK
-        string entity_type
-        string entity_id
-        string action_type
-        json old_values
-        json new_values
-        string user_agent
-        string ip_address
-        datetime action_time
-    }
-
-    %% Configuration & Settings
-    BOT_CONFIGURATIONS {
-        string config_id PK
-        string profile_name
-        string trading_type
-        json strategy_settings
-        json risk_settings
-        json position_settings
-        json notification_settings
-        boolean is_active
+        float current_profit_pips
+        float current_pnl_usd
+        float risk_amount_usd
+        float potential_profit_usd
+        datetime open_time
+        datetime close_time
+        json meta_data
         datetime created_at
         datetime updated_at
     }
 
-    %% Relationships
-    TRADING_SESSIONS ||--o{ POSITIONS : "has"
-    TRADING_SESSIONS ||--o{ ZONES : "analyzes"
-    TRADING_SESSIONS ||--o{ TRADING_SIGNALS : "generates"
-    TRADING_SESSIONS ||--o{ SYSTEM_HEALTH : "monitors"
-    TRADING_SESSIONS ||--o{ RISK_METRICS : "calculates"
-
-    POSITIONS ||--o{ POSITION_MODIFICATIONS : "has"
-    POSITIONS ||--o{ PARTIAL_CLOSES : "executes"
-    POSITIONS ||--o{ RISK_METRICS : "tracks"
-
-    ZONES ||--o{ TRADING_SIGNALS : "generates"
-
-    TRADING_SIGNALS ||--o{ SIGNAL_EXECUTIONS : "executes"
-    SIGNAL_EXECUTIONS ||--o{ POSITIONS : "creates"
-
-    SYMBOL_INFO ||--o{ POSITIONS : "defines"
-    SYMBOL_INFO ||--o{ MARKET_DATA : "provides"
-
-    RISK_METRICS ||--o{ RISK_VIOLATIONS : "detects"
-
-    BOT_CONFIGURATIONS ||--o{ TRADING_SESSIONS : "configures"
 ```
 
-## Key Entity Descriptions
+**Note**: Currently NO relationships exist as tables are independent.
 
-### Core Trading Entities
+---
 
-#### TRADING_SESSIONS
-Central entity yang merepresentasikan satu sesi trading bot.
-- **Primary Key**: `session_id` (unique session identifier)
-- **Key Fields**:
-  - `trading_type`: SCALPING, DAY_TRADING, SWING_TRADING, POSITION_TRADING
-  - `config_profile`: Configuration profile yang digunakan
-  - `dry_run`: Boolean flag untuk paper trading mode
-  - `session_metadata`: JSON field untuk menyimpan additional session info
+## 🚨 Critical Gap Analysis: Current vs Required Schema
 
-#### POSITIONS
-Entity utama untuk position management dengan pip tracking lengkap.
-- **Primary Key**: `position_id` (unique position identifier)
-- **Foreign Key**: `session_id` → TRADING_SESSIONS
-- **Pip Tracking Fields**:
-  - `pip_size`: Asset-specific pip size (0.0001, 0.01, 0.1, 1.0)
-  - `pip_value_per_lot`: USD value per pip for 1 lot
-  - `entry_to_sl_pips`: Distance to stop loss in pips
-  - `entry_to_tp_pips`: Distance to take profit in pips
-  - `current_profit_pips`: Real-time profit/loss in pips
-  - `risk_amount_usd`: USD amount at risk
-  - `potential_profit_usd`: USD potential profit
-  - `current_pnl_usd`: Current P&L in USD
+### Missing Tables (12 Tables) - **CRITICAL**
 
-#### POSITION_MODIFICATIONS
-Audit trail untuk semua perubahan position (breakeven, trailing, partial closes).
-- **Primary Key**: `modification_id`
-- **Foreign Key**: `position_id` → POSITIONS
-- **Key Fields**:
-  - `modification_type`: BREAKEVEN, TRAILING, PARTIAL_CLOSE, MODIFY_SL, MODIFY_TP
-  - `success`: Boolean flag untuk status execution
-  - `error_message`: Error details jika modification gagal
+#### **1. TRADING_SESSIONS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Track trading sessions, configurations, and performance
+**Impact**: Cannot group positions by session, cannot track configuration changes, cannot calculate session-level P&L
 
-### Strategy Analysis Entities
-
-#### ZONES
-Supply & Demand zones yang dideteksi oleh foundation strategy.
-- **Primary Key**: `zone_id`
-- **Foreign Key**: `session_id` → TRADING_SESSIONS
-- **Key Fields**:
-  - `zone_type`: SUPPLY atau DEMAND
-  - `strength_score`: Score kekuatan zone (0-100)
-  - `test_count`: Berapa kali zone sudah ditest
-  - `freshness_score`: Seberapa fresh zone tersebut
-
-#### TRADING_SIGNALS
-Signals yang dihasilkan dari strategy analysis.
-- **Primary Key**: `signal_id`
-- **Foreign Keys**: `session_id`, `zone_id`
-- **Key Fields**:
-  - `foundation_score`: Score dari foundation strategy
-  - `enhancement_scores`: JSON field untuk scores dari 6 enhancement layers
-  - `final_confidence`: Final confidence score (weighted)
-  - `signal_status`: GENERATED, EXECUTED, EXPIRED, CANCELLED
-
-### Risk Management Entities
-
-#### RISK_METRICS
-Real-time risk metrics calculation.
-- **Primary Key**: `risk_id`
-- **Foreign Keys**: `session_id`, `position_id`
-- **Key Fields**:
-  - `risk_percentage`: Current account risk percentage
-  - `max_drawdown`: Maximum drawdown experienced
-  - `risk_limits`: JSON field dengan risk limits configuration
-
-#### RISK_VIOLATIONS
-Risk violations dan alerts.
-- **Primary Key**: `violation_id`
-- **Foreign Key**: `risk_id` → RISK_METRICS
-- **Key Fields**:
-  - `violation_type`: EXPOSURE_LIMIT, DRAWDOWN_LIMIT, POSITION_LIMIT
-  - `severity`: LOW, MEDIUM, HIGH, CRITICAL
-
-## Database Schema Features
-
-### 1. **Comprehensive Pip Tracking**
-- Real-time pip calculations stored di database
-- Asset-specific pip values dan calculations
-- USD amount tracking untuk risk management
-
-### 2. **Complete Audit Trail**
-- Semua position modifications di-track
-- Signal generation dan execution history
-- Risk metrics evolution over time
-
-### 3. **Multi-Asset Support**
-- Symbol-specific information dan settings
-- Asset class specific pip calculations
-- Flexible market data storage
-
-### 4. **Advanced Risk Management**
-- Real-time risk metrics calculation
-- Risk violation detection dan alerting
-- Account balance dan exposure tracking
-
-### 5. **Performance Optimization**
-- Indexed pada frequently queried fields
-- JSON fields untuk flexible configuration storage
-- Time-based partitioning untuk historical data
-
-## Implementation Notes
-
-### Database Type
-- **Primary**: SQLite untuk development dan testing
-- **Production**: PostgreSQL untuk production dengan advanced features
-- **Async ORM**: SQLAlchemy 2.0 dengan async support
-
-### Indexing Strategy
+**Required Fields**:
 ```sql
--- Performance critical indexes
-CREATE INDEX idx_positions_session_symbol ON positions(session_id, symbol);
-CREATE INDEX idx_positions_status_updated ON positions(status, updated_at);
-CREATE INDEX idx_zones_symbol_timeframe ON zones(symbol, timeframe, is_valid);
-CREATE INDEX idx_signals_session_confidence ON trading_signals(session_id, final_confidence);
-CREATE INDEX idx_market_data_symbol_time ON market_data(symbol, timestamp);
+- session_id (PK)
+- account_id (FK) → TRADING_ACCOUNTS
+- config_hash (FK) → CONFIG_SNAPSHOTS
+- trading_type, config_profile, dry_run
+- start_time, end_time, status
+- total_pnl_usd, total_trades, winning_trades, losing_trades, win_rate
+- is_backtest, backtest_start_date, backtest_end_date
+- data_quality_score
+- session_metadata (JSON)
+- created_at, updated_at
 ```
 
-### Data Retention Policy
-- **Trading Sessions**: Keep all sessions (historical analysis)
-- **Positions**: Keep all positions (performance tracking)
-- **Market Data**: Retention based on timeframe (M1: 30 days, H1: 1 year, D1: permanent)
-- **System Health**: Keep 90 days rolling
-- **Audit Log**: Keep 1 year rolling
+#### **2. TRADING_ACCOUNTS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Multi-account support (Demo/Live, Cent/Standard, Prop Firm)
+**Impact**: Cannot distinguish between accounts, cannot track which account opened positions
 
-### Backup Strategy
-- **Real-time**: Position data dan critical changes
-- **Daily**: Complete database backup
-- **Weekly**: Archived backup untuk long-term storage
+**Required Fields**:
+```sql
+- account_id (PK) - MT5 Login ID
+- broker_name, account_number, account_type
+- currency, balance, equity, leverage
+- is_active
+- created_at, updated_at
+```
 
-Diagram ini menunjukkan complete database schema yang mendukung semua fitur advanced trading bot dengan position management, strategy analysis, dan risk management yang terintegrasi.
+#### **3. CONFIG_SNAPSHOTS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Configuration versioning for audit trail
+**Impact**: Cannot reproduce results, cannot audit configuration changes
+
+**Required Fields**:
+```sql
+- config_hash (PK) - SHA256 of config
+- config_json (JSONB) - Full config snapshot
+- created_at
+```
+
+#### **4. TRADING_SIGNALS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Store generated trading signals
+**Impact**: Cannot analyze signal quality, cannot track signal-to-position success rate
+
+**Required Fields**:
+```sql
+- signal_id (PK)
+- session_id (FK), zone_id (FK)
+- symbol, timeframe, trading_type, direction
+- entry_price, stop_loss, take_profit
+- foundation_score, enhancement_scores (JSON), final_confidence
+- risk_reward_ratio, signal_status
+- generated_at, expires_at
+```
+
+#### **5. SIGNAL_EXECUTIONS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Track signal execution attempts
+**Impact**: Cannot track execution failures, cannot analyze slippage
+
+**Required Fields**:
+```sql
+- execution_id (PK)
+- signal_id (FK), position_id (FK)
+- execution_type, success, failure_reason
+- execution_price, slippage
+- execution_time
+```
+
+#### **6. POSITION_MODIFICATIONS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Audit trail for breakeven, trailing, partial closes
+**Impact**: Cannot track automation effectiveness, no modification history
+
+**Required Fields**:
+```sql
+- modification_id (PK)
+- position_id (FK)
+- modification_type, old_value, new_value
+- reason, success, error_message
+- executed_at
+```
+
+#### **7. PARTIAL_CLOSES** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Track partial position closes
+**Impact**: Cannot analyze profit-taking strategy effectiveness
+
+**Required Fields**:
+```sql
+- partial_close_id (PK)
+- position_id (FK)
+- close_price, volume_closed, profit_pips, profit_usd
+- remaining_volume, close_time, reason
+```
+
+#### **8. MARKET_DATA** - ❌ **NOT IMPLEMENTED**
+**Purpose**: OHLCV data with technical indicators
+**Impact**: Cannot build charts, cannot backtest, no historical data
+
+**Required Fields**:
+```sql
+- data_id (PK)
+- symbol, timeframe, timestamp
+- open_price, high_price, low_price, close_price, volume, spread
+- technical_indicators (JSON)
+- created_at
+```
+
+#### **9. SYMBOL_INFO** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Symbol metadata and specifications
+**Impact**: Hardcoded pip values, no dynamic symbol configuration
+
+**Required Fields**:
+```sql
+- symbol (PK)
+- asset_class, description
+- pip_size, pip_value_per_lot, digits
+- min_volume, max_volume, volume_step
+- is_active, market_hours (JSON)
+- last_updated
+```
+
+#### **10. RISK_METRICS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Real-time risk calculations
+**Impact**: No risk dashboard, cannot track exposure history
+
+**Required Fields**:
+```sql
+- risk_id (PK)
+- session_id (FK), position_id (FK)
+- account_balance, total_exposure, used_margin, free_margin
+- daily_pnl, max_drawdown, risk_percentage, active_positions
+- risk_limits (JSON)
+- calculated_at
+```
+
+#### **11. RISK_VIOLATIONS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: Risk violation tracking
+**Impact**: No risk alerts history, cannot analyze violations
+
+**Required Fields**:
+```sql
+- violation_id (PK)
+- risk_id (FK)
+- violation_type, severity, description
+- violation_details (JSON)
+- resolved, occurred_at, resolved_at
+```
+
+#### **12. SYSTEM_HEALTH** / **AUDIT_LOG** / **BOT_CONFIGURATIONS** - ❌ **NOT IMPLEMENTED**
+**Purpose**: System monitoring and audit trail
+**Impact**: No system health tracking, limited audit capabilities
+
+---
+
+### Missing Fields in POSITIONS Table - **CRITICAL**
+
+#### **Relationship Fields** (Priority: CRITICAL)
+```sql
+❌ session_id (FK) → TRADING_SESSIONS  -- Cannot group by session
+❌ account_id (FK) → TRADING_ACCOUNTS  -- Cannot identify account
+❌ signal_id (FK) → TRADING_SIGNALS    -- Cannot link to signal
+❌ strategy_id TEXT                     -- Cannot identify strategy
+❌ magic_number INTEGER                 -- MT5 magic number
+❌ mt5_ticket INTEGER                   -- MT5 ticket ID
+❌ comment TEXT                         -- MT5 comment
+```
+
+#### **Closing Details** (Priority: CRITICAL)
+```sql
+✅ close_price REAL                     -- EXISTS
+❌ realized_pnl_usd REAL                -- Final P&L when closed
+❌ realized_profit_pips REAL            -- Final profit in pips
+❌ close_reason TEXT                    -- Why closed (SL/TP/Manual)
+❌ exit_type TEXT                       -- Exit classification
+```
+
+#### **Quality Metrics** (Priority: HIGH)
+```sql
+❌ mae_pips REAL                        -- Max Adverse Excursion
+❌ mfe_pips REAL                        -- Max Favorable Excursion
+❌ quality_score REAL                   -- Calculated quality (0-100)
+❌ is_winner BOOLEAN                    -- Win/Loss flag
+❌ holding_time_seconds INTEGER         -- Position duration
+❌ max_profit_pips REAL                 -- Max profit reached
+❌ max_drawdown_pips REAL               -- Max loss from peak
+❌ signal_confidence REAL               -- Copy from signal
+```
+
+#### **Execution Metrics** (Priority: MEDIUM)
+```sql
+❌ execution_duration_ms INTEGER        -- Entry execution time
+❌ slippage_pips REAL                   -- Entry slippage
+❌ closing_slippage_pips REAL           -- Exit slippage
+❌ entry_tags JSON                      -- Entry context tags
+```
+
+#### **Missing from Current Schema**
+```sql
+❌ asset_class TEXT                     -- Forex/Commodities/Crypto
+❌ direction TEXT                       -- (currently position_type)
+❌ entry_to_sl_pips REAL                -- Risk in pips
+❌ entry_to_tp_pips REAL                -- Reward in pips
+❌ breakeven_activated BOOLEAN          -- Automation tracking
+❌ trailing_activated BOOLEAN           -- Automation tracking
+```
+
+---
+
+### Missing Fields in SUPPLY_DEMAND_ZONES Table
+
+#### **Relationship Fields**
+```sql
+❌ session_id (FK) → TRADING_SESSIONS  -- Cannot group zones by session
+❌ trading_type TEXT                    -- Cannot filter by trading type
+```
+
+#### **Additional Context**
+```sql
+❌ price_level REAL                     -- Exact price level
+❌ freshness_score REAL                 -- Zone freshness
+```
+
+---
+
+## 📊 Dashboard Feasibility Analysis
+
+### ❌ **Current State: DASHBOARD NOT FEASIBLE**
+
+| Dashboard Feature | Data Available? | Severity |
+|-------------------|-----------------|----------|
+| **Real-time Position Dashboard** | ⚠️ Partial (no session/account context) | 🔴 CRITICAL |
+| **Position Management** | ⚠️ Partial (basic data only) | 🔴 CRITICAL |
+| **Strategy Analysis** | ❌ No signal data | 🔴 CRITICAL |
+| **Market Analysis** | ❌ No market data | 🔴 CRITICAL |
+| **Risk Management** | ❌ No risk metrics | 🔴 CRITICAL |
+| **Analytics & Reports** | ❌ Missing aggregations | 🔴 CRITICAL |
+| **System Health** | ❌ No health tracking | 🟡 HIGH |
+
+### Critical Questions That CANNOT Be Answered:
+
+1. ❌ **"Mana posisi yang bagus atau tidak?"**
+   - No `quality_score`, `mae_pips`, `mfe_pips`
+   - No `realized_pnl_usd` for closed positions
+   - No `exit_type` classification
+
+2. ❌ **"Profit atau loss tiap sesi/tiap start berapa?"**
+   - No `TRADING_SESSIONS` table
+   - No `session_id` in POSITIONS
+   - No session-level aggregation
+
+3. ❌ **"Data untuk backtest valid atau tidak?"**
+   - No `MARKET_DATA` table
+   - No `is_backtest` flag
+   - No data quality validation
+
+4. ❌ **"Position dibuka pakai akun mana?"**
+   - No `TRADING_ACCOUNTS` table
+   - No `account_id` in POSITIONS
+
+5. ❌ **"Position dibuka dengan strategi apa?"**
+   - No `strategy_id` or `magic_number`
+   - No `TRADING_SIGNALS` table
+
+---
+
+## 🎯 Migration Roadmap (Priority Order)
+
+### **Phase 1: Foundation Tables** (CRITICAL - Week 1)
+1. ✅ Create `TRADING_ACCOUNTS` table
+2. ✅ Create `TRADING_SESSIONS` table with session aggregation fields
+3. ✅ Create `CONFIG_SNAPSHOTS` table
+4. ✅ Update `POSITIONS` table:
+   - Add relationship FKs (`session_id`, `account_id`, `signal_id`)
+   - Add closing details (`realized_pnl_usd`, `exit_type`, etc.)
+   - Add strategy attribution (`strategy_id`, `magic_number`, `mt5_ticket`)
+5. ✅ Update `SUPPLY_DEMAND_ZONES` table:
+   - Add `session_id` FK
+
+### **Phase 2: Signal & Execution Tracking** (HIGH - Week 2)
+6. ✅ Create `TRADING_SIGNALS` table
+7. ✅ Create `SIGNAL_EXECUTIONS` table
+8. ✅ Create `POSITION_MODIFICATIONS` table
+9. ✅ Create `PARTIAL_CLOSES` table
+
+### **Phase 3: Market Data & Monitoring** (MEDIUM - Week 3)
+10. ✅ Create `MARKET_DATA` table
+11. ✅ Create `SYMBOL_INFO` table
+12. ✅ Create `RISK_METRICS` table
+13. ✅ Create `RISK_VIOLATIONS` table
+
+### **Phase 4: System Health & Audit** (LOW - Week 4)
+14. ✅ Create `SYSTEM_HEALTH` table
+15. ✅ Create `AUDIT_LOG` table
+16. ✅ Create `BOT_CONFIGURATIONS` table
+
+### **Phase 5: Quality Metrics & Analytics** (ENHANCEMENT - Week 5)
+17. ✅ Add quality metrics to POSITIONS (MAE, MFE, quality_score)
+18. ✅ Create background worker for MAE/MFE calculation
+19. ✅ Create materialized views for analytics
+20. ✅ Implement indexes for performance
+
+---
+
+## ✅ Current Database Strengths
+
+Despite gaps, current schema has:
+- ✅ Basic position tracking with pip calculations
+- ✅ Supply & Demand zones with strength scoring
+- ✅ Proper timestamps and audit fields
+- ✅ JSON fields for flexible data storage
+- ✅ PostgreSQL-ready data types
+
+---
+
+## 📝 Summary
+
+**Current State**: 2 tables (14% complete)
+**Required State**: 14+ tables (100%)
+**Dashboard Readiness**: ❌ **NOT READY** (requires all Phase 1-3 tables minimum)
+
+**Recommendation**: Complete Phase 1-3 migrations before dashboard development.

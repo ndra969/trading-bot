@@ -44,19 +44,22 @@ class BreakevenManager:
         """
         Get breakeven settings for asset class.
 
-        Merges defaults with overrides.
+        Uses position_management config structure from docs:
+        position_management:
+          forex_major:
+            breakeven_trigger: 15
+            breakeven_offset: 2
         """
-        tm_config = self.config.get("trade_management", {})
+        pm_config = self.config.get("position_management", {})
 
-        # Get Defaults
-        defaults = tm_config.get("defaults", {}).get("breakeven", {})
+        # Get asset-specific config (flat structure as per docs)
+        asset_config = pm_config.get(asset_class, {})
 
-        # Get Overrides for Asset Class
-        overrides = tm_config.get("overrides", {}).get(asset_class, {}).get("breakeven", {})
-
-        # Merge
-        settings = defaults.copy()
-        settings.update(overrides)
+        # Map from docs field names to internal field names
+        settings = {
+            "trigger_pips": asset_config.get("breakeven_trigger", 15.0),
+            "offset_pips": asset_config.get("breakeven_offset", 2.0),
+        }
 
         return settings
 

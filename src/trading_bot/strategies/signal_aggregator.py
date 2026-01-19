@@ -247,6 +247,22 @@ class SignalAggregator:
         # Collect strategy scores
         strategy_scores = {r.strategy_name: r.score for r in results}
 
+        # Extract price action info from foundation strategy result (if available)
+        price_action_info = None
+        for result in results:
+            if result.strategy_name == "foundation" and result.metadata:
+                layer_details = result.metadata.get("layer_details", {})
+                if "price_action" in layer_details:
+                    price_action_info = layer_details["price_action"]
+                    break
+
+        # Create signal metadata with price action info
+        signal_metadata = {
+            "num_strategies": len(results),
+        }
+        if price_action_info:
+            signal_metadata["price_action"] = price_action_info
+
         # Create signal
         try:
             signal = TradingSignal(
@@ -261,7 +277,7 @@ class SignalAggregator:
                 strategy_scores=strategy_scores,
                 timeframe=results[0].timeframe,
                 status=SignalStatus.PENDING,
-                metadata={"num_strategies": len(results)},
+                metadata=signal_metadata,
             )
 
             logger.debug(

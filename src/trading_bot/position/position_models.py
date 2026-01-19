@@ -40,6 +40,9 @@ class Position:
         volume: Position volume (lot size)
         pip_size: Asset-specific pip size
         pip_value_per_lot: USD value per pip per lot
+        confluence_score: Signal confluence score (0-100)
+        ticket: MT5 ticket number (if available)
+        account_id: Link to TradingAccount (multi-account support)
         status: Current position status
         open_time: When position was opened
         close_time: When position was closed (if closed)
@@ -61,6 +64,10 @@ class Position:
     volume: float  # Lot size
     pip_size: float  # Asset-specific pip size
     pip_value_per_lot: float  # USD value per pip per lot
+    confluence_score: float = 0.0  # Signal confluence score (0-100)
+    ticket: int | None = None  # MT5 ticket number
+    account_id: int | None = None  # Link to TradingAccount (multi-account support)
+    session_id: str | None = None  # Link to TradingSession
     status: PositionStatus = PositionStatus.PENDING
     open_time: datetime | None = None
     close_time: datetime | None = None

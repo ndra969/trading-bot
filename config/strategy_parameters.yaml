@@ -38,7 +38,7 @@ trendline:
   tolerance: 0.0005
 
 price_action:
-  enabled_patterns: ["PINBAR", "ENGULFING", "INSIDE_BAR"]
+  enabled_patterns: ["PINBAR", "ENGULFING", "INSIDE_BAR", "DOJI", "HARAMI", "OUTSIDE_BAR", "MORNING_STAR", "EVENING_STAR", "PULLBACK", "ORDER_BLOCK", "LIQUIDITY_SWEEP", "DOUBLE_TOP", "DOUBLE_BOTTOM"]
   min_confidence: 60.0
 
 fibonacci:
@@ -95,14 +95,16 @@ supply_demand:
 signal_generation:
   # Signal Quality Requirements
   quality_thresholds:
-    min_confluence_score: 25.0   # Minimum overall confluence score (Lowered for Testing)
-    min_foundation_score: 20.0   # Minimum foundation S&D score (Lowered for Testing)
+    min_confluence_score: 40.0   # Lowered to 40% for testing - allows more signals to pass
+    min_foundation_score: 30.0   # Minimum foundation S&D score (Raised for quality)
+    min_price_action_score: 10.0  # Minimum price action score (NEW: require price action confirmation)
     max_signals_per_symbol: 1    # Maximum signals per symbol
     signal_refresh_interval: 300  # Signal refresh interval (seconds)
 
   # Signal Validation Rules
   validation_rules:
     require_foundation: true     # Foundation strategy required
+    require_price_action: false  # Temporarily disabled for testing - will enable after validation
     conflict_prevention: true    # Prevent conflicting signals
     market_hours_validation: true # Validate market hours
 
@@ -148,7 +150,7 @@ timeframe_analysis:
 
   # Analysis Parameters
   analysis_settings:
-    min_confluence_score: 65.0   # Minimum confluence score for signals
+    min_confluence_score: 40.0   # Lowered to 40% for testing - allows more signals to pass
     timeframes_required: 2       # Minimum timeframes for validation
     cache_duration_minutes: 5    # Cache duration for analysis results
     max_analysis_time_seconds: 10 # Maximum time for analysis

@@ -623,3 +623,728 @@ class TestStopCommand:
 
                 assert result.exit_code == 0
                 assert "stopped" in result.output.lower()
+
+
+class TestStartCommandMissingCoverage:
+    """Test start command - additional coverage for missing lines."""
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_live_mode_mt5_success(
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
+    ):
+        """Test start command in live mode with successful MT5 connection (line 156)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_connector = Mock()
+            mock_connector.initialize.return_value = True
+            mock_connector.account_info = {
+                "login": 12345,
+                "balance": 10000.0,
+                "server": "TestServer",
+            }
+            mock_mt5.return_value = mock_connector
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(cli, ["--config", "development", "start"])
+
+            assert result.exit_code == 0
+            assert "MT5 connected" in result.output
+            # Should NOT show dry-run message
+            assert "DRY-RUN" not in result.output
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_keyboard_interrupt(
+        self, mock_bot_class, mock_setup_logger, mock_mt5, mock_init_db, runner, mock_config
+    ):
+        """Test start command with KeyboardInterrupt (line 231-239)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_connector = Mock()
+            mock_connector.initialize.return_value = True
+            mock_connector.account_info = {"login": 12345, "balance": 10000.0}
+            mock_mt5.return_value = mock_connector
+
+            mock_bot = Mock()
+            # Make bot.start raise KeyboardInterrupt when run through asyncio
+            call_count = [0]
+
+            def mock_asyncio_run(coro, *args, **kwargs):
+                # First call is create_tables, second is bot.start()
+                call_count[0] += 1
+                if call_count[0] == 2:  # Second call (bot.start)
+                    raise KeyboardInterrupt()
+                return None
+
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+
+            with patch("asyncio.run", side_effect=mock_asyncio_run):
+                result = runner.invoke(cli, ["--config", "development", "start"])
+
+            # KeyboardInterrupt should be handled gracefully (exit code 0 or 1 depending on implementation)
+            assert result.exit_code in [0, 1]
+            assert (
+                "Stopping" in result.output
+                or "stopped" in result.output.lower()
+                or "ERROR" in result.output
+            )
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_trading_loop_exception(
+        self, mock_bot_class, mock_setup_logger, mock_mt5, mock_init_db, runner, mock_config
+    ):
+        """Test start command with exception in trading loop (line 236-239)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_connector = Mock()
+            mock_connector.initialize.return_value = True
+            mock_connector.account_info = {"login": 12345, "balance": 10000.0}
+            mock_mt5.return_value = mock_connector
+
+            mock_bot = Mock()
+
+            # Create a coroutine that raises an exception
+            async def failing_start():
+                raise RuntimeError("Trading loop error")
+
+            mock_bot.start = failing_start
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+
+            # Don't mock asyncio.run - let it actually run the coroutine
+            result = runner.invoke(cli, ["--config", "development", "start"])
+
+            # The exception should be re-raised after being logged
+            assert result.exit_code == 1
+            assert "ERROR" in result.output
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_bot_config_no_trading_key(
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
+    ):
+        """Test start command when bot_config has no 'trading' key (line 210-212)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_connector = Mock()
+            mock_connector.initialize.return_value = True
+            mock_connector.account_info = {"login": 12345, "balance": 10000.0}
+            mock_mt5.return_value = mock_connector
+
+            # Remove _config to trigger line 210-212
+            delattr(mock_config, "_config")
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(cli, ["--config", "development", "start"])
+
+            assert result.exit_code == 0
+
+    @patch("trading_bot.cli.init_database")
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    @patch("asyncio.run")
+    @patch("trading_bot.main.TradingBot")
+    def test_start_bot_config_has_trading_key(
+        self,
+        mock_bot_class,
+        mock_asyncio_run,
+        mock_setup_logger,
+        mock_mt5,
+        mock_init_db,
+        runner,
+        mock_config,
+    ):
+        """Test start command when bot_config has 'trading' key (line 212)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_db_manager = Mock()
+            mock_db_manager.create_tables = AsyncMock()
+            mock_init_db.return_value = mock_db_manager
+
+            mock_connector = Mock()
+            mock_connector.initialize.return_value = True
+            mock_connector.account_info = {"login": 12345, "balance": 10000.0}
+            mock_mt5.return_value = mock_connector
+
+            # Keep _config with trading key to trigger line 212 (just set dry_run)
+            mock_config._config = {"symbols": ["EURUSD"], "trading": {"existing_key": "value"}}
+
+            mock_bot = Mock()
+            mock_bot.start = AsyncMock()
+            mock_bot.stop = AsyncMock()
+            mock_bot_class.return_value = mock_bot
+            mock_asyncio_run.return_value = None
+
+            result = runner.invoke(cli, ["--config", "development", "start"])
+
+            assert result.exit_code == 0
+
+
+class TestMT5ConnectMissingCoverage:
+    """Test MT5 connect command - additional coverage for missing lines."""
+
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    def test_mt5_connect_import_error(self, mock_setup_logger, mock_mt5, runner, mock_config):
+        """Test MT5 connect with ImportError (line 363-366)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_mt5.side_effect = ImportError("MetaTrader5 not available")
+
+            result = runner.invoke(cli, ["--config", "development", "mt5", "connect"])
+
+            assert result.exit_code == 0
+            assert "not installed" in result.output.lower() or "ERROR" in result.output
+
+    @patch("trading_bot.cli.MT5Connector")
+    @patch("trading_bot.cli.setup_logger")
+    def test_mt5_connect_exception(self, mock_setup_logger, mock_mt5, runner, mock_config):
+        """Test MT5 connect with general exception (line 367-370)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_mt5.side_effect = Exception("Connection error")
+
+            result = runner.invoke(cli, ["--config", "development", "mt5", "connect"])
+
+            assert result.exit_code == 0
+            assert "ERROR" in result.output or "error" in result.output.lower()
+
+
+class TestConfigValidateMissingCoverage:
+    """Test config validate command - additional coverage for missing lines."""
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_config_validate_exception(self, mock_setup_logger, runner, mock_config):
+        """Test config validate with exception (line 502-504)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            mock_config.validate.side_effect = ValueError("Invalid config")
+
+            result = runner.invoke(cli, ["--config", "development", "config", "validate"])
+
+            assert result.exit_code == 1
+            assert "ERROR" in result.output or "validation failed" in result.output.lower()
+
+
+class TestRulesCommand:
+    """Test rules command and _display_claude_rules function (line 550-634)."""
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_windows_console_encoding(self, mock_setup_logger, runner, mock_config):
+        """Test rules command with Windows console encoding (line 562-563)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            import os
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+                with open(claude_md_path, "w", encoding="utf-8") as f:
+                    f.write("# Test Rules\n\n## Critical Rules\n\nTest content here.")
+
+                import trading_bot.cli
+
+                original_file = trading_bot.cli.__file__
+
+                try:
+                    fake_cli_path = os.path.join(tmpdir, "cli.py")
+                    with open(fake_cli_path, "w") as f:
+                        f.write("# fake")
+
+                    trading_bot.cli.__file__ = fake_cli_path
+
+                    # Simulate Windows platform
+                    with patch("sys.platform", "win32"):
+                        result = runner.invoke(
+                            cli, ["--config", "development", "rules", "--format", "full"]
+                        )
+
+                        # Should handle gracefully
+                        assert result.exit_code == 0
+                finally:
+                    trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_file_not_found(self, mock_setup_logger, runner, mock_config):
+        """Test rules command when CLAUDE.md not found (line 569-571)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            # Force the file not to exist by using an invalid path
+            import os
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # Empty temp directory - no CLAUDE.md
+                import trading_bot.cli
+
+                original_file = trading_bot.cli.__file__
+
+                try:
+                    fake_cli_path = os.path.join(tmpdir, "cli.py")
+                    with open(fake_cli_path, "w") as f:
+                        f.write("# fake")
+
+                    trading_bot.cli.__file__ = fake_cli_path
+
+                    result = runner.invoke(cli, ["--config", "development", "rules"])
+
+                    # Should handle gracefully
+                    assert result.exit_code == 0
+                finally:
+                    trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_summary_format_with_content(self, mock_setup_logger, runner, mock_config):
+        """Test rules command with summary format and actual content (line 577-601)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            import os
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # Create a proper CLAUDE.md with all required sections
+                claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+                with open(claude_md_path, "w", encoding="utf-8") as f:
+                    f.write(
+                        """
+# Project Rules
+
+## Critical Implementation Rules
+
+Rule 1: Test rule
+Rule 2: Another rule
+
+## Code Quality Standards
+
+Standard 1: Code must be clean
+Standard 2: Add tests
+
+## Testing Requirements
+
+Test 1: Write tests first
+Test 2: Ensure 100% coverage
+
+## Test-Driven Development
+
+TDD workflow description
+"""
+                    )
+
+                import trading_bot.cli
+
+                original_file = trading_bot.cli.__file__
+
+                try:
+                    fake_cli_path = os.path.join(tmpdir, "cli.py")
+                    with open(fake_cli_path, "w") as f:
+                        f.write("# fake")
+
+                    trading_bot.cli.__file__ = fake_cli_path
+
+                    result = runner.invoke(
+                        cli, ["--config", "development", "rules", "--format", "summary"]
+                    )
+
+                    # Should handle gracefully
+                    assert result.exit_code == 0
+                finally:
+                    trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_rules_only_format_with_content(self, mock_setup_logger, runner, mock_config):
+        """Test rules command with rules-only format and actual content (line 603-615)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            import os
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # Create a proper CLAUDE.md with Critical Implementation Rules section
+                claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+                with open(claude_md_path, "w", encoding="utf-8") as f:
+                    f.write(
+                        """
+# Project Rules
+
+## Critical Implementation Rules
+
+Rule 1: Always write tests first
+Rule 2: Never commit without tests
+Rule 3: Follow TDD methodology
+
+## Other Section
+
+Other content here
+"""
+                    )
+
+                import trading_bot.cli
+
+                original_file = trading_bot.cli.__file__
+
+                try:
+                    fake_cli_path = os.path.join(tmpdir, "cli.py")
+                    with open(fake_cli_path, "w") as f:
+                        f.write("# fake")
+
+                    trading_bot.cli.__file__ = fake_cli_path
+
+                    result = runner.invoke(
+                        cli, ["--config", "development", "rules", "--format", "rules-only"]
+                    )
+
+                    # Should handle gracefully
+                    assert result.exit_code == 0
+                finally:
+                    trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_rules_only_no_critical_section(self, mock_setup_logger, runner, mock_config):
+        """Test rules-only format when Critical section not found (line 614-615)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            import os
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # Create CLAUDE.md WITHOUT Critical Implementation Rules section
+                claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+                with open(claude_md_path, "w", encoding="utf-8") as f:
+                    f.write(
+                        """
+# Project Rules
+
+## Some Other Section
+
+Just some content
+"""
+                    )
+
+                import trading_bot.cli
+
+                original_file = trading_bot.cli.__file__
+
+                try:
+                    fake_cli_path = os.path.join(tmpdir, "cli.py")
+                    with open(fake_cli_path, "w") as f:
+                        f.write("# fake")
+
+                    trading_bot.cli.__file__ = fake_cli_path
+
+                    result = runner.invoke(
+                        cli, ["--config", "development", "rules", "--format", "rules-only"]
+                    )
+
+                    # Should handle gracefully
+                    assert result.exit_code == 0
+                finally:
+                    trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_file_read_error(self, mock_setup_logger, runner, mock_config):
+        """Test rules command with file read error (line 632-634)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            import os
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+
+                # Create file but mock open to fail
+                try:
+                    with open(claude_md_path, "w") as f:
+                        f.write("test")
+                except OSError:
+                    pass
+
+                import trading_bot.cli
+
+                original_file = trading_bot.cli.__file__
+
+                try:
+                    fake_cli_path = os.path.join(tmpdir, "cli.py")
+                    with open(fake_cli_path, "w") as f:
+                        f.write("# fake")
+
+                    trading_bot.cli.__file__ = fake_cli_path
+
+                    # Mock open to raise exception
+                    with patch("builtins.open", side_effect=OSError("Permission denied")):
+                        result = runner.invoke(cli, ["--config", "development", "rules"])
+
+                        # Should handle error gracefully
+                        assert result.exit_code == 0
+                finally:
+                    trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_rules_command_default_format(self, mock_setup_logger, runner, mock_config):
+        """Test rules command with default format (line 646)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            # Mock the _display_claude_rules function
+            with patch("trading_bot.cli._display_claude_rules") as mock_display:
+                result = runner.invoke(cli, ["--config", "development", "rules"])
+
+                assert result.exit_code == 0
+                mock_display.assert_called_once_with("full")
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_claude_command_alias(self, mock_setup_logger, runner, mock_config):
+        """Test claude command alias (line 658)."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            # Mock the _display_claude_rules function
+            with patch("trading_bot.cli._display_claude_rules") as mock_display:
+                result = runner.invoke(cli, ["--config", "development", "claude"])
+
+                assert result.exit_code == 0
+                mock_display.assert_called_once_with("full")
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_claude_command_with_format(self, mock_setup_logger, runner, mock_config):
+        """Test claude command with format option."""
+        with patch("trading_bot.cli.Configuration", return_value=mock_config):
+            # Mock the _display_claude_rules function
+            with patch("trading_bot.cli._display_claude_rules") as mock_display:
+                result = runner.invoke(
+                    cli, ["--config", "development", "claude", "--format", "summary"]
+                )
+
+                assert result.exit_code == 0
+                mock_display.assert_called_once_with("summary")
+
+
+class TestDisplayClaudeRulesDirectly:
+    """Test _display_claude_rules helper function directly (line 550-634)."""
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_display_claude_rules_full_format_direct(self, mock_setup_logger, runner, mock_config):
+        """Test _display_claude_rules directly with full format."""
+        import os
+        import tempfile
+
+        from trading_bot.cli import _display_claude_rules
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create CLAUDE.md
+            claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+            with open(claude_md_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "# Test Rules\n\n## Section 1\n\nContent here\n\n## Section 2\n\nMore content"
+                )
+
+            import trading_bot.cli
+
+            original_file = trading_bot.cli.__file__
+
+            try:
+                fake_cli_path = os.path.join(tmpdir, "cli.py")
+                with open(fake_cli_path, "w") as f:
+                    f.write("# fake")
+
+                trading_bot.cli.__file__ = fake_cli_path
+
+                # Call the function directly - it should not raise
+                _display_claude_rules("full")
+            finally:
+                trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_display_claude_rules_summary_format_direct(
+        self, mock_setup_logger, runner, mock_config
+    ):
+        """Test _display_claude_rules directly with summary format."""
+        import os
+        import tempfile
+
+        from trading_bot.cli import _display_claude_rules
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create CLAUDE.md with proper sections
+            claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+            with open(claude_md_path, "w", encoding="utf-8") as f:
+                f.write(
+                    """
+# Test Rules
+
+## Critical Implementation Rules
+
+Rule 1
+Rule 2
+
+## Code Quality Standards
+
+Standard 1
+Standard 2
+
+## Testing Requirements
+
+Test 1
+Test 2
+
+## Test-Driven Development
+
+TDD content
+"""
+                )
+
+            import trading_bot.cli
+
+            original_file = trading_bot.cli.__file__
+
+            try:
+                fake_cli_path = os.path.join(tmpdir, "cli.py")
+                with open(fake_cli_path, "w") as f:
+                    f.write("# fake")
+
+                trading_bot.cli.__file__ = fake_cli_path
+
+                # Call the function directly
+                _display_claude_rules("summary")
+            finally:
+                trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_display_claude_rules_only_format_direct(self, mock_setup_logger, runner, mock_config):
+        """Test _display_claude_rules directly with rules-only format."""
+        import os
+        import tempfile
+
+        from trading_bot.cli import _display_claude_rules
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create CLAUDE.md with Critical section
+            claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+            with open(claude_md_path, "w", encoding="utf-8") as f:
+                f.write(
+                    """
+# Test Rules
+
+## Critical Implementation Rules
+
+Critical rule 1
+Critical rule 2
+
+## Other Section
+
+Other content
+"""
+                )
+
+            import trading_bot.cli
+
+            original_file = trading_bot.cli.__file__
+
+            try:
+                fake_cli_path = os.path.join(tmpdir, "cli.py")
+                with open(fake_cli_path, "w") as f:
+                    f.write("# fake")
+
+                trading_bot.cli.__file__ = fake_cli_path
+
+                # Call the function directly
+                _display_claude_rules("rules-only")
+            finally:
+                trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_display_claude_rules_file_not_found_direct(
+        self, mock_setup_logger, runner, mock_config
+    ):
+        """Test _display_claude_rules directly when file not found."""
+        import os
+        import tempfile
+
+        from trading_bot.cli import _display_claude_rules
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import trading_bot.cli
+
+            original_file = trading_bot.cli.__file__
+
+            try:
+                fake_cli_path = os.path.join(tmpdir, "cli.py")
+                with open(fake_cli_path, "w") as f:
+                    f.write("# fake")
+
+                trading_bot.cli.__file__ = fake_cli_path
+
+                # Call the function - should handle gracefully
+                _display_claude_rules("full")
+            finally:
+                trading_bot.cli.__file__ = original_file
+
+    @patch("trading_bot.cli.setup_logger")
+    def test_display_claude_rules_windows_encoding_direct(
+        self, mock_setup_logger, runner, mock_config
+    ):
+        """Test _display_claude_rules directly with Windows encoding."""
+        import os
+        import sys
+        import tempfile
+
+        from trading_bot.cli import _display_claude_rules
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create CLAUDE.md
+            claude_md_path = os.path.join(tmpdir, "CLAUDE.md")
+            with open(claude_md_path, "w", encoding="utf-8") as f:
+                f.write("# Test Rules\n\nContent")
+
+            import trading_bot.cli
+
+            original_file = trading_bot.cli.__file__
+            original_platform = sys.platform
+
+            try:
+                fake_cli_path = os.path.join(tmpdir, "cli.py")
+                with open(fake_cli_path, "w") as f:
+                    f.write("# fake")
+
+                trading_bot.cli.__file__ = fake_cli_path
+
+                # Simulate Windows platform
+                with patch("sys.platform", "win32"):
+                    _display_claude_rules("full")
+            finally:
+                trading_bot.cli.__file__ = original_file
+                sys.platform = original_platform

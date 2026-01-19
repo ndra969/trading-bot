@@ -1288,3 +1288,433 @@ class TestAutomationLogic:
 
         # Verify it tried to update trailing stop
         position_manager.trailing_stop_manager.update_trailing_stop.assert_called_once()
+
+
+class TestOrphanedPositions:
+    """Test handling of orphaned positions (OPEN positions without ticket)."""
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_orphaned_open_position_without_ticket(
+        self, mock_get_session, position_manager
+    ):
+        """Test that OPEN position without ticket is closed and skipped (lines 186-206)."""
+        # Create mock OPEN position without ticket (orphaned)
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_orphaned_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.OPEN.value  # OPEN status
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}  # No ticket in metadata
+        mock_db_pos.ticket = None  # No ticket field
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - orphaned position should be closed in DB and not loaded
+        await position_manager.load_positions_from_db()
+
+        # Verify orphaned position was NOT loaded into memory
+        assert len(position_manager.positions) == 0
+
+        # Verify position was closed in database
+        assert mock_db_pos.status == PositionStatus.CLOSED.value
+        assert mock_db_pos.close_time is not None
+        assert mock_db_pos.close_price == 1.1000  # Should use entry_price as fallback
+        mock_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_pending_position_without_ticket_is_allowed(
+        self, mock_get_session, position_manager
+    ):
+        """Test that PENDING position without ticket is allowed (not considered orphaned)."""
+        # Create mock PENDING position without ticket
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_pending_no_ticket_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.PENDING.value  # PENDING status
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1000
+        mock_db_pos.current_profit_pips = 0.0
+        mock_db_pos.current_pnl_usd = 0.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.meta_data = {}  # No ticket
+        mock_db_pos.ticket = None
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Load positions - PENDING position without ticket should be loaded
+        await position_manager.load_positions_from_db()
+
+        # Verify position WAS loaded (orphaned check only applies to OPEN positions)
+        assert len(position_manager.positions) == 1
+        assert "pos_pending_no_ticket_001" in position_manager.positions
+
+
+class TestSavePositionDryRun:
+    """Test save_position in dry-run mode."""
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_dry_run_mode(self, mock_get_session, position_manager, buy_signal):
+        """Test that save_position skips database in dry-run mode (lines 254-257)."""
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+
+        # Save position in dry-run mode
+        await position_manager.save_position(position, is_dry_run=True)
+
+        # Verify get_session was NOT called (skipped database)
+        mock_get_session.assert_not_called()
+
+        # Position should still exist in memory
+        assert position.position_id in position_manager.positions
+
+
+class TestSavePositionConfluenceScore:
+    """Test save_position with confluence_score handling."""
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_confluence_score_from_attribute(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving position with confluence_score from position attribute (line 266)."""
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position.confluence_score = 85.5  # Set as attribute
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None  # New position
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position
+        await position_manager.save_position(position)
+
+        # Verify position was saved with confluence_score
+        mock_session.add.assert_called_once()
+        added_pos = mock_session.add.call_args[0][0]
+        assert added_pos.confluence_score == 85.5
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_ticket_from_metadata(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Test saving position with ticket from metadata when not on position object (line 278)."""
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        # Set ticket in metadata, not on position object
+        position.metadata["ticket"] = 67890
+        # Don't set position.ticket (it's None)
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None  # New position
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position
+        await position_manager.save_position(position)
+
+        # Verify ticket was retrieved from metadata
+        mock_session.add.assert_called_once()
+        added_pos = mock_session.add.call_args[0][0]
+        assert added_pos.ticket == 67890
+
+
+class TestCreatePositionWithPriceAction:
+    """Test create_position_from_signal with price_action metadata."""
+
+    def test_create_position_with_price_action_info(self, position_manager, buy_signal):
+        """Test creating position with price_action info from signal metadata (lines 413-418)."""
+        # Add price_action info to signal metadata
+        buy_signal.metadata = {
+            "price_action": {
+                "desc": "Bullish Engulfing",
+                "status": "confirmed",
+                "confidence": 0.85,
+            }
+        }
+
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+
+        # Verify price_action info was stored in position metadata
+        assert "price_action" in position.metadata
+        assert position.metadata["price_action"]["pattern_type"] == "Bullish Engulfing"
+        assert position.metadata["price_action"]["status"] == "confirmed"
+        assert position.metadata["price_action"]["pattern_details"]["confidence"] == 0.85
+
+    def test_create_position_without_price_action_info(self, position_manager, buy_signal):
+        """Test creating position without price_action info (metadata is None or empty)."""
+        # No price_action in metadata
+        buy_signal.metadata = {}
+
+        # Create position
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+
+        # Verify price_action is NOT in position metadata
+        assert "price_action" not in position.metadata
+
+
+class TestMaxDurationChecking:
+    """Test _check_max_duration method (lines 605-609, 643, 661-699)."""
+
+    def test_check_max_duration_no_open_time(self, position_manager, buy_signal):
+        """Test _check_max_duration returns False when position has no open_time (line 643)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+        position.open_time = None  # No open time
+
+        # Should return False (skip check)
+        result = position_manager._check_max_duration(position, 1.1050)
+        assert result is False
+
+    def test_check_max_duration_no_config(self, position_manager, buy_signal):
+        """Test _check_max_duration when max_duration_hours is not configured."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config without max_position_duration_hours
+        position_manager.config["trading_types"] = {"day_trading": {}}
+
+        # Should return False (skip check)
+        result = position_manager._check_max_duration(position, 1.1050)
+        assert result is False
+
+    def test_check_max_duration_not_exceeded(self, position_manager, buy_signal):
+        """Test _check_max_duration when duration not exceeded (line 668)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with 4 hour max duration
+        position_manager.config["trading_types"] = {
+            "day_trading": {"max_position_duration_hours": 4.0}
+        }
+        position_manager.config["active_trading_type"] = "day_trading"
+
+        # Create position that was opened 1 hour ago (not exceeded)
+        from datetime import timedelta
+
+        position.open_time = datetime.now() - timedelta(hours=1)
+
+        # Should return False (duration not exceeded)
+        result = position_manager._check_max_duration(position, 1.1050)
+        assert result is False
+
+    def test_check_max_duration_exceeded_but_in_loss(self, position_manager, buy_signal):
+        """Test _check_max_duration when exceeded but position is in loss (lines 669-687)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with 1 hour max duration
+        position_manager.config["trading_types"] = {
+            "day_trading": {"max_position_duration_hours": 1.0}
+        }
+        position_manager.config["active_trading_type"] = "day_trading"
+
+        # Create position that was opened 2 hours ago (exceeded)
+        from datetime import timedelta
+
+        position.open_time = datetime.now() - timedelta(hours=2)
+
+        # Update position to be in loss (price moved against us)
+        position_manager.update_position(position.position_id, 1.0970)  # Below entry
+        # Position is now in loss (negative profit)
+
+        # Should return False (in loss, don't force close)
+        result = position_manager._check_max_duration(position, 1.0970)
+        assert result is False
+        assert position.is_open  # Position should still be open
+
+    def test_check_max_duration_exceeded_and_in_profit(self, position_manager, buy_signal):
+        """Test _check_max_duration when exceeded and position is in profit (lines 689-697)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with 1 hour max duration
+        position_manager.config["trading_types"] = {
+            "day_trading": {"max_position_duration_hours": 1.0}
+        }
+        position_manager.config["active_trading_type"] = "day_trading"
+
+        # Create position that was opened 2 hours ago (exceeded)
+        from datetime import timedelta
+
+        position.open_time = datetime.now() - timedelta(hours=2)
+
+        # Update position to be in profit
+        position_manager.update_position(position.position_id, 1.1050)  # Above entry
+        # Position is now in profit
+
+        # Should return True and close position
+        result = position_manager._check_max_duration(position, 1.1050)
+        assert result is True
+        assert position.is_closed  # Position should be closed
+        assert position.close_price == 1.1050
+        assert "Max Duration" in position.metadata.get("close_reason", "")
+
+    def test_check_max_duration_with_pnl_profit_check(self, position_manager, buy_signal):
+        """Test _check_max_duration uses both pips and USD to determine profit (line 677)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with 1 hour max duration
+        position_manager.config["trading_types"] = {
+            "day_trading": {"max_position_duration_hours": 1.0}
+        }
+        position_manager.config["active_trading_type"] = "day_trading"
+
+        # Create position that was opened 2 hours ago (exceeded)
+        from datetime import timedelta
+
+        position.open_time = datetime.now() - timedelta(hours=2)
+
+        # Update position - manually set profit values to test both checks
+        position.current_price = 1.1050
+        position.current_profit_pips = 50.0  # Positive pips
+        position.current_pnl_usd = 0.0  # Zero USD (but pips is positive)
+
+        # Should return True (profit detected via pips)
+        result = position_manager._check_max_duration(position, 1.1050)
+        assert result is True
+
+    def test_check_max_duration_root_trading_type_config(self, position_manager, buy_signal):
+        """Test _check_max_duration reads active_trading_type from root config (line 650)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with active_trading_type at root level (not in trading_types section)
+        position_manager.config["active_trading_type"] = "scalping"
+        position_manager.config["trading_types"] = {
+            "scalping": {"max_position_duration_hours": 0.5}
+        }
+
+        # Create position that was opened 1 hour ago (exceeded for scalping)
+        from datetime import timedelta
+
+        position.open_time = datetime.now() - timedelta(hours=1)
+
+        # Update position to be in profit
+        position_manager.update_position(position.position_id, 1.1050)
+
+        # Should return True (uses root config)
+        result = position_manager._check_max_duration(position, 1.1050)
+        assert result is True
+
+    def test_check_max_duration_duration_seconds_none(self, position_manager, buy_signal):
+        """Test _check_max_duration when duration_seconds is None (line 663)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with max duration
+        position_manager.config["trading_types"] = {
+            "day_trading": {"max_position_duration_hours": 1.0}
+        }
+        position_manager.config["active_trading_type"] = "day_trading"
+
+        # Set open_time but mock duration_seconds to return None
+        # This can happen in edge cases where the calculation fails
+        position.open_time = datetime.now()
+
+        # Mock the duration_seconds property to return None
+        with patch.object(
+            type(position), "duration_seconds", new_callable=PropertyMock
+        ) as mock_duration:
+            mock_duration.return_value = None
+
+            # Should return False (skip check when duration_seconds is None)
+            result = position_manager._check_max_duration(position, 1.1050)
+            assert result is False
+
+
+class TestCheckAndClosePositionsMaxDuration:
+    """Test check_and_close_positions with max duration logging (lines 605-609)."""
+
+    def test_check_and_close_max_duration_exceeded(self, position_manager, buy_signal):
+        """Test check_and_close_positions closes position when max duration exceeded (lines 605-609)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        # Config with 1 hour max duration
+        position_manager.config["trading_types"] = {
+            "day_trading": {"max_position_duration_hours": 1.0}
+        }
+        position_manager.config["active_trading_type"] = "day_trading"
+
+        # Create position that was opened 2 hours ago (exceeded)
+        from datetime import timedelta
+
+        position.open_time = datetime.now() - timedelta(hours=2)
+
+        # Update position to be in profit
+        position_manager.update_position(position.position_id, 1.1050)
+
+        # Check and close positions
+        prices = {"EURUSD": 1.1050}
+        closed = position_manager.check_and_close_positions(prices)
+
+        # Verify position was closed
+        assert len(closed) == 1
+        assert position.is_closed
+        assert "Max Duration" in position.metadata.get("close_reason", "")

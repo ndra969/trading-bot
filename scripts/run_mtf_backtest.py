@@ -21,6 +21,7 @@ project_root = str(Path(__file__).parent.parent / "src")
 sys.path.append(project_root)
 
 from run_backtest import BacktestEngine, MockTrade
+
 from trading_bot.strategies.foundation.foundation_engine import FoundationEngine
 from trading_bot.strategies.models import SignalDirection
 from trading_bot.utils.logger import get_logger
@@ -50,7 +51,7 @@ class MTFBacktestEngine(BacktestEngine):
 
         # Load configuration
         self.config = self._load_config()
-        
+
         # Override zone expiration for backtest (allow zones up to 100000 hours old)
         # This prevents zones from being filtered out in historical backtests
         # Historical data may have zones that are very old relative to current time
@@ -60,16 +61,21 @@ class MTFBacktestEngine(BacktestEngine):
             self.config["supply_demand"] = {}
         if "zone_detection" not in self.config["supply_demand"]:
             self.config["supply_demand"]["zone_detection"] = {}
-        self.config["supply_demand"]["zone_detection"]["max_zone_age_hours"] = 100000  # ~11 years - effectively disable expiration for backtest
-        logger.info(f"Backtest mode: max_zone_age_hours set to {self.config['supply_demand']['zone_detection']['max_zone_age_hours']} (effectively disabled)")
+        self.config["supply_demand"]["zone_detection"][
+            "max_zone_age_hours"
+        ] = 100000  # ~11 years - effectively disable expiration for backtest
+        logger.info(
+            f"Backtest mode: max_zone_age_hours set to {self.config['supply_demand']['zone_detection']['max_zone_age_hours']} (effectively disabled)"
+        )
 
         # Load both timeframe data
         self.zone_data = self._load_data_from_path(zone_data_path)
         self.entry_data = self._load_data_from_path(entry_data_path)
 
         from trading_bot.position.pip_calculator import PipCalculator
+
         self.pip_calculator = PipCalculator()
-        
+
         logger.info(f"Loaded {len(self.zone_data)} {zone_tf} candles for zone detection")
         logger.info(f"Loaded {len(self.entry_data)} {entry_tf} candles for entry signals")
 
@@ -84,14 +90,15 @@ class MTFBacktestEngine(BacktestEngine):
     def _load_config(self) -> dict:
         """Load strategy parameters."""
         import yaml
+
         config_path = Path(__file__).parent.parent / "config" / "strategy_parameters.yaml"
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 return yaml.safe_load(f)
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
             return {}
-    
+
     def _load_data_from_path(self, path: str) -> pd.DataFrame:
         """Load CSV data from path."""
         p = Path(path)
@@ -154,7 +161,7 @@ class MTFBacktestEngine(BacktestEngine):
                 # This ensures zone age is calculated relative to when we're checking, not datetime.now()
                 for zone in zones:
                     zone._reference_time = current_time
-                
+
                 # Get zones that are relevant at this time
                 active_zones = [z for z in zones if self._is_zone_active(z, current_time)]
 
@@ -172,54 +179,72 @@ class MTFBacktestEngine(BacktestEngine):
                             # We use all H1 data up to current_time to avoid leakage
                             h1_mask = self.zone_data.index <= current_candle.name
                             h1_hist = self.zone_data[h1_mask]
-                            
+
                             if len(h1_hist) >= 50:
                                 # Multi-Stage Trend Verification
-                                h1_ema_50 = h1_hist['close'].ewm(span=50, adjust=False).mean()
-                                h1_ema_20 = h1_hist['close'].ewm(span=20, adjust=False).mean()
-                                
+                                h1_ema_50 = h1_hist["close"].ewm(span=50, adjust=False).mean()
+                                h1_ema_20 = h1_hist["close"].ewm(span=20, adjust=False).mean()
+
                                 ema_50_curr = h1_ema_50.iloc[-1]
                                 ema_50_prev = h1_ema_50.iloc[-2]
                                 ema_20_curr = h1_ema_20.iloc[-1]
-                                
+
                                 # Slope: Is the major trend actually moving?
                                 slope_up = ema_50_curr > ema_50_prev
                                 slope_down = ema_50_curr < ema_50_prev
-                                
+
                                 # Double-Confirmation: Price must be on the right side of BOTH EMAs
                                 # AND the EMA 50 must have the correct slope
-                                is_bullish = current_price > ema_50_curr and current_price > ema_20_curr and slope_up
-                                is_bearish = current_price < ema_50_curr and current_price < ema_20_curr and slope_down
-                                
+                                is_bullish = (
+                                    current_price > ema_50_curr
+                                    and current_price > ema_20_curr
+                                    and slope_up
+                                )
+                                is_bearish = (
+                                    current_price < ema_50_curr
+                                    and current_price < ema_20_curr
+                                    and slope_down
+                                )
+
                                 if is_bullish:
                                     h1_trend_bias = "BULLISH"
                                 elif is_bearish:
                                     h1_trend_bias = "BEARISH"
                                 else:
                                     h1_trend_bias = "NEUTRAL"
-                                
+
                                 # --- MOMENTUM PROTECTION (PHASE 5.24.1) ---
                                 # Even if Price > EMA, if H1 is crashing, don't BUY
                                 if len(h1_hist) >= 3:
-                                    c_curr = h1_hist['close'].iloc[-1]
-                                    c_p1 = h1_hist['close'].iloc[-2]
-                                    c_p2 = h1_hist['close'].iloc[-3]
-                                    
+                                    c_curr = h1_hist["close"].iloc[-1]
+                                    c_p1 = h1_hist["close"].iloc[-2]
+                                    c_p2 = h1_hist["close"].iloc[-3]
+
                                     # If two consecutive red candles, block BUY
                                     if h1_trend_bias == "BULLISH" and c_curr < c_p1 and c_p1 < c_p2:
-                                        logger.warning(f"SNIPER: Blocking BULLISH bias due to H1 Bearish Momentum (Crash protection)")
+                                        logger.warning(
+                                            "SNIPER: Blocking BULLISH bias due to H1 Bearish Momentum (Crash protection)"
+                                        )
                                         h1_trend_bias = "NEUTRAL"
                                     # If two consecutive green candles, block SELL
                                     if h1_trend_bias == "BEARISH" and c_curr > c_p1 and c_p1 > c_p2:
-                                        logger.warning(f"SNIPER: Blocking BEARISH bias due to H1 Bullish Momentum")
+                                        logger.warning(
+                                            "SNIPER: Blocking BEARISH bias due to H1 Bullish Momentum"
+                                        )
                                         h1_trend_bias = "NEUTRAL"
-                                
-                                logger.info(f"SNIPER BIAS: {current_candle.name} | Price: {current_price:.2f} | H1 EMA50: {ema_50_curr:.2f} | Bias: {h1_trend_bias}")
+
+                                logger.info(
+                                    f"SNIPER BIAS: {current_candle.name} | Price: {current_price:.2f} | H1 EMA50: {ema_50_curr:.2f} | Bias: {h1_trend_bias}"
+                                )
 
                         # Generate signal using ENTRY TF data + H1 Bias
                         result = await self.engine._create_signal_from_zone(
-                            self.symbol, zone, current_price, self.entry_tf, historical_data,
-                            h1_trend_bias=h1_trend_bias
+                            self.symbol,
+                            zone,
+                            current_price,
+                            self.entry_tf,
+                            historical_data,
+                            h1_trend_bias=h1_trend_bias,
                         )
 
                         if result:
@@ -251,6 +276,7 @@ class MTFBacktestEngine(BacktestEngine):
 
         # Determine pip size using PipCalculator for accuracy
         from trading_bot.position.pip_calculator import PipCalculator
+
         pip_calc = PipCalculator()
         pip_size = pip_calc.get_pip_size(self.symbol)
 
@@ -291,9 +317,12 @@ class MTFBacktestEngine(BacktestEngine):
                 # SNIPER BREAKEVEN (Phase 5.24): Trigger at 0.7R (70% of SL Distance)
                 initial_sl_dist = abs(self.active_trade.entry_price - self.active_trade.stop_loss)
                 sniper_trigger_pips = (initial_sl_dist * 0.7) / pip_size
-                
+
                 be_price = self.active_trade.entry_price + (be_offset * pip_size)
-                if current_profit_pips >= sniper_trigger_pips and self.active_trade.stop_loss < be_price:
+                if (
+                    current_profit_pips >= sniper_trigger_pips
+                    and self.active_trade.stop_loss < be_price
+                ):
                     old_sl = self.active_trade.stop_loss
                     self.active_trade.stop_loss = be_price
                     logger.debug(
@@ -323,9 +352,12 @@ class MTFBacktestEngine(BacktestEngine):
                 # SNIPER BREAKEVEN (Phase 5.24): Trigger at 0.7R (70% of SL Distance)
                 initial_sl_dist = abs(self.active_trade.entry_price - self.active_trade.stop_loss)
                 sniper_trigger_pips = (initial_sl_dist * 0.7) / pip_size
-                
+
                 be_price = self.active_trade.entry_price - (be_offset * pip_size)
-                if current_profit_pips >= sniper_trigger_pips and self.active_trade.stop_loss > be_price:
+                if (
+                    current_profit_pips >= sniper_trigger_pips
+                    and self.active_trade.stop_loss > be_price
+                ):
                     old_sl = self.active_trade.stop_loss
                     self.active_trade.stop_loss = be_price
                     logger.debug(

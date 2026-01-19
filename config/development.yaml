@@ -17,8 +17,8 @@ logging:
 # MT5 Configuration for Development
 mt5:
   path: "C:\\Program Files\\MetaTrader 5\\Broker B"
-  # Optional: uncomment jika ingin login credentials
-  # login: 12345678
-  # password: "your_password"
-  # server: "YourBroker-Server"
+  # IMPORTANT: Set these to prevent auto-switch to test server
+  login: 159394302
+  # password: "your_password"  # Uncomment and set if needed
+  server: "Exness-MT5Real20"  # Force specific server to prevent auto-switch
   timeout: 60000

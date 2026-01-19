@@ -10,12 +10,22 @@ from trading_bot.position.position_models import Position, PositionStatus, Posit
 def mock_config():
     """Create a mock configuration."""
     return {
-        "trade_management": {
-            "defaults": {"breakeven": {"enabled": True, "trigger_pips": 15.0, "offset_pips": 2.0}},
-            "overrides": {
-                "forex_jpy": {"breakeven": {"trigger_pips": 150.0, "offset_pips": 20.0}},
-                "commodities": {"breakeven": {"trigger_pips": 500.0, "offset_pips": 50.0}},
-                "crypto": {"breakeven": {"trigger_pips": 1000.0, "offset_pips": 300.0}},
+        "position_management": {
+            "forex_major": {
+                "breakeven_trigger": 15.0,
+                "breakeven_offset": 2.0,
+            },
+            "forex_jpy": {
+                "breakeven_trigger": 150.0,
+                "breakeven_offset": 20.0,
+            },
+            "commodities": {
+                "breakeven_trigger": 500.0,
+                "breakeven_offset": 50.0,
+            },
+            "crypto": {
+                "breakeven_trigger": 1000.0,
+                "breakeven_offset": 300.0,
             },
         }
     }

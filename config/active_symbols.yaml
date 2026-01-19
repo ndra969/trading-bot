@@ -3,7 +3,7 @@
 
 # Global settings
 enabled: true
-max_concurrent_symbols: 5
+max_concurrent_symbols: 7  # Increased to accommodate 6 forex pairs + XAUUSD (EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, XAUUSD)
 max_positions_per_symbol: 1
 
 # Asset class settings
@@ -21,7 +21,7 @@ asset_classes:
     trading_sessions: ["london", "new_york"]
 
   commodities:
-    enabled: false  # Disabled until pip calculation is fixed
+    enabled: true  # Enabled for XAUUSD trading
     max_concurrent_positions: 1
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
@@ -81,7 +81,7 @@ symbols:
     max_volume_lots: 0.5
 
   USDCHF:
-    enabled: false  # Disabled for initial phase
+    enabled: true  # Enabled for initial phase - diversifies USD pairs
     priority: 4
     asset_class: "forex_majors"
     timeframes: ["M15", "H1", "H4"]
@@ -94,7 +94,7 @@ symbols:
     max_volume_lots: 0.5
 
   AUDUSD:
-    enabled: false  # Disabled for initial phase
+    enabled: true  # Enabled for initial phase - provides Asia session coverage
     priority: 5
     asset_class: "forex_majors"
     timeframes: ["M15", "H1", "H4"]
@@ -106,23 +106,36 @@ symbols:
     min_volume_lots: 0.01
     max_volume_lots: 0.5
 
+  USDCAD:
+    enabled: true  # Enabled for initial phase - diversifies USD pairs with CAD exposure
+    priority: 6
+    asset_class: "forex_majors"
+    timeframes: ["M15", "H1", "H4"]
+    trading_sessions: ["london", "new_york"]
+    min_zone_strength: 70
+    max_zones_per_session: 2
+    risk_per_trade: 0.001
+    max_spread_pips: 4
+    min_volume_lots: 0.01
+    max_volume_lots: 0.5
+
   # Commodities
   XAUUSD:
-    enabled: false  # Disabled until pip calculation is fixed
-    priority: 6
+    enabled: true  # Enabled for live trading
+    priority: 7
     asset_class: "commodities"
     timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 75
     max_zones_per_session: 1
     risk_per_trade: 0.001  # 0.1%
-    max_spread_pips: 50  # 5 pips for gold
+    max_spread_pips: 50  # 50 pips for gold (0.1 pip size = 5 USD)
     min_volume_lots: 0.01
     max_volume_lots: 0.1
 
   XAGUSD:
     enabled: false  # Disabled for initial phase
-    priority: 7
+    priority: 8
     asset_class: "commodities"
     timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
@@ -136,7 +149,7 @@ symbols:
   # Crypto
   BTCUSD:
     enabled: false  # Disabled until pip calculation is fixed
-    priority: 8
+    priority: 9
     asset_class: "crypto"
     timeframes: ["H1", "H4"]
     trading_sessions: ["24/7"]

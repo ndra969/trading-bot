@@ -49,19 +49,34 @@ class ExposureManager:
             "max_asset_class_exposure_percent", 40.0
         )
 
+        # Correlation management
+        # Define correlated pairs (pairs that move together, should have same direction)
+        # Define negative correlated pairs (pairs that move opposite, should have opposite direction)
+        # Correlation threshold: 0.7+ means pairs move together, -0.7+ means pairs move opposite
+        self.correlated_pairs = self._build_correlation_groups()
+        self.negative_correlated_pairs = self._build_negative_correlation_groups()
+        self.correlation_enabled = (
+            self.config.get("risk_management", {})
+            .get("correlation_management", {})
+            .get("enabled", True)
+        )
+
         # Tracking
         self.positions_by_symbol: dict[str, int] = defaultdict(int)
         self.positions_by_asset_class: dict[str, int] = defaultdict(int)
         self.currency_exposure: dict[str, float] = defaultdict(float)
+        # Track position directions for correlation checking
+        self.position_directions: dict[str, str] = {}  # symbol -> "BUY" or "SELL"
 
         logger.info(
             f"ExposureManager initialized: "
             f"Max positions/symbol: {self.max_positions_per_symbol}, "
-            f"Max total: {self.max_total_positions}"
+            f"Max total: {self.max_total_positions}, "
+            f"Correlation checking: {self.correlation_enabled}"
         )
 
     def can_open_position(
-        self, symbol: str, asset_class: str, risk_amount: float
+        self, symbol: str, asset_class: str, risk_amount: float, direction: str = None
     ) -> tuple[bool, str]:
         """
         Check if a new position can be opened.
@@ -70,6 +85,7 @@ class ExposureManager:
             symbol: Trading symbol
             asset_class: Asset class (forex_major, forex_jpy, etc.)
             risk_amount: Risk amount for the position
+            direction: Position direction ("BUY" or "SELL")
 
         Returns:
             Tuple of (can_open, reason)
@@ -90,6 +106,15 @@ class ExposureManager:
                 f"Total position limit reached: {total_positions}/{self.max_total_positions}",
             )
 
+        # Check correlation conflicts (if direction provided)
+        if direction and self.correlation_enabled:
+            conflict_reason = self._check_correlation_conflict(symbol, direction)
+            if conflict_reason:
+                logger.warning(
+                    f"Correlation conflict detected for {symbol} {direction}: {conflict_reason}"
+                )
+                return False, conflict_reason
+
         # Check asset class exposure (if we have portfolio balance)
         # This would need portfolio balance to calculate percentage
         # For now, we just track counts
@@ -97,7 +122,12 @@ class ExposureManager:
         return True, "OK"
 
     def register_position(
-        self, symbol: str, asset_class: str, volume: float, currency_pair: str = None
+        self,
+        symbol: str,
+        asset_class: str,
+        volume: float,
+        currency_pair: str = None,
+        direction: str = None,
     ) -> None:
         """
         Register a new position.
@@ -107,9 +137,14 @@ class ExposureManager:
             asset_class: Asset class
             volume: Position volume
             currency_pair: Currency pair (e.g., "EUR/USD")
+            direction: Position direction ("BUY" or "SELL")
         """
         self.positions_by_symbol[symbol] += 1
         self.positions_by_asset_class[asset_class] += 1
+
+        # Track position direction for correlation checking
+        if direction:
+            self.position_directions[symbol] = direction.upper()
 
         # Track currency exposure if provided
         if currency_pair:
@@ -121,6 +156,7 @@ class ExposureManager:
 
         logger.debug(
             f"Position registered: {symbol} ({asset_class}), "
+            f"Direction: {direction}, "
             f"Total positions: {sum(self.positions_by_symbol.values())}"
         )
 
@@ -141,6 +177,10 @@ class ExposureManager:
 
         if self.positions_by_asset_class[asset_class] > 0:
             self.positions_by_asset_class[asset_class] -= 1
+
+        # Remove direction tracking
+        if symbol in self.position_directions:
+            del self.position_directions[symbol]
 
         # Update currency exposure
         if currency_pair:
@@ -213,11 +253,185 @@ class ExposureManager:
             "max_total_positions": self.max_total_positions,
         }
 
+    def _build_correlation_groups(self) -> dict[str, list[str]]:
+        """
+        Build correlation groups for currency pairs.
+
+        Loads from config YAML if available, otherwise uses hardcoded defaults.
+
+        Returns:
+            Dictionary mapping symbol to list of correlated symbols
+        """
+        # Try to load from config first
+        config_groups = (
+            self.config.get("risk_management", {})
+            .get("correlation_management", {})
+            .get("correlation_groups", {})
+        )
+
+        if config_groups:
+            # Use config if available
+            correlation_groups = config_groups
+        else:
+            # Fallback to hardcoded defaults if config not found
+            correlation_groups = {
+                # Major USD pairs (positive correlation)
+                "EURUSD": ["GBPUSD", "AUDUSD", "NZDUSD"],
+                "GBPUSD": ["EURUSD", "AUDUSD", "NZDUSD"],
+                "AUDUSD": ["EURUSD", "GBPUSD", "NZDUSD"],
+                "NZDUSD": ["EURUSD", "GBPUSD", "AUDUSD"],
+                # USD pairs (positive correlation)
+                "USDJPY": ["USDCHF", "USDCAD"],
+                "USDCHF": ["USDJPY", "USDCAD"],
+                "USDCAD": ["USDJPY", "USDCHF"],
+                # JPY pairs (positive correlation)
+                "EURJPY": ["GBPJPY", "AUDJPY"],
+                "GBPJPY": ["EURJPY", "AUDJPY"],
+                "AUDJPY": ["EURJPY", "GBPJPY"],
+            }
+
+        # Build reverse mapping (symbol -> correlated symbols)
+        # This ensures bidirectional correlation (if A correlates with B, then B correlates with A)
+        result = {}
+        for symbol, correlated in correlation_groups.items():
+            # Normalize symbol
+            normalized = symbol.upper().strip()
+
+            # Normalize correlated symbols list
+            if isinstance(correlated, list):
+                normalized_correlated = [s.upper().strip() for s in correlated]
+            else:
+                # Handle case where config might have different structure
+                normalized_correlated = []
+
+            result[normalized] = normalized_correlated
+
+            # Also add reverse mappings (bidirectional)
+            for corr_symbol in normalized_correlated:
+                if corr_symbol not in result:
+                    result[corr_symbol] = []
+                if normalized not in result[corr_symbol]:
+                    result[corr_symbol].append(normalized)
+
+        return result
+
+    def _build_negative_correlation_groups(self) -> dict[str, list[str]]:
+        """
+        Build negative correlation groups for currency pairs.
+
+        Negative correlation means pairs move in opposite directions.
+        Example: USDCAD BUY (USD strong) vs EURUSD SELL (USD weak vs EUR)
+
+        Loads from config YAML if available, otherwise uses hardcoded defaults.
+
+        Returns:
+            Dictionary mapping symbol to list of negatively correlated symbols
+        """
+        # Try to load from config first
+        config_groups = (
+            self.config.get("risk_management", {})
+            .get("correlation_management", {})
+            .get("negative_correlation_groups", {})
+        )
+
+        if config_groups:
+            # Use config if available
+            negative_correlation_groups = config_groups
+        else:
+            # Fallback to hardcoded defaults if config not found
+            negative_correlation_groups = {
+                # USD pairs vs Major pairs (negative correlation)
+                # When USD is strong (USDCAD/USDJPY/USDCHF BUY), major pairs should be weak (EURUSD/GBPUSD SELL)
+                "USDCAD": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"],
+                "USDJPY": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"],
+                "USDCHF": ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"],
+                # Reverse mapping: Major pairs vs USD pairs
+                "EURUSD": ["USDCAD", "USDJPY", "USDCHF"],
+                "GBPUSD": ["USDCAD", "USDJPY", "USDCHF"],
+                "AUDUSD": ["USDCAD", "USDJPY", "USDCHF"],
+                "NZDUSD": ["USDCAD", "USDJPY", "USDCHF"],
+            }
+
+        # Build reverse mapping (symbol -> negatively correlated symbols)
+        # This ensures bidirectional negative correlation
+        result = {}
+        for symbol, correlated in negative_correlation_groups.items():
+            # Normalize symbol
+            normalized = symbol.upper().strip()
+
+            # Normalize correlated symbols list
+            if isinstance(correlated, list):
+                normalized_correlated = [s.upper().strip() for s in correlated]
+            else:
+                normalized_correlated = []
+
+            result[normalized] = normalized_correlated
+
+            # Also add reverse mappings (bidirectional)
+            for corr_symbol in normalized_correlated:
+                if corr_symbol not in result:
+                    result[corr_symbol] = []
+                if normalized not in result[corr_symbol]:
+                    result[corr_symbol].append(normalized)
+
+        return result
+
+    def _check_correlation_conflict(self, symbol: str, direction: str) -> str | None:
+        """
+        Check if opening a position would conflict with correlated pairs.
+
+        Handles both:
+        - Positive correlation: pairs that move together (should have same direction)
+        - Negative correlation: pairs that move opposite (should have opposite direction)
+
+        Args:
+            symbol: Trading symbol to check
+            direction: Position direction ("BUY" or "SELL")
+
+        Returns:
+            Error message if conflict found, None otherwise
+        """
+        if not self.position_directions:
+            return None
+
+        # Normalize symbol and direction
+        normalized_symbol = symbol.upper().strip()
+        normalized_direction = direction.upper()
+
+        # Check positive correlation (pairs that move together - same direction required)
+        correlated_symbols = self.correlated_pairs.get(normalized_symbol, [])
+        for corr_symbol in correlated_symbols:
+            if corr_symbol in self.position_directions:
+                existing_direction = self.position_directions[corr_symbol]
+                if existing_direction != normalized_direction:
+                    return (
+                        f"Positive correlation conflict: {corr_symbol} has {existing_direction} position, "
+                        f"cannot open {normalized_direction} for {symbol} "
+                        f"(correlated pairs should have same direction)"
+                    )
+
+        # Check negative correlation (pairs that move opposite - opposite direction required)
+        negative_correlated_symbols = self.negative_correlated_pairs.get(normalized_symbol, [])
+        for neg_corr_symbol in negative_correlated_symbols:
+            if neg_corr_symbol in self.position_directions:
+                existing_direction = self.position_directions[neg_corr_symbol]
+                # For negative correlation, directions should be opposite
+                opposite_direction = "SELL" if normalized_direction == "BUY" else "BUY"
+                if existing_direction != opposite_direction:
+                    return (
+                        f"Negative correlation conflict: {neg_corr_symbol} has {existing_direction} position, "
+                        f"cannot open {normalized_direction} for {symbol} "
+                        f"(negatively correlated pairs should have opposite direction: {neg_corr_symbol} {existing_direction} → {symbol} {opposite_direction})"
+                    )
+
+        return None
+
     def reset_tracking(self) -> None:
         """Reset exposure tracking (for testing or new session)."""
         self.positions_by_symbol.clear()
         self.positions_by_asset_class.clear()
         self.currency_exposure.clear()
+        self.position_directions.clear()
         logger.info("Exposure tracking reset")
 
     def __str__(self) -> str:

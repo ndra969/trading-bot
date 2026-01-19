@@ -6,7 +6,6 @@ Fetches historical OHLCV data from MT5 and saves it to CSV.
 
 import argparse
 import asyncio
-import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -39,10 +38,17 @@ async def download_data(symbol: str, timeframe: str, days: int, output_dir: str)
         symbol_manager = SymbolManager(connector)
         data_manager = DataManager(connector, symbol_manager)
 
-        # Validate symbol
-        if not symbol_manager.is_symbol_available(symbol):
-            logger.error(f"Symbol {symbol} not found in MT5")
-            return
+        # Validate and enable symbol in Market Watch (required for data retrieval)
+        logger.info(f"Validating and enabling symbol {symbol} in Market Watch...")
+        try:
+            symbol_manager.validate_symbol(symbol, auto_enable=True)
+            logger.info(f"Symbol {symbol} enabled successfully")
+        except Exception as e:
+            logger.error(f"Failed to enable symbol {symbol}: {e}")
+            logger.info("Trying to enable symbol manually...")
+            if not symbol_manager.select_symbol(symbol, enable=True):
+                logger.error(f"Symbol {symbol} not available or cannot be enabled in MT5")
+                return
 
         # Calculate date range
         end_date = datetime.now()
