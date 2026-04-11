@@ -274,7 +274,7 @@ symbols:
     min_volume_lots: 0.01
     max_volume_lots: 0.1
     use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
-    
+
     # Stop Loss / Take Profit Configuration (10 pips = $1 for Gold)
     # Zone-based SL: Dynamically calculated from zone size with limits
     use_zone_based_sl: true                 # Calculate SL from zone size
@@ -282,12 +282,12 @@ symbols:
     min_stop_loss_pips: 80                  # $8 minimum (prevents too tight stops)
     max_stop_loss_pips: 300                 # $30 maximum (prevents too wide stops)
     default_stop_loss_pips: 150             # $15 fallback if zone-based calculation fails
-    
+
     # Take Profit Configuration
     min_take_profit_pips: 100               # $10 minimum TP
     max_take_profit_pips: 600               # $60 maximum TP
     default_risk_reward_ratio: 2.0          # Default 1:2 R:R (if TP not specified)
-    
+
     # Trailing Stop Configuration (dynamic based on SL distance)
     use_dynamic_trailing: true              # Calculate trailing params from SL
     trailing_activation_percent: 0.35       # Activate at 35% of SL distance
@@ -306,7 +306,7 @@ symbols:
     min_volume_lots: 0.01
     max_volume_lots: 0.1
     use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
-    
+
     # Stop Loss / Take Profit Configuration (Silver - FIXED pip size 0.01)
     # With pip size 0.01 and pip value $0.50 per 0.01 lot:
     # 1 pip = $0.50, so 8 pips = $4, 40 pips = $20
@@ -333,7 +333,7 @@ symbols:
     min_volume_lots: 0.01
     max_volume_lots: 0.1
     use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
-    
+
     # Stop Loss / Take Profit Configuration (Crypto - very high volatility)
     # BTC 1 pip = $1 (usually). $67k price requires wide stops.
     use_zone_based_sl: true                # Zone-based due to extreme volatility

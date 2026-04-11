@@ -246,7 +246,7 @@ class FoundationEngine:
         # 1. First, check if symbol has specific SL configuration
         symbols_cfg = self.config.get("symbols", {})
         symbol_cfg = symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
-        
+
         # Priority 1: Symbol-specific config
         if symbol_cfg:
             config = {
@@ -668,7 +668,9 @@ class FoundationEngine:
                 # If price is too high (chasing), risk will be too large
                 # Priority: Symbol-specific > Asset-class > Global default
                 symbols_cfg = self.config.get("symbols", {})
-                symbol_cfg = symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+                symbol_cfg = (
+                    symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+                )
                 max_risk_pips = symbol_cfg.get("max_stop_loss_pips")
 
                 if max_risk_pips is None:
@@ -835,7 +837,9 @@ class FoundationEngine:
                 # CHASE PROTECTION / MAX STOP LOSS CHECK
                 # Priority: Symbol-specific > Asset-class > Global default
                 symbols_cfg = self.config.get("symbols", {})
-                symbol_cfg = symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+                symbol_cfg = (
+                    symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+                )
                 max_risk_pips = symbol_cfg.get("max_stop_loss_pips")
 
                 if max_risk_pips is None:

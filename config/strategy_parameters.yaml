@@ -113,14 +113,14 @@ signal_generation:
     min_risk_reward_ratio: 2.0   # Minimum R:R ratio (1:2)
     max_stop_loss_pips: 50       # Maximum stop loss in pips
     default_take_profit_ratio: 2.0 # Default TP ratio (1:2)
-    
+
     # Zone-Based Stop Loss (NEW)
     # When enabled, SL is calculated from zone size instead of fixed pips
     # Formula: SL = zone_size * buffer_multiplier (with min/max limits)
     # Per-symbol config in active_symbols.yaml takes precedence
     use_zone_based_sl: false  # Default: false (use fixed SL from trading_types.yaml)
     zone_sl_buffer_multiplier: 1.2  # Place SL 20% beyond zone boundary
-    
+
     # Minimum Stop Loss Distance (in pips) - ASSET CLASS DEFAULTS
     # NOTE: Per-symbol overrides in active_symbols.yaml take precedence!
     # These are fallback values when symbol-specific config not found.
@@ -129,7 +129,7 @@ signal_generation:
       forex_jpy: 15.0            # 15 pips (150 points for 5-digit broker) for USDJPY, EURJPY, etc.
       commodities: 80.0          # 80 pips for XAUUSD (Gold) - updated from 40 ($8 vs $4)
       crypto: 50.0               # 50 pips for BTCUSD, ETHUSD, etc.
-      
+
     # Maximum Stop Loss Distance (in pips) - ASSET CLASS DEFAULTS
     # NOTE: Per-symbol overrides in active_symbols.yaml take precedence!
     max_stop_loss_distance:
@@ -137,7 +137,7 @@ signal_generation:
       forex_jpy: 60.0            # Maximum 60 pips SL for JPY pairs
       commodities: 300.0         # Maximum 300 pips SL for commodities (Gold: $30)
       crypto: 200.0              # Maximum 200 pips SL for crypto
-      
+
     # Maximum Take Profit Distance (in pips) - ASSET CLASS DEFAULTS
     # Prevents TP from being too far and unreachable
     max_take_profit_distance:

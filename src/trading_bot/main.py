@@ -412,9 +412,7 @@ class TradingBot:
                     raise ValueError("Config snapshot is None after get_or_create")
 
                 if created:
-                    logger.info(
-                        f"✅ Config snapshot created: {config_snapshot.config_hash[:12]}..."
-                    )
+                    logger.info(f"✅ Config snapshot created: {config_snapshot.config_hash[:12]}...")
                 else:
                     logger.info(
                         f"✅ Config snapshot already exists: {config_snapshot.config_hash[:12]}..."
@@ -901,7 +899,9 @@ class TradingBot:
                         direction_emoji = (
                             "🟢"
                             if direction == "BULLISH"
-                            else "🔴" if direction == "BEARISH" else "⚪"
+                            else "🔴"
+                            if direction == "BEARISH"
+                            else "⚪"
                         )
                         pattern_emoji = "📊"
                         # Add specific emoji for common patterns
@@ -987,7 +987,9 @@ class TradingBot:
                         direction_emoji = (
                             "🟢"
                             if direction == "BULLISH"
-                            else "🔴" if direction == "BEARISH" else "⚪"
+                            else "🔴"
+                            if direction == "BEARISH"
+                            else "⚪"
                         )
                         pattern_emoji = "📊"
                         # Add specific emoji for common patterns
@@ -1052,9 +1054,7 @@ class TradingBot:
                 # Store ticket in both position object and metadata
                 position.ticket = ticket_value
                 position.metadata["ticket"] = ticket_value
-                logger.info(
-                    f"  🎫 Position Ticket: {ticket_value} (saved to position and metadata)"
-                )
+                logger.info(f"  🎫 Position Ticket: {ticket_value} (saved to position and metadata)")
 
             # Link position to current active account (multi-account support)
             if self.account_selector:
@@ -1208,8 +1208,12 @@ class TradingBot:
             symbol_cfg = self.config.get("symbols", {}).get(symbol_for_config, {})
 
             # DEBUG: Log symbol config lookup
-            logger.debug(f"  🔍 Symbol lookup: signal.symbol={signal.symbol}, symbol_for_config={symbol_for_config}")
-            logger.debug(f"  🔍 Symbol config found: {bool(symbol_cfg)}, keys={list(symbol_cfg.keys()) if symbol_cfg else 'None'}")
+            logger.debug(
+                f"  🔍 Symbol lookup: signal.symbol={signal.symbol}, symbol_for_config={symbol_for_config}"
+            )
+            logger.debug(
+                f"  🔍 Symbol config found: {bool(symbol_cfg)}, keys={list(symbol_cfg.keys()) if symbol_cfg else 'None'}"
+            )
 
             # Check if symbol should use dynamic lot sizing
             use_dynamic = symbol_cfg.get("use_dynamic_lot_size", True)  # Default to True
@@ -1269,7 +1273,9 @@ class TradingBot:
 
         except Exception as e:
             logger.error(f"  Position size calculation error: {e}")
-            logger.error(f"  Trace: symbol={signal.symbol}, balance={self.portfolio_risk.current_balance}")
+            logger.error(
+                f"  Trace: symbol={signal.symbol}, balance={self.portfolio_risk.current_balance}"
+            )
             # Fallback: Try to get from config with proper structure
             # CRITICAL: Config structure is config['symbols'] not config['active_symbols']['symbols']
             symbol_cfg = self.config.get("symbols", {}).get(signal.symbol, {})
