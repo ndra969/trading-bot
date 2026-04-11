@@ -34,10 +34,36 @@ class PortfolioRiskManager:
         """
         self.config = config or {}
 
-        # Risk parameters
-        self.max_risk_per_trade_pct = self.config.get("risk_management", {}).get(
-            "max_risk_per_trade_percent", 2.0
+        # Risk parameters - PRIORITY: Trading Type Config > Risk Management Config > Default
+        # Get active trading type
+        trading_types = self.config.get("trading_types", {})
+        active_type = (
+            self.config.get("active_trading_type")
+            or trading_types.get("active_trading_type")
+            or "day_trading"
         )
+
+        # Get risk config from trading type (if exists)
+        type_config = trading_types.get(active_type, {})
+        trading_risk_pct = type_config.get("risk_per_trade")
+
+        # Fallback to risk_management section if trading type doesn't have risk_per_trade
+        if trading_risk_pct is None:
+            trading_risk_pct = self.config.get("risk_management", {}).get(
+                "max_risk_per_trade_percent", 2.0
+            )
+            logger.info(
+                f"Using risk_management config: {trading_risk_pct}% (trading type '{active_type}' doesn't specify risk_per_trade)"
+            )
+        else:
+            logger.info(
+                f"Using trading type '{active_type}' config: risk_per_trade={trading_risk_pct}%"
+            )
+
+        # trading_risk_pct is in decimal form (0.005 for 0.5%), convert to percentage
+        self.max_risk_per_trade_pct = trading_risk_pct  # Already decimal, use directly
+
+        # Other parameters (use risk_management section as fallback)
         self.daily_loss_limit_pct = self.config.get("risk_management", {}).get(
             "daily_loss_limit_percent", 1.0
         )

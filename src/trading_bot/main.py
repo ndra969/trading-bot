@@ -104,7 +104,7 @@ class TradingBot:
             logger.info(f"MTF Mode: Zone={self.zone_timeframe}, Entry={self.entry_timeframe}")
         else:
             # Single TF Mode (legacy)
-            self.symbols = config.get("symbols", ["EURUSD", "GBPUSD"])
+            self.symbols = config.get("enabled_symbols", ["EURUSD", "GBPUSD"])
             self.timeframe = config.get("timeframe", "H1")
             logger.info(f"Single TF Mode: {self.timeframe}")
 
@@ -127,11 +127,16 @@ class TradingBot:
                 # Skip initialization and continue without MT5
                 if is_dry_run:
                     logger.info("🔧 DRY-RUN MODE: MT5 not set (mock mode) - using simulated data")
+                    self.data_manager = None
                 else:
-                    logger.warning(
-                        "⚠️  MT5 not set but dry_run=False - will use mock data (not recommended for live trading)"
-                    )
-                self.data_manager = None
+                    # LIVE TRADING: Initialize MT5 connector
+                    logger.info("🔴 LIVE MODE: Initializing MT5 connector...")
+                    try:
+                        await self._initialize_mt5()
+                    except Exception as e:
+                        logger.error(f"❌ Failed to initialize MT5: {e}")
+                        logger.error("❌ Cannot proceed in live mode without MT5 connection")
+                        raise
             else:
                 # MT5 connector provided, verify connection
                 try:
@@ -407,7 +412,9 @@ class TradingBot:
                     raise ValueError("Config snapshot is None after get_or_create")
 
                 if created:
-                    logger.info(f"✅ Config snapshot created: {config_snapshot.config_hash[:12]}...")
+                    logger.info(
+                        f"✅ Config snapshot created: {config_snapshot.config_hash[:12]}..."
+                    )
                 else:
                     logger.info(
                         f"✅ Config snapshot already exists: {config_snapshot.config_hash[:12]}..."
@@ -549,10 +556,36 @@ class TradingBot:
                 account_info = self.mt5.account_info
                 mt5_balance = account_info.get("balance")
                 if mt5_balance is not None and mt5_balance > 0:
-                    initial_balance = float(mt5_balance)
-                    logger.info(f"Using live MT5 balance: ${initial_balance:,.2f}")
+                    mt5_balance = float(mt5_balance)
+                    # WARNING: Check if config balance significantly differs from MT5
+                    config_balance = initial_balance
+                    if abs(mt5_balance - config_balance) / config_balance > 0.1:  # >10% difference
+                        logger.warning(
+                            f"⚠️  BALANCE MISMATCH: MT5 balance (${mt5_balance:,.2f}) differs "
+                            f"significantly from default (${config_balance:,.2f}). "
+                            f"Using MT5 balance for accurate risk management!"
+                        )
+                    initial_balance = mt5_balance
+                    logger.info(f"✅ Using live MT5 balance: ${initial_balance:,.2f}")
+                else:
+                    logger.warning(
+                        f"⚠️  Could not get MT5 balance, using default: ${initial_balance:,.2f}. "
+                        f"RISK: Position sizing may be inaccurate!"
+                    )
+            else:
+                logger.warning(
+                    f"⚠️  MT5 not connected during init, using default balance: ${initial_balance:,.2f}. "
+                    f"Balance will be updated when MT5 connects."
+                )
+
+            # Store the expected MT5 balance for later verification
+            self.expected_mt5_balance = None
 
             self.portfolio_risk.initialize_balance(initial_balance)
+            logger.info(
+                f"📊 Portfolio Risk initialized with balance: ${initial_balance:,.2f} "
+                f"(Risk per trade: {self.portfolio_risk.max_risk_per_trade_pct}% = ${initial_balance * self.portfolio_risk.max_risk_per_trade_pct / 100:.2f})"
+            )
 
             # Load active positions from database
             await self.position_manager.load_positions_from_db()
@@ -868,9 +901,7 @@ class TradingBot:
                         direction_emoji = (
                             "🟢"
                             if direction == "BULLISH"
-                            else "🔴"
-                            if direction == "BEARISH"
-                            else "⚪"
+                            else "🔴" if direction == "BEARISH" else "⚪"
                         )
                         pattern_emoji = "📊"
                         # Add specific emoji for common patterns
@@ -956,9 +987,7 @@ class TradingBot:
                         direction_emoji = (
                             "🟢"
                             if direction == "BULLISH"
-                            else "🔴"
-                            if direction == "BEARISH"
-                            else "⚪"
+                            else "🔴" if direction == "BEARISH" else "⚪"
                         )
                         pattern_emoji = "📊"
                         # Add specific emoji for common patterns
@@ -1023,7 +1052,9 @@ class TradingBot:
                 # Store ticket in both position object and metadata
                 position.ticket = ticket_value
                 position.metadata["ticket"] = ticket_value
-                logger.info(f"  🎫 Position Ticket: {ticket_value} (saved to position and metadata)")
+                logger.info(
+                    f"  🎫 Position Ticket: {ticket_value} (saved to position and metadata)"
+                )
 
             # Link position to current active account (multi-account support)
             if self.account_selector:
@@ -1111,9 +1142,90 @@ class TradingBot:
             logger.error(f"  Exposure validation error: {e}")
             return False
 
-    async def _calculate_position_size(self, signal):
-        """Calculate appropriate position size for the signal."""
+    async def _sync_balance_from_mt5(self):
+        """Sync balance from MT5 to ensure accurate position sizing."""
+        if not self.mt5 or not self.mt5.is_connected():
+            logger.debug("MT5 not connected - skipping balance sync")
+            return
+
         try:
+            account_info = self.mt5.account_info
+            mt5_balance = account_info.get("balance")
+
+            if mt5_balance is not None and mt5_balance > 0:
+                mt5_balance = float(mt5_balance)
+                current_balance = self.portfolio_risk.current_balance
+
+                # Check if balance changed significantly (more than 1%)
+                if abs(mt5_balance - current_balance) / current_balance > 0.01:
+                    logger.info(
+                        f"💰 Balance updated: ${current_balance:,.2f} → ${mt5_balance:,.2f} "
+                        f"(Change: {(mt5_balance - current_balance):+.2f}, "
+                        f"{(mt5_balance - current_balance) / current_balance * 100:+.1f}%)"
+                    )
+                    self.portfolio_risk.update_balance(mt5_balance)
+                    self.expected_mt5_balance = mt5_balance
+                else:
+                    # Small change or no change, just verify
+                    self.expected_mt5_balance = mt5_balance
+
+        except Exception as e:
+            logger.error(f"Failed to sync balance from MT5: {e}")
+
+    async def _calculate_position_size(self, signal):
+        """
+        Calculate appropriate position size for the signal.
+
+        Uses config-based lot size setting:
+        - If use_dynamic_lot_size=false: Use fixed min_volume_lots from config
+        - If use_dynamic_lot_size=true (or not set): Calculate dynamically based on risk
+
+        This allows per-symbol control of lot sizing strategy.
+        """
+        logger.info(f"  🔧 [LOT CALC] Starting position size calculation for {signal.symbol}...")
+
+        try:
+            # CRITICAL: Sync balance from MT5 BEFORE calculating position size
+            # This ensures we always use the most recent balance
+            await self._sync_balance_from_mt5()
+
+            # CRITICAL: Convert broker symbol to universal format for config lookup
+            # EURUSDc -> EURUSD so we can find the config in active_symbols.yaml
+            # Uses proper broker mapping from symbol_mapping.yaml (e.g., exness_cent)
+            symbol_for_config = signal.symbol
+            if self.symbol_mapper:
+                try:
+                    # Use convert_to_universal_symbol() to properly map broker symbols to universal format
+                    symbol_for_config = self.symbol_mapper.convert_to_universal_symbol(
+                        signal.symbol
+                    )
+                except Exception:
+                    # Fallback to basic normalization if conversion fails
+                    symbol_for_config = signal.symbol.upper().strip()
+
+            # Get symbol config from active_symbols.yaml
+            # CRITICAL FIX: Config structure is config['symbols'] not config['active_symbols']['symbols']
+            symbol_cfg = self.config.get("symbols", {}).get(symbol_for_config, {})
+
+            # DEBUG: Log symbol config lookup
+            logger.debug(f"  🔍 Symbol lookup: signal.symbol={signal.symbol}, symbol_for_config={symbol_for_config}")
+            logger.debug(f"  🔍 Symbol config found: {bool(symbol_cfg)}, keys={list(symbol_cfg.keys()) if symbol_cfg else 'None'}")
+
+            # Check if symbol should use dynamic lot sizing
+            use_dynamic = symbol_cfg.get("use_dynamic_lot_size", True)  # Default to True
+            logger.debug(f"  🔍 use_dynamic_lot_size={use_dynamic} (from config or default True)")
+
+            # FIXED LOT SIZE MODE (for testing or risky symbols like XAUUSD)
+            if not use_dynamic:
+                fixed_lot_size = symbol_cfg.get("min_volume_lots", 0.01)
+
+                logger.info(
+                    f"  📊 {signal.symbol} FIXED lot size: {fixed_lot_size:.2f} lots (config-based)"
+                )
+                return fixed_lot_size
+
+            # DYNAMIC LOT SIZE MODE (calculate based on risk)
+            logger.info(f"  📊 {signal.symbol} using DYNAMIC lot sizing mode...")
             from trading_bot.position.pip_calculator import PipCalculator
 
             # Calculate max risk amount (2% of portfolio)
@@ -1140,17 +1252,31 @@ class TradingBot:
                 pip_value_per_lot=pip_value_per_lot,
             )
 
+            # Apply min/max limits from config if available
+            min_lot = symbol_cfg.get("min_volume_lots", 0.01)
+            max_lot = symbol_cfg.get("max_volume_lots", 100.0)
+
+            # Clamp position size to config limits
+            position_size = max(min_lot, min(position_size, max_lot))
+
             logger.info(
-                f"  📊 Position sizing: Balance=${self.portfolio_risk.current_balance:.2f}, "
+                f"  📊 Position sizing: {signal.symbol} | Balance=${self.portfolio_risk.current_balance:.2f}, "
                 f"Risk=${max_risk_amount:.2f}, SL={stop_distance_pips:.1f} pips, "
-                f"PipValue=${pip_value_per_lot:.2f}, Size={position_size:.2f} lots"
+                f"PipValue=${pip_value_per_lot:.2f}, Size={position_size:.2f} lots (dynamic)"
             )
 
             return position_size
 
         except Exception as e:
             logger.error(f"  Position size calculation error: {e}")
-            return 0.01  # Fallback to hardcoded value
+            logger.error(f"  Trace: symbol={signal.symbol}, balance={self.portfolio_risk.current_balance}")
+            # Fallback: Try to get from config with proper structure
+            # CRITICAL: Config structure is config['symbols'] not config['active_symbols']['symbols']
+            symbol_cfg = self.config.get("symbols", {}).get(signal.symbol, {})
+            fallback_lot = symbol_cfg.get("min_volume_lots", 0.01)
+
+            logger.info(f"  ⚠️  Using fallback lot size: {fallback_lot:.2f} lots")
+            return fallback_lot
 
     def _get_asset_class(self, symbol):
         """Determine asset class from symbol using config."""
@@ -2380,6 +2506,10 @@ class TradingBot:
 
         while self.is_running:
             try:
+                # CRITICAL: Sync balance from MT5 on every loop iteration
+                # This ensures we always use the correct balance for position sizing
+                await self._sync_balance_from_mt5()
+
                 # CRITICAL: Verify MT5 server hasn't changed (prevent auto-switch)
                 if self.mt5 and not self.config.get("trading", {}).get("dry_run", False):
                     health = self.mt5.health_check()
@@ -2402,11 +2532,30 @@ class TradingBot:
                         self.is_running = False
                         break
 
-                logger.info(f"🔄 Trading loop iteration - analyzing {len(self.symbols)} symbol(s)")
+                logger.info(
+                    f"🔄 Trading loop iteration - analyzing {len(self.symbols)} symbol(s) in PARALLEL"
+                )
 
-                # Analyze each symbol
-                for symbol in self.symbols:
-                    await self._analyze_symbol(symbol)
+                # Analyze all symbols in parallel using asyncio.gather
+                # This ensures all symbols are analyzed simultaneously instead of sequentially
+                # Benefits:
+                # - XAUUSD won't be delayed by other symbols
+                # - All symbols get equal processing time
+                # - Faster overall analysis (limited by slowest symbol, not sum of all)
+                try:
+                    # Create analysis tasks for all symbols
+                    analysis_tasks = [self._analyze_symbol(symbol) for symbol in self.symbols]
+
+                    # Run all tasks in parallel and capture exceptions
+                    results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
+
+                    # Log any errors that occurred during analysis
+                    for symbol, result in zip(self.symbols, results, strict=False):
+                        if isinstance(result, Exception):
+                            logger.error(f"Error analyzing {symbol}: {result}")
+
+                except Exception as e:
+                    logger.error(f"Error in parallel analysis: {e}")
 
                 # Update and manage positions
                 await self._manage_positions()

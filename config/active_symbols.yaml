@@ -3,7 +3,7 @@
 
 # Global settings
 enabled: true
-max_concurrent_symbols: 7  # Increased to accommodate 6 forex pairs + XAUUSD (EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, XAUUSD)
+max_concurrent_symbols: 12  # Increased to accommodate 7 forex majors + 2 forex crosses + 2 commodities + 1 crypto
 max_positions_per_symbol: 1
 
 # Asset class settings
@@ -14,11 +14,23 @@ asset_classes:
     preferred_timeframes: ["M15", "H1", "H4"]
     trading_sessions: ["london", "new_york"]
 
+  forex_major:  # Alias for PipCalculator compatibility
+    enabled: true
+    max_concurrent_positions: 3
+    preferred_timeframes: ["M15", "H1", "H4"]
+    trading_sessions: ["london", "new_york"]
+
   forex_crosses:
-    enabled: false  # Disabled for initial phase
-    max_concurrent_positions: 2
+    enabled: true  # Enabled for EURJPY and GBPJPY
+    max_concurrent_positions: 2  # Max 2 cross pairs
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
+
+  forex_jpy:
+    enabled: true  # JPY pairs (auto-detected by PipCalculator)
+    max_concurrent_positions: 2  # Max 2 JPY positions
+    preferred_timeframes: ["H1", "H4"]
+    trading_sessions: ["tokyo", "london"]
 
   commodities:
     enabled: true  # Enabled for XAUUSD trading
@@ -27,7 +39,7 @@ asset_classes:
     trading_sessions: ["london", "new_york"]
 
   crypto:
-    enabled: false  # Disabled until pip calculation is fixed
+    enabled: true  # Enabled for BTCUSD trading
     max_concurrent_positions: 1
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["24/7"]
@@ -49,10 +61,21 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 3
-    risk_per_trade: 0.001  # 0.1%
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
     max_spread_pips: 3
     min_volume_lots: 0.01
     max_volume_lots: 1.0
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+    # Stop Loss / Take Profit Configuration (Relaxed for safety)
+    use_zone_based_sl: true                # Zone-based SL (adapts to market structure)
+    zone_sl_buffer_multiplier: 1.2         # Buffer 20% (was 1.0)
+    min_stop_loss_pips: 25                 # 25 pips minimum (was 15)
+    max_stop_loss_pips: 60                 # 60 pips maximum (was 40)
+    default_stop_loss_pips: 30             # 30 pips default (was 15)
+    min_take_profit_pips: 50               # 50 pips minimum TP
+    max_take_profit_pips: 120              # 120 pips maximum TP
+    default_risk_reward_ratio: 2.0         # 1:2 R:R
 
   GBPUSD:
     enabled: true
@@ -62,10 +85,21 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 75
     max_zones_per_session: 2
-    risk_per_trade: 0.001  # 0.1%
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+    # Stop Loss / Take Profit Configuration (GBPUSD more volatile - wider)
+    use_zone_based_sl: true                # Zone-based SL
+    zone_sl_buffer_multiplier: 1.2         # Buffer 20% (was 1.0)
+    min_stop_loss_pips: 30                 # 30 pips min (was 20)
+    max_stop_loss_pips: 70                 # 70 pips max (was 50)
+    default_stop_loss_pips: 40             # 40 pips default (was 20)
+    min_take_profit_pips: 60
+    max_take_profit_pips: 150
+    default_risk_reward_ratio: 2.0
 
   USDJPY:
     enabled: true
@@ -75,10 +109,21 @@ symbols:
     trading_sessions: ["tokyo", "london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.001  # 0.1%
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
     max_spread_pips: 3
     min_volume_lots: 0.01
     max_volume_lots: 0.5
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+    # Stop Loss / Take Profit Configuration (JPY pairs - higher volatility)
+    use_zone_based_sl: true                # Zone-based SL
+    zone_sl_buffer_multiplier: 1.2         # Buffer 20% (was 1.0)
+    min_stop_loss_pips: 30                 # 30 pips min (was 15)
+    max_stop_loss_pips: 70                 # 70 pips max (was 40)
+    default_stop_loss_pips: 40             # 40 pips default (was 15)
+    min_take_profit_pips: 60
+    max_take_profit_pips: 150              # 150 pips max (was 80)
+    default_risk_reward_ratio: 2.0
 
   USDCHF:
     enabled: true  # Enabled for initial phase - diversifies USD pairs
@@ -88,10 +133,21 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.001
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+    # Stop Loss / Take Profit Configuration
+    use_zone_based_sl: true                # Zone-based SL
+    zone_sl_buffer_multiplier: 1.2         # Buffer 20% (was 1.0)
+    min_stop_loss_pips: 25                 # 25 pips minimum (was 15)
+    max_stop_loss_pips: 60                 # 60 pips max (was 40)
+    default_stop_loss_pips: 30             # 30 pips default (was 15)
+    min_take_profit_pips: 50
+    max_take_profit_pips: 120              # 120 pips max (was 80)
+    default_risk_reward_ratio: 2.0
 
   AUDUSD:
     enabled: true  # Enabled for initial phase - provides Asia session coverage
@@ -101,10 +157,21 @@ symbols:
     trading_sessions: ["sydney", "tokyo", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.001
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+    # Stop Loss / Take Profit Configuration
+    use_zone_based_sl: true                # Zone-based SL
+    zone_sl_buffer_multiplier: 1.0         # Tighter buffer (was 1.2)
+    min_stop_loss_pips: 15                 # 15 pips minimum
+    max_stop_loss_pips: 40                 # 40 pips max (was 60)
+    default_stop_loss_pips: 15             # 15 pips default
+    min_take_profit_pips: 30
+    max_take_profit_pips: 80               # 80 pips max (was 120)
+    default_risk_reward_ratio: 2.0
 
   USDCAD:
     enabled: true  # Enabled for initial phase - diversifies USD pairs with CAD exposure
@@ -114,10 +181,84 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.001
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+    # Stop Loss / Take Profit Configuration
+    use_zone_based_sl: true                # Zone-based SL
+    zone_sl_buffer_multiplier: 1.0         # Tighter buffer (was 1.2)
+    min_stop_loss_pips: 15                 # 15 pips minimum
+    max_stop_loss_pips: 40                 # 40 pips max (was 60)
+    default_stop_loss_pips: 15             # 15 pips default
+    min_take_profit_pips: 30
+    max_take_profit_pips: 80               # 80 pips max (was 120)
+    default_risk_reward_ratio: 2.0
+
+  NZDUSD:
+    enabled: true  # Enabled for diversification
+    priority: 10
+    asset_class: "forex_majors"
+    timeframes: ["M15", "H1", "H4"]
+    trading_sessions: ["tokyo", "london", "new_york"]
+    min_zone_strength: 70
+    max_zones_per_session: 2
+    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    max_spread_pips: 4
+    min_volume_lots: 0.01
+    max_volume_lots: 0.5
+    use_dynamic_lot_size: true  # Use dynamic lot sizing based on risk
+
+  # Forex Crosses (JPY pairs)
+  EURJPY:
+    enabled: true  # Enabled for diversification
+    priority: 11
+    asset_class: "forex_crosses"
+    timeframes: ["H1", "H4"]
+    trading_sessions: ["london", "new_york"]  # Tokyo + London overlap
+    min_zone_strength: 70
+    max_zones_per_session: 2
+    risk_per_trade: 0.004  # 0.4% per trade
+    max_spread_pips: 5  # JPY pairs have wider spreads
+    min_volume_lots: 0.01
+    max_volume_lots: 0.5
+    use_dynamic_lot_size: true
+
+    # Stop Loss / Take Profit Configuration (JPY pairs - pip size 0.01)
+    use_zone_based_sl: true
+    zone_sl_buffer_multiplier: 1.0
+    min_stop_loss_pips: 20  # 20 pips for JPY (200 points)
+    max_stop_loss_pips: 50  # 50 pips max
+    default_stop_loss_pips: 20
+    min_take_profit_pips: 40
+    max_take_profit_pips: 100
+    default_risk_reward_ratio: 2.0
+
+  GBPJPY:
+    enabled: true  # Enabled for diversification
+    priority: 12
+    asset_class: "forex_crosses"
+    timeframes: ["H1", "H4"]
+    trading_sessions: ["tokyo", "london"]  # Best session for GBPJPY
+    min_zone_strength: 70
+    max_zones_per_session: 2
+    risk_per_trade: 0.004  # 0.4% per trade
+    max_spread_pips: 6  # GBPJPY more volatile
+    min_volume_lots: 0.01
+    max_volume_lots: 0.5
+    use_dynamic_lot_size: true
+
+    # Stop Loss / Take Profit Configuration (JPY pairs)
+    use_zone_based_sl: true
+    zone_sl_buffer_multiplier: 1.0
+    min_stop_loss_pips: 25  # GBPJPY more volatile
+    max_stop_loss_pips: 60  # 60 pips max
+    default_stop_loss_pips: 25
+    min_take_profit_pips: 50
+    max_take_profit_pips: 120
+    default_risk_reward_ratio: 2.0
 
   # Commodities
   XAUUSD:
@@ -132,9 +273,28 @@ symbols:
     max_spread_pips: 50  # 50 pips for gold (0.1 pip size = 5 USD)
     min_volume_lots: 0.01
     max_volume_lots: 0.1
+    use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
+    
+    # Stop Loss / Take Profit Configuration (10 pips = $1 for Gold)
+    # Zone-based SL: Dynamically calculated from zone size with limits
+    use_zone_based_sl: true                 # Calculate SL from zone size
+    zone_sl_buffer_multiplier: 1.2          # Place SL 20% beyond zone boundary
+    min_stop_loss_pips: 80                  # $8 minimum (prevents too tight stops)
+    max_stop_loss_pips: 300                 # $30 maximum (prevents too wide stops)
+    default_stop_loss_pips: 150             # $15 fallback if zone-based calculation fails
+    
+    # Take Profit Configuration
+    min_take_profit_pips: 100               # $10 minimum TP
+    max_take_profit_pips: 600               # $60 maximum TP
+    default_risk_reward_ratio: 2.0          # Default 1:2 R:R (if TP not specified)
+    
+    # Trailing Stop Configuration (dynamic based on SL distance)
+    use_dynamic_trailing: true              # Calculate trailing params from SL
+    trailing_activation_percent: 0.35       # Activate at 35% of SL distance
+    trailing_limit_percent: 0.12            # Trail 12% of SL distance behind high
 
   XAGUSD:
-    enabled: false  # Disabled for initial phase
+    enabled: true  # Enabled for testing
     priority: 8
     asset_class: "commodities"
     timeframes: ["H1", "H4"]
@@ -145,10 +305,23 @@ symbols:
     max_spread_pips: 10  # 10 pips for silver
     min_volume_lots: 0.01
     max_volume_lots: 0.1
+    use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
+    
+    # Stop Loss / Take Profit Configuration (Silver - FIXED pip size 0.01)
+    # With pip size 0.01 and pip value $0.50 per 0.01 lot:
+    # 1 pip = $0.50, so 8 pips = $4, 40 pips = $20
+    use_zone_based_sl: true                # Zone-based for commodities
+    zone_sl_buffer_multiplier: 1.2
+    min_stop_loss_pips: 8                  # $4 minimum (8 pips × $0.50)
+    max_stop_loss_pips: 40                 # $20 maximum (40 pips × $0.50)
+    default_stop_loss_pips: 16             # $8 default (16 pips × $0.50)
+    min_take_profit_pips: 12               # $6 minimum TP
+    max_take_profit_pips: 60               # $30 maximum TP
+    default_risk_reward_ratio: 2.0
 
   # Crypto
   BTCUSD:
-    enabled: false  # Disabled until pip calculation is fixed
+    enabled: true  # Enabled for testing
     priority: 9
     asset_class: "crypto"
     timeframes: ["H1", "H4"]
@@ -159,6 +332,18 @@ symbols:
     max_spread_pips: 1000 # ~10 USD spread
     min_volume_lots: 0.01
     max_volume_lots: 0.1
+    use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
+    
+    # Stop Loss / Take Profit Configuration (Crypto - very high volatility)
+    # BTC 1 pip = $1 (usually). $67k price requires wide stops.
+    use_zone_based_sl: true                # Zone-based due to extreme volatility
+    zone_sl_buffer_multiplier: 1.5         # Wider buffer (was 1.3)
+    min_stop_loss_pips: 300                # $300 minimum (approx 0.5%)
+    max_stop_loss_pips: 2000               # $2000 maximum (approx 3%)
+    default_stop_loss_pips: 800            # $800 default (approx 1.2%)
+    min_take_profit_pips: 600              # $600 min TP
+    max_take_profit_pips: 5000             # $5000 max TP
+    default_risk_reward_ratio: 2.0
 
 # Trading session schedules
 trading_sessions:

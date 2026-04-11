@@ -95,7 +95,7 @@ supply_demand:
 signal_generation:
   # Signal Quality Requirements
   quality_thresholds:
-    min_confluence_score: 40.0   # Lowered to 40% for testing - allows more signals to pass
+    min_confluence_score: 30.0   # Lowered to 30% to increase trade frequency while maintaining quality
     min_foundation_score: 30.0   # Minimum foundation S&D score (Raised for quality)
     min_price_action_score: 10.0  # Minimum price action score (NEW: require price action confirmation)
     max_signals_per_symbol: 1    # Maximum signals per symbol
@@ -113,20 +113,38 @@ signal_generation:
     min_risk_reward_ratio: 2.0   # Minimum R:R ratio (1:2)
     max_stop_loss_pips: 50       # Maximum stop loss in pips
     default_take_profit_ratio: 2.0 # Default TP ratio (1:2)
-    # Minimum Stop Loss Distance (in pips)
-    # Prevents SL from being too tight and getting stopped out by normal market noise
+    
+    # Zone-Based Stop Loss (NEW)
+    # When enabled, SL is calculated from zone size instead of fixed pips
+    # Formula: SL = zone_size * buffer_multiplier (with min/max limits)
+    # Per-symbol config in active_symbols.yaml takes precedence
+    use_zone_based_sl: false  # Default: false (use fixed SL from trading_types.yaml)
+    zone_sl_buffer_multiplier: 1.2  # Place SL 20% beyond zone boundary
+    
+    # Minimum Stop Loss Distance (in pips) - ASSET CLASS DEFAULTS
+    # NOTE: Per-symbol overrides in active_symbols.yaml take precedence!
+    # These are fallback values when symbol-specific config not found.
     min_stop_loss_distance:
       forex_major: 15.0          # 15 pips (150 points for 5-digit broker) for EURUSD, GBPUSD, etc.
       forex_jpy: 15.0            # 15 pips (150 points for 5-digit broker) for USDJPY, EURJPY, etc.
-      commodities: 40.0           # 40 pips for XAUUSD (Gold) - reduced for more flexibility
-      crypto: 50.0                # 50 pips for BTCUSD, ETHUSD, etc.
-    # Maximum Take Profit Distance (in pips)
+      commodities: 80.0          # 80 pips for XAUUSD (Gold) - updated from 40 ($8 vs $4)
+      crypto: 50.0               # 50 pips for BTCUSD, ETHUSD, etc.
+      
+    # Maximum Stop Loss Distance (in pips) - ASSET CLASS DEFAULTS
+    # NOTE: Per-symbol overrides in active_symbols.yaml take precedence!
+    max_stop_loss_distance:
+      forex_major: 60.0          # Maximum 60 pips SL for forex major
+      forex_jpy: 60.0            # Maximum 60 pips SL for JPY pairs
+      commodities: 300.0         # Maximum 300 pips SL for commodities (Gold: $30)
+      crypto: 200.0              # Maximum 200 pips SL for crypto
+      
+    # Maximum Take Profit Distance (in pips) - ASSET CLASS DEFAULTS
     # Prevents TP from being too far and unreachable
     max_take_profit_distance:
       forex_major: 60.0           # Maximum 60 pips TP distance for forex major
       forex_jpy: 60.0             # Maximum 60 pips TP distance for JPY pairs
-      commodities: 200.0          # Maximum 200 pips TP distance for commodities
-      crypto: 200.0                # Maximum 200 pips TP distance for crypto
+      commodities: 600.0          # Maximum 600 pips TP distance for commodities (Gold: $60)
+      crypto: 200.0               # Maximum 200 pips TP distance for crypto
 
 # Multi-Timeframe Analysis Configuration
 timeframe_analysis:
@@ -150,7 +168,7 @@ timeframe_analysis:
 
   # Analysis Parameters
   analysis_settings:
-    min_confluence_score: 40.0   # Lowered to 40% for testing - allows more signals to pass
+    min_confluence_score: 30.0   # Synchronized with signal_generation threshold
     timeframes_required: 2       # Minimum timeframes for validation
     cache_duration_minutes: 5    # Cache duration for analysis results
     max_analysis_time_seconds: 10 # Maximum time for analysis

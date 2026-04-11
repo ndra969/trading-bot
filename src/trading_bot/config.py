@@ -157,7 +157,7 @@ class Configuration:
                                 enabled_symbols.append(sym)
 
                     if enabled_symbols:
-                        self._config["symbols"] = enabled_symbols
+                        self._config["enabled_symbols"] = enabled_symbols
 
         # Load trading types configuration
         trading_types_path = self.config_dir / "trading_types.yaml"

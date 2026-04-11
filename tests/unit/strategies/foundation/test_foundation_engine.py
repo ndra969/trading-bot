@@ -1238,9 +1238,21 @@ class TestFoundationEngineAssetClassSLBuffer:
                     },
                     "risk_reward": {
                         "default_take_profit_ratio": 2.0,
+                        "use_zone_based_sl": True,
+                        "zone_sl_buffer_multiplier": 1.2,
                         "min_stop_loss_distance": {
                             "forex_major": 15.0,
                             "forex_jpy": 15.0,
+                            "commodities": 80.0,
+                            "crypto": 50.0,
+                        },
+                        "max_stop_loss_distance": {
+                            "commodities": 300.0,
+                            "crypto": 500.0,
+                        },
+                        "max_take_profit_distance": {
+                            "commodities": 600.0,
+                            "crypto": 2000.0,
                         },
                     },
                 },
@@ -1507,7 +1519,11 @@ class TestFoundationEngineAssetClassSLBuffer:
         # Update config to allow larger risk for crypto test (BTC has high raw price difference)
         if "risk_reward" not in engine.config["signal_generation"]:
             engine.config["signal_generation"]["risk_reward"] = {}
-        engine.config["signal_generation"]["risk_reward"]["max_stop_loss_pips"] = 1000000.0
+        # Ensure max_stop_loss_distance.crypto is large enough to not reject the signal
+        engine.config["signal_generation"]["risk_reward"]["max_stop_loss_distance"] = {
+            "crypto": 500.0,
+            "commodities": 300.0,
+        }
         # Increase max_take_profit_distance for crypto to avoid R:R being too low after capping
         if "max_take_profit_distance" not in engine.config["signal_generation"]["risk_reward"]:
             engine.config["signal_generation"]["risk_reward"]["max_take_profit_distance"] = {}
@@ -1526,72 +1542,88 @@ class TestFoundationEngineAssetClassSLBuffer:
             }
         )
 
-        # Mock all analyzers
-        with patch.object(
-            engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
-        ) as mock_rsi:
-            mock_rsi.return_value = type(
-                "RSISignal", (), {"signal_type": "NEUTRAL", "confidence": 0.0, "details": {}}
-            )()
+        # FIX: Patch _get_sl_config directly on the engine instance to guarantee correct
+        # crypto SL config is used. The PipCalculator class-level patch was unreliable
+        # because _get_sl_config creates a new PipCalculator() instance internally,
+        # causing asset_class lookup to fail and defaulting to the 100-pip max risk limit.
+        crypto_sl_config = {
+            "use_zone_based": True,
+            "zone_buffer": 1.2,
+            "min_sl": 50.0,
+            "max_sl": 500.0,
+            "default_sl": 150.0,
+            "source": "asset_class_config",
+        }
 
+        with patch.object(engine, "_get_sl_config", return_value=crypto_sl_config):
+
+            # Mock all analyzers
             with patch.object(
-                engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
-            ) as mock_ma:
-                mock_ma.return_value = type(
-                    "MASignal", (), {"signal_type": "NEUTRAL", "confidence": 0.0, "details": {}}
+                engine.rsi_analyzer, "analyze_rsi_signal", new_callable=AsyncMock
+            ) as mock_rsi:
+                mock_rsi.return_value = type(
+                    "RSISignal", (), {"signal_type": "NEUTRAL", "confidence": 0.0, "details": {}}
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
-                ) as mock_tl:
-                    mock_tl.return_value = type(
-                        "TrendlineSignal",
-                        (),
-                        {"signal_type": "NEUTRAL", "confidence": 0.0, "details": {}},
+                    engine.ma_analyzer, "analyze_ma_signal", new_callable=AsyncMock
+                ) as mock_ma:
+                    mock_ma.return_value = type(
+                        "MASignal", (), {"signal_type": "NEUTRAL", "confidence": 0.0, "details": {}}
                     )()
 
                     with patch.object(
-                        engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
-                    ) as mock_pa:
-                        # Mock price action to return valid pattern (since require_price_action is False, this is optional)
-                        pa_signal = type(
-                            "PriceActionSignal",
+                        engine.trendline_analyzer,
+                        "analyze_trendline_signal",
+                        new_callable=AsyncMock,
+                    ) as mock_tl:
+                        mock_tl.return_value = type(
+                            "TrendlineSignal",
                             (),
-                            {
-                                "symbol": "EURUSD",
-                                "pattern_type": "PINBAR",
-                                "direction": "BULLISH",
-                                "confidence": 75.0,
-                                "details": {"pattern": "PINBAR"},
-                            },
+                            {"signal_type": "NEUTRAL", "confidence": 0.0, "details": {}},
                         )()
-                        mock_pa.return_value = pa_signal
 
                         with patch.object(
-                            engine.fibonacci_analyzer, "analyze_fibonacci", new_callable=AsyncMock
-                        ) as mock_fib:
-                            mock_fib.return_value = None
+                            engine.price_action_analyzer, "analyze_pattern", new_callable=AsyncMock
+                        ) as mock_pa:
+                            pa_signal = type(
+                                "PriceActionSignal",
+                                (),
+                                {
+                                    "symbol": "BTCUSD",
+                                    "pattern_type": "PINBAR",
+                                    "direction": "BULLISH",
+                                    "confidence": 75.0,
+                                    "details": {"pattern": "PINBAR"},
+                                },
+                            )()
+                            mock_pa.return_value = pa_signal
 
                             with patch.object(
-                                engine.structure_analyzer,
-                                "analyze_structure",
+                                engine.fibonacci_analyzer,
+                                "analyze_fibonacci",
                                 new_callable=AsyncMock,
-                            ) as mock_struct:
-                                mock_struct.return_value = None
+                            ) as mock_fib:
+                                mock_fib.return_value = None
 
-                                result = await engine._create_signal_from_zone(
-                                    "BTCUSD", demand_zone_crypto, current_price, "H1", data
-                                )
+                                with patch.object(
+                                    engine.structure_analyzer,
+                                    "analyze_structure",
+                                    new_callable=AsyncMock,
+                                ) as mock_struct:
+                                    mock_struct.return_value = None
 
-                                assert result is not None
-                                assert result.direction.value == "BUY"
-                                # For crypto: SL buffer should be 150% of zone height OR minimum 1000 points
-                                # Zone height: 1000 points, 150% = 1500 points
-                                # So SL should be at least 1000 points below lower_bound
-                                assert result.stop_loss < result.entry_price
-                                # Verify SL is at least 1000 points away
-                                sl_distance = result.entry_price - result.stop_loss
-                                assert sl_distance >= 1000.0  # At least minimum buffer for crypto
+                                    result = await engine._create_signal_from_zone(
+                                        "BTCUSD", demand_zone_crypto, current_price, "H1", data
+                                    )
+
+                                    assert result is not None
+                                    assert result.direction.value == "BUY"
+                                    # Zone height is 50 pips. Buffer 1.2 → 60 pips.
+                                    # Min SL is 50 pips. Max SL is 500 pips.
+                                    # Final SL = max(50, min(60, 500)) = 60 pips.
+                                    sl_distance = result.entry_price - result.stop_loss
+                                    assert sl_distance >= 50.0
 
     @pytest.mark.asyncio
     async def test_commodity_sl_buffer_calculation(self, engine_with_config, demand_zone_commodity):

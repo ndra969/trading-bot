@@ -149,6 +149,7 @@ class BreakevenManager:
         position.stop_loss = new_stop_loss
 
         # Mark as moved to breakeven
+        position.breakeven_activated = True
         self.breakeven_positions.add(position.position_id)
 
         logger.info(

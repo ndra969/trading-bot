@@ -9,8 +9,6 @@ trading:
     zone_cache_minutes: 60
 
   watchlist:
-    - symbol: XAUUSD
-      enabled: true
     - symbol: EURUSD
       enabled: true
     - symbol: GBPUSD
@@ -22,6 +20,18 @@ trading:
     - symbol: AUDUSD
       enabled: true
     - symbol: USDCAD
+      enabled: true
+    - symbol: NZDUSD
+      enabled: true
+    - symbol: EURJPY
+      enabled: true
+    - symbol: GBPJPY
+      enabled: true
+    - symbol: XAUUSD
+      enabled: true
+    - symbol: XAGUSD
+      enabled: true
+    - symbol: BTCUSD
       enabled: true
 
   risk_per_trade: 0.005
@@ -59,10 +69,10 @@ position_management:
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
 
     # Fallback to fixed pips if ATR not available
-    breakeven_trigger: 15      # More aggressive protection (realistic for day trading)
-    breakeven_offset: 3        # Tighter buffer for quicker protection
-    trailing_activation: 20    # Lower threshold for more frequent trailing
-    trailing_distance: 12      # Balanced trailing distance
+    breakeven_trigger: 30      # More room (was 15 pips/points)
+    breakeven_offset: 5        # Buffer
+    trailing_activation: 40    # Activate after 40 pips/points
+    trailing_distance: 25      # Trail by 25 pips/points
 
     # Tiered trailing
     use_tiered_trailing: true
@@ -76,10 +86,10 @@ position_management:
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
 
     # Fallback to fixed pips if ATR not available
-    breakeven_trigger: 25     # Pips (Adjusted for realistic day trading)
+    breakeven_trigger: 40     # JPY pairs are more volatile
     breakeven_offset: 5       # Buffer for breakeven
-    trailing_activation: 30   # Pips profit to activate trailing
-    trailing_distance: 15     # Pips trailing distance
+    trailing_activation: 50   # Pips profit to activate trailing
+    trailing_distance: 30     # Pips trailing distance
 
     # Tiered trailing
     use_tiered_trailing: true
@@ -90,18 +100,18 @@ position_management:
     # ATR-based trailing (Week 15.5 improvement)
     use_atr_trailing: true
     trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
-    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+    trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR (More aggressive locking)
 
     # Fallback to fixed pips if ATR not available
-    breakeven_trigger: 100    # More realistic for day trading (down from 500)
-    breakeven_offset: 20      # Reasonable buffer for Gold volatility
-    trailing_activation: 150  # More responsive (down from 600)
-    trailing_distance: 50     # Tighter trailing (down from 300)
+    breakeven_trigger: 50     # $0.50 move (activate sooner)
+    breakeven_offset: 10      # $0.10 buffer
+    trailing_activation: 80   # Activate at $0.80 profit
+    trailing_distance: 40     # Trail by $0.40 initial distance
 
-    # Tiered trailing
+    # Tiered trailing (TIGHTENING LOGIC)
     use_tiered_trailing: true
-    tier_thresholds: [100, 200, 300]  # Profit levels in pips
-    tier_distances: [40, 60, 80]      # Trailing distance per tier
+    tier_thresholds: [100, 200, 300]  # Profit levels ($1, $2, $3)
+    tier_distances: [40, 30, 20]      # TIGHTER as profit grows ($0.40 -> $0.30 -> $0.20)
 
   crypto:  # BTCUSD, ETHUSD
     # ATR-based trailing (Week 15.5 improvement)
@@ -110,15 +120,16 @@ position_management:
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
 
     # Fallback to fixed pips if ATR not available
-    breakeven_trigger: 40     # More aggressive (down from 50)
-    breakeven_offset: 5       # Buffer for breakeven
-    trailing_activation: 50   # More responsive (down from 60)
-    trailing_distance: 25     # Tighter trailing (down from 30)
+    # For BTC price ~$67k, 1 pip usually = $1
+    breakeven_trigger: 400    # $400 move (approx 0.6%) to activate BE
+    breakeven_offset: 50      # $50 buffer
+    trailing_activation: 600  # Activate trailing after $600 move
+    trailing_distance: 300    # Trail by $300 distance (approx 0.5%)
 
     # Tiered trailing
     use_tiered_trailing: true
-    tier_thresholds: [30, 60, 100]  # Profit levels in USD
-    tier_distances: [20, 30, 40]    # Trailing distance per tier
+    tier_thresholds: [500, 1000, 2000]  # Profit levels in USD/pips
+    tier_distances: [300, 500, 800]     # Trailing distance per tier
 
 # Risk Management Configuration
 risk_management:

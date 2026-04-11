@@ -39,6 +39,15 @@ class SignalAggregator:
         """
         self.config = config or {}
 
+        # Get active trading type and its configuration
+        trading_types = self.config.get("trading_types", {})
+        active_type = (
+            self.config.get("active_trading_type")
+            or trading_types.get("active_trading_type")
+            or "day_trading"
+        )
+        type_config = trading_types.get(active_type, {})
+
         # Load confluence weights from config
         self.confluence_weights = self.config.get("confluence_weights", {})
         if not self.confluence_weights:
@@ -64,11 +73,17 @@ class SignalAggregator:
                 k: v / total_weight for k, v in self.confluence_weights.items()
             }
 
-        # Signal quality thresholds
-        self.min_confluence_score = (
+        # Signal quality thresholds - PRIORITY: Trading Type Config > General Config > Default
+        self.min_confluence_score = type_config.get(
+            "confluence_threshold",
             self.config.get("signal_generation", {})
             .get("quality_thresholds", {})
-            .get("min_confluence_score", 65.0)
+            .get("min_confluence_score", 65.0),
+        )
+
+        logger.info(
+            f"SignalAggregator initialized (trading_type: {active_type}, "
+            f"min_confluence: {self.min_confluence_score})"
         )
         self.max_signals_per_symbol = (
             self.config.get("signal_generation", {})
@@ -322,18 +337,44 @@ class SignalAggregator:
         """
         Filter signals by quality threshold.
 
+        Note: Commodities skip confluence check (consistent with foundation_engine.py:1168)
+        because they use dynamic quality thresholds based on market conditions.
+
         Args:
             signals: List of trading signals
 
         Returns:
             Filtered signals that meet quality requirements
         """
-        filtered = [
-            signal
-            for signal in signals
-            if signal.confluence_score >= self.min_confluence_score
-            and signal.risk_reward_ratio >= self.min_risk_reward_ratio
-        ]
+        # Import here to avoid circular dependency
+        from trading_bot.position.pip_calculator import PipCalculator
+
+        pip_calc = PipCalculator()
+        filtered = []
+
+        for signal in signals:
+            # Determine asset class
+            asset_class = pip_calc._determine_asset_class(signal.symbol)
+
+            # For commodities, skip confluence check (only check R:R)
+            if asset_class == "commodities":
+                if signal.risk_reward_ratio >= self.min_risk_reward_ratio:
+                    filtered.append(signal)
+                else:
+                    logger.debug(
+                        f"{signal.symbol} (commodities): R:R {signal.risk_reward_ratio:.2f} < {self.min_risk_reward_ratio:.2f} (rejected)"
+                    )
+            # For other assets, check both confluence and R:R
+            else:
+                if (
+                    signal.confluence_score >= self.min_confluence_score
+                    and signal.risk_reward_ratio >= self.min_risk_reward_ratio
+                ):
+                    filtered.append(signal)
+                else:
+                    logger.debug(
+                        f"{signal.symbol}: Confluence {signal.confluence_score:.1f}% < {self.min_confluence_score:.1f}% OR R:R {signal.risk_reward_ratio:.2f} < {self.min_risk_reward_ratio:.2f} (rejected)"
+                    )
 
         if len(filtered) < len(signals):
             logger.debug(f"Filtered {len(signals) - len(filtered)} signals below quality threshold")

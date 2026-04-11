@@ -87,9 +87,17 @@ class MTFAnalyzer:
         logger.info(f"{symbol}: Detected {len(zones)} zones on {zone_tf}")
         self.detected_zones = zones
 
-        # Step 2: Check for entry signals on lower timeframe
+        # Step 2: Calculate H1 Trend Bias (Sniper Gate)
+        h1_trend_bias = self._calculate_h1_trend_bias(zone_tf_data)
+        logger.info(f"{symbol}: H1 Trend Bias: {h1_trend_bias}")
+
+        # Step 3: Check for entry signals on lower timeframe
         signals = await self._check_entry_signals(
-            symbol=symbol, zones=zones, entry_tf_data=entry_tf_data, entry_tf=entry_tf
+            symbol=symbol,
+            zones=zones,
+            entry_tf_data=entry_tf_data,
+            entry_tf=entry_tf,
+            h1_trend_bias=h1_trend_bias,
         )
 
         if not signals:
@@ -123,7 +131,12 @@ class MTFAnalyzer:
             return []
 
     async def _check_entry_signals(
-        self, symbol: str, zones: list, entry_tf_data: pd.DataFrame, entry_tf: str
+        self,
+        symbol: str,
+        zones: list,
+        entry_tf_data: pd.DataFrame,
+        entry_tf: str,
+        h1_trend_bias: str | None = None,
     ) -> list[StrategyResult]:
         """
         Check for entry signals on lower timeframe at zone levels.
@@ -151,7 +164,10 @@ class MTFAnalyzer:
         # Generate signals using FoundationEngine
         # It will check if price is at any zone and create signals with proper SL/TP
         signals = await self.foundation_engine.generate_signals(
-            symbol=symbol, data=entry_tf_data, timeframe=entry_tf
+            symbol=symbol,
+            data=entry_tf_data,
+            timeframe=entry_tf,
+            h1_trend_bias=h1_trend_bias,
         )
 
         # Filter signals to only those that are at our detected H1 zones
@@ -165,6 +181,54 @@ class MTFAnalyzer:
                 valid_signals.append(signal)
 
         return valid_signals
+
+    def _calculate_h1_trend_bias(self, h1_data: pd.DataFrame) -> str:
+        """
+        Calculate H1 trend bias using EMA 50 (Strict Sniper Gate).
+
+        Matches the logic in IntradayExecutor/Backtest:
+        - Price > EMA 50: BULLISH
+        - Price < EMA 50: BEARISH
+        - Momentum Protection: consecutive candles must align.
+
+        Args:
+            h1_data: H1 OHLCV data
+
+        Returns:
+            'BULLISH', 'BEARISH', or 'NEUTRAL'
+        """
+        if len(h1_data) < 50:
+            return "NEUTRAL"
+
+        # Calculate EMA 50
+        ema_50 = h1_data["close"].ewm(span=50, adjust=False).mean()
+        curr_ema = ema_50.iloc[-1]
+        curr_price = float(h1_data["close"].iloc[-1])
+
+        # Strict Price vs EMA 50
+        if curr_price > curr_ema:
+            bias = "BULLISH"
+        elif curr_price < curr_ema:
+            bias = "BEARISH"
+        else:
+            bias = "NEUTRAL"
+
+        # Momentum Protection (2 consecutive candles)
+        if len(h1_data) >= 3:
+            c_curr = h1_data["close"].iloc[-1]
+            c_p1 = h1_data["close"].iloc[-2]
+            c_p2 = h1_data["close"].iloc[-3]
+
+            # If two consecutive red candles, block BUY
+            if bias == "BULLISH" and c_curr < c_p1 and c_p1 < c_p2:
+                logger.info("SNIPER: Blocking BULLISH bias due to Bearish Momentum")
+                bias = "NEUTRAL"
+            # If two consecutive green candles, block SELL
+            if bias == "BEARISH" and c_curr > c_p1 and c_p1 > c_p2:
+                logger.info("SNIPER: Blocking BEARISH bias due to Bullish Momentum")
+                bias = "NEUTRAL"
+
+        return bias
 
 
 class ZoneCache:

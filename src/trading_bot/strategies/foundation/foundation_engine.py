@@ -27,15 +27,19 @@ class FoundationEngine:
     Coordinates all foundation strategy components.
     """
 
-    def __init__(self, config: dict[str, Any] = None, use_database: bool = True):
+    def __init__(
+        self, config: dict[str, Any] = None, use_database: bool = True, symbol_mapper=None
+    ):
         """
         Initialize foundation engine.
 
         Args:
             config: Engine configuration
             use_database: Whether to persist zones to database
+            symbol_mapper: Optional SymbolMapper for symbol normalization (EURUSDc -> EURUSD)
         """
         self.config = config or {}
+        self.symbol_mapper = symbol_mapper  # Store for symbol normalization
 
         # Initialize S&D strategy
         self.strategy = SupplyDemandStrategy(
@@ -84,7 +88,11 @@ class FoundationEngine:
         return self.strategy.get_zones(symbol)
 
     async def generate_signals(
-        self, symbol: str, data: pd.DataFrame, timeframe: str = "H1"
+        self,
+        symbol: str,
+        data: pd.DataFrame,
+        timeframe: str = "H1",
+        h1_trend_bias: str = None,
     ) -> list[StrategyResult]:
         """
         Generate trading signals from foundation strategy.
@@ -139,7 +147,7 @@ class FoundationEngine:
             # Check if price is at/near zone
             if self._is_price_at_zone(current_price, zone):
                 result = await self._create_signal_from_zone(
-                    symbol, zone, current_price, timeframe, data
+                    symbol, zone, current_price, timeframe, data, h1_trend_bias
                 )
                 if result:
                     results.append(result)
@@ -207,6 +215,142 @@ class FoundationEngine:
             # If price is approaching from below, it's a SUPPLY zone (Resistance)
             return current_price > midpoint
 
+    def _get_sl_config(self, symbol: str) -> dict:
+        """
+        Get SL configuration with fallback hierarchy.
+
+        Priority:
+        1. Symbol-specific config (active_symbols.yaml)
+        2. Asset class config (strategy_parameters.yaml)
+        3. Hardcoded defaults
+
+        Args:
+            symbol: Trading symbol
+
+        Returns:
+            Dictionary with SL configuration
+        """
+        # Try symbol-specific config first (active_symbols.yaml)
+        # CRITICAL: Convert broker symbol to universal format using broker mappings (EURUSDc -> EURUSD)
+        # This ensures we use the proper broker mapping from symbol_mapping.yaml (e.g., exness_cent)
+        symbol_for_config = symbol
+        if self.symbol_mapper:
+            try:
+                # Use convert_to_universal_symbol() to properly map broker symbols to universal format
+                # EURUSDc (exness_cent) -> EURUSD (universal) using the broker's reverse mapping
+                symbol_for_config = self.symbol_mapper.convert_to_universal_symbol(symbol)
+            except Exception:
+                # Fallback to basic normalization if conversion fails
+                symbol_for_config = symbol.upper().strip()
+
+        # 1. First, check if symbol has specific SL configuration
+        symbols_cfg = self.config.get("symbols", {})
+        symbol_cfg = symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+        
+        # Priority 1: Symbol-specific config
+        if symbol_cfg:
+            config = {
+                "use_zone_based": symbol_cfg.get("use_zone_based_sl", False),
+                "zone_buffer": symbol_cfg.get("zone_sl_buffer_multiplier", 1.2),
+                "min_sl": symbol_cfg.get("min_stop_loss_pips", 80),
+                "max_sl": symbol_cfg.get("max_stop_loss_pips", 300),
+                "default_sl": symbol_cfg.get("default_stop_loss_pips", 150),
+                "source": "symbol_config",
+            }
+            logger.debug(
+                f"{symbol}: Using symbol-specific SL config (min={config['min_sl']}p, max={config['max_sl']}p)"
+            )
+            return config
+
+        # Fallback to asset class config (strategy_parameters.yaml)
+        from trading_bot.position.pip_calculator import PipCalculator
+
+        pip_calc = PipCalculator()
+        asset_class = pip_calc._determine_asset_class(symbol)
+
+        strategy_cfg = self.config.get("signal_generation", {}).get("risk_reward", {})
+
+        min_sl_config = strategy_cfg.get("min_stop_loss_distance", {})
+        max_sl_config = strategy_cfg.get("max_stop_loss_distance", {})
+
+        config = {
+            "use_zone_based": strategy_cfg.get("use_zone_based_sl", False),
+            "zone_buffer": strategy_cfg.get("zone_sl_buffer_multiplier", 1.2),
+            "min_sl": min_sl_config.get(asset_class, 80.0),
+            "max_sl": max_sl_config.get(asset_class, 300.0),
+            "default_sl": min_sl_config.get(asset_class, 150.0),
+            "source": "asset_class_config",
+        }
+        logger.debug(
+            f"{symbol}: Using asset class ({asset_class}) SL config "
+            f"(min={config['min_sl']}p, max={config['max_sl']}p)"
+        )
+        return config
+
+    def _calculate_zone_based_sl(
+        self, zone: DetectedZone, entry_price: float, direction: str, symbol: str
+    ) -> tuple[float, float]:
+        """
+        Calculate SL based on zone size with min/max limits.
+
+        This implements zone-based SL that adapts to market structure:
+        - Small zones: Use minimum SL (prevents too tight)
+        - Medium zones: Use zone size × buffer (adaptive)
+        - Large zones: Use maximum SL (prevents too wide)
+
+        Args:
+            zone: Detected zone
+            entry_price: Entry price
+            direction: "BUY" or "SELL"
+            symbol: Trading symbol
+
+        Returns:
+            Tuple of (sl_price, sl_distance_pips)
+        """
+        from trading_bot.position.pip_calculator import PipCalculator
+
+        pip_calc = PipCalculator()
+        pip_size = pip_calc.get_pip_size(symbol)
+
+        # Get config (with fallback hierarchy)
+        config = self._get_sl_config(symbol)
+
+        if config["use_zone_based"]:
+            # Calculate zone size in pips
+            zone_size_price = zone.upper_bound - zone.lower_bound
+            zone_size_pips = zone_size_price / pip_size
+
+            # Add buffer (SL beyond zone boundary, not inside)
+            sl_distance_pips = zone_size_pips * config["zone_buffer"]
+
+            # Apply min/max limits
+            sl_distance_pips = max(config["min_sl"], min(sl_distance_pips, config["max_sl"]))
+
+            logger.debug(
+                f"{symbol}: Zone-based SL | "
+                f"Zone={zone_size_pips:.1f}p, "
+                f"Buffered={zone_size_pips * config['zone_buffer']:.1f}p, "
+                f"Final={sl_distance_pips:.1f}p (${sl_distance_pips/10:.1f})"
+            )
+        else:
+            # Use default fixed SL
+            sl_distance_pips = config["default_sl"]
+            logger.debug(
+                f"{symbol}: Fixed SL | " f"{sl_distance_pips:.1f}p (${sl_distance_pips/10:.1f})"
+            )
+
+        # Calculate SL price
+        sl_distance_price = sl_distance_pips * pip_size
+
+        if direction == "BUY":
+            # SL below entry for BUY
+            sl_price = entry_price - sl_distance_price
+        else:  # SELL
+            # SL above entry for SELL
+            sl_price = entry_price + sl_distance_price
+
+        return sl_price, sl_distance_pips
+
     async def _create_signal_from_zone(
         self,
         symbol: str,
@@ -248,20 +392,25 @@ class FoundationEngine:
             asset_class = pip_calc._determine_asset_class(symbol)
             pip_size = pip_calc.get_pip_size(symbol)
 
-            min_sl_distance = 0.0
+            # Convert symbol to universal format for config lookup (e.g., EURUSDc -> EURUSD)
+            symbol_for_config = symbol
+            if self.symbol_mapper:
+                try:
+                    symbol_for_config = self.symbol_mapper.convert_to_universal_symbol(symbol)
+                except Exception:
+                    symbol_for_config = symbol.upper().strip()
 
             zone_height = zone.upper_bound - zone.lower_bound
             zone_height_pips = zone_height / pip_size
 
             # ═══════════════════════════════════════════════════════
-            # QUALITY FILTERS FOR COMMODITIES (Gold)
-            # Skip low-quality setups to improve expectancy
+            # QUALITY FILTERS: Asset-specific zone validation
             # ═══════════════════════════════════════════════════════
             if asset_class == "commodities":
                 # Filter 1: Zone Width (Precision Filter)
-                # RELAXED: Increased max zone width to 500 pips for XAUUSD backtest
+                # RELAXED: Increased max zone width to 1000 pips for XAUUSD
                 # Gold can have larger zones due to volatility, allow more flexibility
-                max_acceptable_zone_width = 500.0  # pips (increased from 350.0)
+                max_acceptable_zone_width = 1000.0  # pips (increased from 500.0)
                 if zone_height_pips > max_acceptable_zone_width:
                     logger.warning(
                         f"{symbol}: REJECTED - Zone too wide ({zone_height_pips:.1f} pips > {max_acceptable_zone_width} pips). "
@@ -280,127 +429,39 @@ class FoundationEngine:
                     )
                     return None
 
-            # Crypto needs much wider SL buffer due to high volatility
-            # Initialize minimum SL distance pips (will be set per asset class below)
-            min_sl_distance_pips = 0.0
-
-            if asset_class == "crypto":
-                # For crypto: Use 50% buffer (reduced from 150%) with cap
-                # Cap max zone height to prevent excessive SL (e.g. 10000 points)
-                max_zone_height_pips = 10000.0
-                max_zone_height = max_zone_height_pips * pip_size
-
-                if zone_height > max_zone_height:
+            elif asset_class == "crypto":
+                # Filter 1: Zone Width (Precision Filter)
+                # Crypto has extreme volatility, but we still need reasonable zones
+                # Max 600 pips for BTCUSD to prevent huge risk
+                max_acceptable_zone_width = 600.0  # pips
+                if zone_height_pips > max_acceptable_zone_width:
                     logger.warning(
-                        f"{symbol}: Zone height {zone_height_pips:.1f} pips exceeds maximum {max_zone_height_pips} pips. "
-                        f"Capping zone height for SL calculation."
+                        f"{symbol}: REJECTED - Zone too wide ({zone_height_pips:.1f} pips > {max_acceptable_zone_width} pips). "
+                        f"Wide zones increase risk beyond acceptable limits for crypto."
                     )
-                    effective_zone_height = max_zone_height
-                    sl_buffer = effective_zone_height * 0.5
-                else:
-                    sl_buffer = zone_height * 0.5
+                    return None
 
-                # Ensure minimum buffer (1000 points)
-                min_buffer_points = 1000.0
-                sl_buffer = max(sl_buffer, min_buffer_points)
-
-            elif asset_class == "forex_major":
-                # For forex major: 50% of zone height, but with maximum limits
-                # Maximum zone height: 30 pips (0.0030 for EURUSD) - more conservative
-                # This prevents TP from being too far when zone is large
-                max_zone_height_pips = 30.0
-                max_zone_height = max_zone_height_pips * pip_size
-
-                # If zone is too large, cap it and use smaller buffer
-                if zone_height > max_zone_height:
-                    logger.debug(
-                        f"{symbol}: Zone height {zone_height_pips:.1f} pips exceeds maximum {max_zone_height_pips} pips. "
-                        f"Capping zone height for SL calculation."
-                    )
-                    # Use capped zone height for buffer calculation
-                    effective_zone_height = max_zone_height
-                    sl_buffer = effective_zone_height * 0.5
-                else:
-                    # Normal zone, use 50% buffer
-                    sl_buffer = zone_height * 0.5
-
-                # Get minimum SL distance from config (default: 15 pips)
-                min_sl_distance_pips = (
-                    self.config.get("signal_generation", {})
-                    .get("risk_reward", {})
-                    .get("min_stop_loss_distance", {})
-                    .get("forex_major", 15.0)
-                )
-                min_sl_distance = min_sl_distance_pips * pip_size
-
-                # Ensure SL buffer is at least minimum distance
-                if sl_buffer < min_sl_distance:
-                    sl_buffer = min_sl_distance
-                    logger.debug(
-                        f"{symbol}: Using minimum SL buffer {min_sl_distance_pips} pips (150 points for 5-digit broker)"
-                    )
-            elif asset_class == "forex_jpy":
-                # For JPY pairs: Similar to major but with JPY pip size
-                # Maximum zone height: 30 pips (more conservative)
-                max_zone_height_pips = 30.0
-                max_zone_height = max_zone_height_pips * pip_size
-
-                if zone_height > max_zone_height:
+                # Filter 2: Zone Strength (Quality Filter)
+                # Require strong zones for crypto due to high volatility
+                min_zone_strength = 0.5  # Higher threshold for crypto
+                if zone.strength < min_zone_strength:
                     logger.warning(
-                        f"{symbol}: Zone height {zone_height_pips:.1f} pips exceeds maximum {max_zone_height_pips} pips. "
-                        f"Capping zone height for SL calculation."
+                        f"{symbol}: REJECTED - Zone strength too low ({zone.strength:.2f} < {min_zone_strength}). "
+                        f"Crypto requires strong zones due to high volatility."
                     )
-                    effective_zone_height = max_zone_height
-                    sl_buffer = effective_zone_height * 0.5
-                else:
-                    sl_buffer = zone_height * 0.5
+                    return None
 
-                # Get minimum SL distance from config (default: 15 pips)
-                min_sl_distance_pips = (
-                    self.config.get("signal_generation", {})
-                    .get("risk_reward", {})
-                    .get("min_stop_loss_distance", {})
-                    .get("forex_jpy", 15.0)
-                )
-                min_sl_distance = min_sl_distance_pips * pip_size
-                if sl_buffer < min_sl_distance:
-                    sl_buffer = min_sl_distance
-                    logger.debug(
-                        f"{symbol}: Using minimum SL buffer {min_sl_distance_pips} pips (150 points for 5-digit broker)"
-                    )
-            else:
-                # For commodities: Cap logic added
-                # FIX: Increased max zone height for SL calculation to handle larger zones
-                # Gold can have large zones, but we still need reasonable SL
-                max_zone_height_pips = 200.0  # Increased from 100.0 to 200.0 pips ($20.00)
-                max_zone_height = max_zone_height_pips * pip_size
+            # -------------------------------------------------------------------------
+            # SL & DISTANCE CALCULATION (Refactored 2026-01-22)
+            # Replaces old 'sl_buffer' logic with unified zone-based calculation
+            # -------------------------------------------------------------------------
+            direction_str = "BUY" if is_demand else "SELL"
+            stop_loss, sl_distance_pips = self._calculate_zone_based_sl(
+                zone, current_price, direction_str, symbol
+            )
 
-                # Boost RR for commodities to allow runners, but keep realistic for backtest
-                rr_ratio = 2.0  # Restored to 2.0 (Intraday Phase 5.21)
-                min_rr = 1.5  # Restored to 1.5
-
-                if zone_height > max_zone_height:
-                    logger.warning(
-                        f"{symbol}: Zone height {zone_height_pips:.1f} pips exceeds maximum {max_zone_height_pips} pips. "
-                        f"Capping zone height for SL calculation."
-                    )
-                    effective_zone_height = max_zone_height
-                    sl_buffer = effective_zone_height * 0.5  # Restored to 0.5 (Intraday)
-                else:
-                    sl_buffer = zone_height * 0.5  # Restored to 0.5 (Intraday)
-
-                # Get minimum SL distance from config (default: 50 pips for commodities)
-                # RELAXED: Reduced to 40 pips to allow more setups
-                min_sl_distance_pips = (
-                    self.config.get("signal_generation", {})
-                    .get("risk_reward", {})
-                    .get("min_stop_loss_distance", {})
-                    .get("commodities", 40.0)  # Reduced from 50.0 to 40.0 for more flexibility
-                )
-                min_sl_distance = min_sl_distance_pips * pip_size
-                if sl_buffer < min_sl_distance:
-                    sl_buffer = min_sl_distance
-                    logger.debug(f"{symbol}: Using minimum SL buffer {min_sl_distance_pips} pips")
+            # Entry is always current market price
+            entry_price = current_price
 
             # -------------------------------------------------------------------------
             # ENTRY & RISK CALCULATION FIX
@@ -467,33 +528,32 @@ class FoundationEngine:
                             )
                             return None
 
-                # === FLASH CRASH PROTECTION (Volatility Filter) ===
-                if asset_class == "commodities" and len(data) >= 14:
+                # === FLASH CRASH / CLIMAX PROTECTION (Volatility Filter) ===
+                # APPLIES TO ALL ASSET CLASSES (Fixed 2026-02-11)
+                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms)
+                if len(data) >= 14:
                     # Calculate ATR(14) equivalent (moving range)
                     ranges = data["high"] - data["low"]
                     avg_range = ranges.tail(14).mean()
                     current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
 
-                    # FIX: Melonggarkan volatility threshold (dari 2.0x menjadi 2.5x)
-                    # If current candle is > 2.5x the average volatility, skip (Panic/News event)
-                    volatility_multiplier = 2.5  # Lebih longgar dari 2.0
-                    if current_range > avg_range * volatility_multiplier:
-                        # NEW (Phase 5.22): Allow trend-following entries even in extreme volatility
-                        # Only block if we are fighting the momentum (e.g. buying a massive drop)
-                        ema_20 = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-                        is_with_trend = (
-                            direction == SignalDirection.BUY and current_price > ema_20
-                        ) or (direction == SignalDirection.SELL and current_price < ema_20)
+                    # Thresholds by asset class
+                    vol_multiplier = 3.0  # Default (loose)
+                    if asset_class == "commodities":
+                        vol_multiplier = 2.0  # Strict for Gold/Silver (was 2.5 loose)
+                    elif asset_class == "crypto":
+                        vol_multiplier = 2.5
+                    elif asset_class == "forex_majors":
+                        vol_multiplier = 2.5
 
-                        if not is_with_trend:
-                            logger.warning(
-                                f"{symbol}: REJECTED - Extreme volatility ({current_range:.1f} > {avg_range*volatility_multiplier:.1f}) and counter-trend. Skipping panic move."
-                            )
-                            return None
-                        else:
-                            logger.info(
-                                f"{symbol}: ALLOWED - Extreme volatility move is trend-aligned. Riding the momentum."
-                            )
+                    # If current candle is > multiplier * avg range, it's likely exhaustion
+                    if current_range > avg_range * vol_multiplier:
+                        logger.warning(
+                            f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
+                            f"({current_range:.1f} > {avg_range*vol_multiplier:.1f}). "
+                            "Risk of reversal is high. Waiting for consolidation."
+                        )
+                        return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
                 if asset_class == "commodities" and last_range > 0:
@@ -561,12 +621,6 @@ class FoundationEngine:
                             )
                             return None
 
-                # SL is always below the zone
-                stop_loss = zone.lower_bound - sl_buffer
-
-                # ENTRY is Market Price (current_price)
-                entry_price = current_price
-
                 # ═══════════════════════════════════════════════════════
                 # ENTRY QUALITY VALIDATION (PHASE 5.1)
                 # ═══════════════════════════════════════════════════════
@@ -610,26 +664,24 @@ class FoundationEngine:
                             f"{zone.lower_bound:.5f}. This is acceptable (price at support)."
                         )
 
-                # ENFORCE MINIMUM SL DISTANCE (from config)
-                # This ensures SL isn't too tight for the asset class
-                if min_sl_distance > 0:
-                    actual_sl_dist = entry_price - stop_loss
-                    # min_sl_price_dist = min_sl_distance * pip_size  <-- Removed duplicate multiplication
-                    if actual_sl_dist < min_sl_distance:  # Changed to use min_sl_distance directly
-                        stop_loss = entry_price - min_sl_distance
-                        logger.debug(
-                            f"{symbol}: SL enforced to min distance {min_sl_distance/pip_size:.1f} pips"
-                        )
-
                 # CHASE PROTECTION / MAX STOP LOSS CHECK
                 # If price is too high (chasing), risk will be too large
-                max_risk_pips = (
-                    self.config.get("signal_generation", {})
-                    .get("risk_reward", {})
-                    .get("max_stop_loss_pips", 100.0)
-                )
-                if asset_class == "commodities":
-                    max_risk_pips = 250.0  # Increased from 200.0 to 250.0 for larger zones
+                # Priority: Symbol-specific > Asset-class > Global default
+                symbols_cfg = self.config.get("symbols", {})
+                symbol_cfg = symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+                max_risk_pips = symbol_cfg.get("max_stop_loss_pips")
+
+                if max_risk_pips is None:
+                    # No symbol-specific config, check asset-class
+                    max_risk_pips = (
+                        self.config.get("signal_generation", {})
+                        .get("risk_reward", {})
+                        .get("max_stop_loss_distance", {})
+                        .get(asset_class, 100.0)
+                    )
+                    # Special case: commodities use a higher limit
+                    if asset_class == "commodities":
+                        max_risk_pips = max(max_risk_pips, 250.0)
 
                 current_risk = entry_price - stop_loss
                 if current_risk > max_risk_pips * pip_size:
@@ -692,6 +744,33 @@ class FoundationEngine:
                             )
                             return None
 
+                # === FLASH CRASH / CLIMAX PROTECTION (Volatility Filter) ===
+                # APPLIES TO ALL ASSET CLASSES (Fixed 2026-02-11)
+                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms)
+                if len(data) >= 14:
+                    # Calculate ATR(14) equivalent (moving range)
+                    ranges = data["high"] - data["low"]
+                    avg_range = ranges.tail(14).mean()
+                    current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
+
+                    # Thresholds by asset class
+                    vol_multiplier = 3.0  # Default (loose)
+                    if asset_class == "commodities":
+                        vol_multiplier = 2.0  # Strict for Gold/Silver (was 2.5 loose)
+                    elif asset_class == "crypto":
+                        vol_multiplier = 2.5
+                    elif asset_class == "forex_majors":
+                        vol_multiplier = 2.5
+
+                    # If current candle is > multiplier * avg range, it's likely exhaustion
+                    if current_range > avg_range * vol_multiplier:
+                        logger.warning(
+                            f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
+                            f"({current_range:.1f} > {avg_range*vol_multiplier:.1f}). "
+                            "Risk of reversal is high. Waiting for consolidation."
+                        )
+                        return None
+
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
                 if asset_class == "commodities" and last_range > 0:
                     upper_wick = last_high - max(last_open, last_close)
@@ -734,12 +813,6 @@ class FoundationEngine:
                             )
                             return None
 
-                # SL is always above the zone
-                stop_loss = zone.upper_bound + sl_buffer
-
-                # ENTRY is Market Price
-                entry_price = current_price
-
                 # ═══════════════════════════════════════════════════════
                 # ENTRY QUALITY VALIDATION (PHASE 5.1)
                 # ═══════════════════════════════════════════════════════
@@ -759,24 +832,23 @@ class FoundationEngine:
                         )
                         return None
 
-                # ENFORCE MINIMUM SL DISTANCE (from config)
-                if min_sl_distance > 0:
-                    actual_sl_dist = stop_loss - entry_price
-                    # min_sl_price_dist = min_sl_distance * pip_size  <-- Removed duplicate
-                    if actual_sl_dist < min_sl_distance:
-                        stop_loss = entry_price + min_sl_distance
-                        logger.debug(
-                            f"{symbol}: SL enforced to min distance {min_sl_distance/pip_size:.1f} pips"
-                        )
+                # CHASE PROTECTION / MAX STOP LOSS CHECK
+                # Priority: Symbol-specific > Asset-class > Global default
+                symbols_cfg = self.config.get("symbols", {})
+                symbol_cfg = symbols_cfg.get(symbol_for_config, {}) if isinstance(symbols_cfg, dict) else {}
+                max_risk_pips = symbol_cfg.get("max_stop_loss_pips")
 
-                # CHASE PROTECTION
-                max_risk_pips = (
-                    self.config.get("signal_generation", {})
-                    .get("risk_reward", {})
-                    .get("max_stop_loss_pips", 100.0)
-                )
-                if asset_class == "commodities":
-                    max_risk_pips = 250.0  # Increased from 200.0 to 250.0 for larger zones
+                if max_risk_pips is None:
+                    # No symbol-specific config, check asset-class
+                    max_risk_pips = (
+                        self.config.get("signal_generation", {})
+                        .get("risk_reward", {})
+                        .get("max_stop_loss_distance", {})
+                        .get(asset_class, 100.0)
+                    )
+                    # Special case: commodities use a higher limit
+                    if asset_class == "commodities":
+                        max_risk_pips = max(max_risk_pips, 250.0)
 
                 current_risk = stop_loss - entry_price
                 if current_risk > max_risk_pips * pip_size:
@@ -804,6 +876,13 @@ class FoundationEngine:
             risk_pips = risk / pip_size
             reward_pips = reward / pip_size
 
+            # ═══════════════════════════════════════════════════════
+            # SAVE ORIGINAL RR (for validation)
+            # ═══════════════════════════════════════════════════════
+            # Save original RR before any modifications
+            # With TP cap removed, this is just for clarity/validation
+            original_rr = calculated_rr
+
             # TP Calculation Logic:
             # - For BUY: TP = entry_price + (entry_price - stop_loss) * rr_ratio
             #   This means: TP = entry + risk * rr_ratio
@@ -818,90 +897,45 @@ class FoundationEngine:
             # TP distance is determined by:
             # 1. Risk distance (entry to SL) - controlled by zone height and min SL distance
             # 2. Risk-Reward ratio (default 2.0 = 1:2)
-            # 3. Maximum TP distance limit (for intraday trading - prevents unreachable targets)
+            # 3. NO TP CAP - Partial close needs original TP distance for proper levels
 
-            # Validate maximum TP distance (for intraday trading - prevents unreachable targets)
-            max_tp_distance_pips = (
-                self.config.get("signal_generation", {})
-                .get("risk_reward", {})
-                .get("max_take_profit_distance", {})
-                .get(asset_class, 100.0)  # Default 100 pips if not specified
-            )
+            # ═══════════════════════════════════════════════════════
+            # TP CAPPING DISABLED - To allow partial close at proper levels
+            # ═══════════════════════════════════════════════════════
+            # TP capping has been removed because:
+            # 1. Partial close levels are calculated as proportion of TP distance
+            # 2. Capping TP reduces partial close levels, losing profit potential
+            # 3. With zone-based SL + RR ratio, TP is already naturally constrained
+            # 4. Better to have realistic TP with partial close than capped TP with reduced levels
+            #
+            # Original capping logic (lines 861-918) has been commented out
+            # and can be restored if needed for specific use cases.
+            # ═══════════════════════════════════════════════════════
 
-            if reward_pips > max_tp_distance_pips:
-                # Cap TP to maximum distance, adjust RR ratio accordingly
-                capped_reward_pips = max_tp_distance_pips
-                capped_reward = capped_reward_pips * pip_size
+            # ═══════════════════════════════════════════════════════
+            # R:R VALIDATION (Check ORIGINAL R:R)
+            # ═══════════════════════════════════════════════════════
+            # original_rr was saved at line 851
+            # No TP cap means calculated_rr = original_rr
 
-                if direction == SignalDirection.BUY:
-                    take_profit = entry_price + capped_reward
-                else:  # SELL
-                    take_profit = entry_price - capped_reward
-
-                # Recalculate actual RR with capped TP
-                if direction == SignalDirection.BUY:
-                    actual_reward = take_profit - entry_price
-                else:  # SELL
-                    actual_reward = entry_price - take_profit
-
-                actual_rr = actual_reward / risk if risk > 0 else 0.0
-                actual_reward_pips = actual_reward / pip_size
-
-                logger.warning(
-                    f"{symbol} {direction.value}: TP distance capped from {reward_pips:.1f} to {capped_reward_pips:.1f} pips "
-                    f"(max for {asset_class} intraday trading). R:R adjusted from {calculated_rr:.2f} to {actual_rr:.2f}"
-                )
-
-                # Update variables for validation
-                reward_pips = actual_reward_pips
-                calculated_rr = actual_rr
-                reward = actual_reward
-
-            # Validate R:R ratio is close to target (allow 20% tolerance for flexibility)
-            rr_tolerance = 0.2  # 20% tolerance (more flexible)
+            # More lenient for crypto due to high volatility
+            rr_tolerance = 0.3 if asset_class == "crypto" else 0.2  # 30% for crypto, 20% for others
             min_rr = rr_ratio * (1 - rr_tolerance)
-            max_rr = rr_ratio * (1 + rr_tolerance)
 
             logger.info(
                 f"{symbol} {direction.value}: Entry={entry_price:.5f}, SL={stop_loss:.5f}, TP={take_profit:.5f} | "
                 f"Risk={risk:.5f} ({risk_pips:.1f} pips), Reward={reward:.5f} ({reward_pips:.1f} pips), "
-                f"R:R={calculated_rr:.2f} (Target: {rr_ratio:.2f}, Acceptable: {min_rr:.2f}-{max_rr:.2f})"
+                f"R:R={calculated_rr:.2f} (Original: {original_rr:.2f}, Target: {rr_ratio:.2f}, Min: {min_rr:.2f})"
             )
 
-            # Only reject if R:R is extremely outside acceptable range
-            # Allow wider range to account for zone variations
-            if calculated_rr < min_rr * 0.7:  # More than 30% below minimum = reject
+            # ONLY reject if ORIGINAL R:R is below minimum acceptable
+            # Accept any R:R >= min_rr, even if far from target (profit is profit!)
+            if original_rr < min_rr:
                 logger.warning(
-                    f"{symbol}: R:R {calculated_rr:.2f} is too low (min acceptable: {min_rr * 0.7:.2f}). "
+                    f"{symbol}: R:R {original_rr:.2f} is too low (min acceptable: {min_rr:.2f}). "
                     f"This may indicate zone is too large or SL buffer too wide. Rejecting signal."
                 )
                 return None
-            elif calculated_rr > max_rr * 3.0:  # More than 3x maximum = reject (extreme case)
-                logger.warning(
-                    f"{symbol}: R:R {calculated_rr:.2f} is extremely high (max acceptable: {max_rr * 3.0:.2f}). "
-                    f"Zone may be too large ({zone_height_pips:.1f} pips). Rejecting signal."
-                )
-                return None
-            elif calculated_rr < min_rr:
-                # Below target but still acceptable - just warn
-                logger.warning(
-                    f"{symbol}: R:R {calculated_rr:.2f} is below target {rr_ratio:.2f} "
-                    f"(min: {min_rr:.2f}). Accepting signal but zone quality may be suboptimal."
-                )
-            elif (
-                calculated_rr > max_rr * 2.0
-            ):  # More than 2x target but less than 3x - warn strongly
-                logger.warning(
-                    f"{symbol}: R:R {calculated_rr:.2f} is significantly above target {rr_ratio:.2f} "
-                    f"(max: {max_rr:.2f}). TP may be far from entry. Zone height: {zone_height_pips:.1f} pips. "
-                    f"Accepting signal but consider reviewing zone detection."
-                )
-            elif calculated_rr > max_rr:
-                # Slightly above target - just info
-                logger.info(
-                    f"{symbol}: R:R {calculated_rr:.2f} is slightly above target {rr_ratio:.2f} "
-                    f"(max: {max_rr:.2f}). Acceptable."
-                )
 
             # Validate prices
             if entry_price <= 0 or stop_loss <= 0 or take_profit <= 0:
@@ -933,6 +967,26 @@ class FoundationEngine:
             rsi_res = await self.rsi_analyzer.analyze_rsi_signal(
                 symbol, closes, timeframe, zone_type_str
             )
+
+            # CRITICAL: Block signal if RSI is strongly against direction
+            # RSI oversold (< 35) should block SELL signals
+            # RSI overbought (> 65) should block BUY signals
+            if direction == SignalDirection.SELL and rsi_res.details.get("condition") == "OVERSOLD":
+                logger.warning(
+                    f"{symbol}: REJECTING SELL signal - RSI is oversold ({rsi_res.rsi_value:.1f}). "
+                    f"Cannot short when market is already oversold."
+                )
+                return None
+            elif (
+                direction == SignalDirection.BUY
+                and rsi_res.details.get("condition") == "OVERBOUGHT"
+            ):
+                logger.warning(
+                    f"{symbol}: REJECTING BUY signal - RSI is overbought ({rsi_res.rsi_value:.1f}). "
+                    f"Cannot buy when market is already overbought."
+                )
+                return None
+
             if rsi_res.signal_type == direction.name:  # Only add if aligns
                 score = rsi_res.confidence * 0.10
                 enhancement_score += score
@@ -1144,8 +1198,8 @@ class FoundationEngine:
                 .get("min_confluence_score", 75.0)
             )
 
-            # Apply UNIVERSAL minimum confluence check
-            if final_score < min_confluence_global:
+            # Apply UNIVERSAL minimum confluence check (Skip for Commodities as they have dynamic thresholds)
+            if asset_class != "commodities" and final_score < min_confluence_global:
                 logger.info(
                     f"{symbol}: REJECTED - Confluence too low ({final_score:.1f}% < {min_confluence_global}%). "
                     f"Active layers: {list(layer_scores.keys())}, "
@@ -1192,6 +1246,26 @@ class FoundationEngine:
                     )
 
             # ═══════════════════════════════════════════════════════
+            # UNIVERSAL H1 SNIPER GATE (FIX 2026-04-09)
+            # Apply H1 Trend Gate to ALL asset classes (forex + commodities + crypto)
+            # Previously this only ran inside the 'if asset_class == commodities' block —
+            # meaning forex pairs were NEVER filtered by H1 trend bias. This caused
+            # counter-trend trades on EURUSD, USDJPY, USDCHF, EURJPY etc.
+            # ═══════════════════════════════════════════════════════
+            if h1_trend_bias == "BEARISH" and direction == SignalDirection.BUY:
+                logger.warning(
+                    f"{symbol}: REJECTED - H1 Trend is BEARISH. "
+                    f"Counter-trend BUY blocked by SNIPER Gate (Universal)."
+                )
+                return None
+            if h1_trend_bias == "BULLISH" and direction == SignalDirection.SELL:
+                logger.warning(
+                    f"{symbol}: REJECTED - H1 Trend is BULLISH. "
+                    f"Counter-trend SELL blocked by SNIPER Gate (Universal)."
+                )
+                return None
+
+            # ═══════════════════════════════════════════════════════
             # ADDITIONAL QUALITY FILTERS: Asset-specific refinements
             # ═══════════════════════════════════════════════════════
             if asset_class == "commodities":
@@ -1225,32 +1299,10 @@ class FoundationEngine:
                     )
                     return None
 
-                # === DIRECTIONAL BIAS FILTER (RELAXED) ===
-                # RELAXED: Further relaxed for XAUUSD backtest
-                # Only block if trend is VERY strong AND we have very low confluence
-                # Allow counter-trend if we have moderate confluence (score > 18)
-                if h1_trend_bias == "BEARISH" and direction == SignalDirection.BUY:
-                    # Only block if score is very low (weak confluence)
-                    if final_score < 18.0:  # Reduced from 25.0
-                        logger.warning(
-                            f"{symbol}: REJECTED - H1 Trend is BEARISH and confluence too low ({final_score:.1f} < 18.0)."
-                        )
-                        return None
-                    else:
-                        logger.debug(
-                            f"{symbol}: ALLOWED - Counter-trend BUY with strong confluence ({final_score:.1f})"
-                        )
-                if h1_trend_bias == "BULLISH" and direction == SignalDirection.SELL:
-                    # Only block if score is very low (weak confluence)
-                    if final_score < 18.0:  # Reduced from 25.0
-                        logger.warning(
-                            f"{symbol}: REJECTED - H1 Trend is BULLISH and confluence too low ({final_score:.1f} < 18.0)."
-                        )
-                        return None
-                    else:
-                        logger.debug(
-                            f"{symbol}: ALLOWED - Counter-trend SELL with strong confluence ({final_score:.1f})"
-                        )
+                # === DIRECTIONAL BIAS FILTER (PHASE 5.24: Strict Gate) ===
+                # NOTE: Universal H1 Sniper Gate is now applied ABOVE (before this block)
+                # for ALL asset classes. The check below is kept as documentation only
+                # and is no longer needed since it's already handled universally above.
 
                 # Technical Confirmation Gate (Phase 5.1)
                 # Require at least ONE technical indicator confirmation

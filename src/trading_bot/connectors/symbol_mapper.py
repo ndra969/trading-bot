@@ -69,12 +69,22 @@ class SymbolMapper:
         """Build reverse mappings for broker to universal conversion."""
         self._reverse_mappings = {}
 
-        # Build regular reverse mappings
+        # Build regular reverse mappings with NORMALIZED KEYS
+        # This ensures lookup works for both 'EURUSDc' and 'EURUSDC' (uppercase)
         for broker, mappings in self._config["brokers"].items():
-            self._reverse_mappings[broker] = {v: k for k, v in mappings.items()}
+            # Reverse the mapping and normalize the broker symbol keys
+            # EURUSD: EURUSDc → EURUSDc: EURUSD (with normalized key for case-insensitive lookup)
+            self._reverse_mappings[broker] = {
+                self.normalize_symbol(v): k for k, v in mappings.items()
+            }
 
-        # Store special reverse mappings separately
-        self._special_reverse_mappings = self._config.get("special_reverse_mappings", {})
+        # Store special reverse mappings separately (also normalized)
+        special_mappings = self._config.get("special_reverse_mappings", {})
+        self._special_reverse_mappings = {}
+        for broker, mappings in special_mappings.items():
+            self._special_reverse_mappings[broker] = {
+                self.normalize_symbol(k): v for k, v in mappings.items()
+            }
 
     @property
     def broker_mappings(self) -> dict[str, dict[str, str]]:
@@ -191,8 +201,13 @@ class SymbolMapper:
 
         # Normalize inputs
         broker_name = broker_name.lower().strip()
-        # Keep broker symbol case as-is for reverse mapping to work correctly
-        normalized_broker_symbol = broker_symbol.strip()
+
+        # FIX: Normalize input symbol (upper case + strip) to match normalized keys in reverse lookup
+        # This fixes issues where input 'XAUUSDc' doesn't match 'XAUUSDC' key
+        try:
+            normalized_broker_symbol = self.normalize_symbol(broker_symbol)
+        except SymbolMappingError:
+            normalized_broker_symbol = broker_symbol.strip().upper()
 
         # Check special mappings first
         if broker_name in self._special_reverse_mappings:
@@ -287,6 +302,12 @@ class SymbolMapper:
         asset_class = self.get_asset_class(symbol)
         logger.info(f"DEBUG: SymbolMapper.get_pip_size({symbol}) Asset Class: {asset_class}")
 
+        # Check symbol-specific overrides first (FIX for XAGUSD bug)
+        symbol_pip_values = self._config.get("symbol_pip_values", {})
+        if normalized_symbol in symbol_pip_values:
+            return symbol_pip_values[normalized_symbol]
+
+        # Fall back to asset class defaults
         if asset_class == "forex":
             # Check if it's a JPY pair
             if "JPY" in normalized_symbol:
@@ -314,6 +335,12 @@ class SymbolMapper:
         normalized_symbol = self.normalize_symbol(symbol)
         asset_class = self.get_asset_class(normalized_symbol)
 
+        # Check symbol-specific overrides first (FIX for XAGUSD bug)
+        symbol_pip_values_per_lot = self._config.get("symbol_pip_values_per_lot", {})
+        if normalized_symbol in symbol_pip_values_per_lot:
+            return symbol_pip_values_per_lot[normalized_symbol]
+
+        # Fall back to asset class defaults
         if asset_class == "forex":
             # Check if it's a JPY pair
             if "JPY" in normalized_symbol:

@@ -394,6 +394,120 @@ uv run trading-bot start --dry-run
    uv run trading-bot account info
    ```
 
+## 🔧 Troubleshooting
+
+### Log File Locked Error
+
+**Problem**: `PermissionError: [WinError 32] The process cannot access the file because it is being used by another process`
+
+This happens when:
+- Multiple bot instances are running
+- Previous bot process didn't shut down properly
+- Log file is locked by another process
+
+**Solution 1: Kill All Python Processes** (Windows)
+```powershell
+# Kill all Python processes (⚠️ WARNING: This kills ALL Python processes!)
+Get-Process python* | Stop-Process -Force
+```
+
+**Solution 2: Use Kill Script**
+```bash
+# Interactive script to kill trading bot processes
+uv run python scripts/kill_trading_bot.py
+```
+
+**Solution 3: Manual Process Cleanup**
+```powershell
+# List all Python processes
+tasklist | findstr python
+
+# Kill specific process by PID
+taskkill /F /PID <process_id>
+```
+
+**Prevention**:
+- Always use `Ctrl+C` to stop the bot gracefully
+- Wait a few seconds for proper shutdown
+- Check for running processes before starting a new instance:
+  ```powershell
+  Get-Process python* | Where-Object {$_.Path -like "*trading-bot*"}
+  ```
+
+### MT5 Connection Issues
+
+**Problem**: Bot reports "MT5 not connected" even though MT5 terminal is running
+
+**Solution**:
+1. Check if MT5 terminal is logged in to the correct account
+2. Verify MT5 credentials in config:
+   ```bash
+   uv run trading-bot config show
+   ```
+3. Check server name matches your broker:
+   - Demo accounts usually use "testserver" or broker-specific demo server
+   - Live accounts use broker-specific live server
+4. Review detailed connection logs:
+   - Look for `MT5 Server:` and `Config Server:` in logs
+   - Check for server mismatch warnings
+
+### MT5 Auto-Switching to Test Server
+
+**Problem**: MT5 keeps switching back to test server (e.g., `159394302`) instead of staying on live server (e.g., `Exness-MT5Real20`)
+
+**Root Cause**:
+- MT5 server not explicitly configured in `config/development.yaml`
+- MT5 terminal uses last logged-in account/server
+- MT5 may auto-reconnect to different server on disconnect
+
+**Solution**:
+
+1. **Set Server in Config** (`config/development.yaml`):
+```yaml
+mt5:
+  path: "C:\\Program Files\\MetaTrader 5\\Broker B"
+  login: 159394302          # Your MT5 account ID
+  server: "Exness-MT5Real20"  # CRITICAL: Force specific server
+  timeout: 60000
+```
+
+2. **Bot Auto-Protection**:
+   - Bot now monitors server changes every loop iteration
+   - If server mismatch detected, bot automatically stops
+   - Emergency Telegram notification sent
+   - Prevents accidental trading on wrong server
+
+3. **Manual MT5 Terminal Check**:
+   - Open MT5 terminal
+   - Check top-left corner for account number and server
+   - Ensure it matches config settings
+   - If wrong, right-click account → Login with correct credentials
+
+4. **Logs to Monitor**:
+```bash
+# Good - Server match
+✅ MT5 connection verified: ready for trade execution
+
+# Bad - Server mismatch
+🚨 SERVER MISMATCH DETECTED! Expected: 'Exness-MT5Real20', Current: 'testserver'
+🚨 CRITICAL: Server Mismatch Detected! Bot stopped to prevent trading on wrong server.
+```
+
+**Prevention**:
+- Always set `server` in config (never leave commented out)
+- Use environment variables for sensitive data (password)
+- Monitor bot logs for server warnings
+- Check Telegram notifications for server mismatch alerts
+
+### Dry-Run Notifications
+
+**Problem**: Receiving notifications in dry-run mode
+
+**Solution**: This is fixed in the latest version. Notifications are automatically disabled in dry-run mode. If you still see notifications:
+1. Ensure you're using `--dry-run` flag
+2. Check config: `trading.dry_run: true`
+3. Verify in logs: `🧪 Dry-run mode: Skipping notification`
+
 ---
 
 **Built with ❤️ using modern Python best practices**

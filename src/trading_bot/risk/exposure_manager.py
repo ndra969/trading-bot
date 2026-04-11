@@ -49,6 +49,17 @@ class ExposureManager:
             "max_asset_class_exposure_percent", 40.0
         )
 
+        # Asset class position limits (from active_symbols.yaml)
+        # Reads max_concurrent_positions per asset class
+        asset_classes_config = self.config.get("asset_classes", {})
+        self.max_positions_per_asset_class: dict[str, int] = {}
+        for asset_class_name, asset_class_cfg in asset_classes_config.items():
+            if asset_class_cfg.get("enabled", False):
+                max_pos = asset_class_cfg.get("max_concurrent_positions", 10)
+                self.max_positions_per_asset_class[asset_class_name] = max_pos
+
+        logger.debug(f"Asset class position limits: {self.max_positions_per_asset_class}")
+
         # Correlation management
         # Define correlated pairs (pairs that move together, should have same direction)
         # Define negative correlated pairs (pairs that move opposite, should have opposite direction)
@@ -72,6 +83,7 @@ class ExposureManager:
             f"ExposureManager initialized: "
             f"Max positions/symbol: {self.max_positions_per_symbol}, "
             f"Max total: {self.max_total_positions}, "
+            f"Asset class limits: {self.max_positions_per_asset_class}, "
             f"Correlation checking: {self.correlation_enabled}"
         )
 
@@ -97,6 +109,16 @@ class ExposureManager:
                 False,
                 f"Symbol limit reached: {current_symbol_positions}/{self.max_positions_per_symbol}",
             )
+
+        # Check per-asset-class limit (from active_symbols.yaml)
+        if asset_class in self.max_positions_per_asset_class:
+            current_asset_class_positions = self.positions_by_asset_class.get(asset_class, 0)
+            max_for_asset_class = self.max_positions_per_asset_class[asset_class]
+            if current_asset_class_positions >= max_for_asset_class:
+                return (
+                    False,
+                    f"Asset class {asset_class} limit reached: {current_asset_class_positions}/{max_for_asset_class}",
+                )
 
         # Check total positions limit
         total_positions = sum(self.positions_by_symbol.values())

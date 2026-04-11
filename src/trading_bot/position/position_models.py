@@ -43,15 +43,36 @@ class Position:
         confluence_score: Signal confluence score (0-100)
         ticket: MT5 ticket number (if available)
         account_id: Link to TradingAccount (multi-account support)
+        asset_class: Asset class (forex_major, forex_jpy, commodities, crypto)
+        signal_id: Link to TradingSignal
+        strategy_id: Strategy identifier
+        session_id: Link to TradingSession
         status: Current position status
         open_time: When position was opened
         close_time: When position was closed (if closed)
         close_price: Price at which position was closed
+        close_reason: Reason for closing (SL, TP, Manual, etc.)
+        exit_type: Exit type (full, partial)
         current_price: Current market price
         current_profit_pips: Current profit in pips
         current_pnl_usd: Current P&L in USD
         risk_amount_usd: USD amount at risk (SL distance)
         potential_profit_usd: Potential USD profit (TP distance)
+        is_winner: Whether position was profitable (set on close)
+        breakeven_activated: Whether breakeven was triggered
+        trailing_activated: Whether trailing stop was triggered
+        entry_to_sl_pips: Distance from entry to SL in pips
+        entry_to_tp_pips: Distance from entry to TP in pips
+        mae_pips: Maximum adverse excursion (max drawdown in pips)
+        mfe_pips: Maximum favorable excursion (max profit in pips)
+        max_profit_pips: Maximum profit achieved in pips
+        max_drawdown_pips: Maximum drawdown in pips
+        holding_time_seconds: Duration position was held
+        quality_score: Position quality score (0-100)
+        signal_confidence: Signal confidence score (0-100)
+        execution_duration_ms: Time taken to execute position (ms)
+        slippage_pips: Slippage at entry in pips
+        closing_slippage_pips: Slippage at exit in pips
         metadata: Additional position metadata
     """
 
@@ -67,16 +88,36 @@ class Position:
     confluence_score: float = 0.0  # Signal confluence score (0-100)
     ticket: int | None = None  # MT5 ticket number
     account_id: int | None = None  # Link to TradingAccount (multi-account support)
+    asset_class: str | None = None  # Asset class (forex_major, forex_jpy, commodities, crypto)
+    signal_id: str | None = None  # Link to TradingSignal
+    strategy_id: str | None = None  # Strategy identifier
     session_id: str | None = None  # Link to TradingSession
     status: PositionStatus = PositionStatus.PENDING
     open_time: datetime | None = None
     close_time: datetime | None = None
     close_price: float | None = None
+    close_reason: str | None = None  # Reason for closing
+    exit_type: str | None = None  # Exit type (full, partial)
     current_price: float | None = None
     current_profit_pips: float = 0.0
     current_pnl_usd: float = 0.0
     risk_amount_usd: float = 0.0
     potential_profit_usd: float = 0.0
+    is_winner: bool | None = None  # Set when position is closed
+    breakeven_activated: bool = False  # Whether breakeven was triggered
+    trailing_activated: bool = False  # Whether trailing stop was triggered
+    entry_to_sl_pips: float = 0.0  # Distance from entry to SL
+    entry_to_tp_pips: float = 0.0  # Distance from entry to TP
+    mae_pips: float = 0.0  # Maximum adverse excursion
+    mfe_pips: float = 0.0  # Maximum favorable excursion
+    max_profit_pips: float = 0.0  # Maximum profit achieved
+    max_drawdown_pips: float = 0.0  # Maximum drawdown
+    holding_time_seconds: int = 0  # Duration held
+    quality_score: float = 0.0  # Position quality
+    signal_confidence: float = 0.0  # Signal confidence
+    execution_duration_ms: int = 0  # Execution time
+    slippage_pips: float = 0.0  # Entry slippage
+    closing_slippage_pips: float = 0.0  # Exit slippage
     metadata: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -156,6 +197,11 @@ class Position:
             "volume": self.volume,
             "pip_size": self.pip_size,
             "pip_value_per_lot": self.pip_value_per_lot,
+            "confluence_score": self.confluence_score,
+            "ticket": self.ticket,
+            "account_id": self.account_id,
+            "asset_class": self.asset_class,
+            "session_id": self.session_id,
             "status": self.status.value,
             "open_time": self.open_time.isoformat() if self.open_time else None,
             "close_time": self.close_time.isoformat() if self.close_time else None,
@@ -165,6 +211,9 @@ class Position:
             "current_pnl_usd": self.current_pnl_usd,
             "risk_amount_usd": self.risk_amount_usd,
             "potential_profit_usd": self.potential_profit_usd,
+            "is_winner": self.is_winner,
+            "breakeven_activated": self.breakeven_activated,
+            "trailing_activated": self.trailing_activated,
             "risk_reward_ratio": self.risk_reward_ratio,
             "duration_seconds": self.duration_seconds,
             "metadata": self.metadata,

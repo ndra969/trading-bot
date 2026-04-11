@@ -41,6 +41,10 @@ class PositionTracker:
         - current_price
         - current_profit_pips
         - current_pnl_usd
+        - mae_pips (maximum adverse excursion)
+        - mfe_pips (maximum favorable excursion)
+        - max_profit_pips
+        - max_drawdown_pips
         """
         if not position.is_open:
             logger.warning(
@@ -63,10 +67,26 @@ class PositionTracker:
         pip_value = position.pip_value_per_lot
         position.current_pnl_usd = position.current_profit_pips * pip_value
 
+        # Update MAE/MFE tracking
+        # MFE: Maximum favorable excursion (highest profit)
+        if position.current_profit_pips > position.mfe_pips:
+            position.mfe_pips = position.current_profit_pips
+            position.max_profit_pips = position.current_profit_pips
+
+        # MAE: Maximum adverse excursion (lowest profit / highest drawdown)
+        if position.current_profit_pips < position.mae_pips:
+            position.mae_pips = position.current_profit_pips
+            # Track max drawdown as negative value
+            if position.current_profit_pips < 0:
+                drawdown = abs(position.current_profit_pips)
+                if drawdown > position.max_drawdown_pips:
+                    position.max_drawdown_pips = drawdown
+
         logger.debug(
             f"Updated {position.position_id}: "
             f"{position.current_profit_pips:.1f} pips, "
-            f"${position.current_pnl_usd:.2f}"
+            f"${position.current_pnl_usd:.2f}, "
+            f"MAE: {position.mae_pips:.1f}, MFE: {position.mfe_pips:.1f}"
         )
 
     def open_position(self, position: Position) -> None:
@@ -93,6 +113,24 @@ class PositionTracker:
         position.current_profit_pips = 0.0
         position.current_pnl_usd = 0.0
 
+        # Calculate distance to SL and TP in pips
+        position.entry_to_sl_pips = abs(
+            self.pip_calculator.calculate_pips(
+                symbol=position.symbol,
+                entry_price=position.entry_price,
+                current_price=position.stop_loss,
+                position_type=position.position_type.value,
+            )
+        )
+        position.entry_to_tp_pips = abs(
+            self.pip_calculator.calculate_pips(
+                symbol=position.symbol,
+                entry_price=position.entry_price,
+                current_price=position.take_profit,
+                position_type=position.position_type.value,
+            )
+        )
+
         # Calculate risk and potential profit amounts
         position.risk_amount_usd = self.pip_calculator.calculate_usd_amount(
             symbol=position.symbol,
@@ -107,6 +145,12 @@ class PositionTracker:
             target_price=position.take_profit,
             volume=position.volume,
         )
+
+        # Initialize MAE/MFE tracking
+        position.mae_pips = 0.0
+        position.mfe_pips = 0.0
+        position.max_profit_pips = 0.0
+        position.max_drawdown_pips = 0.0
 
         # Calculate R:R ratio based on USD (for verification)
         rr_ratio_usd = (
@@ -137,6 +181,7 @@ class PositionTracker:
         - close_time = now
         - close_price
         - Final P&L
+        - is_winner (True if profit, False if loss)
         """
         if position.status != PositionStatus.OPEN:
             logger.warning(
@@ -159,10 +204,21 @@ class PositionTracker:
         pip_value = position.pip_value_per_lot
         position.current_pnl_usd = position.current_profit_pips * pip_value
 
+        # Set is_winner based on final P&L
+        position.is_winner = position.current_pnl_usd > 0
+
+        # Calculate holding time in seconds
+        if position.open_time:
+            position.holding_time_seconds = int(
+                (position.close_time - position.open_time).total_seconds()
+            )
+
         logger.info(
             f"Closed position {position.position_id}: "
             f"{position.current_profit_pips:.1f} pips, "
-            f"${position.current_pnl_usd:.2f} P&L"
+            f"${position.current_pnl_usd:.2f} P&L, "
+            f"Winner: {position.is_winner}, "
+            f"Held: {position.holding_time_seconds}s"
         )
 
     def check_stop_loss(self, position: Position) -> bool:

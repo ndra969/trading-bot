@@ -264,6 +264,16 @@ pip_values_per_lot:
   crypto: 1.0
   forex_jpy: 9.09
   forex_major: 10.0
+
+# Symbol-specific pip values (override asset class defaults)
+# Added to fix XAGUSD bug - Silver has different specs than Gold
+symbol_pip_values:
+  XAGUSD: 0.01              # Silver: 1 pip = $0.01 price movement (NOT 0.1 like Gold!)
+  XAUUSD: 0.1               # Gold: 1 pip = $0.10 price movement (explicit for clarity)
+
+symbol_pip_values_per_lot:
+  XAGUSD: 50.0              # Silver: $50 per pip per 1.0 lot (50 oz contract)
+  XAUUSD: 10.0              # Gold: $10 per pip per 1.0 lot (100 oz contract)
 special_reverse_mappings:
   xm_cent:
     GOLD.micro: XAUUSD

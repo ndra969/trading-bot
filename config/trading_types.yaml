@@ -26,37 +26,37 @@ trading_types:
     description: "Intraday trading, 30-1440 minutes duration"
     risk_per_trade: 0.01  # 1%
     max_positions: 5
-    confluence_threshold: 40.0  # Lowered to 40% for testing
+    confluence_threshold: 30.0  # Lowered to 30% to increase trade frequency
     max_loss_per_day: 0.02  # 2%
     max_position_duration_hours: 24  # Auto-close positions after 24 hours (intraday limit)
     timeframes: ["M15", "H1", "H4"]
     preferred_sessions: ["london", "new_york", "tokyo"]
     stop_loss_pips:
-      forex_major: 15
-      forex_jpy: 150
-      commodities: 50
+      forex_major: 30        # Increased from 15 to give room
+      forex_jpy: 40          # Increased from 15 (150 pts) -> 40 (400 pts)
+      commodities: 100       # Increased from 50 (for Gold/Silver volatile)
     take_profit_pips:
-      forex_major: 30
-      forex_jpy: 300
-      commodities: 100
+      forex_major: 60        # 1:2 RR
+      forex_jpy: 80
+      commodities: 200
 
   swing_trading:
     name: "Swing Trading"
     description: "Multi-day trading, 1-7 days duration"
     risk_per_trade: 0.02  # 2%
     max_positions: 3
-    confluence_threshold: 60.0
+    confluence_threshold: 30.0
     max_loss_per_day: 0.05  # 5%
     timeframes: ["H4", "D1", "W1"]
     preferred_sessions: ["london", "new_york"]
     stop_loss_pips:
-      forex_major: 50
-      forex_jpy: 500
-      commodities: 200
+      forex_major: 80        # Increased from 50
+      forex_jpy: 800         # Increased from 500
+      commodities: 300       # Increased from 200
     take_profit_pips:
-      forex_major: 100
-      forex_jpy: 1000
-      commodities: 400
+      forex_major: 160
+      forex_jpy: 1600
+      commodities: 600
 
   position_trading:
     name: "Position Trading"

@@ -54,14 +54,24 @@ class PositionManager:
         self.positions: dict[str, Position] = {}  # position_id -> Position
         self.positions_by_symbol: dict[str, list[str]] = {}  # symbol -> list of position_ids
 
-        # Configuration
-        self.max_positions_per_symbol = self.config.get("position_manager", {}).get(
-            "max_positions_per_symbol", 1
+        # Get active trading type and its configuration
+        trading_types = self.config.get("trading_types", {})
+        active_type = (
+            self.config.get("active_trading_type")
+            or trading_types.get("active_trading_type")
+            or "day_trading"
+        )
+        type_config = trading_types.get(active_type, {})
+
+        # Configuration - PRIORITY: Trading Type Config > General Config > Default
+        self.max_positions_per_symbol = type_config.get(
+            "max_positions",
+            self.config.get("position_manager", {}).get("max_positions_per_symbol", 1),
         )
 
         logger.info(
             f"PositionManager initialized with automation "
-            f"(max positions per symbol: {self.max_positions_per_symbol})"
+            f"(trading_type: {active_type}, max positions per symbol: {self.max_positions_per_symbol})"
         )
 
     async def load_positions_from_db(self):
@@ -155,15 +165,35 @@ class PositionManager:
                             pip_value_per_lot=db_pos.pip_value_per_lot,
                             status=PositionStatus(db_pos.status),
                             account_id=db_pos.account_id,  # Load account_id from DB
+                            asset_class=db_pos.asset_class,  # Load asset_class from DB
+                            signal_id=db_pos.signal_id,  # Load signal_id from DB
+                            strategy_id=db_pos.strategy_id,  # Load strategy_id from DB
                             session_id=db_pos.session_id,  # Load session_id from DB
                             open_time=db_pos.open_time,
                             close_time=db_pos.close_time,
                             close_price=db_pos.close_price,
+                            close_reason=db_pos.close_reason,  # Load close_reason from DB
+                            exit_type=db_pos.exit_type,  # Load exit_type from DB
                             current_price=db_pos.current_price,
                             current_profit_pips=db_pos.current_profit_pips,
                             current_pnl_usd=db_pos.current_pnl_usd,
                             risk_amount_usd=db_pos.risk_amount_usd,
                             potential_profit_usd=db_pos.potential_profit_usd,
+                            is_winner=db_pos.is_winner,  # Load is_winner from DB
+                            breakeven_activated=db_pos.breakeven_activated,  # Load breakeven_activated from DB
+                            trailing_activated=db_pos.trailing_activated,  # Load trailing_activated from DB
+                            entry_to_sl_pips=db_pos.entry_to_sl_pips,  # Load entry_to_sl_pips from DB
+                            entry_to_tp_pips=db_pos.entry_to_tp_pips,  # Load entry_to_tp_pips from DB
+                            mae_pips=db_pos.mae_pips,  # Load mae_pips from DB
+                            mfe_pips=db_pos.mfe_pips,  # Load mfe_pips from DB
+                            max_profit_pips=db_pos.max_profit_pips,  # Load max_profit_pips from DB
+                            max_drawdown_pips=db_pos.max_drawdown_pips,  # Load max_drawdown_pips from DB
+                            holding_time_seconds=db_pos.holding_time_seconds,  # Load holding_time_seconds from DB
+                            quality_score=db_pos.quality_score,  # Load quality_score from DB
+                            signal_confidence=db_pos.signal_confidence,  # Load signal_confidence from DB
+                            execution_duration_ms=db_pos.execution_duration_ms,  # Load execution_duration_ms from DB
+                            slippage_pips=db_pos.slippage_pips,  # Load slippage_pips from DB
+                            closing_slippage_pips=db_pos.closing_slippage_pips,  # Load closing_slippage_pips from DB
                             metadata=metadata,
                         )
 
@@ -232,6 +262,20 @@ class PositionManager:
 
                 if count > 0:
                     logger.info(f"Loaded {count} active positions from database")
+
+                    # Restore breakeven and trailing tracking for loaded positions
+                    for position in self.get_open_positions():
+                        if position.breakeven_activated:
+                            self.breakeven_manager.breakeven_positions.add(position.position_id)
+                            logger.debug(f"Restored breakeven tracking for {position.position_id}")
+
+                        if position.trailing_activated:
+                            self.trailing_stop_manager.trailing_active.add(position.position_id)
+                            self.trailing_stop_manager.highest_profit[position.position_id] = (
+                                position.current_profit_pips
+                            )
+                            logger.debug(f"Restored trailing tracking for {position.position_id}")
+
                 if invalid_count > 0:
                     logger.warning(
                         f"Skipped {invalid_count} invalid positions from database. "
@@ -333,7 +377,32 @@ class PositionManager:
                     db_pos.confluence_score = confluence_score  # Update confluence score
                     db_pos.ticket = ticket  # Update MT5 ticket
                     db_pos.account_id = position.account_id  # Update account_id
+                    db_pos.asset_class = position.asset_class  # Update asset_class
                     db_pos.session_id = position.session_id  # Update session_id
+                    db_pos.is_winner = position.is_winner  # Update is_winner
+                    db_pos.breakeven_activated = (
+                        position.breakeven_activated
+                    )  # Update breakeven_activated
+                    db_pos.trailing_activated = (
+                        position.trailing_activated
+                    )  # Update trailing_activated
+                    # Update new fields
+                    db_pos.signal_id = position.signal_id
+                    db_pos.strategy_id = position.strategy_id
+                    db_pos.close_reason = position.close_reason
+                    db_pos.exit_type = position.exit_type
+                    db_pos.entry_to_sl_pips = position.entry_to_sl_pips
+                    db_pos.entry_to_tp_pips = position.entry_to_tp_pips
+                    db_pos.mae_pips = position.mae_pips
+                    db_pos.mfe_pips = position.mfe_pips
+                    db_pos.max_profit_pips = position.max_profit_pips
+                    db_pos.max_drawdown_pips = position.max_drawdown_pips
+                    db_pos.holding_time_seconds = position.holding_time_seconds
+                    db_pos.quality_score = position.quality_score
+                    db_pos.signal_confidence = position.signal_confidence
+                    db_pos.execution_duration_ms = position.execution_duration_ms
+                    db_pos.slippage_pips = position.slippage_pips
+                    db_pos.closing_slippage_pips = position.closing_slippage_pips
                     db_pos.meta_data = position.metadata  # Keep metadata for backward compatibility
                 else:
                     # Create new
@@ -356,7 +425,27 @@ class PositionManager:
                         confluence_score=confluence_score,  # Add confluence score
                         ticket=ticket,  # Add MT5 ticket
                         account_id=position.account_id,  # Add account_id
+                        asset_class=position.asset_class,  # Add asset_class
+                        signal_id=position.signal_id,  # Add signal_id
+                        strategy_id=position.strategy_id,  # Add strategy_id
                         session_id=position.session_id,  # Add session_id
+                        is_winner=position.is_winner,  # Add is_winner
+                        breakeven_activated=position.breakeven_activated,  # Add breakeven_activated
+                        trailing_activated=position.trailing_activated,  # Add trailing_activated
+                        close_reason=position.close_reason,  # Add close_reason
+                        exit_type=position.exit_type,  # Add exit_type
+                        entry_to_sl_pips=position.entry_to_sl_pips,  # Add entry_to_sl_pips
+                        entry_to_tp_pips=position.entry_to_tp_pips,  # Add entry_to_tp_pips
+                        mae_pips=position.mae_pips,  # Add mae_pips
+                        mfe_pips=position.mfe_pips,  # Add mfe_pips
+                        max_profit_pips=position.max_profit_pips,  # Add max_profit_pips
+                        max_drawdown_pips=position.max_drawdown_pips,  # Add max_drawdown_pips
+                        holding_time_seconds=position.holding_time_seconds,  # Add holding_time_seconds
+                        quality_score=position.quality_score,  # Add quality_score
+                        signal_confidence=position.signal_confidence,  # Add signal_confidence
+                        execution_duration_ms=position.execution_duration_ms,  # Add execution_duration_ms
+                        slippage_pips=position.slippage_pips,  # Add slippage_pips
+                        closing_slippage_pips=position.closing_slippage_pips,  # Add closing_slippage_pips
                         open_time=position.open_time,
                         meta_data=position.metadata,
                     )
@@ -398,6 +487,9 @@ class PositionManager:
         # Calculate pip value
         pip_value_per_lot = self.pip_calculator.calculate_pip_value(signal.symbol, volume)
 
+        # Get asset class for symbol
+        asset_class = self.pip_calculator.symbol_mapper.get_asset_class(signal.symbol)
+
         # Extract price action info from signal metadata (if available)
         price_action_info = signal.metadata.get("price_action") if signal.metadata else None
 
@@ -430,6 +522,10 @@ class PositionManager:
             volume=volume,
             pip_size=pip_size,
             pip_value_per_lot=pip_value_per_lot,
+            confluence_score=signal.confluence_score,
+            asset_class=asset_class,
+            signal_id=signal.signal_id,
+            strategy_id="foundation",  # TODO: Get from signal
             status=PositionStatus.PENDING,
             metadata=position_metadata,
         )

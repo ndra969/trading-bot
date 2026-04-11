@@ -215,6 +215,7 @@ class TrailingStopManager:
         if not position.is_open:
             return
 
+        position.trailing_activated = True
         self.trailing_active.add(position.position_id)
         self.highest_profit[position.position_id] = position.current_profit_pips
 

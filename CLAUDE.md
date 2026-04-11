@@ -2,6 +2,56 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 📋 Quick Access to Project Rules & Commands
+
+**🚀 Custom Claude Commands** (In Cursor IDE):
+
+| Command | Description |
+|---------|-------------|
+| `/workflow` | **START HERE** - Complete development workflow guide |
+| `/rules` / `/claude` | Display project rules and guidelines |
+| `/test` | Run test suite with coverage (unit, integration, critical) |
+| `/tdd` | TDD workflow guidance for new features |
+| `/quality` | Run code quality checks (black, ruff, mypy) |
+| `/dry-run` | Validate bot with dry-run mode (MANDATORY before commit) |
+| `/coverage` | Check and display test coverage report |
+| `/commit` | Pre-commit validation workflow (quick/full) |
+| `/analyze <symbol>` | Analyze symbol with foundation strategy |
+| `/backtest <symbol>` | Run backtesting on strategies |
+| `/migrate` | Database migration management |
+| `/docs [topic]` | Quick access to project documentation |
+
+**Examples:**
+```bash
+/workflow              # Show complete development workflow
+/workflow implement     # Show TDD implementation phase
+/test critical         # Run risk management tests (95% coverage)
+/quality fix           # Auto-fix code quality issues
+/dry-run               # Final validation before commit
+/tdd new-feature       # TDD guidance for specific feature
+/analyze EURUSD        # Analyze EURUSD with foundation strategy
+/backtest XAUUSD       # Backtest Gold strategy
+/docs risk-management  # View risk management guide
+```
+
+**💡 Traditional CLI Commands:**
+```bash
+# Display project rules
+uv run trading-bot rules
+uv run trading-bot rules --format summary
+uv run trading-bot rules --format rules-only
+
+# Start trading bot
+uv run trading-bot start --config production
+uv run trading-bot start --dry-run
+```
+
+**File Reference:**
+- Use `@CLAUDE.md` to reference this file directly
+- Check `.cursorrules` for auto-loaded context
+
+---
+
 ## Project Overview
 
 This is a **New Trading Bot System** built with modern Python architecture for automated multi-asset trading (Forex, Commodities, Crypto). The system will implement sophisticated position management and market structure analysis using Test-Driven Development (TDD) methodology.
@@ -57,6 +107,20 @@ trading-bot/
 ```
 
 ## Essential Commands
+
+### 📋 View Project Rules
+```bash
+# Display complete project rules and guidelines
+uv run trading-bot rules
+
+# Quick summary of key rules
+uv run trading-bot rules --format summary
+
+# Critical rules only (implementation requirements)
+uv run trading-bot rules --format rules-only
+```
+
+**💡 Quick Access**: In Cursor IDE, you can also use `@CLAUDE.md` to reference this file directly.
 
 ### Development Workflow
 ```bash
