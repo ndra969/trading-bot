@@ -1,0 +1,187 @@
+# Strategy Execution Flow Diagram
+
+```mermaid
+flowchart TB
+    Start([Trading Cycle Start]) --> Scan[Scan Active Symbols]
+
+    Scan --> ZoneFoundation[Foundation: Supply & Demand Zones]
+    ZoneFoundation --> |30% weight| ZoneScore[Zone Score]
+
+    ZoneFoundation --> Trendline[Trendline Confluence]
+    Trendline --> |20% weight| TrendlineScore[Trendline Score]
+
+    Trendline --> PriceAction[Price Action Patterns]
+    PriceAction --> |15% weight| PriceActionScore[Price Action Score]
+
+    PriceAction --> Fibonacci[Fibonacci Levels]
+    Fibonacci --> |12% weight| FibonacciScore[Fibonacci Score]
+
+    Fibonacci --> Breakout[Breakout Retest Validation]
+    Breakout --> |12% weight| BreakoutScore[Breakout Score]
+
+    Breakout --> Structure[Market Structure BOS/CHoCH]
+    Structure --> |8% weight| StructureScore[Structure Score]
+
+    Structure --> RSI[RSI Analysis]
+    RSI --> |10% weight| RSIScore[RSI Score]
+
+    RSI --> MA[Moving Average Analysis]
+    MA --> |8% weight| MAScore[MA Score]
+
+    %% Aggregation
+    MAScore --> Aggregate[SignalAggregator]
+    ZoneScore --> Aggregate
+    TrendlineScore --> Aggregate
+    PriceActionScore --> Aggregate
+    FibonacciScore --> Aggregate
+    BreakoutScore --> Aggregate
+    StructureScore --> Aggregate
+    RSIScore --> Aggregate
+
+    %% Confluence Calculation
+    Aggregate --> Calculate{Total Score ≥ 65%?}
+
+    Calculate --> |Yes| Generate[Generate Trading Signal]
+    Calculate --> |No| Skip[Skip Symbol]
+
+    %% Signal Validation
+    Generate --> Validate[Enhanced Signal Validator]
+    Validate --> |Valid| RiskCheck[Risk Management Check]
+    Validate --> |Invalid| Skip
+
+    %% Risk Check
+    RiskCheck --> |Pass| Execute[Execute Trade]
+    RiskCheck --> |Fail| Skip
+
+    %% Execution
+    Execute --> Order[Send Order to MT5]
+    Order --> Track[Track Position]
+
+    %% Skip Path
+    Skip --> Next{More Symbols?}
+    Track --> Next
+
+    %% Loop
+    Next --> |Yes| Scan
+    Next --> |No| Wait[Wait for Next Cycle]
+    Wait --> Start
+
+    %% Styling
+    classDef foundation fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    classDef enhancement fill:#4ecdc4,stroke:#0f9d8a,color:#fff
+    classDef aggregator fill:#ffe66d,stroke:#f4a127,color:#000
+    classDef decision fill:#a8dadc,stroke:#1d3557,color:#000
+    classDef execution fill:#118ab2,stroke:#075f8a,color:#fff
+
+    class ZoneFoundation foundation
+    class Trendline,PriceAction,Fibonacci,Breakout,Structure,RSI,MA enhancement
+    class Aggregate,Calculate aggregator
+    class Validate,RiskCheck,Calculate decision
+    class Execute,Order,Track execution
+```
+
+## Phase 2: Multi-Timeframe Analysis Flow
+
+```mermaid
+flowchart LR
+    subgraph MTF["Multi-Timeframe Analysis"]
+        direction TB
+        M1[M1<br/>Scalping]
+        M5[M5<br/>Scalping]
+        M15[M15<br/>Scalping/Day]
+        H1[H1<br/>Day Trading]
+        H4[H4<br/>Swing]
+        D1[D1<br/>Position]
+        W1[W1<br/>Position]
+    end
+
+    subgraph Types["Trading Types"]
+        Scalping[Scalping<br/>1-240 min]
+        Day[Day Trading<br/>30-1440 min]
+        Swing[Swing Trading<br/>1-7 days]
+        Position[Position<br/>1-4 weeks]
+    end
+
+    %% Connections
+    M1 & M5 & M15 --> Scalping
+    M15 & H1 --> Day
+    H4 & D1 --> Swing
+    D1 & W1 --> Position
+
+    %% Styling
+    classDef timeframe fill:#f1f3f5,stroke:#495057,color:#000
+    classDef tradingType fill:#e7f5ff,stroke:#1c7ed6,color:#000
+
+    class M1,M5,M15,H1,H4,D1,W1 timeframe
+    class Scalping,Day,Swing,Position tradingType
+```
+
+## Phase 3: Confluence Scoring Calculation
+
+```mermaid
+flowchart TD
+    Start[Signal Received] --> F[Foundation Layer<br/>S&D Zones]
+
+    F --> |Max 30 pts| F1{Zone Quality?}
+    F1 --> |Fresh| F_Score[+30]
+    F1 --> |Aging| F_Score2[+15]
+    F1 --> |Weak| F_Score3[+5]
+
+    F_Score & F_Score2 & F_Score3 --> T[Trendline Layer]
+    F_Score3 --> T
+
+    T --> |Max 20 pts| T1{Trendline Strength?}
+    T1 --> |Strong 3+ touches| T_Score[+20]
+    T1 --> |Moderate 2 touches| T_Score2[+10]
+    T1 --> |None| T_Score3[+0]
+
+    T_Score & T_Score2 & T_Score3 --> P[Price Action Layer]
+    T_Score3 --> P
+
+    P --> |Max 15 pts| P1{Pattern Quality?}
+    P1 --> |Strong Engulfing| P_Score[+15]
+    P1 --> |Pin Bar| P_Score2[+10]
+    P1 --> |Weak| P_Score3[+5]
+
+    P_Score & P_Score2 & P_Score3 --> Fib[Fibonacci Layer]
+    P_Score3 --> Fib
+
+    Fib --> |Max 12 pts| Fib1{Fibo Confluence?}
+    Fib1 --> |At Key Level| Fib_Score[+12]
+    Fib1 --> |Near Level| Fib_Score2[+6]
+    Fib1 --> |None| Fib_Score3[+0]
+
+    Fib_Score & Fib_Score2 & Fib_Score3 --> B[Breakout Layer]
+    Fib_Score3 --> B
+
+    B --> |Max 12 pts| B1{Breakout Valid?}
+    B1 --> |Volume Confirm| B_Score[+12]
+    B1 --> |Weak| B_Score2[+6]
+    B1 --> |None| B_Score3[+0]
+
+    B_Score & B_Score2 & B_Score3 --> S[Structure Layer]
+    B_Score3 --> S
+
+    S --> |Max 8 pts| S1{BOS/CHoCH Align?}
+    S1 --> |Yes| S_Score[+8]
+    S1 --> |No| S_Score2[+0]
+
+    S_Score & S_Score2 --> R[RSI Layer]
+
+    R --> |Max 10 pts| R1{RSI Confirm?}
+    R1 --> |Oversold/Overbought| R_Score[+10]
+    R1 --> |Divergence| R_Score2[+7]
+    R1 --> |Neutral| R_Score3[+0]
+
+    R_Score & R_Score2 & R_Score3 --> MA[MA Layer]
+
+    MA --> |Max 8 pts| MA1{MA Align?}
+    MA1 --> |Trend Confirm| MA_Score[+8]
+    MA1 --> |Counter| MA_Score2[+0]
+
+    MA_Score & MA_Score2 --> Total[Calculate Total]
+
+    Total --> Check{Score ≥ 65?}
+    Check --> |Yes| Pass[✅ Signal Valid]
+    Check --> |No| Fail[❌ Signal Rejected]
+```

@@ -1,0 +1,121 @@
+# Multi-Timeframe Analysis Flow Diagram
+
+```mermaid
+flowchart TB
+    Start([Analysis Request]) --> Type{Trading Type?}
+
+    Type --> |Scalping| ScalpTF[Select Timeframes<br/>M1, M5, M15]
+    Type --> |Day Trading| DayTF[Select Timeframes<br/>M15, H1, H4]
+    Type --> |Swing Trading| SwingTF[Select Timeframes<br/>H4, D1, W1]
+    Type --> |Position| PosTF[Select Timeframes<br/>D1, W1, MN1]
+
+    ScalpTF --> Cache{Cache Valid?<br/>5 sec for scalping}
+    DayTF --> Cache2{Cache Valid?<br/>30 sec for day}
+    SwingTF --> Cache3{Cache Valid?<br/>1 hour for swing}
+    PosTF --> Cache4{Cache Valid?<br/>1 day for position}
+
+    Cache --> |Yes| UseCache[Use Cached Analysis]
+    Cache --> |No| Fetch[Fetch Fresh Data]
+
+    Cache2 --> |Yes| UseCache
+    Cache2 --> |No| Fetch
+    Cache3 --> |Yes| UseCache
+    Cache3 --> |No| Fetch
+    Cache4 --> |Yes| UseCache
+    Cache4 --> |No| Fetch
+
+    Fetch --> Parallel[Parallel Timeframe Analysis]
+
+    subgraph MTF["Multi-Timeframe Parallel Processing"]
+        direction LR
+        TF1[Lower TF<br/>Entry Signals]
+        TF2[Mid TF<br/>Confluence]
+        TF3[Higher TF<br/>Trend Filter]
+    end
+
+    Parallel --> TF1
+    Parallel --> TF2
+    Parallel --> TF3
+
+    TF1 --> Analyze1[Analyze<br/>Zones & Patterns]
+    TF2 --> Analyze2[Analyze<br/>Trend & Structure]
+    TF3 --> Analyze3[Analyze<br/>Overall Trend]
+
+    Analyze1 --> Score1[Score: 35%]
+    Analyze2 --> Score2[Score: 40%]
+    Analyze3 --> Score3[Score: 25%]
+
+    Score1 & Score2 & Score3 --> Aggregate[Aggregate Scores]
+
+    UseCache --> CacheResult[Cached Analysis Result]
+    Aggregate --> Final[Final Confluence Score]
+    CacheResult --> Final
+
+    Final --> Threshold{Score ≥ 65%?}
+
+    Threshold --> |Yes| Signal[Generate Signal]
+    Threshold --> |No| NoSignal[No Signal]
+
+    Signal --> Store[Store in Cache]
+    NoSignal --> Store
+
+    Store --> End([Analysis Complete])
+
+    %% Styling
+    classDef tfBox fill:#e7f5ff,stroke:#1c7ed6,color:#000
+    classDef analysis fill:#d3f9d8,stroke:#2f9e44,color:#000
+    classDef score fill:#fff4e6,stroke:#f4a127,color:#000
+    classDef decision fill:#f8f9fa,stroke:#495057,color:#000
+
+    class ScalpTF,DayTF,SwingTF,PosTF tfBox
+    class Analyze1,Analyze2,Analyze3 analysis
+    class Score1,Score2,Score3 score
+    class Cache,Cache2,Cache3,Cache4,Threshold decision
+```
+
+## Timeframe Weighting by Trading Type
+
+```mermaid
+graph LR
+    subgraph Scalping["Scalping (1-240 min)"]
+        M1[M1: 40%]
+        M5[M5: 35%]
+        M15[M15: 25%]
+    end
+
+    subgraph DayTrading["Day Trading (30-1440 min)"]
+        M15_2[M15: 30%]
+        H1[H1: 40%]
+        H4[H4: 30%]
+    end
+
+    subgraph SwingTrading["Swing Trading (1-7 days)"]
+        H4_2[H4: 35%]
+        D1[D1: 40%]
+        W1[W1: 25%]
+    end
+
+    subgraph PositionTrading["Position Trading (1-4 weeks)"]
+        D1_2[D1: 30%]
+        W1_2[W1: 45%]
+        MN1[MN1: 25%]
+    end
+```
+
+## Cache Strategy by Trading Type
+
+```mermaid
+graph TB
+    subgraph Cache["Cache Duration Strategy"]
+        direction TB
+        ScalpingCache[Scalping: 5 seconds<br/>Fast-paced, frequent updates]
+        DayCache[Day Trading: 30 seconds<br/>Balance between speed & freshness]
+        SwingCache[Swing Trading: 1 hour<br/>Moderate update frequency]
+        PositionCache[Position Trading: 1 day<br/>Long-term analysis sufficient]
+    end
+
+    ScalpingCache --> Reason1[Reason: Ultra-short term<br/>Need real-time data]
+    DayCache --> Reason2[Reason: Intraday moves<br/>30-min candle frequency]
+    SwingCache --> Reason3[Reason: Daily swings<br/>Hourly checks sufficient]
+    PositionCache --> Reason4[Reason: Long-term trends<br/>Daily checks adequate]
+```

@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `/dry-run` | Validate bot with dry-run mode (MANDATORY before commit) |
 | `/coverage` | Check and display test coverage report |
 | `/commit` | Pre-commit validation workflow (quick/full) |
+| `/new <category>/<name>` | **Create new doc/spec** with template |
 | `/analyze <symbol>` | Analyze symbol with foundation strategy |
 | `/backtest <symbol>` | Run backtesting on strategies |
 | `/migrate` | Database migration management |
@@ -29,6 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 /quality fix           # Auto-fix code quality issues
 /dry-run               # Final validation before commit
 /tdd new-feature       # TDD guidance for specific feature
+/new guides/telegram    # Create new documentation
 /analyze EURUSD        # Analyze EURUSD with foundation strategy
 /backtest XAUUSD       # Backtest Gold strategy
 /docs risk-management  # View risk management guide
@@ -545,30 +547,27 @@ uv run black src/ tests/
 For detailed implementation guides, see `docs/` directory:
 
 **Core Implementation:**
-- `configuration-guide.md`: Complete config management
-- `architecture-guide.md`: System architecture details
-- `strategy-implementation-guide.md`: Strategy development
-- `trading-types-guide.md`: Trading types (scalping, day, swing, position)
-- `risk-management-guide.md`: **Complete Risk Management System** ✅ **UPDATED with Architecture Diagrams**
-- `multi-timeframe-trading-types-guide.md`: Adaptive timeframe analysis
-- `position-management-architecture.md`: **Position Management System** with pip tracking ✅ **NEW**
+- `setup/configuration-guide.md`: Complete config management
+- `architecture/architecture-guide.md`: System architecture details
+- `guides/strategy-guide.md`: Strategy development
+- `trading/trading-types-guide.md`: Trading types (scalping, day, swing, position)
+- `trading/risk-management-guide.md`: **Complete Risk Management System** ✅ **UPDATED with Architecture Diagrams**
+- `guides/multi-timeframe-guide.md`: Adaptive timeframe analysis
+- `trading/position-management-architecture.md`: **Position Management System** with pip tracking ✅ **NEW**
 
 **Technical Components:**
-- `technical-indicators-guide.md`: RSI & Moving Average implementation
-- `technical-indicators-installation-guide.md`: Windows library setup
-- `broker-symbol-mapping-guide.md`: Multi-broker compatibility
-- `asset-configuration-guide.md`: Asset-specific settings
-- `timeframe-analysis-guide.md`: Multi-timeframe analysis
+- `trading/technical-indicators-guide.md`: RSI & Moving Average implementation
+- `setup/broker-symbol-mapping-guide.md`: Multi-broker compatibility
+- `setup/asset-configuration-guide.md`: Asset-specific settings
+- `guides/multi-timeframe-guide.md`: Multi-timeframe analysis
 
 **Operations & Integration:**
-- `windows-setup-guide.md`: Windows/MT5 setup
-- `cli-reference.md`: Complete CLI commands
-- `notifications-guide.md`: Telegram notification system
-- `code-examples.md`: Production-ready implementation patterns
+- `setup/windows-setup-guide.md`: Windows/MT5 setup
+- `guides/cli-reference.md`: Complete CLI commands
+- `trading/notifications-guide.md`: Telegram notification system
 
 **Database & Architecture:**
-- `database-erd.md`: **Complete Database ERD** with entity relationships ✅ **NEW**
-- `diagrams/database-erd.mermaid`: **Database ERD Diagram** (Mermaid format) ✅ **NEW**
+- `diagrams/database-erd.md`: **Database ERD** with entity relationships ✅ **NEW**
 - `diagrams/position-management-flow.mermaid`: **Position Management Flow** diagram ✅ **NEW**
 - `diagrams/risk-management-architecture.mermaid`: **Risk Management System Architecture** diagrams ✅ **NEW**
 

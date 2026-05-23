@@ -1,0 +1,149 @@
+# Account Management Flow Diagram
+
+```mermaid
+flowchart TB
+    Start([Trading Bot Start]) --> Init[Initialize Account Services]
+
+    Init --> SyncService[AccountSyncService]
+    Init --> Selector[AccountSelector]
+
+    SyncService --> CheckMT5{MT5 Connected?}
+
+    CheckMT5 --> |Yes| GetInfo[Get MT5 Account Info]
+    CheckMT5 --> |No| UseCached[Use Cached Account]
+
+    GetInfo --> Exists{Account Exists in DB?}
+
+    Exists --> |Yes| Update[Update Balance & Equity]
+    Exists --> |No| Create[Create New Account Record]
+
+    Update --> Account[TradingAccount Object]
+    Create --> Account
+
+    UseCached --> Account
+
+    Account --> Selector
+
+    Selector --> GetActive{Get Active Account}
+
+    GetActive --> Cached{Cached Account<br/>Available?}
+
+    Cached --> |Yes| IsActive{Is Active?}
+    Cached --> |No| FirstActive[Get First Active Account]
+
+    IsActive --> |Yes| ActiveAccount[Active Account Ready]
+    IsActive --> |No| FirstActive
+
+    FirstActive --> SetCache[Set as Cached]
+    SetCache --> ActiveAccount
+
+    ActiveAccount --> Trading[Trading Operations]
+
+    subgraph Trading["Trading Cycle"]
+        direction TB
+        Generate[Generate Signal] --> Validate[Validate Risk]
+        Validate --> Execute[Execute Trade]
+        Execute --> LinkPosition[Link to Account]
+    end
+
+    LinkPosition --> NextCycle{Next Symbol?}
+
+    NextCycle --> |Yes| Generate
+    NextCycle --> |No| PeriodicSync[Periodic Account Sync]
+
+    PeriodicSync --> SyncService
+
+    %% Account Switching
+    ActiveAccount -.->|User Request| Switch[Switch Account]
+    Switch --> Selector
+
+    %% Styling
+    classDef service fill:#e7f5ff,stroke:#1c7ed6,color:#000
+    classDef decision fill:#f8f9fa,stroke:#495057,color:#000
+    classDef account fill:#d3f9d8,stroke:#2f9e44,color:#000
+    classDef trading fill:#fff4e6,stroke:#f4a127,color:#000
+
+    class SyncService,Selector service
+    class CheckMT5,Exists,Cached,IsActive,NextCycle decision
+    class Account,ActiveAccount account
+    class Generate,Validate,Execute,LinkPosition trading
+```
+
+## Multi-Account Data Flow
+
+```mermaid
+flowchart LR
+    subgraph MT5["MetaTrader 5"]
+        Acc1[Account 1<br/>159394302]
+        Acc2[Account 2<br/>123456]
+        Acc3[Account 3<br/>789012]
+    end
+
+    subgraph Sync["AccountSyncService"]
+        Fetch[Fetch Account Info]
+        Determine[Determine Type<br/>DEMO/LIVE]
+        Upsert[Upsert to DB]
+    end
+
+    subgraph DB[(Database)]
+        TA[trading_accounts]
+        Pos[positions]
+    end
+
+    subgraph Select["AccountSelector"]
+        GetActive[Get Active]
+        Switch[Switch Account]
+        ListAll[List All]
+    end
+
+    subgraph Bot["Trading Bot"]
+        Execute[Execute Trades]
+        Track[Track Positions]
+    end
+
+    Acc1 --> Fetch
+    Acc2 --> Fetch
+    Acc3 --> Fetch
+
+    Fetch --> Determine
+    Determine --> Upsert
+    Upsert --> TA
+
+    TA --> GetActive
+    TA --> ListAll
+
+    GetActive --> Execute
+    Switch --> Execute
+
+    Execute --> Pos
+    Track --> Pos
+
+    Pos -.->|Filter by Account| GetActive
+```
+
+## Account Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unconnected: Bot Start
+
+    Unconnected --> Connecting: MT5 Connect
+    Connecting --> Connected: Login Success
+    Connecting --> Failed: Login Failed
+
+    Failed --> Unconnected: Retry
+
+    Connected --> Syncing: Initial Sync
+    Syncing --> Active: Account Created/Updated
+    Syncing --> Inactive: Account Disabled
+
+    Active --> Syncing: Periodic Sync
+    Active --> Switching: User Switch
+
+    Switching --> Active: New Account
+    Switching --> Inactive: Old Account
+
+    Active --> Disconnected: MT5 Disconnect
+    Inactive --> Disconnected: MT5 Disconnect
+
+    Disconnected --> [*]: Bot Stop
