@@ -6,7 +6,7 @@ Entity relationship diagram for the trading bot database schema.
 
 | Status | Tables | Completion |
 |--------|--------|------------|
-| **Implemented** | 8 | ~50% |
+| **Implemented** | 5 | ~36% |
 | **Target** | 14 | 100% |
 
 ### Implemented Tables
@@ -14,16 +14,16 @@ Entity relationship diagram for the trading bot database schema.
 - `positions` - Position management
 - `trading_accounts` - Multi-account support
 - `trading_sessions` - Session grouping
-- `trading_signals` - Signal tracking
 - `config_snapshots` - Config versioning
+
+### In Progress
+- `trading_signals` - Signal tracking
 - `position_modifications` - Modification audit
 - `partial_closes` - Profit-taking tracking
 
-### In Progress
+### Planned
 - `market_data` - OHLCV storage
 - `risk_metrics` - Risk tracking
-
-### Planned
 - `symbol_info` - Dynamic symbol config
 - `risk_violations` - Risk alerts
 - `system_health` - Monitoring
@@ -81,37 +81,28 @@ erDiagram
         float equity
     }
 
-    RISK_METRICS {
-        string risk_id PK
-        string session_id FK
-        float account_balance
-        float total_exposure
-        float daily_pnl
-    }
-
-    MARKET_DATA {
-        string data_id PK
-        string symbol
-        datetime timestamp
-        float open_price
-        float high_price
-        float low_price
-        float close_price
+    CONFIG_SNAPSHOTS {
+        string config_hash PK
+        json config_json
+        datetime created_at
     }
 
     TRADING_SESSIONS ||--o{ POSITIONS : "manages"
-    TRADING_SESSIONS ||--o{ TRADING_SIGNALS : "generates"
     TRADING_SESSIONS ||--o{ SUPPLY_DEMAND_ZONES : "analyzes"
-    TRADING_SESSIONS ||--o{ RISK_METRICS : "tracks"
+    TRADING_SESSIONS ||--o{ TRADING_SIGNALS : "generates"
+    TRADING_ACCOUNTS ||--o{ POSITIONS : "holds"
     SUPPLY_DEMAND_ZONES ||--o{ TRADING_SIGNALS : "triggers"
     TRADING_SIGNALS ||--o{ POSITIONS : "creates"
-    TRADING_ACCOUNTS ||--o{ POSITIONS : "holds"
 ```
 
 ## Missing Tables (Priority)
 
 | Phase | Table | Purpose |
 |-------|-------|---------|
+| 2 | `TRADING_SIGNALS` | Signal quality analysis |
+| 2 | `SIGNAL_EXECUTIONS` | Execution tracking |
+| 2 | `POSITION_MODIFICATIONS` | Breakeven/trailing audit |
+| 2 | `PARTIAL_CLOSES` | Profit-taking tracking |
 | 3 | `MARKET_DATA` | OHLCV + indicators |
 | 3 | `RISK_METRICS` | Risk dashboard |
 | 3 | `SYMBOL_INFO` | Dynamic symbol config |
@@ -121,7 +112,7 @@ erDiagram
 ## Migration Checklist
 
 - [x] Phase 1: Core tables (sessions, accounts, configs)
-- [x] Phase 2: Signal tracking & execution
+- [ ] Phase 2: Signal tracking & execution
 - [ ] Phase 3: Market data & risk metrics
 - [ ] Phase 4: System health & monitoring
 
@@ -129,9 +120,9 @@ erDiagram
 
 | Feature | Ready? |
 |---------|--------|
-| Position Dashboard | ✅ Yes |
-| Strategy Analysis | ✅ Yes |
-| Risk Dashboard | ⚠️ Partial |
-| Analytics | ⚠️ Partial |
+| Position Dashboard | ⚠️ Partial (no signal tracking) |
+| Strategy Analysis | ⚠️ Partial (no execution tracking) |
+| Risk Dashboard | ❌ No risk metrics table |
+| Analytics | ⚠️ Partial (basic aggregations) |
 
 **For database implementation details, see [`src/trading_bot/data/models.py`](../../src/trading_bot/data/models.py).**

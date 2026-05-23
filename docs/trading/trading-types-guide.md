@@ -236,14 +236,14 @@ dynamic_switching:
 
 ## Implementation
 
-> **Note**: For implementation details, see `src/trading_bot/core/trading_type_manager.py`
-
 The trading type system manages different trading styles through:
 
-1. **TradingTypeManager**: Handles switching and configuration
-2. **Type-Aware Strategy Engine**: Applies type-specific weights and timeframes
-3. **Dynamic Risk Adjustment**: Risk per trade scales with trading type
-4. **Position Duration Management**: Automatic close based on holding period limits
+1. **TradingTypeExecutor** (`src/trading_bot/executors/base_executor.py`): Base executor for type-specific trading
+2. **TradingTypeFactory** (`src/trading_bot/executors/factory.py`): Creates appropriate executors per type
+3. **IntradayExecutor** (`src/trading_bot/executors/intraday_executor.py`): Handles intraday/position types
+4. **Configuration**: Trading type parameters in `config/trading_types.yaml`
+5. **Type-Aware Strategy Engine**: Applies type-specific weights and timeframes
+6. **Dynamic Risk Adjustment**: Risk per trade scales with trading type
 
 ## Switching Trading Types
 
@@ -265,8 +265,6 @@ uv run trading-bot type compare --types scalping,day_trading
 
 ### Automatic Switching (Optional)
 
-> **Note**: For implementation details, see `src/trading_bot/core/dynamic_trading_type_manager.py`
-
 Automatic switching evaluates market conditions (volatility, liquidity, session) and suggests optimal trading type:
 - **High volatility + High liquidity**: Scalping
 - **Medium volatility + Normal session**: Day trading
@@ -276,7 +274,7 @@ Automatic switching evaluates market conditions (volatility, liquidity, session)
 
 ### Type-Specific Performance Tracking
 
-> **Note**: For implementation details, see `src/trading_bot/core/performance_tracker.py`
+> **Note**: For implementation details, see `src/trading_bot/executors/` and `src/trading_bot/analytics/`
 
 Performance tracking metrics by trading type:
 - Win rate and profit factor
