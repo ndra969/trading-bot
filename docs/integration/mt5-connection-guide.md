@@ -2,12 +2,12 @@
 
 ## ✅ MT5 Connection Working!
 
-MT5 connector sudah berhasil diimplementasikan dan berfungsi dengan baik.
+The MT5 connector has been successfully implemented and is working properly.
 
 ## 🔌 How MT5 Connection Works
 
 ### CLI Commands (One-Time Execution)
-Setiap CLI command adalah **separate process**:
+Each CLI command is a **separate process**:
 
 ```bash
 # Test connection (works, but doesn't persist)
@@ -23,7 +23,7 @@ uv run trading-bot mt5 status
 ```
 
 ### Running Bot (Persistent Connection)
-Untuk persistent connection, run bot dalam mode daemon:
+For persistent connection, run the bot in daemon mode:
 
 ```bash
 # Start bot with persistent MT5 connection
@@ -246,4 +246,4 @@ Press Ctrl+C to stop...
 
 ## 🎉 Success!
 
-MT5 integration is **fully functional**! Connection works perfectly. Untuk persistent connection dan real-time trading, gunakan `trading-bot start` command.
+MT5 integration is **fully functional**! Connection works perfectly. For persistent connection and real-time trading, use the `trading-bot start` command.

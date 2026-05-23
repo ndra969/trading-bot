@@ -2,7 +2,7 @@
 
 ## Overview
 
-Trading bot menggunakan sophisticated multi-timeframe analysis untuk meningkatkan akurasi signal dan mengurangi false signals. System ini menganalisis struktur pasar dan trend alignment across multiple timeframes untuk memberikan confluence-based trading decisions.
+Trading bot uses sophisticated multi-timeframe analysis to improve signal accuracy and reduce false signals. This system analyzes market structure and trend alignment across multiple timeframes to provide confluence-based trading decisions.
 
 ## Default Timeframe Configuration
 

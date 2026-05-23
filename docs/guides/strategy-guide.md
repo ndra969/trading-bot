@@ -2,13 +2,13 @@
 
 ## Strategy Overview
 
-Trading bot ini menggunakan pendekatan multi-strategy dengan fokus pada **institutional trading concepts** dan **market structure analysis**. Sistem ini dirancang untuk mengidentifikasi dan memanfaatkan pergerakan yang didorong oleh institutional money flow.
+This trading bot uses a multi-strategy approach focusing on **institutional trading concepts** and **market structure analysis**. The system is designed to identify and exploit movements driven by institutional money flow.
 
 ## Core Strategy Framework
 
 ### 1. Supply & Demand Strategy (Primary)
 
-**Konsep Dasar**: Trading berdasarkan zone supply dan demand yang telah terbukti secara historis
+**Basic Concept**: Trading based on historically proven supply and demand zones
 
 #### Zone Detection Algorithm
 ```python
@@ -29,9 +29,9 @@ class EnhancedZoneAnalyzer:
 
 #### Zone Quality Criteria
 - **Minimum Strength**: 35.0 (configurable)
-- **Minimum Grade**: C atau lebih tinggi
-- **Maximum Age**: 168 jam (7 hari)
-- **Freshness Bonus**: 15.0 untuk zone baru
+- **Minimum Grade**: C or higher
+- **Maximum Age**: 168 hours (7 days)
+- **Freshness Bonus**: 15.0 for new zones
 - **Volume Confirmation**: Minimum 0.8x average volume
 
 #### Entry Validation Process
@@ -70,7 +70,7 @@ flowchart TD
 
 ### 2. Breakout Retest Strategy (Secondary)
 
-**Konsep Dasar**: Trading momentum breakout dengan konfirmasi retest
+**Basic Concept**: Trading momentum breakout with retest confirmation
 
 #### Breakout Detection
 ```python
@@ -89,12 +89,12 @@ class BreakoutDetector:
 ```
 
 #### Retest Validation
-- **Retest Patience**: 4 jam maximum waiting time
+- **Retest Patience**: 4 hours maximum waiting time
 - **Tolerance Levels**:
   - Forex: 8 pips
   - Commodities: 25 pips
   - Crypto: 100 pips
-- **Confidence Boost**: +0.15 untuk successful retest
+- **Confidence Boost**: +0.15 for successful retest
 
 #### Breakout Parameters
 ```json
@@ -116,7 +116,7 @@ class BreakoutDetector:
 
 ### 1. Break of Structure (BOS) Detection
 
-**Definisi**: Perubahan struktur pasar yang menunjukkan shift dalam market sentiment
+**Definition**: Market structure change indicating a shift in market sentiment
 
 #### BOS Detection Algorithm
 ```python
@@ -142,18 +142,18 @@ class BOSDetector:
 
 #### BOS Validation Criteria
 - **Swing Lookback**: 20-50 candles
-- **Volume Confirmation**: Required untuk high-confidence BOS
-- **Multi-timeframe Alignment**: H1, H4, D1 confirmation dengan weighted system
+- **Volume Confirmation**: Required for high-confidence BOS
+- **Multi-timeframe Alignment**: H1, H4, D1 confirmation with weighted system
   - **D1 Weight**: 3 (Major trend - 30% influence)
   - **H4 Weight**: 2 (Intermediate trend - 40% influence)
   - **H1 Weight**: 1 (Short-term trend - 30% influence)
-  - **Minimum Score**: 4 (Combined weighted score untuk confirmation)
+  - **Minimum Score**: 4 (Combined weighted score for confirmation)
 - **Analysis Timeframes**: M15, H1, H4 (Structure detection range)
 - **Minimum Break Distance**: Asset-specific pip requirements
 
 ### 2. Change of Character (CHoCH) Detection
 
-**Definisi**: Perubahan karakter pasar dari trending ke ranging atau sebaliknya
+**Definition**: Market character change from trending to ranging or vice versa
 
 #### CHoCH Detection Process
 ```python
@@ -176,7 +176,7 @@ class CHoCHDetector:
 
 ### 3. Order Block Identification
 
-**Definisi**: Candle terakhir sebelum struktur break yang menunjukkan institutional entry
+**Definition**: Last candle before structure break indicating institutional entry
 
 #### Order Block Detection
 ```python
@@ -209,7 +209,7 @@ class OrderBlockDetector:
 
 ### 4. Fair Value Gap (FVG) Analysis
 
-**Definisi**: Area imbalance harga yang cenderung diisi oleh pergerakan selanjutnya
+**Definition**: Price imbalance area that tends to be filled by subsequent movements
 
 #### FVG Detection Algorithm
 ```python

@@ -80,13 +80,13 @@ monitoring:
     enabled: true
     bot_token: ${TELEGRAM_BOT_TOKEN}
     chat_id: ${TELEGRAM_CHAT_ID}
-    
+
     # Notification types
     notify_on_trade: true
     notify_on_risk: true
     notify_on_error: true
     notify_daily_summary: true
-    
+
     # Rate limiting (prevent spam)
     rate_limit_per_minute: 5
     rate_limit_per_hour: 20

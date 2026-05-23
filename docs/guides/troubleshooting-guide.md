@@ -2,7 +2,7 @@
 
 ## Overview
 
-Panduan lengkap untuk mendiagnosis dan mengatasi masalah yang umum terjadi pada trading bot system. Guide ini mencakup troubleshooting untuk berbagai komponen sistem dari MT5 connection hingga database performance.
+Comprehensive guide for diagnosing and resolving issues commonly occurring in the trading bot system. This guide covers troubleshooting for various system components from MT5 connection to database performance.
 
 ## Quick Diagnostic Commands
 

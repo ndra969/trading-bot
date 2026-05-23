@@ -2,7 +2,7 @@
 
 ## Deployment Overview
 
-Panduan lengkap untuk deploy trading bot dari development hingga production environment dengan berbagai opsi deployment.
+Complete guide for deploying trading bot from development to production environment with various deployment options.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ mkdir -p backups
 
 ### 3. Basic Configuration
 
-Edit `.env` file dengan konfigurasi dasar:
+Edit `.env` file with basic configuration:
 
 ```bash
 # Broker Configuration
