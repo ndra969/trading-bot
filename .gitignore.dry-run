@@ -1,0 +1,16 @@
+# Debug files
+DEBUG
+debug_*.py
+verify_*.py
+
+# Test reports (keep in scripts/reports instead)
+backtest_*.json
+backtest_*.txt
+
+# Coverage files
+coverage.json
+coverage.xml
+.coverage
+
+# HTML coverage
+htmlcov/

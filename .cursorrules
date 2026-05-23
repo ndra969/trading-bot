@@ -1,0 +1,84 @@
+# Cursor Rules for Trading Bot Project
+
+This file provides automatic context for Claude Code when working in this repository.
+
+## 🚀 AUTO-LOAD: Project Rules Command
+
+**ALWAYS REFERENCE PROJECT RULES** when working on this codebase. The project has a built-in CLI command to display all rules:
+
+```bash
+# View complete project rules (RECOMMENDED FIRST STEP)
+uv run trading-bot rules
+# OR use the claude command (alias)
+uv run trading-bot claude
+
+# Quick summary for fast reference
+uv run trading-bot rules --format summary
+uv run trading-bot claude --format summary
+
+# Critical implementation rules only
+uv run trading-bot rules --format rules-only
+uv run trading-bot claude --format rules-only
+```
+
+**💡 Quick Access Methods:**
+- **Slash Commands** (Cursor IDE): `/rules` or `/claude [format]` - Display project rules directly in chat
+  - `/rules` or `/claude` - Full rules
+  - `/rules summary` or `/claude summary` - Quick summary
+  - `/rules rules-only` or `/claude rules-only` - Critical rules only
+- **CLI Command**: `uv run trading-bot rules` or `uv run trading-bot claude` - Display complete project guidelines
+- **CLI Command**: `uv run trading-bot rules --format summary` - Quick reference
+- **CLI Command**: `uv run trading-bot rules --format rules-only` - Critical rules only
+- **Cursor @ Mention**: `@CLAUDE.md` - Reference the complete project rules file
+- **This File**: `.cursorrules` - Auto-loaded context (you're reading it now!)
+
+## Primary Documentation
+
+**ALWAYS REFERENCE**: `CLAUDE.md` contains all project rules, guidelines, and standards.
+
+### Key Sections in CLAUDE.md:
+- **Critical Implementation Rules**: Asset-specific pip values, position management, strategy architecture
+- **Code Quality Standards**: Type hints, async-first, TDD methodology, coding standards
+- **Testing Requirements**: 85% minimum coverage, 95% for critical components, 100% for new features
+- **TDD Workflow**: Red-Green-Refactor cycle, mandatory test-first development
+- **Database Architecture**: SQLite/PostgreSQL support, migration commands
+- **Configuration Management**: YAML-based config with environment variable override
+
+## Auto-Load Context
+
+When working on this project, Claude should automatically:
+1. **Reference project rules** - Use `uv run trading-bot rules` or `@CLAUDE.md` for complete guidelines
+2. **Follow TDD methodology** - Write failing tests before implementation (Red-Green-Refactor)
+3. **Maintain test coverage** - 85% minimum, 95% for critical components, 100% for new features
+4. **Use type hints** - Required for all functions and classes (mypy validation)
+5. **Async-first architecture** - Use async/await throughout the codebase
+6. **Follow coding standards** - See `docs/guides/coding-standards.md` for detailed guidelines
+
+## Critical Rules Summary
+
+- **TDD First**: Write failing tests before implementation
+- **Test Coverage**: 85% minimum, 95% for risk/position management, 100% for new features
+- **Type Hints**: Required for all functions and classes (mypy validation)
+- **Async-First**: Use async/await throughout the codebase
+- **No Hardcoded Values**: Use YAML configuration files
+- **SQLAlchemy 2.0**: Modern async syntax required
+- **Code Quality**: Black formatting, ruff linting, mypy type checking
+
+## File References
+
+- `CLAUDE.md` - Complete project rules and guidelines (PRIMARY REFERENCE)
+- `docs/guides/coding-standards.md` - Detailed coding standards
+- `config/` - YAML configuration files
+- `tests/` - Test suite (TDD approach required)
+
+---
+
+## 📚 Complete Documentation
+
+**For complete project rules and guidelines:**
+- **CLI Command**: `uv run trading-bot rules` (RECOMMENDED - displays full CLAUDE.md)
+- **File Reference**: `@CLAUDE.md` in Cursor IDE
+- **Direct File**: `CLAUDE.md` in project root
+
+**Note**: This `.cursorrules` file is auto-loaded by Cursor IDE. For complete details, always refer to `CLAUDE.md` using the CLI command `uv run trading-bot rules` or `@CLAUDE.md` mention.
+

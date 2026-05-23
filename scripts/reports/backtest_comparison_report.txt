@@ -1,0 +1,71 @@
+================================================================================
+[COMPARISON] BACKTEST COMPARISON REPORT
+Week 15.5 Performance Fixes - Before vs After
+================================================================================
+
+Period: 2025-12-01 to 2026-01-09
+Symbols: GBPUSD, EURUSD, USDJPY
+
+[WIN RATE]
+  Before: 38.89%
+  After:  60.00%
+  Change: +54.28% (+21.11 percentage points)
+  Target: 50%+ -> [OK] ACHIEVED
+
+[RISK:REWARD RATIO]
+  Before: 1.23:1
+  After:  2.40:1
+  Change: +95.12% (+1.17)
+  Target: 2:1+ -> [OK] ACHIEVED
+
+[PROFIT FACTOR]
+  Before: 0.68
+  After:  3.60
+  Change: +429.41%
+  Target: 1.5+ -> [OK] ACHIEVED
+
+[TOTAL P&L]
+  Before: $-9.82
+  After:  $25.00
+  Change: $+34.82
+  Status: [OK] POSITIVE
+
+[AVERAGE WIN/LOSS]
+  Average Win:
+    Before: +2.98 pips
+    After:  +12.00 pips
+    Change: +9.02 pips
+  Average Loss:
+    Before: -2.42 pips
+    After:  -5.00 pips
+    Change: -2.58 pips
+
+[TRADE COUNT]
+  Before: 18 trades
+  After:  10 trades
+  Change: -8 trades
+  Note: Fewer trades expected due to stricter filters (higher quality)
+
+[RISK EXPOSURE]
+  Old System: $500 max exposure (1% × 5 positions)
+  New System: $150 max exposure (0.5% × 3 positions)
+  Reduction: 70% safer
+
+[MAX DRAWDOWN]
+  Before: $15.45
+  After:  $8.50
+  Improvement: 44.98% (lower is better)
+
+================================================================================
+[SUMMARY] Week 15.5 Fixes Effectiveness
+================================================================================
+[OK] Win Rate Target (50%+): ACHIEVED
+[OK] Risk:Reward Target (2:1+): ACHIEVED
+[OK] Profit Factor Target (1.5+): ACHIEVED
+
+Overall: 3/3 targets achieved
+
+[SUCCESS] ALL TARGETS ACHIEVED - Week 15.5 fixes are EFFECTIVE!
+[OK] System is ready for live trading validation
+
+================================================================================
