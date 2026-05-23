@@ -1,260 +1,103 @@
-# Trading Types Configuration Guide
+# Trading Types Guide
 
-This guide covers the comprehensive trading types system that allows the bot to operate in different trading styles: Scalping, Day Trading, Swing Trading, and Position Trading.
-
-## Table of Contents
-1. [Overview](#overview)
-2. [Trading Types Comparison](#trading-types-comparison)
-3. [Configuration](#configuration)
-4. [Implementation](#implementation)
-5. [Switching Trading Types](#switching-trading-types)
-6. [Performance Optimization](#performance-optimization)
-7. [CLI Commands](#cli-commands)
+Configure the bot for different trading styles.
 
 ## Overview
 
-The trading types system allows the bot to adapt its strategy, risk management, and timeframe analysis based on different trading styles. Each trading type has optimized parameters for its specific holding duration and market approach.
+The bot adapts strategy, risk, and timeframes based on trading type.
 
-### Available Trading Types
+| Type | Hold Duration | Timeframes | Risk/Trade | Max Daily Trades |
+|------|---------------|------------|------------|------------------|
+| **Scalping** | 1-240 min | M1, M5, M15 | 0.2% | 20 |
+| **Day Trading** | 30-1440 min | M15, H1, H4 | 0.5% | 8 |
+| **Swing** | 1-7 days | H4, D1, W1 | 0.8% | 2 |
+| **Position** | 1-4 weeks | D1, W1, MN1 | 1.2% | 1 |
 
-| Type | Hold Duration | Primary Timeframe | Risk Level | Max Daily Trades |
-|------|---------------|-------------------|------------|------------------|
-| **Scalping** | 1-240 minutes | M1/M5 | Low (0.2%) | 20 |
-| **Day Trading** | 30-1440 minutes | M15/H1 | Medium (0.5%) | 8 |
-| **Swing Trading** | 1-7 days | H4/D1 | High (0.8%) | 2 |
-| **Position Trading** | 1-4 weeks | D1/W1 | Highest (1.2%) | 1 |
+## Scalping
 
-### Key Features
+**Best for**: High-frequency trading, quick profits, tight spreads
 
-✅ **Adaptive Timeframes**: Each type uses optimal timeframes for analysis
-✅ **Dynamic Risk Management**: Risk per trade adjusts based on holding duration
-✅ **Optimized Position Management**: Stop losses and targets suited for each style
-✅ **Technical Indicator Tuning**: Different RSI/MA parameters per trading type
-✅ **Session Awareness**: Preferred trading sessions for each type
-✅ **Performance Tracking**: Type-specific performance metrics
+| Parameter | Value |
+|-----------|-------|
+| Hold target | 15 minutes |
+| Primary TF | M1 |
+| Risk/trade | 0.2% |
+| Min SL | 5 pips |
+| Breakeven | 5 pips |
+| Trailing | 3 pips |
+| Sessions | London + NY overlap |
+| Max trades/day | 20 |
 
-## Trading Types Comparison
+**Strategy weight**:
+- Technical: 60% (heavy)
+- Foundation: 25%
+- Multi-TF: 15%
 
-### 1. Scalping Configuration
+## Day Trading
 
-**Best for**: High-frequency, quick profit taking
-**Market conditions**: Medium to high volatility, tight spreads
+**Best for**: Intraday opportunities, balanced approach
 
-```yaml
-scalping:
-  hold_duration:
-    target_minutes: 15        # Quick 15-minute trades
+| Parameter | Value |
+|-----------|-------|
+| Hold target | 4 hours |
+| Primary TF | H1 |
+| Risk/trade | 0.5% |
+| Min SL | 15 pips |
+| Breakeven | 15 pips |
+| Trailing | 10 pips |
+| Sessions | London, NY |
+| Max trades/day | 8 |
 
-  timeframes:
-    primary: "M1"             # 1-minute charts
-    analysis: ["M1", "M5", "M15"]
+**Strategy weight**:
+- Foundation: 40%
+- Technical: 35%
+- Multi-TF: 25%
 
-  risk_management:
-    risk_per_trade: 0.002     # Low risk (0.2%)
-    max_concurrent_positions: 8
-    max_daily_trades: 20
+## Swing Trading
 
-  position_management:
-    forex_major:
-      min_sl_pips: 5          # Tight stops
-      breakeven_trigger_pips: 8
-      partial_close_levels: [8, 12]
+**Best for**: Multi-day trends, less monitoring needed
 
-  strategy_weights:
-    technical_indicators: 0.27  # Heavy emphasis on technicals
-    foundation_sd_zones: 0.40
-```
+| Parameter | Value |
+|-----------|-------|
+| Hold target | 3 days |
+| Primary TF | H4 |
+| Risk/trade | 0.8% |
+| Min SL | 50 pips |
+| Breakeven | 50 pips |
+| Trailing | 30 pips |
+| Sessions | All |
+| Max trades/day | 2 |
 
-**Pros:**
-- Quick profits, multiple opportunities
-- Lower individual trade risk
-- Active trading experience
+**Strategy weight**:
+- Foundation: 45%
+- Multi-TF: 35%
+- Technical: 20%
 
-**Cons:**
-- Requires constant monitoring
-- Higher spread costs
-- Stressful for beginners
+## Position Trading
 
-### 2. Day Trading Configuration
+**Best for**: Long-term trends, minimal monitoring
 
-**Best for**: Balanced approach, same-day closes
-**Market conditions**: Medium volatility, normal spreads
+| Parameter | Value |
+|-----------|-------|
+| Hold target | 2 weeks |
+| Primary TF | D1 |
+| Risk/trade | 1.2% |
+| Min SL | 150 pips |
+| Breakeven | 150 pips |
+| Trailing | 100 pips |
+| Sessions | All |
+| Max trades/day | 1 |
 
-```yaml
-day_trading:
-  hold_duration:
-    target_minutes: 240       # 4-hour average trades
-
-  timeframes:
-    primary: "M15"            # 15-minute charts
-    analysis: ["M15", "H1", "H4"]
-
-  risk_management:
-    risk_per_trade: 0.005     # Standard risk (0.5%)
-    max_concurrent_positions: 5
-    max_daily_trades: 8
-
-  position_management:
-    forex_major:
-      min_sl_pips: 15         # Moderate stops
-      breakeven_trigger_pips: 15
-      partial_close_levels: [20, 40, 60]
-
-  strategy_weights:
-    foundation_sd_zones: 0.35  # Balanced approach
-    price_action: 0.15
-    technical_indicators: 0.18
-```
-
-**Pros:**
-- No overnight risk
-- Good risk/reward balance
-- Suitable for part-time traders
-
-**Cons:**
-- Requires intraday monitoring
-- Limited to daily timeframes
-- Can miss longer-term moves
-
-### 3. Swing Trading Configuration
-
-**Best for**: Multi-day trend captures
-**Market conditions**: Any volatility, wider spreads acceptable
-
-```yaml
-swing_trading:
-  hold_duration:
-    target_minutes: 4320      # 3-day average trades
-
-  timeframes:
-    primary: "H4"             # 4-hour charts
-    analysis: ["H4", "D1", "W1"]
-
-  risk_management:
-    risk_per_trade: 0.008     # Higher risk (0.8%)
-    max_concurrent_positions: 3
-    max_daily_trades: 2
-
-  position_management:
-    forex_major:
-      min_sl_pips: 50         # Wider stops
-      breakeven_trigger_pips: 80
-      partial_close_levels: [80, 120, 160]
-
-  strategy_weights:
-    fibonacci: 0.18           # Emphasis on Fib levels
-    breakout_retest: 0.15
-    market_structure: 0.15
-```
-
-**Pros:**
-- Captures larger moves
-- Less time-intensive
-- Better risk/reward ratios
-
-**Cons:**
-- Overnight/weekend risk
-- Fewer trading opportunities
-- Requires patience
-
-### 4. Position Trading Configuration
-
-**Best for**: Long-term trend following
-**Market conditions**: Any conditions, focuses on major moves
-
-```yaml
-position_trading:
-  hold_duration:
-    target_minutes: 20160     # 2-week average trades
-
-  timeframes:
-    primary: "D1"             # Daily charts
-    analysis: ["D1", "W1", "MN1"]
-
-  risk_management:
-    risk_per_trade: 0.012     # Highest risk (1.2%)
-    max_concurrent_positions: 2
-    max_daily_trades: 1
-
-  position_management:
-    forex_major:
-      min_sl_pips: 150        # Very wide stops
-      breakeven_trigger_pips: 200
-      partial_close_levels: [200, 300, 400]
-
-  strategy_weights:
-    fibonacci: 0.25           # Heavy Fib emphasis
-    breakout_retest: 0.20
-    market_structure: 0.20
-    rsi_analysis: 0.00        # Technical indicators less relevant
-```
-
-**Pros:**
-- Captures major trends
-- Minimal time commitment
-- Best risk/reward potential
-
-**Cons:**
-- Highest individual risk
-- Very few opportunities
-- Requires strong conviction
-
-## Configuration
-
-### Basic Trading Type Setup
-
-```yaml
-# config/trading_types.yaml
-trading_types:
-  active_type: "day_trading"  # Current active type
-
-  types:
-    day_trading:
-      # ... configuration as shown above
-```
-
-### Dynamic Type Switching
-
-```yaml
-# Switch based on market conditions
-dynamic_switching:
-  enabled: true
-
-  conditions:
-    low_volatility:
-      switch_to: "swing_trading"
-      volatility_threshold: 0.8
-
-    high_volatility:
-      switch_to: "scalping"
-      volatility_threshold: 2.0
-
-    news_events:
-      switch_to: "position_trading"
-      avoid_duration_hours: 2
-```
-
-## Implementation
-
-The trading type system manages different trading styles through:
-
-1. **TradingTypeExecutor** (`src/trading_bot/executors/base_executor.py`): Base executor for type-specific trading
-2. **TradingTypeFactory** (`src/trading_bot/executors/factory.py`): Creates appropriate executors per type
-3. **IntradayExecutor** (`src/trading_bot/executors/intraday_executor.py`): Handles intraday/position types
-4. **Configuration**: Trading type parameters in `config/trading_types.yaml`
-5. **Type-Aware Strategy Engine**: Applies type-specific weights and timeframes
-6. **Dynamic Risk Adjustment**: Risk per trade scales with trading type
+**Strategy weight**:
+- Multi-TF: 40%
+- Foundation: 35%
+- Fundamental: 25%
 
 ## Switching Trading Types
 
-### Manual Switching
-
 ```bash
-# CLI commands for switching trading types
+# Switch trading type
 uv run trading-bot type switch --type scalping
-uv run trading-bot type switch --type day_trading
-uv run trading-bot type switch --type swing_trading
-uv run trading-bot type switch --type position_trading
 
 # Check current type
 uv run trading-bot type status
@@ -263,105 +106,110 @@ uv run trading-bot type status
 uv run trading-bot type compare --types scalping,day_trading
 ```
 
-### Automatic Switching (Optional)
+## Configuration
 
-Automatic switching evaluates market conditions (volatility, liquidity, session) and suggests optimal trading type:
-- **High volatility + High liquidity**: Scalping
-- **Medium volatility + Normal session**: Day trading
-- **Low volatility or Poor liquidity**: Swing trading
+`config/trading_types.yaml`:
 
-## Performance Optimization
+```yaml
+default_trading_type: day_trading
 
-### Type-Specific Performance Tracking
+types:
+  scalping:
+    hold_duration:
+      target_minutes: 15
+    timeframes:
+      primary: M1
+      analysis: [M1, M5, M15]
+    risk:
+      per_trade: 0.002
+      max_positions: 5
+      max_daily_trades: 20
+    position:
+      min_sl_pips: 5
+      breakeven_pips: 5
+      trailing_pips: 3
 
-> **Note**: For implementation details, see `src/trading_bot/executors/` and `src/trading_bot/analytics/`
+  day_trading:
+    hold_duration:
+      target_minutes: 240
+    timeframes:
+      primary: H1
+      analysis: [M15, H1, H4]
+    risk:
+      per_trade: 0.005
+      max_positions: 5
+      max_daily_trades: 8
+    position:
+      min_sl_pips: 15
+      breakeven_pips: 15
+      trailing_pips: 10
 
-Performance tracking metrics by trading type:
-- Win rate and profit factor
-- Average hold time
-- Maximum favorable excursion (MFE)
-- Maximum adverse excursion (MAE)
-- Risk-adjusted returns comparison
+  swing_trading:
+    hold_duration:
+      target_hours: 72
+    timeframes:
+      primary: H4
+      analysis: [H4, D1, W1]
+    risk:
+      per_trade: 0.008
+      max_positions: 3
+      max_daily_trades: 2
+    position:
+      min_sl_pips: 50
+      breakeven_pips: 50
+      trailing_pips: 30
 
-This helps identify which trading type performs best for your account and market conditions.
-
-## CLI Commands
-
-### Trading Type Management
-
-```bash
-# View current trading type status
-uv run trading-bot type status
-
-# Switch trading types
-uv run trading-bot type switch --type scalping
-uv run trading-bot type switch --type day_trading
-uv run trading-bot type switch --type swing_trading
-uv run trading-bot type switch --type position_trading
-
-# View type configuration
-uv run trading-bot type config --type scalping
-uv run trading-bot type config --current
-
-# Compare trading types
-uv run trading-bot type compare --types scalping,day_trading
-uv run trading-bot type compare --all
-
-# Performance by type
-uv run trading-bot type performance --type scalping
-uv run trading-bot type performance --all
-
-# Test type configuration
-uv run trading-bot type test --type scalping --symbol EURUSD
-uv run trading-bot type validate --all
-
-# Type-specific analysis
-uv run trading-bot type analyze --symbol EURUSD --type day_trading
-uv run trading-bot type optimize --type swing_trading --days 30
+  position_trading:
+    hold_duration:
+      target_days: 14
+    timeframes:
+      primary: D1
+      analysis: [D1, W1, MN1]
+    risk:
+      per_trade: 0.012
+      max_positions: 2
+      max_daily_trades: 1
+    position:
+      min_sl_pips: 150
+      breakeven_pips: 150
+      trailing_pips: 100
 ```
 
-### Advanced Type Management
+## Choosing the Right Type
+
+### Recommended by Goal
+
+| Goal | Trading Type |
+|------|--------------|
+| **Quick profits** | Scalping |
+| **Daily income** | Day Trading |
+| **Part-time trading** | Swing |
+| **Long-term wealth** | Position |
+
+### Recommended by Experience
+
+| Experience | Trading Type |
+|------------|--------------|
+| Beginner | Day Trading or Swing |
+| Intermediate | Day Trading + Swing |
+| Advanced | Any |
+
+## Performance Tracking
+
+Each type tracks separate metrics:
+- Win rate
+- Average pips per trade
+- Average holding time
+- Risk-adjusted returns
 
 ```bash
-# Auto-switching (experimental)
-uv run trading-bot type auto-switch --enable
-uv run trading-bot type auto-switch --disable
-uv run trading-bot type auto-switch --status
-
-# Market condition analysis
-uv run trading-bot type market-conditions --recommend
-uv run trading-bot type volatility-analysis
-
-# Type-specific backtesting
-uv run trading-bot type backtest --type scalping --period 30d
-uv run trading-bot type backtest --all --period 90d --compare
-
-# Configuration management
-uv run trading-bot type export-config --type scalping --output scalping_config.yaml
-uv run trading-bot type import-config --file custom_day_trading.yaml
+# View performance by type
+uv run trading-bot performance --by-type
 ```
 
-## Summary
+## Related Documentation
 
-The trading types system provides:
-
-✅ **4 Complete Trading Styles**: Scalping, Day Trading, Swing Trading, Position Trading
-✅ **Adaptive Parameters**: Risk, timeframes, and strategy weights per type
-✅ **Dynamic Switching**: Manual or automatic type switching
-✅ **Performance Tracking**: Type-specific performance metrics
-✅ **Session Awareness**: Optimal trading sessions per type
-✅ **Market Condition Matching**: Type recommendations based on volatility/liquidity
-
-**Quick Start:**
-```bash
-# Set up day trading (recommended for beginners)
-uv run trading-bot type switch --type day_trading
-
-# Check configuration
-uv run trading-bot type status
-
-# Start trading with current type
-uv run trading-bot start --config production
-```
-
-Each trading type is optimized for its specific market approach, ensuring the bot performs optimally regardless of your preferred trading style.
+- [Multi-Timeframe Guide](../guides/multi-timeframe-guide.md) - MTF analysis
+- [Risk Management](risk-management-guide.md) - Risk per type
+- [Position Management](position-management-architecture.md) - Position lifecycle
+- [Strategy Guide](../guides/strategy-guide.md) - Strategy architecture

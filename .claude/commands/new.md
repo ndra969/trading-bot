@@ -1,13 +1,9 @@
 ---
-description: Create new documentation file with template
+description: Create new documentation file
 argument-hint: <category>/<name>
 ---
 
-# New Documentation
-
-Create new doc/spec file following project standards.
-
-## Usage
+# New Doc File
 
 ```
 /new <category>/<name>
@@ -15,46 +11,32 @@ Create new doc/spec file following project standards.
 
 ## Categories
 
-**docs/**: `guides/`, `setup/`, `trading/`, `integration/`, `architecture/`
+**docs/**: `architecture/`, `setup/`, `trading/`, `guides/`, `diagrams/`
 
-**specs/**: `dashboard/`, `database/`, `fixes/`, `phases/`
+**specs/**: `archive/` (phases, fixes, etc.)
 
 ## Naming
 
-Always **kebab-case**:
-- ✅ `phase-6-todo.md`
-- ✅ `risk-dashboard-guide.md`
-- ❌ `PHASE6_TODO.md`
-- ❌ `RiskDashboard.md`
+Use **kebab-case**: `risk-dashboard-guide.md` ✅ | `RiskDashboard.md` ❌
 
 ## Template
 
 ```markdown
 # [Title]
 
-**Status**: [Draft/Ready]
-**Date**: YYYY-MM-DD
+[1-2 sentence overview]
 
-## Overview
-[1-2 sentences]
-
-## Details
-- [Point 1]
-- [Point 2]
+## [Section]
+- [Content]
 
 ## Related
-- [Link to related docs]
+- [Link]
 ```
 
 ## Examples
 
 ```
 /new guides/telegram-notifications
-/new specs/phases/phase-6-dashboard
-/new specs/fixes/position-sl-bug
+/new setup/postgres-tuning
+/new specs/archive/fixes/sl-bug
 ```
-
-## Related
-
-- `/docs` - Browse documentation
-- `/rules` - Project standards

@@ -34,11 +34,12 @@ class TestGetPipSize:
         assert calculator.get_pip_size("GBPJPY") == 0.01
 
     def test_commodities_pip_size(self):
-        """Test pip size for commodities (Gold)."""
+        """Test pip size for commodities (Gold = 0.1, Silver = 0.01)."""
         calculator = PipCalculator()
         assert calculator.get_pip_size("XAUUSD") == 0.1
         assert calculator.get_pip_size("GOLD") == 0.1
-        assert calculator.get_pip_size("XAGUSD") == 0.1
+        # Silver has different pip size than Gold (see config/symbol_mapping.yaml)
+        assert calculator.get_pip_size("XAGUSD") == 0.01
 
     def test_crypto_pip_size(self):
         """Test pip size for crypto."""

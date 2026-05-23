@@ -17,20 +17,17 @@ Quick access to project documentation.
 
 ## Topics
 
-### Core
+### Architecture
 - `architecture` - System architecture
-- `coding-standards` - ⚠️ MANDATORY before coding
-- `configuration` - Config management
+- `database-erd` - Database schema & ERD
 
-### Guides
-- `cli` - Command reference
-- `dry-run` - Testing without risk
-- `deployment` - Production deployment
-- `intraday` - Day trading execution
-- `multi-account` - Multiple accounts
-- `multi-timeframe` - MTF analysis
-- `strategy` - Strategy development
-- `troubleshooting` - Common issues
+### Setup
+- `windows-setup` - Windows/MT5 installation
+- `mt5-connection` - MetaTrader5 setup
+- `configuration` - Config management
+- `asset-config` - Asset-specific settings
+- `broker-symbols` - Multi-broker support
+- `market-hours` - Trading sessions
 
 ### Trading
 - `trading-types` - Scalping, Day, Swing, Position
@@ -39,28 +36,26 @@ Quick access to project documentation.
 - `notifications` - Telegram alerts
 - `technical-indicators` - RSI, MA
 
-### Setup
-- `windows-setup` - Windows/MT5 installation
-- `asset-config` - Asset-specific settings
-- `broker-symbols` - Multi-broker support
-- `market-hours` - Trading sessions
-
-### Integration
-- `mt5-connection` - MetaTrader5 setup
-
-### Database
-- `database-erd` - Schema diagram
+### Guides
+- `cli` - Command reference
+- `coding-standards` - ⚠️ MANDATORY before coding
+- `deployment` - Production deployment
+- `dry-run` - Testing without risk
+- `intraday` - Day trading execution
+- `multi-account` - Multiple accounts
+- `multi-timeframe` - MTF analysis
+- `strategy` - Strategy development
+- `troubleshooting` - Common issues
 
 ## Structure
 
 ```
 docs/
-├── architecture/     # System design
-├── diagrams/         # ERD, flows
-├── guides/           # How-to guides
-├── integration/      # External APIs
-├── setup/            # Configuration
-└── trading/          # Trading concepts
+├── architecture/    # System design & database
+├── setup/           # Installation & configuration
+├── trading/         # Trading concepts
+├── guides/          # How-to guides
+└── diagrams/        # Mermaid diagrams
 ```
 
 ## Examples
@@ -75,4 +70,6 @@ docs/
 ## Related
 
 - `/rules` - Project rules
+- `/status` - Bot status
+- `/logs` - View logs
 - `/new <category>/<name>` - Create new doc

@@ -1,565 +1,200 @@
-# 📈 Trading Strategy Guide
+# Strategy Guide
 
-## Strategy Overview
+Trading strategy architecture and signal generation.
 
-This trading bot uses a multi-strategy approach focusing on **institutional trading concepts** and **market structure analysis**. The system is designed to identify and exploit movements driven by institutional money flow.
+> **Quick Commands**: Use `/analyze <symbol>` to analyze a symbol with foundation strategy.
 
-## Core Strategy Framework
+## Strategy Architecture
 
-### 1. Supply & Demand Strategy (Primary)
+The bot uses a **foundation-first approach** with 7 enhancement layers:
 
-**Basic Concept**: Trading based on historically proven supply and demand zones
-
-#### Zone Detection Algorithm
-```python
-class EnhancedZoneAnalyzer:
-    def detect_zones(self, data, lookback=300):
-        zones = []
-
-        # Identify potential zones
-        for i in range(lookback, len(data)):
-            # Look for strong rejection patterns
-            if self.is_strong_rejection(data, i):
-                zone = self.create_zone(data, i)
-                if self.validate_zone_quality(zone):
-                    zones.append(zone)
-
-        return self.filter_overlapping_zones(zones)
+```
+Foundation (S&D) → Enhancement Layers → Signal Aggregation → Execution
+     30%               7 layers              65% threshold       MT5
 ```
 
-#### Zone Quality Criteria
-- **Minimum Strength**: 35.0 (configurable)
-- **Minimum Grade**: C or higher
-- **Maximum Age**: 168 hours (7 days)
-- **Freshness Bonus**: 15.0 for new zones
-- **Volume Confirmation**: Minimum 0.8x average volume
+## Confluence Weights
 
-#### Entry Validation Process
-```mermaid
-flowchart TD
-    A[Price Approaches Zone] --> B{Zone Quality Check}
-    B -->|Pass| C{Entry Score Calculation}
-    B -->|Fail| D[Reject Signal]
-    C --> E{Score >= 50?}
-    E -->|Yes| F{Risk Validation}
-    E -->|No| D
-    F -->|Pass| G[Execute Trade]
-    F -->|Fail| D
+| Layer | Weight | Purpose |
+|-------|--------|---------|
+| Supply & Demand (Foundation) | 30% | Zone-based entries |
+| Trendline Confluence | 20% | Trendline validation |
+| Price Action Patterns | 15% | Candlestick patterns |
+| Fibonacci Levels | 12% | Key retracement levels |
+| Breakout Retest | 12% | Validated breakouts |
+| Market Structure | 8% | BOS/CHoCH alignment |
+| RSI Analysis | 10% | Momentum confirmation |
+| Moving Average | 8% | Trend alignment |
+| **Total** | **120%** | **Min 65% to execute** |
+
+## Foundation: Supply & Demand
+
+### Zone Detection
+
+The bot identifies 3 types of zones:
+- **Rejection zones** - Strong price rejection
+- **Consolidation zones** - Accumulation/distribution
+- **Breakout origin zones** - Pre-breakout consolidation
+
+### Zone Quality Criteria
+
+| Parameter | Default |
+|-----------|---------|
+| Minimum strength | 35.0 |
+| Minimum grade | C |
+| Max age | 72 hours |
+| Freshness bonus | +15.0 (fresh zones) |
+| Volume factor | 0.8x average |
+
+### Entry Validation
+
+```
+Price approaches zone
+    ↓
+Zone quality check (strength, age)
+    ↓
+Entry score calculation
+    ↓
+Score ≥ 50? → Pass to enhancement layers
 ```
 
-#### Zone-Based Parameters
-```json
-{
-  "zone_detection": {
-    "min_strength": 35.0,
-    "min_grade": "C",
-    "max_age_hours": 168,
-    "freshness_threshold": 15.0,
-    "volume_factor": 0.8
-  },
-  "entry_validation": {
-    "min_entry_score": 50,
-    "tolerance_pips": {
-      "forex": 12,
-      "commodities": 40,
-      "crypto": 150
-    }
-  }
-}
-```
+## Enhancement Layers
 
-### 2. Breakout Retest Strategy (Secondary)
+### Trendline Confluence (20%)
 
-**Basic Concept**: Trading momentum breakout with retest confirmation
+Validates trendline support/resistance:
+- Minimum 3 touches for confirmation
+- Multi-timeframe analysis
+- Break/bounce probability scoring
 
-#### Breakout Detection
-```python
-class BreakoutDetector:
-    def detect_breakout(self, data, structure_levels):
-        for level in structure_levels:
-            if self.is_clean_break(data, level):
-                breakout = {
-                    'level': level,
-                    'strength': self.calculate_break_strength(data, level),
-                    'volume_confirmation': self.validate_volume(data),
-                    'confidence': self.calculate_confidence(data, level)
-                }
-                return breakout
-        return None
-```
+### Price Action Patterns (15%)
 
-#### Retest Validation
-- **Retest Patience**: 4 hours maximum waiting time
-- **Tolerance Levels**:
-  - Forex: 8 pips
-  - Commodities: 25 pips
-  - Crypto: 100 pips
-- **Confidence Boost**: +0.15 for successful retest
+Detects key candlestick patterns:
+- Engulfing patterns
+- Pin bars (rejection)
+- Inside bars (consolidation)
+- Doji (indecision)
+- Flag and pennant
 
-#### Breakout Parameters
-```json
-{
-  "breakout_detection": {
-    "min_confidence": 0.50,
-    "max_spread_ratio": 0.4,
-    "volume_confirmation": true
-  },
-  "retest_validation": {
-    "patience_hours": 4.0,
-    "confidence_boost": 0.15,
-    "momentum_entry": true
-  }
-}
-```
+### Fibonacci Levels (12%)
 
-## Market Structure Integration
+Key levels: 38.2%, 50%, 61.8%, 78.6%
 
-### 1. Break of Structure (BOS) Detection
+Zones at these levels get bonus score.
 
-**Definition**: Market structure change indicating a shift in market sentiment
+### Breakout Retest (12%)
 
-#### BOS Detection Algorithm
-```python
-class BOSDetector:
-    def detect_bos(self, data, timeframe):
-        swing_points = self.identify_swing_points(data)
+Validates breakout entries:
+- Volume confirmation (>1.5x average)
+- Momentum scoring
+- False breakout filtering
 
-        for i in range(1, len(swing_points)):
-            current_swing = swing_points[i]
-            previous_swing = swing_points[i-1]
+### Market Structure (8%)
 
-            if self.is_structure_break(current_swing, previous_swing):
-                bos_event = {
-                    'type': 'BOS',
-                    'direction': self.get_break_direction(current_swing, previous_swing),
-                    'strength': self.calculate_break_strength(data, current_swing),
-                    'confidence': self.calculate_confidence(data, current_swing),
-                    'timestamp': current_swing['timestamp']
-                }
-                return bos_event
-        return None
-```
+Tracks:
+- **BOS** (Break of Structure) - Trend continuation
+- **CHoCH** (Change of Character) - Trend reversal
+- Higher highs / Lower lows
 
-#### BOS Validation Criteria
-- **Swing Lookback**: 20-50 candles
-- **Volume Confirmation**: Required for high-confidence BOS
-- **Multi-timeframe Alignment**: H1, H4, D1 confirmation with weighted system
-  - **D1 Weight**: 3 (Major trend - 30% influence)
-  - **H4 Weight**: 2 (Intermediate trend - 40% influence)
-  - **H1 Weight**: 1 (Short-term trend - 30% influence)
-  - **Minimum Score**: 4 (Combined weighted score for confirmation)
-- **Analysis Timeframes**: M15, H1, H4 (Structure detection range)
-- **Minimum Break Distance**: Asset-specific pip requirements
+### RSI Analysis (10%)
 
-### 2. Change of Character (CHoCH) Detection
+- Overbought/oversold levels (70/30)
+- Divergence detection (bullish/bearish)
+- Multi-timeframe RSI confluence
 
-**Definition**: Market character change from trending to ranging or vice versa
+### Moving Average (8%)
 
-#### CHoCH Detection Process
-```python
-class CHoCHDetector:
-    def detect_choch(self, data, trend_data):
-        momentum_shifts = self.identify_momentum_shifts(data)
+- EMA 9, 21, 50, 200
+- Trend alignment (price vs MA)
+- MA crossovers
 
-        for shift in momentum_shifts:
-            if self.validate_character_change(shift, trend_data):
-                choch_event = {
-                    'type': 'CHoCH',
-                    'from_character': shift['previous_character'],
-                    'to_character': shift['new_character'],
-                    'strength': shift['momentum_strength'],
-                    'confidence': self.calculate_choch_confidence(shift)
-                }
-                return choch_event
-        return None
-```
+## Signal Generation
 
-### 3. Order Block Identification
-
-**Definition**: Last candle before structure break indicating institutional entry
-
-#### Order Block Detection
-```python
-class OrderBlockDetector:
-    def identify_order_blocks(self, data, bos_events):
-        order_blocks = []
-
-        for bos in bos_events:
-            # Find last opposite candle before BOS
-            ob_candle = self.find_last_opposite_candle(data, bos)
-
-            if self.validate_order_block(ob_candle, bos):
-                order_block = {
-                    'high': ob_candle['high'],
-                    'low': ob_candle['low'],
-                    'direction': 'bullish' if bos['direction'] == 'up' else 'bearish',
-                    'strength': self.calculate_ob_strength(ob_candle, bos),
-                    'timestamp': ob_candle['timestamp']
-                }
-                order_blocks.append(order_block)
-
-        return order_blocks
-```
-
-#### Order Block Validation
-- **Volume Analysis**: Minimum volume during formation
-- **Price Reaction**: Historical reaction at the level
-- **Strength Scoring**: Based on break strength and volume
-- **Validity Period**: Time-based expiration
-
-### 4. Fair Value Gap (FVG) Analysis
-
-**Definition**: Price imbalance area that tends to be filled by subsequent movements
-
-#### FVG Detection Algorithm
-```python
-class FairValueGapDetector:
-    def detect_fvg(self, data):
-        fvgs = []
-
-        for i in range(2, len(data)):
-            candle1 = data[i-2]
-            candle2 = data[i-1]  # Gap candle
-            candle3 = data[i]
-
-            # Check for bullish FVG
-            if candle1['high'] < candle3['low']:
-                gap = {
-                    'type': 'bullish_fvg',
-                    'top': candle3['low'],
-                    'bottom': candle1['high'],
-                    'size_pips': self.calculate_gap_size(candle1['high'], candle3['low']),
-                    'fill_probability': self.calculate_fill_probability(gap_data)
-                }
-                fvgs.append(gap)
-
-            # Check for bearish FVG
-            elif candle1['low'] > candle3['high']:
-                gap = {
-                    'type': 'bearish_fvg',
-                    'top': candle1['low'],
-                    'bottom': candle3['high'],
-                    'size_pips': self.calculate_gap_size(candle3['high'], candle1['low']),
-                    'fill_probability': self.calculate_fill_probability(gap_data)
-                }
-                fvgs.append(gap)
-
-        return fvgs
-```
-
-## Entry Validation System
-
-### Multi-Factor Entry Scoring
+### Confluence Calculation
 
 ```python
-class EnhancedEntryValidator:
-    def calculate_entry_score(self, signal, market_data):
-        score = 0
+total_score = (
+    foundation_score * 0.30 +
+    trendline_score * 0.20 +
+    price_action_score * 0.15 +
+    fibonacci_score * 0.12 +
+    breakout_score * 0.12 +
+    structure_score * 0.08 +
+    rsi_score * 0.10 +
+    ma_score * 0.08
+)
 
-        # Zone quality (30% weight)
-        zone_score = self.calculate_zone_score(signal.zone)
-        score += zone_score * 0.30
-
-        # Pattern recognition (25% weight)
-        pattern_score = self.calculate_pattern_score(signal, market_data)
-        score += pattern_score * 0.25
-
-        # Volume confirmation (20% weight)
-        volume_score = self.calculate_volume_score(market_data)
-        score += volume_score * 0.20
-
-        # Market structure (15% weight)
-        structure_score = self.calculate_structure_score(signal)
-        score += structure_score * 0.15
-
-        # Timing context (10% weight)
-        timing_score = self.calculate_timing_score(signal)
-        score += timing_score * 0.10
-
-        return min(100, max(0, score))
+if total_score >= 0.65:
+    generate_signal()
 ```
 
-### Entry Score Components
+### Signal Validation
 
-#### 1. Zone Quality Score (30%)
-- **Zone Strength**: 0-40 points
-- **Zone Freshness**: 0-20 points
-- **Historical Performance**: 0-15 points
-- **Volume Confirmation**: 0-25 points
+Before execution:
+1. Confluence score ≥ 65%
+2. Risk validation passes
+3. Market hours valid
+4. No existing position for symbol
+5. Portfolio limits OK
 
-#### 2. Pattern Recognition Score (25%)
-- **Rejection Pattern**: 0-30 points
-- **Candle Formation**: 0-25 points
-- **Multi-candle Pattern**: 0-20 points
-- **Pattern Completion**: 0-25 points
+## Multi-Timeframe Analysis
 
-#### 3. Volume Confirmation Score (20%)
-- **Volume Ratio**: 0-40 points
-- **Volume Trend**: 0-30 points
-- **Institutional Volume**: 0-30 points
+Timeframes adapt to trading type:
 
-#### 4. Market Structure Score (15%)
-- **BOS Alignment**: 0-35 points
-- **Order Block Proximity**: 0-30 points
-- **Liquidity Context**: 0-35 points
+| Trading Type | Timeframes |
+|--------------|------------|
+| Scalping | M1, M5, M15 |
+| Day Trading | M15, H1, H4 |
+| Swing | H4, D1, W1 |
+| Position | D1, W1, MN1 |
 
-#### 5. Timing Context Score (10%)
-- **Session Quality**: 0-40 points
-- **News Proximity**: 0-30 points
-- **Market Hours**: 0-30 points
+See [Multi-Timeframe Guide](multi-timeframe-guide.md).
 
-### Entry Validation Thresholds
+## Configuration
 
-```json
-{
-  "entry_thresholds": {
-    "minimum_entry_score": 50,
-    "high_confidence_threshold": 75,
-    "pattern_recognition_required": true,
-    "volume_confirmation_required": true,
-    "structure_alignment_bonus": 10
-  },
-  "rejection_criteria": {
-    "poor_zone_quality": -20,
-    "counter_trend_penalty": -25,
-    "high_spread_penalty": -15,
-    "poor_timing_penalty": -20
-  }
-}
+`config/strategy_parameters.yaml`:
+
+```yaml
+foundation:
+  min_zone_strength: 35.0
+  min_zone_grade: C
+  max_zone_age_hours: 72
+
+confluence:
+  min_total_score: 0.65
+  weights:
+    foundation: 0.30
+    trendline: 0.20
+    price_action: 0.15
+    fibonacci: 0.12
+    breakout_retest: 0.12
+    market_structure: 0.08
+    rsi: 0.10
+    ma: 0.08
+
+multi_timeframe:
+  day_trading:
+    primary: H1
+    secondary: H4
+    tertiary: D1
 ```
 
-## Risk Management Integration
+## CLI Commands
 
-### Stop Loss Calculation
+```bash
+# Analyze symbol with foundation strategy
+uv run trading-bot foundation analyze --symbol EURUSD
 
-#### Zone-Based Stop Loss
-```python
-class ZoneBasedSLCalculator:
-    def calculate_sl(self, signal, zone):
-        if signal.direction == 'buy':
-            # Place SL below zone low with buffer
-            sl_price = zone.low - (self.get_buffer_pips(signal.symbol) * self.get_pip_value(signal.symbol))
-        else:
-            # Place SL above zone high with buffer
-            sl_price = zone.high + (self.get_buffer_pips(signal.symbol) * self.get_pip_value(signal.symbol))
+# Multi-timeframe analysis
+uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
 
-        # Validate SL distance
-        sl_distance = abs(signal.entry_price - sl_price)
-        if not self.validate_sl_distance(sl_distance, signal.symbol):
-            return self.calculate_fallback_sl(signal)
-
-        return sl_price
+# Backtest strategy
+uv run trading-bot backtest --symbol EURUSD --period 30d
 ```
 
-#### Structure-Based Stop Loss
-```python
-class StructureBasedSLCalculator:
-    def calculate_sl(self, signal, structure_data):
-        recent_structure = self.get_recent_structure_level(signal.symbol, signal.direction)
+## Related Documentation
 
-        if recent_structure:
-            buffer = self.get_structure_buffer(signal.symbol)
-            if signal.direction == 'buy':
-                sl_price = recent_structure.low - buffer
-            else:
-                sl_price = recent_structure.high + buffer
-        else:
-            # Fallback to ATR-based SL
-            sl_price = self.calculate_atr_based_sl(signal)
-
-        return sl_price
-```
-
-### Take Profit Calculation
-
-#### Risk-Reward Based TP
-```python
-class RiskRewardTPCalculator:
-    def calculate_tp(self, signal, sl_price):
-        sl_distance = abs(signal.entry_price - sl_price)
-        min_rr_ratio = self.get_min_rr_ratio(signal.symbol)
-
-        tp_distance = sl_distance * min_rr_ratio
-
-        if signal.direction == 'buy':
-            tp_price = signal.entry_price + tp_distance
-        else:
-            tp_price = signal.entry_price - tp_distance
-
-        return tp_price
-```
-
-#### Structure-Based TP
-```python
-class StructureBasedTPCalculator:
-    def calculate_tp(self, signal, structure_data):
-        target_levels = self.identify_target_levels(signal, structure_data)
-
-        # Use nearest significant level as TP
-        if target_levels:
-            return target_levels[0]  # Nearest level
-        else:
-            # Fallback to RR-based TP
-            return self.calculate_rr_based_tp(signal)
-```
-
-## Position Management Strategy
-
-### Breakeven Management
-
-#### Asset-Specific Breakeven
-```json
-{
-  "breakeven_parameters": {
-    "forex_major": {
-      "trigger_pips": 15,
-      "buffer_pips": 0.5
-    },
-    "forex_jpy": {
-      "trigger_pips": 18,
-      "buffer_pips": 0.8
-    },
-    "commodities": {
-      "trigger_pips": 150,
-      "buffer_pips": 5
-    },
-    "crypto": {
-      "trigger_pips": 300,
-      "buffer_pips": 20
-    }
-  }
-}
-```
-
-### Trailing Stop Management
-
-#### Dynamic Trailing System
-```python
-class DynamicTrailingManager:
-    def update_trailing_stop(self, position):
-        current_profit_pips = self.calculate_profit_pips(position)
-        asset_params = self.get_asset_parameters(position.symbol)
-
-        # Check if trailing should start
-        if current_profit_pips >= asset_params['trailing']['start_pips_from_sl']:
-            new_sl = self.calculate_trailing_sl(position, asset_params)
-
-            # Only move SL in favorable direction
-            if self.is_favorable_move(position, new_sl):
-                self.update_stop_loss(position, new_sl)
-```
-
-### Partial Close Management
-
-#### Multi-Level Partial Close
-```python
-class PartialCloseManager:
-    def check_partial_close(self, position):
-        profit_pips = self.calculate_profit_pips(position)
-        asset_params = self.get_asset_parameters(position.symbol)
-
-        partial_levels = asset_params['partial_close']['levels']
-        partial_percentages = asset_params['partial_close']['percentages']
-
-        for i, level in enumerate(partial_levels):
-            if profit_pips >= level and not position.partial_closes[i]:
-                close_percentage = partial_percentages[i]
-                self.execute_partial_close(position, close_percentage)
-                position.partial_closes[i] = True
-```
-
-## Performance Optimization
-
-### Signal Quality Tracking
-
-```python
-class SignalQualityTracker:
-    def track_signal_performance(self, signal, trade_result):
-        quality_metrics = {
-            'entry_score': signal.entry_score,
-            'zone_strength': signal.zone.strength,
-            'structure_alignment': signal.structure_score,
-            'trade_outcome': trade_result.profit_loss,
-            'win_rate_contribution': 1 if trade_result.profit_loss > 0 else 0
-        }
-
-        self.update_quality_database(quality_metrics)
-        self.adjust_scoring_weights(quality_metrics)
-```
-
-### Strategy Performance Analysis
-
-```python
-class StrategyPerformanceAnalyzer:
-    def analyze_strategy_performance(self, strategy_name, period_days=30):
-        trades = self.get_strategy_trades(strategy_name, period_days)
-
-        metrics = {
-            'total_trades': len(trades),
-            'win_rate': self.calculate_win_rate(trades),
-            'profit_factor': self.calculate_profit_factor(trades),
-            'average_rr': self.calculate_average_rr(trades),
-            'max_drawdown': self.calculate_max_drawdown(trades),
-            'sharpe_ratio': self.calculate_sharpe_ratio(trades)
-        }
-
-        return StrategyPerformanceReport(metrics)
-```
-
-## Configuration Examples
-
-### Complete Strategy Configuration
-
-```json
-{
-  "strategy_config": {
-    "supply_demand": {
-      "enabled": true,
-      "priority": 1,
-      "zone_detection": {
-        "min_strength": 35.0,
-        "min_grade": "C",
-        "max_age_hours": 168,
-        "freshness_threshold": 15.0
-      },
-      "entry_validation": {
-        "min_entry_score": 50,
-        "pattern_recognition": true,
-        "volume_confirmation": true,
-        "structure_alignment": true
-      }
-    },
-    "breakout_retest": {
-      "enabled": true,
-      "priority": 2,
-      "breakout_detection": {
-        "min_confidence": 0.50,
-        "volume_confirmation": true,
-        "max_spread_ratio": 0.4
-      },
-      "retest_validation": {
-        "patience_hours": 4.0,
-        "tolerance_pips": {
-          "forex": 8,
-          "commodities": 25,
-          "crypto": 100
-        }
-      }
-    }
-  },
-  "risk_management": {
-    "position_sizing": {
-      "risk_per_trade": 0.005,
-      "max_risk_exposure": 0.06,
-      "volatility_adjustment": true
-    },
-    "stop_loss": {
-      "method": "zone_based",
-      "fallback": "structure_based",
-      "min_rr_ratio": 1.2
-    }
-  }
-}
-```
-
-This comprehensive strategy guide provides the foundation for understanding and optimizing the trading bot's decision-making process.
+- [Multi-Timeframe Guide](multi-timeframe-guide.md) - MTF analysis
+- [Technical Indicators](../trading/technical-indicators-guide.md) - RSI, MA details
+- [Risk Management](../trading/risk-management-guide.md) - Risk validation
+- [Trading Types](../trading/trading-types-guide.md) - Trading type configs

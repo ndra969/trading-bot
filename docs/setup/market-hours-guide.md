@@ -1,251 +1,150 @@
-# 🕐 Market Hours Validation Guide
+# Market Hours Guide
 
-The trading bot includes a comprehensive market hours validation system that ensures trades are only executed during appropriate market sessions for each asset class.
+Trading hours validation for different asset classes.
 
-## Overview
+## Trading Sessions
 
-The `MarketHoursValidator` provides intelligent trading session management with:
-- **Multi-Asset Support**: Different schedules for Forex, Commodities, and Crypto
-- **Timezone Awareness**: All times managed in UTC with proper conversion
-- **Holiday Support**: US market holidays for commodities trading
-- **Buffer Periods**: Configurable buffers to avoid spread widening during session transitions
-- **Real-Time Status**: Current market status with next open/close predictions
+### Forex Major Pairs (24/5)
 
-## Asset Classes & Sessions
-
-### 🌍 Forex Major Pairs (24/5 Market)
 **Symbols**: EURUSD, GBPUSD, USDCHF, AUDUSD, USDCAD, NZDUSD
 
-**Trading Sessions** (UTC):
-- **Sydney**: 22:00 - 07:00
-- **Tokyo**: 00:00 - 09:00
-- **London**: 08:00 - 17:00
-- **New York**: 13:00 - 22:00
+| Session | UTC Time |
+|---------|----------|
+| Sydney | 22:00 - 07:00 |
+| Tokyo | 00:00 - 09:00 |
+| London | 08:00 - 17:00 |
+| New York | 13:00 - 22:00 |
 
-**Weekend Break**: Saturday 22:00 - Sunday 22:00 UTC
-**Buffer**: 5 minutes from session start/end
-**Holidays**: None (Forex markets typically don't observe holidays)
+**Weekend**: Closed Saturday 22:00 - Sunday 22:00 UTC
 
-### 🗾 Forex JPY Pairs
+### Forex JPY Pairs
+
 **Symbols**: USDJPY, EURJPY, GBPJPY, AUDJPY
 
-**Trading Sessions** (UTC):
-- **Tokyo** (main): 00:00 - 09:00
-- **London**: 08:00 - 17:00
-- **New York**: 13:00 - 22:00
+Sessions same as Forex Major, but **Tokyo session preferred** for best liquidity.
 
-**Weekend Break**: Saturday 22:00 - Sunday 22:00 UTC
-**Buffer**: 5 minutes from session start/end
+### Commodities (Gold, Silver)
 
-### 🥇 Commodities
-**Symbols**: XAUUSD, XAGUSD, Oil, etc.
+**Symbols**: XAUUSD, XAGUSD
 
-**Trading Sessions** (UTC):
-- **Electronic Trading**: 01:00 - 21:00 (23 hours)
+| Trading | UTC Time |
+|---------|----------|
+| Electronic | 01:00 - 21:00 (23 hours) |
+| Best Liquidity | London + NY overlap (13:00 - 17:00 UTC) |
 
-**Weekend Break**: Friday 21:00 - Monday 01:00 UTC
-**Buffer**: 10 minutes (larger buffer due to volatility)
-**Holidays**: US Federal Holidays
+**Weekend**: Closed Friday 21:00 - Monday 01:00 UTC
+
+**Holidays**: US Federal Holidays observed
 - New Year's Day
 - Martin Luther King Jr. Day
-- Presidents Day
+- Presidents' Day
+- Good Friday
 - Memorial Day
 - Independence Day
 - Labor Day
-- Thanksgiving
+- Thanksgiving Day
 - Christmas Day
 
-### ₿ Cryptocurrency (24/7 Market)
-**Symbols**: BTCUSD, ETHUSD, etc.
+### Crypto (24/7)
 
-**Trading Sessions** (UTC):
-- **Continuous**: 00:00 - 23:59 (24/7)
+**Symbols**: BTCUSD, ETHUSD
 
-**Weekend Break**: None
-**Buffer**: 1 minute (minimal buffer)
-**Holidays**: None
+**Trading**: 24/7, no holidays
 
-## CLI Usage
+## Best Trading Times
 
-### Check Market Hours
-
-```bash
-# Check different asset classes
-uv run trading-bot market hours --asset forex_major
-uv run trading-bot market hours --asset forex_jpy
-uv run trading-bot market hours --asset commodities
-uv run trading-bot market hours --asset crypto
-```
-
-### Example Output
-
-```
-Market Hours - Forex Major
-┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Property       ┃ Value                     ┃
-┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ Status         │ Open                      │
-│ Timezone       │ UTC                       │
-│ 24/7 Market    │ No                        │
-│ Buffer Minutes │ 5                         │
-│ Next Close     │ 2025-10-05T22:00:00+00:00 │
-└────────────────┴───────────────────────────┘
-
-Trading Sessions
-┏━━━━━━━┳━━━━━━━┳━━━━━━━━━━┓
-┃ Start ┃ End   ┃ Timezone ┃
-┡━━━━━━━╇━━━━━━━╇━━━━━━━━━━┩
-│ 22:00 │ 07:00 │ UTC      │
-│ 00:00 │ 09:00 │ UTC      │
-│ 08:00 │ 17:00 │ UTC      │
-│ 13:00 │ 22:00 │ UTC      │
-└───────┴───────┴──────────┘
-```
-
-## Programmatic Usage
-
-### Import and Initialize
-
-```python
-from trading_bot.utils import get_market_validator, MarketStatus
-from trading_bot.data.models import AssetClass
-from datetime import datetime
-
-# Get validator instance
-validator = get_market_validator()
-```
-
-### Check Market Status
-
-```python
-# Check if market is open now
-is_open = validator.is_market_open(AssetClass.FOREX_MAJOR)
-
-# Get detailed status
-status = validator.get_market_status(AssetClass.FOREX_MAJOR)
-print(f"Market status: {status.value}")  # open, closed, weekend, holiday
-
-# Check specific time
-specific_time = datetime(2025, 10, 7, 14, 30)  # Monday 14:30 UTC
-is_open_then = validator.is_market_open(AssetClass.FOREX_MAJOR, specific_time)
-```
-
-### Get Next Open/Close Times
-
-```python
-# Get next market open time
-next_open = validator.get_next_market_open(AssetClass.COMMODITIES)
-if next_open:
-    print(f"Next open: {next_open}")
-
-# Get next market close time
-next_close = validator.get_next_market_close(AssetClass.FOREX_MAJOR)
-if next_close:
-    print(f"Next close: {next_close}")
-```
-
-### Validate Trading Time
-
-```python
-# Get validation with detailed reason
-is_valid, reason = validator.validate_trading_time(AssetClass.FOREX_MAJOR)
-print(f"Can trade: {is_valid}")
-print(f"Reason: {reason}")
-```
-
-### Get Complete Summary
-
-```python
-# Get comprehensive market information
-summary = validator.get_trading_hours_summary(AssetClass.FOREX_MAJOR)
-print(f"Current Status: {summary['current_status']}")
-print(f"24/7 Market: {summary['is_24_7']}")
-print(f"Sessions: {summary['sessions']}")
-```
-
-## Market Status Types
-
-| Status | Description | Trading Allowed |
-|--------|-------------|-----------------|
-| `OPEN` | Market is currently open | ✅ Yes |
-| `CLOSED` | Market is closed during normal hours | ❌ No |
-| `WEEKEND` | Weekend break | ❌ No |
-| `HOLIDAY` | Market holiday | ❌ No |
-| `PRE_MARKET` | Before market opens | ❌ No |
-| `POST_MARKET` | After market closes | ❌ No |
+| Pair | Best Session (UTC) | Reason |
+|------|-------------------|--------|
+| EURUSD | London (08:00-17:00) | Highest liquidity |
+| GBPUSD | London (08:00-17:00) | Native session |
+| USDJPY | Tokyo + London overlap | Asian + EU activity |
+| AUDUSD | Sydney + Tokyo | Asian session |
+| XAUUSD | London + NY overlap | Maximum activity |
 
 ## Buffer Periods
 
-Buffer periods prevent trading too close to session transitions when spreads typically widen:
+To avoid spread widening, the bot uses buffer periods:
 
-- **Forex**: 5 minutes buffer
-- **Commodities**: 10 minutes buffer (higher volatility)
-- **Crypto**: 1 minute buffer (continuous market)
+| Asset Class | Buffer |
+|-------------|--------|
+| Forex | 5 minutes |
+| Commodities | 10 minutes |
+| Crypto | 0 (24/7) |
 
-### Example with Buffer
-
-```
-London Session: 08:00 - 17:00 UTC
-With 5-minute buffer: 08:05 - 16:55 UTC (actual trading window)
-```
-
-## Integration with Trading Bot
-
-The market hours validator is automatically integrated into the trading bot:
-
-```python
-# In trading cycle
-if not self.market_validator.is_market_open(asset_class):
-    logger.debug(f"Market closed for {symbol}, skipping analysis")
-    return
-
-# Before placing trades
-is_valid, reason = self.market_validator.validate_trading_time(asset_class)
-if not is_valid:
-    logger.warning(f"Cannot trade {symbol}: {reason}")
-    return
-```
+**Behavior**: No new trades opened within buffer of session start/end.
 
 ## Configuration
 
-Market hours can be customized by modifying the `MarketHours` configurations in `market_hours.py`:
+`config/market_hours.yaml`:
 
-```python
-# Example: Custom commodities hours
-commodities = MarketHours(
-    asset_class=AssetClass.COMMODITIES,
-    sessions=[
-        TradingSession(time(1, 0), time(21, 0), "UTC"),
-    ],
-    timezone="UTC",
-    weekend_days=[5, 6],  # Saturday, Sunday
-    holidays=["2025-12-25"],  # Christmas
-    buffer_minutes=15  # Custom buffer
-)
+```yaml
+forex_major:
+  sessions:
+    sydney: { open: "22:00", close: "07:00" }
+    tokyo: { open: "00:00", close: "09:00" }
+    london: { open: "08:00", close: "17:00" }
+    new_york: { open: "13:00", close: "22:00" }
+  buffer_minutes: 5
+  weekend_close: "Saturday 22:00 UTC"
+
+commodities:
+  sessions:
+    electronic: { open: "01:00", close: "21:00" }
+  buffer_minutes: 10
+  holidays_enabled: true
+
+crypto:
+  sessions: "24/7"
+  buffer_minutes: 0
 ```
 
-## Best Practices
+## Implementation
 
-1. **Always Validate**: Check market hours before any trading operation
-2. **Use Buffers**: Respect buffer periods to avoid poor execution
-3. **Monitor Holidays**: Be aware of upcoming holidays for commodities
-4. **Test Thoroughly**: Verify market hours logic with your broker's schedule
-5. **Handle Edge Cases**: Consider what happens during daylight saving time transitions
+The bot validates market hours before:
+1. Generating signals
+2. Opening positions
+3. Modifying existing positions
 
-## Troubleshooting
+```python
+# Check if symbol is tradeable now
+is_tradeable = await market_hours.is_market_open(
+    symbol="EURUSD",
+    current_time=datetime.now(UTC)
+)
 
-### Market Shows Closed When It Should Be Open
-- Check timezone configuration
-- Verify system time is accurate
-- Compare with broker's trading hours
-- Consider daylight saving time effects
+if not is_tradeable:
+    logger.info(f"Market closed for {symbol}, skipping")
+    return
+```
 
-### Wrong Holiday Detection
-- Update holiday list in configuration
-- Check if broker observes different holidays
-- Consider regional variations
+## CLI Commands
 
-### Buffer Too Restrictive
-- Adjust buffer minutes in configuration
-- Monitor spread behavior during session transitions
-- Consider different buffers for different symbols
+```bash
+# Check if market is open
+uv run trading-bot market status --symbol EURUSD
+
+# Show next open/close
+uv run trading-bot market next --symbol XAUUSD
+
+# List all market hours
+uv run trading-bot market list
+```
+
+## Common Issues
+
+### No Trades Despite Open Market
+
+**Check**:
+1. Is symbol in buffer period?
+2. Is it weekend?
+3. Is it a holiday (commodities)?
+
+### Holiday Calendar Outdated
+
+Holiday calendar updates yearly. Check `config/holidays.yaml`.
+
+## Related Documentation
+
+- [Configuration Guide](configuration-guide.md) - General config
+- [Asset Configuration](asset-configuration-guide.md) - Asset settings
+- [Trading Types Guide](../trading/trading-types-guide.md) - Trading types

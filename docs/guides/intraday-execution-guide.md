@@ -1,253 +1,78 @@
 # Intraday Execution Guide
 
+Day trading executor for short-term trades within same trading day.
+
 ## Overview
 
-The **Intraday Executor** implements day trading strategies with multi-timeframe analysis. It's designed for short-term trades that close within the same trading day.
+| Feature | Configuration |
+|---------|---------------|
+| Trading Type | Day Trading (30 min - 24 hours) |
+| Zone Detection | H1 timeframe |
+| Entry Signals | M30 timeframe |
+| Trend Filter | H1 EMA (Sniper Gate for commodities) |
+| Position Closure | Before day end |
+| Scan Frequency | Every 30 minutes (M30 close) |
 
-### Key Characteristics
-
-| Feature | Description |
-|---------|-------------|
-| **Trading Type** | Day Trading (30 min - 24 hours) |
-| **Zone Detection** | H1 timeframe (1-hour candles) |
-| **Entry Signals** | M30 timeframe (30-min candles) |
-| **Trend Filter** | H1 EMA for commodities (Sniper Gate) |
-| **Position Closure** | All positions closed before day end |
-| **Scan Frequency** | Every M30 candle close (~30 minutes) |
-
----
-
-## Architecture
-
-### Execution Flow
+## Execution Flow
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Intraday Executor                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. ZONE DETECTION (H1)                                     │
-│     ┌────────────────────────────────────────┐              │
-│     │ • Scan H1 supply/demand zones          │              │
-│     │ • Cache zones for 60 minutes           │              │
-│     │ • Score zones by freshness & strength  │              │
-│     └────────────────────────────────────────┘              │
-│                      │                                       │
-│                      ▼                                       │
-│  2. ENTRY SIGNAL (M30)                                      │
-│     ┌────────────────────────────────────────┐              │
-│     │ • Wait for M30 candle close            │              │
-│     │ • Check price at H1 zone               │              │
-│     │ • Validate M30 price action            │              │
-│     └────────────────────────────────────────┘              │
-│                      │                                       │
-│                      ▼                                       │
-│  3. TREND FILTER (H1) - Commodities Only                   │
-│     ┌────────────────────────────────────────┐              │
-│     │ • EMA 50/20 crossover (Sniper Gate)    │              │
-│     │ • Price vs EMA 50 position            │              │
-│     │ • Momentum confirmation (2 candles)   │              │
-│     └────────────────────────────────────────┘              │
-│                      │                                       │
-│                      ▼                                       │
-│  4. SIGNAL GENERATION                                      │
-│     ┌────────────────────────────────────────┐              │
-│     │ • Combine zone + entry + trend         │              │
-│     │ • Calculate confluence score           │              │
-│     │ • Generate trading signal if > 65%     │              │
-│     └────────────────────────────────────────┘              │
-│                      │                                       │
-│                      ▼                                       │
-│  5. POSITION MANAGEMENT                                    │
-│     ┌────────────────────────────────────────┐              │
-│     │ • Breakeven at 70% of R:R              │              │
-│     │ • Trailing stop after 30 pips          │              │
-│     │ • Close all before day end             │              │
-│     └────────────────────────────────────────┘              │
-└─────────────────────────────────────────────────────────────┘
+1. Zone Detection (H1)
+   - Scan H1 supply/demand zones
+   - Cache for 60 minutes
+   ↓
+2. Entry Signal (M30)
+   - Wait for M30 candle close
+   - Check price at H1 zone
+   - Validate M30 price action
+   ↓
+3. Trend Filter (H1) - Commodities only
+   - EMA 50/20 crossover (Sniper Gate)
+   - Confirm with 2 consecutive candles
+   ↓
+4. Signal Generation
+   - Combine zone + entry + trend
+   - Min 65% confluence
+   ↓
+5. Position Management
+   - Breakeven at 70% of R:R
+   - Trailing stop after 30 pips
+   - Close before day end
 ```
 
----
+## Sniper Gate (Trend Filter)
 
-## Timeframe Configuration
-
-### Multi-Timeframe Analysis
-
-| Purpose | Timeframe | Usage |
-|---------|-----------|-------|
-| **Zone Detection** | H1 | Supply & demand zones |
-| **Entry Signals** | M30 | Entry confirmation |
-| **Trend Filter** | H1 | EMA trend bias (commodities) |
-
-### Cache Strategy
+For commodities only (XAUUSD, XAGUSD):
 
 ```python
-# Zone cache configuration
-zone_cache_duration_minutes = 60  # Refresh H1 zones every hour
+# Calculate H1 EMAs
+ema_50 = h1_data['close'].ewm(span=50).iloc[-1]
+ema_20 = h1_data['close'].ewm(span=20).iloc[-1]
+price = h1_data['close'].iloc[-1]
 
-# Scan frequency
-scan_interval_minutes = 30         # Scan every M30 candle close
-```
-
----
-
-## Technical Indicators
-
-### EMA Configuration (Sniper Gate)
-
-| EMA | Period | Purpose |
-|-----|--------|---------|
-| Fast | 20 | Short-term trend |
-| Slow | 50 | Medium-term trend |
-| Trend | 200 | Long-term trend |
-
-### RSI Settings
-
-| Parameter | Value | Usage |
-|-----------|-------|-------|
-| Period | 14 | Overbought/oversold detection |
-| Overbought | 70 | Potential reversal zone |
-| Oversold | 30 | Potential reversal zone |
-
-### Automation Settings
-
-| Feature | Trigger | Value |
-|---------|---------|-------|
-| Breakeven | 70% of R:R reached | Move SL to entry + 2 pips |
-| Trailing | 30 pips profit | Trail by 10 pips |
-
----
-
-## Usage
-
-### Basic Setup
-
-```python
-from trading_bot.executors.factory import ExecutorFactory
-
-# Create intraday executor
-executor = ExecutorFactory.create_executor(
-    trading_type="day_trading",
-    config=config,
-    foundation_engine=foundation_engine,
-    position_manager=position_manager
-)
-
-# Initialize executor
-await executor.initialize()
-
-# Execute trading loop
-await executor.execute_trading_loop(symbols=["EURUSD", "XAUUSD"])
-```
-
-### Symbol Analysis
-
-```python
-# Analyze a single symbol
-signal = await executor.analyze_symbol(
-    symbol="XAUUSD",
-    current_time=datetime.now(UTC)
-)
-
-if signal:
-    print(f"Signal: {signal['action']} {signal['symbol']}")
-    print(f"Confidence: {signal['confidence']}%")
+# Determine trend bias
+if price > ema_50 and ema_20 > ema_50:
+    trend = "BULLISH"
+elif price < ema_50 and ema_20 < ema_50:
+    trend = "BEARISH"
 else:
-    print("No entry conditions met")
+    trend = "NEUTRAL"  # No trade
 ```
 
----
-
-## Trading Logic
-
-### 1. Zone Detection (H1)
-
-Supply and demand zones are detected on the H1 timeframe:
-
-```python
-# Zones are cached for 60 minutes
-if symbol not in self.zone_cache:
-    zones = await self._detect_h1_zones(symbol)
-    self.zone_cache[symbol] = (zones, datetime.now(UTC))
-
-# Filter zones by quality
-quality_zones = [z for z in zones if z.strength >= 0.7]
-```
-
-### 2. Entry Confirmation (M30)
-
-Entry is confirmed on M30 timeframe:
-
-```python
-# Check if price is at H1 zone
-if self._price_at_zone(current_price, h1_zones):
-    # Validate M30 price action
-    if self._validate_m30_price_action(symbol):
-        return self._generate_signal()
-```
-
-### 3. Trend Filter (H1) - Commodities
-
-For commodities (XAUUSD, XAGUSD), apply EMA trend filter:
-
-```python
-if self._is_commodity(symbol):
-    trend_bias = await self._get_h1_trend_bias(symbol, current_time)
-
-    # Only trade in direction of trend
-    if signal["action"] == "BUY" and trend_bias != "BULLISH":
-        return None  # Reject signal
-    if signal["action"] == "SELL" and trend_bias != "BEARISH":
-        return None  # Reject signal
-```
-
-**Sniper Gate Logic** (from run_mtf_backtest.py):
-1. Price > EMA 50 → Bullish bias
-2. Price < EMA 50 → Bearish bias
-3. EMA 20 > EMA 50 → Bullish momentum
-4. EMA 20 < EMA 50 → Bearish momentum
-5. Require 2 consecutive candles for confirmation
-
----
-
-## End-of-Day Closure
-
-All positions must be closed before the trading day ends:
-
-```python
-async def _close_end_of_day_positions(self):
-    """Close all positions before end of trading day."""
-    for position in self.position_manager.get_active_positions():
-        # Calculate time until day end
-        time_remaining = self._get_time_until_day_end()
-
-        if time_remaining <= timedelta(minutes=30):
-            # Close position
-            await self.position_manager.close_position(
-                position_id=position.position_id,
-                reason="END_OF_DAY"
-            )
-```
-
-**Default Closure Times** (by symbol):
-- Forex: 17:00 NY time (Friday close)
-- Commodities: 17:00 NY time
-- Crypto: 00:00 UTC
-
----
+**Rules**:
+- BUY only if trend = BULLISH
+- SELL only if trend = BEARISH
+- NEUTRAL = skip the trade
 
 ## Configuration
 
-### Trading Type Parameters
-
-Located in `config/trading_types.yaml`:
+`config/trading_types.yaml`:
 
 ```yaml
 day_trading:
   timeframes:
-    zone_detection: "H1"
-    entry_signal: "M30"
-    trend_filter: "H1"
+    zone_detection: H1
+    entry_signal: M30
+    trend_filter: H1
 
   scan:
     interval_minutes: 30
@@ -265,144 +90,75 @@ day_trading:
     trailing:
       activation_pips: 30.0
       trail_pips: 10.0
+
+  sniper_gate:
+    enabled: true
+    apply_to: [XAUUSD, XAGUSD]
+    ema_fast: 20
+    ema_slow: 50
+    confirmation_candles: 2
 ```
 
----
+## Position Closure
 
-## Sniper Gate Trend Filter
+All positions close before trading day end:
 
-### Purpose
+| Asset | Closure Time (UTC) |
+|-------|-------------------|
+| Forex | 17:00 (NY close) |
+| Commodities | 17:00 (NY close) |
+| Crypto | 00:00 (UTC) |
 
-The Sniper Gate is a trend confirmation filter for commodity day trading. It prevents entries against the dominant H1 trend.
+**Buffer**: Close 30 minutes before day end to avoid spread widening.
 
-### Logic
+## Cache Strategy
+
+H1 zones cached for performance:
 
 ```python
-def _get_h1_trend_bias(self, symbol: str, h1_data: pd.DataFrame) -> str:
-    """
-    Determine H1 trend bias using EMA 50/20.
+if symbol not in zone_cache or cache_expired(symbol):
+    zones = await detect_h1_zones(symbol)
+    zone_cache[symbol] = (zones, datetime.now(UTC))
 
-    Returns: 'BULLISH', 'BEARISH', or 'NEUTRAL'
-    """
-    # Calculate EMAs
-    ema_50 = h1_data['close'].ewm(span=50).iloc[-1]
-    ema_20 = h1_data['close'].ewm(span=20).iloc[-1]
-    price = h1_data['close'].iloc[-1]
-
-    # Trend bias based on price vs EMA 50
-    if price > ema_50:
-        trend = "BULLISH"
-    elif price < ema_50:
-        trend = "BEARISH"
-    else:
-        trend = "NEUTRAL"
-
-    # Momentum confirmation (EMA 20 vs EMA 50)
-    if trend == "BULLISH" and ema_20 < ema_50:
-        return "NEUTRAL"  # No bullish momentum
-    if trend == "BEARISH" and ema_20 > ema_50:
-        return "NEUTRAL"  # No bearish momentum
-
-    return trend
+# Use cached zones for M30 analysis
 ```
 
-### Application
+## Usage
 
 ```python
-# Only apply to commodities
-if symbol in ["XAUUSD", "XAGUSD"]:
-    trend = await self._get_h1_trend_bias(symbol, current_time)
+from trading_bot.executors.factory import ExecutorFactory
 
-    if signal["action"] == "BUY" and trend != "BULLISH":
-        logger.info(f"Rejected BUY signal - trend is {trend}")
-        return None
+# Create intraday executor
+executor = ExecutorFactory.create_executor(
+    trading_type="day_trading",
+    config=config,
+    foundation_engine=foundation_engine,
+    position_manager=position_manager,
+)
 
-    if signal["action"] == "SELL" and trend != "BEARISH":
-        logger.info(f"Rejected SELL signal - trend is {trend}")
-        return None
+# Initialize and run
+await executor.initialize()
+await executor.execute_trading_loop(symbols=["EURUSD", "XAUUSD"])
 ```
-
----
 
 ## Best Practices
 
-### 1. Timeframe Alignment
-
-- Always use H1 for zone detection (lower TFs = too much noise)
-- Always use M30 for entry (confirmation of H1 zones)
-- Don't mix timeframes across trading types
-
-### 2. Zone Freshness
-
-- Prefer zones tested < 12 hours ago
-- Discard zones older than 72 hours
-- Prioritize fresh zones (tested 1-4 times)
-
-### 3. Trend Filter Discipline
-
-- **Always** apply Sniper Gate for commodities
-- Don't override trend filter manually
-- If trend is NEUTRAL, skip the trade
-
-### 4. End-of-Day Management
-
-- Set reminders 30 minutes before day end
-- Don't hold positions overnight (unless specifically planned)
-- Close positions in profit first, then losses
-
----
-
-## Performance Optimization
-
-### Caching Strategy
-
-```python
-# Cache H1 zones to avoid repeated calculations
-if self._should_refresh_zones(symbol):
-    zones = await self._detect_h1_zones(symbol)
-    self.zone_cache[symbol] = (zones, datetime.now(UTC))
-```
-
-### Parallel Processing
-
-```python
-# Analyze multiple symbols in parallel
-tasks = [
-    self.analyze_symbol(symbol, current_time)
-    for symbol in symbols
-]
-
-results = await asyncio.gather(*tasks)
-```
-
----
+1. **Always use H1 for zones** - Lower TFs have too much noise
+2. **Apply Sniper Gate for commodities** - Reduces false signals
+3. **Close before day end** - Avoid overnight gaps
+4. **Use M30 entries** - Confirms H1 zone validity
+5. **Cache zones** - Performance optimization
 
 ## Monitoring
 
-### Key Metrics
-
-Track these metrics for intray performance:
-
-1. **Zone Quality**: Average zone strength score
-2. **Entry Accuracy**: % of signals that reach TP
-3. **Trend Filter Effectiveness**: % of filtered signals that would have failed
-4. **End-of-Day Slippage**: Pips lost from day-end closure
-
-### Logging
-
-```python
-logger.info(
-    f"Intraday scan complete: "
-    f"{len(signals)} signals, "
-    f"{len(filtered_by_trend)} filtered by trend, "
-    f"{len(executed)} executed"
-)
-```
-
----
+Track these metrics:
+- Zone quality (average strength)
+- Entry accuracy (% reaching TP)
+- Sniper Gate effectiveness
+- End-of-day slippage
 
 ## Related Documentation
 
-- [Trading Types Guide](../trading-types-guide.md) - All trading type configurations
-- [Multi-Timeframe Guide](../guides/multi-timeframe-guide.md) - MTF analysis patterns
-- [Position Management Architecture](../position-management-architecture.md) - Position lifecycle
+- [Trading Types Guide](../trading/trading-types-guide.md) - Day trading config
+- [Multi-Timeframe Guide](multi-timeframe-guide.md) - MTF analysis
+- [Position Management](../trading/position-management-architecture.md) - Lifecycle
