@@ -119,16 +119,16 @@ if not is_tradeable:
 
 ## CLI Commands
 
+> **Note**: All `market` CLI commands are 📋 planned. Currently market hours validation runs automatically inside the bot.
+
 ```bash
-# Check if market is open
+# 📋 Planned (not yet implemented):
 uv run trading-bot market status --symbol EURUSD
-
-# Show next open/close
 uv run trading-bot market next --symbol XAUUSD
-
-# List all market hours
 uv run trading-bot market list
 ```
+
+**Current**: Market hours validation is automatic during bot operation. Check logs for status.
 
 ## Common Issues
 

@@ -92,10 +92,7 @@ grep "Order\|Execute" logs/trading_bot.log
 2. **Risk percent too low** - Default 0.5%, may result in 0.01 lot minimum
 3. **Account currency** - Different currencies affect pip values
 
-```bash
-# Test pip calculation
-uv run trading-bot symbol info --symbol EURUSD
-```
+Check pip calculation in dry-run mode logs (`symbol info` CLI is 📋 planned).
 
 ---
 
@@ -152,9 +149,8 @@ uv run python scripts/kill_trading_bot.py
    PRAGMA synchronous=NORMAL;
    ```
 2. Migrate to PostgreSQL for production:
-   ```bash
-   uv run trading-bot postgresql migrate
-   ```
+   - Set `DATABASE_URL=postgresql+asyncpg://...` in `.env`
+   - Run `alembic upgrade head`
 
 ### Database Migration Failed
 
@@ -208,10 +204,7 @@ Get-Process python* | Select-Object WorkingSet  # Windows
 3. Notifications enabled in config
 4. Not in dry-run mode (disabled by default)
 
-```bash
-# Test notification
-uv run trading-bot notifications test
-```
+Test notifications by running bot in dry-run mode with `send_in_dry_run: true` in config. (`notifications test` CLI is 📋 planned).
 
 ---
 

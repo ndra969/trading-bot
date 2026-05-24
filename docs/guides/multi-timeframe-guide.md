@@ -151,15 +151,16 @@ multi_timeframe:
 
 ## CLI Commands
 
+> **Note**: Foundation analysis CLI is 📋 planned. Use dry-run mode currently.
+
 ```bash
-# Analyze with default timeframes
-uv run trading-bot foundation analyze --symbol EURUSD
+# ✅ Current: Test analysis via dry-run
+uv run trading-bot start --dry-run --connect-mt5
 
-# Specify trading type
-uv run trading-bot foundation analyze --symbol EURUSD --trading-type day_trading
-
-# Specific timeframe
-uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
+# 📋 Planned commands:
+# uv run trading-bot foundation analyze --symbol EURUSD
+# uv run trading-bot foundation analyze --symbol EURUSD --trading-type day_trading
+# uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
 ```
 
 ## Best Practices

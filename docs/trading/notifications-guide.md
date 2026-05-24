@@ -160,15 +160,17 @@ Prevents notification spam:
 
 ## Commands
 
+> **Note**: `notifications` CLI commands are 📋 planned. Currently test via dry-run mode.
+
 ```bash
-# Test notifications
-uv run trading-bot notifications test
+# ✅ Current: Test via dry-run with notifications enabled
+# Set send_in_dry_run: true in config, then:
+uv run trading-bot start --dry-run
 
-# Send test message
-uv run trading-bot notify --message "Test message"
-
-# Check notification status
-uv run trading-bot notifications status
+# 📋 Planned commands:
+# uv run trading-bot notifications test
+# uv run trading-bot notifications status
+# uv run trading-bot notify --message "Test message"
 ```
 
 ## Related Documentation

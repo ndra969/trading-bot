@@ -128,11 +128,9 @@ Max retries: 5 (configurable)
 The bot supports multiple MT5 accounts:
 
 ```bash
-# List configured accounts
-uv run trading-bot account list
-
-# Switch active account
-uv run trading-bot account switch --account-id 123456
+# 📋 Planned (not yet implemented):
+# uv run trading-bot account list
+# uv run trading-bot account switch --account-id 123456
 ```
 
 See [Multi-Account Guide](../guides/multi-account-guide.md).

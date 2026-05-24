@@ -68,29 +68,22 @@ Pre-configured brokers:
 
 ## Usage
 
-### Switch Broker
+> **Note**: All `broker` CLI commands are 📋 planned. Currently configure via `config/symbol_mapping.yaml`.
+
+### Switch Broker (Currently)
+
+Edit `config/symbol_mapping.yaml`:
+```yaml
+active_broker: exness_standard
+```
+
+### Planned CLI Commands
 
 ```bash
-# Switch active broker
+# 📋 Not yet implemented:
 uv run trading-bot broker switch --name exness_standard
-
-# Check current broker
 uv run trading-bot broker status
-```
-
-### Test Symbol Conversion
-
-```bash
-# Convert internal to broker symbol
 uv run trading-bot broker convert --symbol EURUSD --to-broker
-
-# Output: EURUSDm (for Exness Standard)
-```
-
-### Auto-Discovery
-
-```bash
-# Auto-detect broker symbols
 uv run trading-bot broker discover
 ```
 
@@ -113,11 +106,7 @@ brokers:
 active_broker: your_broker
 ```
 
-3. Test:
-
-```bash
-uv run trading-bot broker convert --symbol EURUSD --to-broker
-```
+3. Test: Start bot in dry-run mode and verify symbol conversion in logs.
 
 ## Symbol Conversion Examples
 
@@ -165,12 +154,7 @@ Some brokers add prefix/suffix:
 
 ### Cannot Convert Symbol
 
-```bash
-# Verify mapping
-uv run trading-bot broker convert --symbol EURUSD --to-broker
-
-# If wrong, edit config/symbol_mapping.yaml
-```
+Check `config/symbol_mapping.yaml` for correct `active_broker` setting. Test via dry-run mode and verify symbol conversion in logs.
 
 ## Related Documentation
 

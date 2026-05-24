@@ -92,12 +92,19 @@ mt5:
 
 ### 3. Database Migration
 
-```bash
-# Migrate to PostgreSQL for production
-uv run trading-bot postgresql migrate
+> **Note**: `trading-bot postgresql` CLI is 📋 planned. Use Alembic directly:
 
-# Verify migration
-uv run trading-bot postgresql status
+```bash
+# Apply migrations
+alembic upgrade head
+
+# Check current revision
+alembic current
+```
+
+Configure `DATABASE_URL` in `.env` for PostgreSQL:
+```bash
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/dbname
 ```
 
 ## Deployment

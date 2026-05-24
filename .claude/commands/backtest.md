@@ -5,27 +5,24 @@ argument-hint: <symbol> [--period <days>] [--strategy <name>]
 
 # Backtest
 
+> **Status**: 📋 CLI command not yet implemented.
+> Backtest scripts exist in `scripts/` directory.
+
+## Planned Command
+
 ```bash
 uv run trading-bot backtest --symbol <SYMBOL> --period <DAYS>
-uv run trading-bot backtest --symbol <SYMBOL> --strategy <NAME> --period <DAYS>
 ```
 
-## Defaults
+## Current Method
 
-- Period: 30 days
-- Strategy: foundation (S&D + 7 layers)
-- Capital: $10,000
-
-## Output
-
-`scripts/reports/backtest_<symbol>_<date>.json`
-
-Metrics: trades, win rate, profit factor, max drawdown, Sharpe ratio.
-
-## Examples
-
+Backtest reports are generated and stored in:
 ```
-/backtest EURUSD
-/backtest XAUUSD --period 90
-/backtest BTCUSD --strategy foundation --period 60
+scripts/reports/backtest_<symbol>_<date>.json
 ```
+
+Use existing scripts in `scripts/` for backtesting (not CLI integrated yet).
+
+## Metrics Tracked
+
+trades, win rate, profit factor, max drawdown, Sharpe ratio

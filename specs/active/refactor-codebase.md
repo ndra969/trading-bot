@@ -229,24 +229,56 @@ Two large methods:
 
 ---
 
-### Refactor 7: Module Decisions (Unused Code)
+### Refactor 7: Module Decisions ✅ DONE
 
+#### Decisions Applied
+
+| Code | Lines | Decision | Status |
+|------|-------|----------|--------|
+| `analytics/performance_analyzer.py` | 690 | Remove | ✅ Deleted |
+| `risk/risk_manager_conservative.py` | 325 | Remove | ✅ Deleted |
+| `connectors/dry_run_wrapper.py` | 211 | Implement properly | ⏳ See Refactor 11 |
+
+---
+
+### Refactor 11: DryRunWrapper Implementation
+
+**Target**: `src/trading_bot/connectors/dry_run_wrapper.py` (211 lines, no tests)
 **Effort**: 1 day
-**Risk**: Low
+**Risk**: Medium (affects dry-run behavior)
 
-#### Code Without Integration
+#### Problem
 
-| Code | Lines | Status | Decision Needed |
-|------|-------|--------|-----------------|
-| `analytics/performance_analyzer.py` | 690 | Has tests, not integrated | Integrate / Remove / Document |
-| `risk/risk_manager_conservative.py` | 325 | Has tests, not integrated | Integrate / Remove / Document |
-| `connectors/dry_run_wrapper.py` | 211 | No tests, not integrated | Implement / Remove |
+Code exists but:
+- No tests
+- Not integrated with main bot
+- Marked "not yet implemented" in pyproject.toml
+
+#### Goal
+
+Properly implement and integrate DryRunWrapper for better dry-run isolation:
+- Wraps OrderManager to prevent real orders
+- Wraps PositionManager to simulate position state
+- Logs all would-be operations
+- Returns realistic mock results
 
 #### Tasks
 
-- [ ] User decision per module
-- [ ] Execute decision (integrate/remove/document)
-- [ ] Update [docs-cli-gap-fix.md](docs-cli-gap-fix.md) accordingly
+- [ ] Review current dry_run_wrapper.py implementation
+- [ ] Write tests for DryRunOrderManager (TDD)
+- [ ] Add DryRunPositionManager wrapper if needed
+- [ ] Integrate into main.py initialization when `dry_run=True`
+- [ ] Update [dry-run-guide.md](../../docs/guides/dry-run-guide.md)
+- [ ] Remove from pyproject.toml omit list
+- [ ] Verify dry-run still works correctly
+
+#### Acceptance Criteria
+
+- [ ] DryRunWrapper integrated in main.py
+- [ ] Tests cover wrapper logic
+- [ ] No real orders sent in dry-run mode (verified)
+- [ ] Logs clearly distinguish dry-run vs live operations
+- [ ] Coverage ≥85% for dry_run_wrapper.py
 
 ---
 

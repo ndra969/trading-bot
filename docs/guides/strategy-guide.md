@@ -181,15 +181,17 @@ multi_timeframe:
 
 ## CLI Commands
 
+> **Note**: Strategy analysis CLI is 📋 planned. Currently analyze via dry-run mode and logs.
+
 ```bash
-# Analyze symbol with foundation strategy
-uv run trading-bot foundation analyze --symbol EURUSD
+# ✅ Current: Run dry-run and inspect signals
+uv run trading-bot start --dry-run --connect-mt5
+grep -i "signal\|zone\|strategy" logs/trading_bot.log
 
-# Multi-timeframe analysis
-uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
-
-# Backtest strategy
-uv run trading-bot backtest --symbol EURUSD --period 30d
+# 📋 Planned commands:
+# uv run trading-bot foundation analyze --symbol EURUSD
+# uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
+# uv run trading-bot backtest --symbol EURUSD --period 30d
 ```
 
 ## Related Documentation

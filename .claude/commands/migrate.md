@@ -1,38 +1,43 @@
 ---
 description: Database migration management
-argument-hint: [status|migrate|reset|verify]
+argument-hint: [revision|upgrade|downgrade|current]
 ---
 
 # DB Migration
 
-| Arg | Action |
-|-----|--------|
-| (none) or `status` | `uv run trading-bot postgresql status` |
-| `migrate` | `uv run trading-bot postgresql migrate` |
-| `verify` | `uv run trading-bot postgresql migrate --command verify` |
-| `reset` | `uv run trading-bot postgresql reset` ⚠️ DELETES DATA |
+> **Status**: Use Alembic directly. CLI wrapper (`trading-bot postgresql`) is 📋 planned.
 
-## Step-by-Step Migration
+## Alembic Commands (Current)
 
 ```bash
-uv run trading-bot postgresql migrate --command setup
-uv run trading-bot postgresql migrate --command backup
-uv run trading-bot postgresql migrate --command migrate
-uv run trading-bot postgresql migrate --command transfer
-uv run trading-bot postgresql migrate --command verify
+# Create migration
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback last migration
+alembic downgrade -1
+
+# Check current revision
+alembic current
+
+# Show migration history
+alembic history
 ```
 
 ## DB URLs
 
+Configure via `DATABASE_URL` in `.env`:
+
 - Dev: `sqlite+aiosqlite:///trading_bot.db`
 - Prod: `postgresql+asyncpg://user:pass@localhost:5432/dbname`
 
-Configure via `DATABASE_URL` in `.env`.
-
-## Alembic (Manual)
+## Planned CLI Wrapper
 
 ```bash
-alembic revision --autogenerate -m "description"
-alembic upgrade head
-alembic current
+# 📋 Not yet implemented
+uv run trading-bot postgresql migrate
+uv run trading-bot postgresql status
+uv run trading-bot postgresql reset  # WARNING
 ```

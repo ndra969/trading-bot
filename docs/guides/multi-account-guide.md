@@ -81,18 +81,16 @@ CREATE TABLE trading_accounts (
 ## CLI Commands
 
 ```bash
-# Show active account
+# ✅ Available: Show active account
 uv run trading-bot account info
 
-# List all accounts
-uv run trading-bot account list
-
-# Switch active account
-uv run trading-bot account switch --account-id 123456
-
-# Sync with MT5
-uv run trading-bot account sync
+# 📋 Planned (not yet implemented):
+uv run trading-bot account list                     # List all accounts
+uv run trading-bot account switch --account-id 123  # Switch active
+uv run trading-bot account sync                      # Force MT5 sync
 ```
+
+**Current workaround for switching**: Manually update database `is_active` flag, or restart bot with different config.
 
 ## Configuration
 
@@ -166,16 +164,17 @@ Each account maintains:
 
 ```bash
 # Start on demo
-uv run trading-bot start --config demo_config
+uv run trading-bot start --config development
 
 # Stop bot (Ctrl+C)
 
-# Switch to live account
-uv run trading-bot account switch --account-id <live_id>
+# Update active account in DB or use different config
 
 # Start live
 uv run trading-bot start --config production
 ```
+
+> **Note**: `account switch` CLI is 📋 planned. Currently switch via config or DB update.
 
 ### Multi-Broker Setup
 
@@ -202,20 +201,15 @@ else:
 
 **Solution**:
 ```bash
-# Sync from MT5
-uv run trading-bot account sync
+# Verify with available command
+uv run trading-bot account info
 
-# Verify
-uv run trading-bot account list
+# 📋 Planned: account sync, account list
 ```
 
 ### Wrong Account Selected
 
-**Solution**:
-```bash
-# Switch to correct account
-uv run trading-bot account switch --account-id <correct_id>
-```
+**Solution**: Update `is_active` flag in DB or use different config file. (`account switch` CLI is 📋 planned)
 
 ### Sync Failures
 

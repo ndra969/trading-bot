@@ -113,20 +113,18 @@ The system tracks pip-based calculations for accurate position management:
 
 ## CLI Commands
 
+> **Note**: All `positions` CLI commands are 📋 planned. Position management runs automatically during bot operation. Manual position control via MT5 terminal currently.
+
 ```bash
-# View active positions
-uv run trading-bot positions active
-uv run trading-bot positions active --symbol EURUSD
-
-# Position operations
-uv run trading-bot positions close --ticket 123456
+# 📋 Planned (not yet implemented):
+uv run trading-bot positions active                               # View active
+uv run trading-bot positions close --ticket 123456                # Close specific
 uv run trading-bot positions partial-close --ticket 123456 --percentage 50
-uv run trading-bot positions modify --ticket 123456 --sl 1.0850
-
-# Analysis
-uv run trading-bot positions analyze --ticket 123456
-uv run trading-bot positions performance --symbol EURUSD --days 30
+uv run trading-bot positions modify --ticket 123456 --sl 1.0850   # Modify SL
+uv run trading-bot positions analyze --ticket 123456              # Analysis
 ```
+
+**Current**: Position management is fully automated. Manual control via MT5 terminal.
 
 ## Integration
 

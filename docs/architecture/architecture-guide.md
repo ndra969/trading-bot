@@ -229,7 +229,6 @@ src/trading_bot/
 │   ├── foundation/         # S&D zones
 │   └── enhancement/        # 7 enhancement layers
 ├── exceptions/             # Custom exceptions (MT5, connector, strategy)
-├── analytics/              # Performance analysis (standalone)
 └── utils/                  # Utilities
 ```
 

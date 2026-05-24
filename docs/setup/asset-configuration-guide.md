@@ -77,12 +77,14 @@ Trails SL as price moves favorably:
 ## Verification
 
 ```bash
-# Check symbol info
-uv run trading-bot symbol info --symbol EURUSD
-
-# Validate config
+# ✅ Available: Validate config
 uv run trading-bot config validate
+
+# 📋 Planned: symbol info CLI
+# uv run trading-bot symbol info --symbol EURUSD
 ```
+
+Currently: Test asset config via dry-run and inspect position sizing in logs.
 
 ## Related Docs
 

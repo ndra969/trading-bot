@@ -1,205 +1,211 @@
 # CLI Reference Guide
 
-Quick reference for common trading bot commands. See [CLAUDE.md](../../CLAUDE.md) for project rules.
+Complete reference for `uv run trading-bot` commands.
 
-## Quick Reference - Common Commands
+> **Status Legend**: ✅ Implemented · 📋 Planned · ⚠️ Partial
 
-### Bot Operations
+## Available Commands (Implemented)
+
+### Bot Control
 
 ```bash
-# Start/Stop
-uv run trading-bot start --config production  # ✅ Production
-uv run trading-bot start --dry-run           # ✅ Test mode
+# Start trading bot
+uv run trading-bot start                              # Default config
+uv run trading-bot start --config production          # Production config
+uv run trading-bot start --dry-run                    # Safe testing mode
+uv run trading-bot start --dry-run --connect-mt5      # MT5 data, no real orders
+
+# Stop trading bot (graceful Ctrl+C or)
 uv run trading-bot stop
 
-# Status
+# Show status
 uv run trading-bot status
-uv run trading-bot health
+
+# Show version
+uv run trading-bot version
 ```
 
-### Position Management
+### MT5 Operations
 
 ```bash
-# Active positions
-uv run trading-bot positions active
-uv run trading-bot positions close --ticket 123456
-uv run trading-bot positions partial-close --ticket 123456 --percentage 50
+# Connect to MT5 terminal
+uv run trading-bot mt5 connect
+
+# Disconnect
+uv run trading-bot mt5 disconnect
+
+# Check connection status
+uv run trading-bot mt5 status
 ```
 
-### Market Analysis
+### Account
 
 ```bash
-# Foundation strategy
-uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
-uv run trading-bot foundation zones --symbol EURUSD --strength-min 40
-
-# Market status
-uv run trading-bot market status --symbol EURUSD
-uv run trading-bot market hours --symbol XAUUSD
+# Show account information
+uv run trading-bot account info
 ```
 
 ### Configuration
 
 ```bash
-# View and manage
+# Show configuration
 uv run trading-bot config show
-uv run trading-bot config show --file trading_parameters
-uv run trading-bot config validate --all
+
+# Validate configuration
+uv run trading-bot config validate
 ```
 
-### Development
+### Project Info
+
+```bash
+# Display project rules from CLAUDE.md
+uv run trading-bot rules
+uv run trading-bot rules --format summary
+uv run trading-bot rules --format rules-only
+
+# Alias
+uv run trading-bot claude
+```
+
+---
+
+## Planned Commands (Not Yet Implemented)
+
+These commands are referenced in some documentation but not implemented yet:
+
+### 📋 Position Management
+
+```bash
+# Planned
+uv run trading-bot positions active                    # List active positions
+uv run trading-bot positions close --ticket <id>       # Close position
+uv run trading-bot positions partial-close --ticket <id> --percent 50
+```
+
+### 📋 Market Analysis
+
+```bash
+# Planned
+uv run trading-bot foundation analyze --symbol EURUSD
+uv run trading-bot foundation zones --symbol EURUSD
+uv run trading-bot market status --symbol EURUSD
+uv run trading-bot market hours --symbol XAUUSD
+```
+
+### 📋 Account Management
+
+```bash
+# Planned
+uv run trading-bot account list                       # List all accounts
+uv run trading-bot account switch --account-id <id>   # Switch active
+uv run trading-bot account sync                        # Force sync with MT5
+```
+
+### 📋 Trading Type Management
+
+```bash
+# Planned (only day_trading currently works)
+uv run trading-bot type switch --type day_trading
+uv run trading-bot type status
+uv run trading-bot type compare --types scalping,day_trading
+```
+
+### 📋 Broker Symbol Management
+
+```bash
+# Planned
+uv run trading-bot broker switch --name exness_standard
+uv run trading-bot broker convert --symbol EURUSD --to-broker
+uv run trading-bot broker status
+```
+
+### 📋 Database Migration
+
+```bash
+# Planned (use alembic directly for now)
+uv run trading-bot postgresql migrate
+uv run trading-bot postgresql status
+
+# Use this instead:
+alembic upgrade head
+alembic current
+```
+
+### 📋 Risk & Performance
+
+```bash
+# Planned
+uv run trading-bot risk status
+uv run trading-bot performance
+uv run trading-bot health
+```
+
+### 📋 Notifications
+
+```bash
+# Planned
+uv run trading-bot notifications test
+uv run trading-bot notifications status
+```
+
+### 📋 Technical Analysis
+
+```bash
+# Planned
+uv run trading-bot technical analyze --symbol EURUSD --indicator rsi
+uv run trading-bot symbol info --symbol EURUSD
+```
+
+### 📋 Backtest
+
+```bash
+# Planned
+uv run trading-bot backtest --symbol EURUSD --period 30d
+```
+
+---
+
+## Development Commands (External Tools)
+
+These use external Python tools, not the trading-bot CLI:
 
 ```bash
 # Code quality
 uv run black src/ tests/
-uv run ruff check --fix src/ tests/
+uv run ruff check src/ tests/ --fix
 uv run mypy src/trading_bot/
 
 # Testing
 uv run pytest tests/ --cov=src/trading_bot --cov-fail-under=85
+uv run pytest tests/unit/ -v
+uv run pytest tests/integration/ --mt5
+
+# Database migrations
+alembic revision --autogenerate -m "description"
+alembic upgrade head
+alembic current
 ```
 
-## Status Indicators
+---
 
-| Status | Meaning |
-|--------|---------|
-| ✅ | Implemented & tested |
-| ⚠️ | Partial implementation |
-| ❌ | Not implemented |
-
-## Full Command Reference
-
-### Bot Control
+## Quick Workflow
 
 ```bash
-uv run trading-bot init --config development
-uv run trading-bot start --config production
+# 1. Test in dry-run first
 uv run trading-bot start --dry-run
-uv run trading-bot start --ignore-market-hours
-uv run trading-bot stop --force
-uv run trading-bot status --detailed
-uv run trading-bot info --platform-check
+
+# 2. Test with real market data (no real trades)
+uv run trading-bot start --dry-run --connect-mt5
+
+# 3. Live trading (REAL MONEY)
+uv run trading-bot start --config production
 ```
 
-### Database Management
+---
 
-```bash
-# PostgreSQL migration
-uv run trading-bot postgresql migrate
-uv run trading-bot postgresql status
-uv run trading-bot postgresql migrate --command verify
-uv run trading-bot postgresql reset  # WARNING: deletes data
+## Related Documentation
 
-# SQLite operations
-uv run trading-bot db backup
-uv run trading-bot db restore --file backup.db
-uv run trading-bot db stats
-```
-
-### Strategy Management
-
-```bash
-uv run trading-bot strategy status
-uv run trading-bot strategy test supply_demand
-uv run trading-bot strategy weights --show
-uv run trading-bot strategy config --name supply_demand --show
-```
-
-### Technical Analysis
-
-```bash
-# RSI
-uv run trading-bot technical analyze --symbol EURUSD --indicator rsi
-uv run trading-bot technical rsi --symbol EURUSD --timeframes H1,H4,D1
-
-# Moving Averages
-uv run trading-bot technical analyze --symbol EURUSD --indicator ma
-uv run trading-bot technical ma-alignment --symbol EURUSD --timeframes H1,H4
-
-# Foundation Strategy
-uv run trading-bot foundation analyze --symbol EURUSD --timeframe H1
-uv run trading-bot foundation price-action EURUSD --timeframe H1 --trading-type day_trading
-```
-
-### Trading Operations
-
-```bash
-# Signals
-uv run trading-bot signal analyze --symbol EURUSD --show-layers
-uv run trading-bot signal validate --symbol EURUSD --confidence-min 70
-
-# Positions
-uv run trading-bot positions active --symbol EURUSD
-uv run trading-bot positions history --days 7
-uv run trading-bot positions analyze --ticket 123456
-```
-
-### Analytics
-
-```bash
-uv run trading-bot analytics performance --days 30
-uv run trading-bot analytics risk --current
-uv run trading-bot analytics correlation --symbols EURUSD,GBPUSD
-```
-
-### Windows/MT5
-
-```bash
-uv run trading-bot mt5 status
-uv run trading-bot mt5 check-connection
-uv run trading-bot windows status
-```
-
-### Notifications
-
-```bash
-uv run trading-bot notifications status
-uv run trading-bot notifications test
-uv run trading-bot notifications enable --type trade_opened
-```
-
-## Configuration Commands
-
-```bash
-# Environment management
-uv run trading-bot config set-env --environment production
-uv run trading-bot config list-environments
-
-# Backup and restore
-uv run trading-bot config backup --version "pre_optimization"
-uv run trading-bot config restore --hash "abc123"
-```
-
-## Global Options
-
-Most commands support these options:
-
-```bash
---config CONFIG_NAME     # Configuration environment
---verbose, -v           # Verbose output
---dry-run               # Simulation mode
---symbol SYMBOL         # Filter by symbol
---timeframe TIMEFRAME   # Filter by timeframe
---days DAYS            # Filter by days
---format FORMAT        # Output: json, csv, yaml, table
-```
-
-## Exit Codes
-
-- `0`: Success
-- `1`: General error
-- `2`: Invalid command/arguments
-- `3`: Configuration error
-- `4`: Database error
-- `5`: MT5 connection error
-
-## Environment Variables
-
-```bash
-export TRADING_BOT_CONFIG=production
-export TRADING_BOT_DB_URL="postgresql+asyncpg://..."
-export TRADING_BOT_MT5_PATH="/custom/mt5/path"
-export TRADING_BOT_LOG_LEVEL=INFO
-```
-
-For complete implementation details, see [`src/trading_bot/cli.py`](../../src/trading_bot/cli.py).
+- [CLAUDE.md](../../CLAUDE.md) - Project rules
+- [Configuration Guide](../setup/configuration-guide.md) - Config files
+- [Windows Setup](../setup/windows-setup-guide.md) - Installation
+- [Troubleshooting](troubleshooting-guide.md) - Common issues

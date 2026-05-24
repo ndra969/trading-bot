@@ -2,18 +2,22 @@
 
 Configure the bot for different trading styles.
 
+> **Implementation Status**: Currently only **Day Trading** is fully implemented. Other types are planned for future phases.
+
 ## Overview
 
 The bot adapts strategy, risk, and timeframes based on trading type.
 
-| Type | Hold Duration | Timeframes | Risk/Trade | Max Daily Trades |
-|------|---------------|------------|------------|------------------|
-| **Scalping** | 1-240 min | M1, M5, M15 | 0.2% | 20 |
-| **Day Trading** | 30-1440 min | M15, H1, H4 | 0.5% | 8 |
-| **Swing** | 1-7 days | H4, D1, W1 | 0.8% | 2 |
-| **Position** | 1-4 weeks | D1, W1, MN1 | 1.2% | 1 |
+| Type | Status | Hold Duration | Timeframes | Risk/Trade | Max Daily Trades |
+|------|--------|---------------|------------|------------|------------------|
+| **Day Trading** | ✅ Implemented | 30-1440 min | M15, H1, H4 | 0.5% | 8 |
+| **Scalping** | 📋 Planned (Phase 4) | 1-240 min | M1, M5, M15 | 0.2% | 20 |
+| **Swing** | 📋 Planned (Phase 3) | 1-7 days | H4, D1, W1 | 0.8% | 2 |
+| **Position** | 📋 Planned (Future) | 1-4 weeks | D1, W1, MN1 | 1.2% | 1 |
 
-## Scalping
+## Scalping 📋 Planned
+
+**Status**: Not yet implemented (Phase 4 planned). Configurations below are documented for future reference.
 
 **Best for**: High-frequency trading, quick profits, tight spreads
 
@@ -33,7 +37,9 @@ The bot adapts strategy, risk, and timeframes based on trading type.
 - Foundation: 25%
 - Multi-TF: 15%
 
-## Day Trading
+## Day Trading ✅ Implemented
+
+**Status**: Fully implemented via `IntradayExecutor`.
 
 **Best for**: Intraday opportunities, balanced approach
 
@@ -53,7 +59,9 @@ The bot adapts strategy, risk, and timeframes based on trading type.
 - Technical: 35%
 - Multi-TF: 25%
 
-## Swing Trading
+## Swing Trading 📋 Planned
+
+**Status**: Not yet implemented (Phase 3 planned). Configurations below are documented for future reference.
 
 **Best for**: Multi-day trends, less monitoring needed
 
@@ -73,7 +81,9 @@ The bot adapts strategy, risk, and timeframes based on trading type.
 - Multi-TF: 35%
 - Technical: 20%
 
-## Position Trading
+## Position Trading 📋 Planned
+
+**Status**: Not yet implemented (Future planning). Configurations below are documented for future reference.
 
 **Best for**: Long-term trends, minimal monitoring
 
@@ -95,16 +105,16 @@ The bot adapts strategy, risk, and timeframes based on trading type.
 
 ## Switching Trading Types
 
+> **Note**: CLI commands below are 📋 Planned. Currently set trading type via `config/trading_types.yaml`.
+
 ```bash
-# Switch trading type
-uv run trading-bot type switch --type scalping
-
-# Check current type
+# Planned commands (not yet implemented)
+uv run trading-bot type switch --type day_trading
 uv run trading-bot type status
-
-# Compare types
 uv run trading-bot type compare --types scalping,day_trading
 ```
+
+**Current method**: Edit `default_trading_type` in `config/trading_types.yaml`.
 
 ## Configuration
 

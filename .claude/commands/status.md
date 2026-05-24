@@ -1,29 +1,25 @@
 ---
-description: Check bot status (MT5, positions, account, risk)
-argument-hint: [bot|mt5|positions|account|risk|all]
+description: Check bot status (MT5, account)
+argument-hint: [bot|mt5|account|all]
 ---
 
 # Bot Status Check
 
-| Arg | Action |
-|-----|--------|
-| (none) or `all` | Full status (bot + MT5 + positions + account + risk) |
-| `bot` | `uv run trading-bot status` |
-| `mt5` | `uv run trading-bot mt5 status` |
-| `positions` | `uv run trading-bot positions active` |
-| `account` | `uv run trading-bot account info` |
-| `risk` | `uv run trading-bot risk status` |
+| Arg | Status | Action |
+|-----|--------|--------|
+| (none) or `all` | ✅ Partial | Run available checks |
+| `bot` | ✅ | `uv run trading-bot status` |
+| `mt5` | ✅ | `uv run trading-bot mt5 status` |
+| `account` | ✅ | `uv run trading-bot account info` |
+| `positions` | 📋 Planned | (not yet implemented) |
+| `risk` | 📋 Planned | (not yet implemented) |
 
-## Full Status (all)
-
-Runs all checks in parallel:
+## Full Status (currently available)
 
 ```bash
 uv run trading-bot status
 uv run trading-bot mt5 status
 uv run trading-bot account info
-uv run trading-bot positions active
-uv run trading-bot risk status
 ```
 
 ## When to Use

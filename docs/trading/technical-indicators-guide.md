@@ -157,17 +157,17 @@ confluence_weights:
 
 ## CLI Commands
 
+> **Note**: All `technical` CLI commands are 📋 planned. Indicators run automatically during strategy analysis.
+
 ```bash
-# Analyze symbol with indicators
+# 📋 Planned (not yet implemented):
 uv run trading-bot technical analyze --symbol EURUSD --indicator rsi
 uv run trading-bot technical analyze --symbol EURUSD --indicator ma
-
-# Test indicator libraries
 uv run trading-bot technical test-libraries
-
-# Multi-timeframe RSI analysis
 uv run trading-bot technical rsi --symbol EURUSD --multi-tf
 ```
+
+**Current**: Indicators are calculated automatically during signal generation. Inspect via dry-run logs.
 
 ## Installation (Optional Performance)
 
