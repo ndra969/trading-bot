@@ -1311,6 +1311,123 @@ class TradingBot:
         """Convert broker symbol to internal format. Delegates to SymbolResolver."""
         return self._symbol_resolver.convert_broker_to_internal_symbol(symbol)
 
+    def _resolve_mt5_ticket(self, position, broker_symbol: str) -> int | None:
+        """Resolve MT5 ticket for a position via 3-stage fallback chain.
+
+        Lookup order (mutates position to cache discovered ticket):
+            1. position.ticket attribute (set during creation)
+            2. position.metadata["ticket"] (loaded from DB)
+            3. MT5 query by symbol + entry_price match (recovery from sync loss)
+
+        Args:
+            position: Position object (may be mutated to cache ticket)
+            broker_symbol: Broker-formatted symbol for MT5 query
+
+        Returns:
+            Ticket number if found, None if all fallbacks fail.
+        """
+        # 1. From position object (fast path)
+        ticket = getattr(position, "ticket", None)
+        if ticket:
+            return int(ticket)
+
+        # 2. From metadata (cache from DB load)
+        if position.metadata and position.metadata.get("ticket"):
+            ticket = int(position.metadata["ticket"])
+            position.ticket = ticket  # Cache on object
+            logger.debug(
+                f"  🎫 Found ticket {ticket} from metadata for {position.position_id}"
+            )
+            return ticket
+
+        # 3. MT5 lookup by symbol + entry_price (recovery)
+        if not self.mt5:
+            return None
+
+        logger.debug(f"  🔍 Looking up ticket for {broker_symbol} from MT5...")
+        open_positions = self.mt5.get_positions(symbol=broker_symbol)
+        if not open_positions:
+            return None
+
+        # Match by entry price (most accurate)
+        for mt5_pos in open_positions:
+            mt5_entry = mt5_pos.get("price_open", 0.0)
+            if abs(mt5_entry - position.entry_price) < 0.0001:
+                ticket = mt5_pos.get("ticket")
+                self._cache_ticket(position, ticket)
+                logger.info(
+                    f"  🎫 Found ticket {ticket} for {position.position_id} "
+                    f"via MT5 lookup (entry: {mt5_entry:.5f})"
+                )
+                return ticket
+
+        # Last resort: single MT5 position for this symbol
+        if len(open_positions) == 1:
+            ticket = open_positions[0].get("ticket")
+            self._cache_ticket(position, ticket)
+            logger.warning(
+                f"  ⚠️ Using first position ticket {ticket} for {position.position_id} "
+                f"(no entry price match)"
+            )
+            return ticket
+
+        return None
+
+    def _cache_ticket(self, position, ticket: int) -> None:
+        """Store ticket on position object + metadata for future lookups."""
+        position.ticket = ticket
+        if not position.metadata:
+            position.metadata = {}
+        position.metadata["ticket"] = ticket
+
+    def _automation_preflight_passed(self, position, is_dry_run: bool) -> bool:
+        """Verify position is eligible for automation (open, in MT5, has price data).
+
+        Returns:
+            True if all checks pass and automation should proceed.
+            False if any check fails (orphan, closed externally, missing data).
+        """
+        # 1. Position must still be open (may have been closed during sync)
+        if not position.is_open:
+            logger.debug(
+                f"Skipping automation for {position.position_id} ({position.symbol}): "
+                f"Position is {position.status.value}, not OPEN"
+            )
+            return False
+
+        # 2. Live trading: verify ticket still exists in MT5
+        if not is_dry_run and self.mt5 and self.mt5.is_connected():
+            ticket = getattr(position, "ticket", None)
+            if not ticket and position.metadata:
+                ticket = position.metadata.get("ticket")
+
+            if ticket:
+                mt5_tickets = {
+                    p.get("ticket") for p in self.mt5.get_positions() if p.get("ticket")
+                }
+                if ticket not in mt5_tickets:
+                    logger.warning(
+                        f"  ⚠️ SKIPPING AUTOMATION: Position {position.position_id} "
+                        f"(Ticket {ticket}) not found in MT5 - position was closed. "
+                        f"Should have been caught during sync reconciliation."
+                    )
+                    return False
+            else:
+                logger.error(
+                    f"  ❌ SKIPPING AUTOMATION: Position {position.position_id} has NO TICKET! "
+                    f"This is an ORPHANED position. Check _manage_positions sync logic."
+                )
+                return False
+
+        # 3. Position must have current price for automation calculations
+        if position.current_price is None:
+            logger.warning(
+                f"  ⚠️ Cannot check automation for {position.position_id}: current_price is None"
+            )
+            return False
+
+        return True
+
     async def _update_position_and_run_automation(self, position, is_dry_run: bool) -> None:
         """Update price + run automation checks for a single open position.
 
@@ -1841,46 +1958,14 @@ class TradingBot:
             return None
 
     async def _check_position_automation(self, position):
-        """Check and apply automation features for a position."""
+        """Check and apply automation features (breakeven, trailing, partial close) for a position."""
         try:
-            # CRITICAL: Verify position is still open before running automation
-            # This prevents automation from running on positions that were closed during sync
-            if not position.is_open:
-                logger.debug(
-                    f"Skipping automation for {position.position_id} ({position.symbol}): "
-                    f"Position is {position.status.value}, not OPEN"
-                )
+            is_dry_run = self.config.get("trading", {}).get("dry_run", False)
+
+            # Pre-flight checks (open status, MT5 verification, required data)
+            if not self._automation_preflight_passed(position, is_dry_run):
                 return
 
-            # CRITICAL: Double-check position still exists in MT5 (for live trading)
-            # This prevents automation from running on positions closed manually in MT5
-            is_dry_run = self.config.get("trading", {}).get("dry_run", False)
-            if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                ticket = getattr(position, "ticket", None)
-                if not ticket and position.metadata:
-                    ticket = position.metadata.get("ticket")
-
-                if ticket:
-                    mt5_positions = self.mt5.get_positions()
-                    mt5_tickets = {p.get("ticket") for p in mt5_positions if p.get("ticket")}
-                    if ticket not in mt5_tickets:
-                        logger.warning(
-                            f"  ⚠️ SKIPPING AUTOMATION: Position {position.position_id} (Ticket {ticket}) "
-                            f"not found in MT5 - position was closed. "
-                            f"This should have been detected during sync reconciliation."
-                        )
-                        return
-                else:
-                    # CRITICAL: No ticket - this position is INVALID and should have been closed
-                    # during sync reconciliation. Skip automation to prevent errors.
-                    logger.error(
-                        f"  ❌ SKIPPING AUTOMATION: Position {position.position_id} has NO TICKET! "
-                        f"This is an ORPHANED position that should have been closed. "
-                        f"Check _manage_positions sync reconciliation logic."
-                    )
-                    return
-
-            # Log position status for debugging
             logger.debug(
                 f"Checking automation for {position.position_id} ({position.symbol}): "
                 f"profit={position.current_profit_pips:.1f} pips, "
@@ -1889,13 +1974,6 @@ class TradingBot:
                 f"entry={position.entry_price:.5f}, "
                 f"sl={position.stop_loss:.5f}"
             )
-
-            # Validate position has required data
-            if position.current_price is None:
-                logger.warning(
-                    f"  ⚠️ Cannot check automation for {position.position_id}: current_price is None"
-                )
-                return
 
             # Breakeven check
             be_should_move = self.breakeven_manager.should_move_to_breakeven(position)
@@ -1911,61 +1989,8 @@ class TradingBot:
                         "dry_run", False
                     )  # Default to False for live trading
                     if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                        # Convert to broker symbol if needed
-                        broker_symbol = position.symbol
-                        if self.symbol_mapper:
-                            try:
-                                broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                                    position.symbol, self.active_broker
-                                )
-                            except Exception:
-                                pass
-
-                        # Get ticket from position (stored during position creation)
-                        ticket = getattr(position, "ticket", None)
-
-                        # Fallback 1: Try to get from metadata
-                        if not ticket and position.metadata:
-                            ticket = position.metadata.get("ticket")
-                            if ticket:
-                                ticket = int(ticket)
-                                position.ticket = ticket  # Set to object for future use
-                                logger.debug(
-                                    f"  🎫 Found ticket {ticket} from metadata for {position.position_id}"
-                                )
-
-                        # Fallback 2: Try to find position from MT5 by symbol and entry price
-                        if not ticket and self.mt5:
-                            logger.debug(f"  🔍 Looking up ticket for {broker_symbol} from MT5...")
-                            open_positions = self.mt5.get_positions(symbol=broker_symbol)
-                            if open_positions:
-                                # Match by entry price (most accurate)
-                                for mt5_pos in open_positions:
-                                    mt5_entry = mt5_pos.get("price_open", 0.0)
-                                    # Allow small tolerance for floating point comparison
-                                    if abs(mt5_entry - position.entry_price) < 0.0001:
-                                        ticket = mt5_pos.get("ticket")
-                                        position.ticket = ticket
-                                        # Save ticket to metadata for future
-                                        if not position.metadata:
-                                            position.metadata = {}
-                                        position.metadata["ticket"] = ticket
-                                        logger.info(
-                                            f"  🎫 Found ticket {ticket} for {position.position_id} via MT5 lookup (entry: {mt5_entry:.5f})"
-                                        )
-                                        break
-
-                                # If no match by entry price, use first position (last resort)
-                                if not ticket and len(open_positions) == 1:
-                                    ticket = open_positions[0].get("ticket")
-                                    position.ticket = ticket
-                                    if not position.metadata:
-                                        position.metadata = {}
-                                    position.metadata["ticket"] = ticket
-                                    logger.warning(
-                                        f"  ⚠️ Using first position ticket {ticket} for {position.position_id} (no entry price match)"
-                                    )
-
+                        broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+                        ticket = self._resolve_mt5_ticket(position, broker_symbol)
                         mt5_modified = False
                         if ticket:
                             logger.debug(
@@ -2133,20 +2158,8 @@ class TradingBot:
                     mt5_modified = False
 
                     if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                        broker_symbol = position.symbol
-                        if self.symbol_mapper:
-                            try:
-                                broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                                    position.symbol, self.active_broker
-                                )
-                            except Exception:
-                                pass
-
-                        ticket = getattr(position, "ticket", None)
-                        if not ticket:  # Fallback lookup
-                            positions = self.mt5.get_positions(symbol=broker_symbol)
-                            if positions:
-                                ticket = positions[0]["ticket"]
+                        broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+                        ticket = self._resolve_mt5_ticket(position, broker_symbol)
 
                         if ticket:
                             res = self.mt5.modify_position(
@@ -2241,20 +2254,8 @@ class TradingBot:
                             "dry_run", False
                         )  # Default to False for live trading
                         if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                            broker_symbol = position.symbol
-                            if self.symbol_mapper:
-                                try:
-                                    broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                                        position.symbol, self.active_broker
-                                    )
-                                except Exception:
-                                    pass
-
-                            ticket = getattr(position, "ticket", None)
-                            if not ticket:  # Fallback lookup
-                                positions = self.mt5.get_positions(symbol=broker_symbol)
-                                if positions:
-                                    ticket = positions[0]["ticket"]
+                            broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+                            ticket = self._resolve_mt5_ticket(position, broker_symbol)
 
                             if ticket:
                                 # Close partial volume in MT5
