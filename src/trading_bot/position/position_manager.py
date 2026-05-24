@@ -78,212 +78,247 @@ class PositionManager:
         """Load active positions from database."""
         try:
             async with get_session() as session:
-                # Query active positions (PENDING or OPEN)
-                stmt = select(DBPosition).where(
-                    DBPosition.status.in_([PositionStatus.PENDING.value, PositionStatus.OPEN.value])
-                )
-                result = await session.execute(stmt)
-                db_positions = result.scalars().all()
+                db_positions = await self._query_active_db_positions(session)
 
                 count = 0
                 invalid_count = 0
                 for db_pos in db_positions:
-                    try:
-                        # Convert DB model to Position object
-                        metadata = db_pos.meta_data or {}
-
-                        # Pre-validate data before creating Position object
-                        position_type = PositionType(db_pos.position_type)
-                        position_status = PositionStatus(db_pos.status)
-                        entry_price = db_pos.entry_price
-                        stop_loss = db_pos.stop_loss
-                        take_profit = db_pos.take_profit
-
-                        # Validate price relationships
-                        # For PENDING positions: strict validation (SL must be below/above entry)
-                        # For OPEN positions: allow breakeven (SL can be above/below entry)
-                        if position_status == PositionStatus.PENDING:
-                            # Strict validation for PENDING positions
-                            if position_type == PositionType.BUY:
-                                if stop_loss >= entry_price:
-                                    logger.warning(
-                                        f"Skipping invalid PENDING BUY position {db_pos.position_id} ({db_pos.symbol}): "
-                                        f"SL {stop_loss:.5f} >= Entry {entry_price:.5f}"
-                                    )
-                                    invalid_count += 1
-                                    continue
-                                if take_profit <= entry_price:
-                                    logger.warning(
-                                        f"Skipping invalid PENDING BUY position {db_pos.position_id} ({db_pos.symbol}): "
-                                        f"TP {take_profit:.5f} <= Entry {entry_price:.5f}"
-                                    )
-                                    invalid_count += 1
-                                    continue
-                            elif position_type == PositionType.SELL:
-                                if stop_loss <= entry_price:
-                                    logger.warning(
-                                        f"Skipping invalid PENDING SELL position {db_pos.position_id} ({db_pos.symbol}): "
-                                        f"SL {stop_loss:.5f} <= Entry {entry_price:.5f}"
-                                    )
-                                    invalid_count += 1
-                                    continue
-                                if take_profit >= entry_price:
-                                    logger.warning(
-                                        f"Skipping invalid PENDING SELL position {db_pos.position_id} ({db_pos.symbol}): "
-                                        f"TP {take_profit:.5f} >= Entry {entry_price:.5f}"
-                                    )
-                                    invalid_count += 1
-                                    continue
-                        # For OPEN positions: only validate that prices are positive
-                        # (breakeven positions may have SL above/below entry)
-                        elif position_status == PositionStatus.OPEN:
-                            if stop_loss <= 0:
-                                logger.warning(
-                                    f"Skipping invalid OPEN position {db_pos.position_id} ({db_pos.symbol}): "
-                                    f"SL {stop_loss:.5f} <= 0"
-                                )
-                                invalid_count += 1
-                                continue
-                            if take_profit <= 0:
-                                logger.warning(
-                                    f"Skipping invalid OPEN position {db_pos.position_id} ({db_pos.symbol}): "
-                                    f"TP {take_profit:.5f} <= 0"
-                                )
-                                invalid_count += 1
-                                continue
-
-                        # Create Position object (will validate other fields)
-                        position = Position(
-                            position_id=db_pos.position_id,
-                            symbol=db_pos.symbol,
-                            position_type=position_type,
-                            entry_price=entry_price,
-                            stop_loss=stop_loss,
-                            take_profit=take_profit,
-                            volume=db_pos.volume,
-                            pip_size=db_pos.pip_size,
-                            pip_value_per_lot=db_pos.pip_value_per_lot,
-                            status=PositionStatus(db_pos.status),
-                            account_id=db_pos.account_id,  # Load account_id from DB
-                            asset_class=db_pos.asset_class,  # Load asset_class from DB
-                            signal_id=db_pos.signal_id,  # Load signal_id from DB
-                            strategy_id=db_pos.strategy_id,  # Load strategy_id from DB
-                            session_id=db_pos.session_id,  # Load session_id from DB
-                            open_time=db_pos.open_time,
-                            close_time=db_pos.close_time,
-                            close_price=db_pos.close_price,
-                            close_reason=db_pos.close_reason,  # Load close_reason from DB
-                            exit_type=db_pos.exit_type,  # Load exit_type from DB
-                            current_price=db_pos.current_price,
-                            current_profit_pips=db_pos.current_profit_pips,
-                            current_pnl_usd=db_pos.current_pnl_usd,
-                            risk_amount_usd=db_pos.risk_amount_usd,
-                            potential_profit_usd=db_pos.potential_profit_usd,
-                            is_winner=db_pos.is_winner,  # Load is_winner from DB
-                            breakeven_activated=db_pos.breakeven_activated,  # Load breakeven_activated from DB
-                            trailing_activated=db_pos.trailing_activated,  # Load trailing_activated from DB
-                            entry_to_sl_pips=db_pos.entry_to_sl_pips,  # Load entry_to_sl_pips from DB
-                            entry_to_tp_pips=db_pos.entry_to_tp_pips,  # Load entry_to_tp_pips from DB
-                            mae_pips=db_pos.mae_pips,  # Load mae_pips from DB
-                            mfe_pips=db_pos.mfe_pips,  # Load mfe_pips from DB
-                            max_profit_pips=db_pos.max_profit_pips,  # Load max_profit_pips from DB
-                            max_drawdown_pips=db_pos.max_drawdown_pips,  # Load max_drawdown_pips from DB
-                            holding_time_seconds=db_pos.holding_time_seconds,  # Load holding_time_seconds from DB
-                            quality_score=db_pos.quality_score,  # Load quality_score from DB
-                            signal_confidence=db_pos.signal_confidence,  # Load signal_confidence from DB
-                            execution_duration_ms=db_pos.execution_duration_ms,  # Load execution_duration_ms from DB
-                            slippage_pips=db_pos.slippage_pips,  # Load slippage_pips from DB
-                            closing_slippage_pips=db_pos.closing_slippage_pips,  # Load closing_slippage_pips from DB
-                            metadata=metadata,
-                        )
-
-                        # Extract ticket from metadata and set to position object
-                        if "ticket" in metadata:
-                            position.ticket = int(metadata["ticket"])
-                            logger.debug(
-                                f"Loaded ticket {position.ticket} for position {position.position_id}"
-                            )
-                        # Also check ticket field directly (new field)
-                        elif db_pos.ticket:
-                            position.ticket = db_pos.ticket
-                            logger.debug(
-                                f"Loaded ticket {position.ticket} from ticket field for position {position.position_id}"
-                            )
-
-                        # CRITICAL: Skip positions without ticket (orphaned/invalid positions)
-                        # These should not be loaded into memory - they're invalid
-                        if not position.ticket and position.status == PositionStatus.OPEN:
-                            logger.error(
-                                f"❌ SKIPPING ORPHANED POSITION: {position.position_id} ({position.symbol}) "
-                                f"has NO TICKET but status is OPEN. This position is invalid and will be closed."
-                            )
-
-                            # Close position immediately in database
-                            position.status = PositionStatus.CLOSED
-                            position.close_time = datetime.now()
-                            position.close_price = position.entry_price  # Use entry as fallback
-
-                            # Update in database
-                            db_pos.status = PositionStatus.CLOSED.value
-                            db_pos.close_time = position.close_time
-                            db_pos.close_price = position.close_price
-                            await session.commit()
-
-                            logger.info(
-                                f"🚫 Closed orphaned position {position.position_id} in database (no ticket)"
-                            )
-                            invalid_count += 1
-                            continue  # Skip adding to memory
-
-                        # Store in memory
-                        self.positions[position.position_id] = position
-
-                        if position.symbol not in self.positions_by_symbol:
-                            self.positions_by_symbol[position.symbol] = []
-                        self.positions_by_symbol[position.symbol].append(position.position_id)
-
+                    result = await self._load_single_position(db_pos, session)
+                    if result == "loaded":
                         count += 1
+                    else:
+                        invalid_count += 1
 
-                    except ValueError as e:
-                        # Handle validation errors from Position.__post_init__
-                        logger.warning(
-                            f"Skipping invalid position {db_pos.position_id} ({db_pos.symbol}): {e}"
-                        )
-                        invalid_count += 1
-                        continue
-                    except Exception as e:
-                        # Handle any other unexpected errors
-                        logger.error(
-                            f"Error loading position {db_pos.position_id} ({db_pos.symbol}): {e}",
-                            exc_info=True,
-                        )
-                        invalid_count += 1
-                        continue
+                self._log_load_summary(count, invalid_count)
 
                 if count > 0:
-                    logger.info(f"Loaded {count} active positions from database")
-
-                    # Restore breakeven and trailing tracking for loaded positions
-                    for position in self.get_open_positions():
-                        if position.breakeven_activated:
-                            self.breakeven_manager.breakeven_positions.add(position.position_id)
-                            logger.debug(f"Restored breakeven tracking for {position.position_id}")
-
-                        if position.trailing_activated:
-                            self.trailing_stop_manager.trailing_active.add(position.position_id)
-                            self.trailing_stop_manager.highest_profit[position.position_id] = (
-                                position.current_profit_pips
-                            )
-                            logger.debug(f"Restored trailing tracking for {position.position_id}")
-
-                if invalid_count > 0:
-                    logger.warning(
-                        f"Skipped {invalid_count} invalid positions from database. "
-                        f"These positions may need manual review or cleanup."
-                    )
+                    self._restore_automation_tracking()
 
         except Exception as e:
             logger.error(f"Error loading positions from database: {e}")
+
+    async def _query_active_db_positions(self, session):
+        """Query active (PENDING/OPEN) positions from database."""
+        stmt = select(DBPosition).where(
+            DBPosition.status.in_([PositionStatus.PENDING.value, PositionStatus.OPEN.value])
+        )
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+    async def _load_single_position(self, db_pos, session) -> str:
+        """Load and validate a single DB position.
+
+        Returns:
+            "loaded" if successfully loaded into memory, "invalid" otherwise.
+        """
+        try:
+            metadata = db_pos.meta_data or {}
+            position_type = PositionType(db_pos.position_type)
+            position_status = PositionStatus(db_pos.status)
+
+            if not self._validate_db_position_prices(db_pos, position_type, position_status):
+                return "invalid"
+
+            position = self._db_row_to_position(db_pos, metadata)
+            self._load_position_ticket(position, db_pos, metadata)
+
+            if await self._handle_orphaned_position(position, db_pos, session):
+                return "invalid"
+
+            self._register_position_in_memory(position)
+            return "loaded"
+
+        except ValueError as e:
+            logger.warning(
+                f"Skipping invalid position {db_pos.position_id} ({db_pos.symbol}): {e}"
+            )
+            return "invalid"
+        except Exception as e:
+            logger.error(
+                f"Error loading position {db_pos.position_id} ({db_pos.symbol}): {e}",
+                exc_info=True,
+            )
+            return "invalid"
+
+    def _validate_db_position_prices(self, db_pos, position_type, position_status) -> bool:
+        """Validate SL/TP prices based on position status.
+
+        Returns:
+            True if valid, False if invalid (caller should skip).
+        """
+        entry = db_pos.entry_price
+        sl = db_pos.stop_loss
+        tp = db_pos.take_profit
+
+        if position_status == PositionStatus.PENDING:
+            return self._validate_pending_sl_tp(db_pos, position_type, entry, sl, tp)
+        elif position_status == PositionStatus.OPEN:
+            return self._validate_open_sl_tp(db_pos, sl, tp)
+        return True  # pragma: no cover - defensive (query filters to PENDING/OPEN only)
+
+    def _validate_pending_sl_tp(self, db_pos, position_type, entry, sl, tp) -> bool:
+        """Strict SL/TP validation for PENDING positions."""
+        if position_type == PositionType.BUY:
+            if sl >= entry:
+                logger.warning(
+                    f"Skipping invalid PENDING BUY position {db_pos.position_id} ({db_pos.symbol}): "
+                    f"SL {sl:.5f} >= Entry {entry:.5f}"
+                )
+                return False
+            if tp <= entry:
+                logger.warning(
+                    f"Skipping invalid PENDING BUY position {db_pos.position_id} ({db_pos.symbol}): "
+                    f"TP {tp:.5f} <= Entry {entry:.5f}"
+                )
+                return False
+        elif position_type == PositionType.SELL:
+            if sl <= entry:
+                logger.warning(
+                    f"Skipping invalid PENDING SELL position {db_pos.position_id} ({db_pos.symbol}): "
+                    f"SL {sl:.5f} <= Entry {entry:.5f}"
+                )
+                return False
+            if tp >= entry:
+                logger.warning(
+                    f"Skipping invalid PENDING SELL position {db_pos.position_id} ({db_pos.symbol}): "
+                    f"TP {tp:.5f} >= Entry {entry:.5f}"
+                )
+                return False
+        return True
+
+    def _validate_open_sl_tp(self, db_pos, sl, tp) -> bool:
+        """Relaxed SL/TP validation for OPEN positions (breakeven allowed)."""
+        if sl <= 0:
+            logger.warning(
+                f"Skipping invalid OPEN position {db_pos.position_id} ({db_pos.symbol}): "
+                f"SL {sl:.5f} <= 0"
+            )
+            return False
+        if tp <= 0:
+            logger.warning(
+                f"Skipping invalid OPEN position {db_pos.position_id} ({db_pos.symbol}): "
+                f"TP {tp:.5f} <= 0"
+            )
+            return False
+        return True
+
+    def _db_row_to_position(self, db_pos, metadata) -> Position:
+        """Convert DB row to Position object with all fields."""
+        return Position(
+            position_id=db_pos.position_id,
+            symbol=db_pos.symbol,
+            position_type=PositionType(db_pos.position_type),
+            entry_price=db_pos.entry_price,
+            stop_loss=db_pos.stop_loss,
+            take_profit=db_pos.take_profit,
+            volume=db_pos.volume,
+            pip_size=db_pos.pip_size,
+            pip_value_per_lot=db_pos.pip_value_per_lot,
+            status=PositionStatus(db_pos.status),
+            account_id=db_pos.account_id,
+            asset_class=db_pos.asset_class,
+            signal_id=db_pos.signal_id,
+            strategy_id=db_pos.strategy_id,
+            session_id=db_pos.session_id,
+            open_time=db_pos.open_time,
+            close_time=db_pos.close_time,
+            close_price=db_pos.close_price,
+            close_reason=db_pos.close_reason,
+            exit_type=db_pos.exit_type,
+            current_price=db_pos.current_price,
+            current_profit_pips=db_pos.current_profit_pips,
+            current_pnl_usd=db_pos.current_pnl_usd,
+            risk_amount_usd=db_pos.risk_amount_usd,
+            potential_profit_usd=db_pos.potential_profit_usd,
+            is_winner=db_pos.is_winner,
+            breakeven_activated=db_pos.breakeven_activated,
+            trailing_activated=db_pos.trailing_activated,
+            entry_to_sl_pips=db_pos.entry_to_sl_pips,
+            entry_to_tp_pips=db_pos.entry_to_tp_pips,
+            mae_pips=db_pos.mae_pips,
+            mfe_pips=db_pos.mfe_pips,
+            max_profit_pips=db_pos.max_profit_pips,
+            max_drawdown_pips=db_pos.max_drawdown_pips,
+            holding_time_seconds=db_pos.holding_time_seconds,
+            quality_score=db_pos.quality_score,
+            signal_confidence=db_pos.signal_confidence,
+            execution_duration_ms=db_pos.execution_duration_ms,
+            slippage_pips=db_pos.slippage_pips,
+            closing_slippage_pips=db_pos.closing_slippage_pips,
+            metadata=metadata,
+        )
+
+    def _load_position_ticket(self, position, db_pos, metadata) -> None:
+        """Load ticket from metadata or DB column."""
+        if "ticket" in metadata:
+            position.ticket = int(metadata["ticket"])
+            logger.debug(
+                f"Loaded ticket {position.ticket} for position {position.position_id}"
+            )
+        elif db_pos.ticket:
+            position.ticket = db_pos.ticket
+            logger.debug(
+                f"Loaded ticket {position.ticket} from ticket field for position {position.position_id}"
+            )
+
+    async def _handle_orphaned_position(self, position, db_pos, session) -> bool:
+        """Close orphaned OPEN positions (no ticket).
+
+        Returns:
+            True if position was orphaned and closed, False otherwise.
+        """
+        if position.ticket or position.status != PositionStatus.OPEN:
+            return False
+
+        logger.error(
+            f"❌ SKIPPING ORPHANED POSITION: {position.position_id} ({position.symbol}) "
+            f"has NO TICKET but status is OPEN. This position is invalid and will be closed."
+        )
+
+        position.status = PositionStatus.CLOSED
+        position.close_time = datetime.now()
+        position.close_price = position.entry_price
+
+        db_pos.status = PositionStatus.CLOSED.value
+        db_pos.close_time = position.close_time
+        db_pos.close_price = position.close_price
+        await session.commit()
+
+        logger.info(
+            f"🚫 Closed orphaned position {position.position_id} in database (no ticket)"
+        )
+        return True
+
+    def _register_position_in_memory(self, position: Position) -> None:
+        """Add position to in-memory storage dicts."""
+        self.positions[position.position_id] = position
+        if position.symbol not in self.positions_by_symbol:
+            self.positions_by_symbol[position.symbol] = []
+        self.positions_by_symbol[position.symbol].append(position.position_id)
+
+    def _restore_automation_tracking(self) -> None:
+        """Restore breakeven/trailing tracking for loaded OPEN positions."""
+        for position in self.get_open_positions():
+            if position.breakeven_activated:
+                self.breakeven_manager.breakeven_positions.add(position.position_id)
+                logger.debug(f"Restored breakeven tracking for {position.position_id}")
+
+            if position.trailing_activated:
+                self.trailing_stop_manager.trailing_active.add(position.position_id)
+                self.trailing_stop_manager.highest_profit[position.position_id] = (
+                    position.current_profit_pips
+                )
+                logger.debug(f"Restored trailing tracking for {position.position_id}")
+
+    def _log_load_summary(self, count: int, invalid_count: int) -> None:
+        """Log summary of position loading."""
+        if count > 0:
+            logger.info(f"Loaded {count} active positions from database")
+        if invalid_count > 0:
+            logger.warning(
+                f"Skipped {invalid_count} invalid positions from database. "
+                f"These positions may need manual review or cleanup."
+            )
 
     async def save_position(self, position: Position, is_dry_run: bool = False):
         """

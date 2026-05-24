@@ -1718,3 +1718,124 @@ class TestCheckAndClosePositionsMaxDuration:
         assert len(closed) == 1
         assert position.is_closed
         assert "Max Duration" in position.metadata.get("close_reason", "")
+
+
+class TestRestoreAutomationTracking:
+    """Test _restore_automation_tracking method (coverage gap fix)."""
+
+    def _build_mock_db_position(self, breakeven=False, trailing=False, profit_pips=0.0):
+        """Build a mock DB position with automation flags."""
+        mock_db_pos = MagicMock(spec=DBPosition)
+        mock_db_pos.position_id = "pos_auto_001"
+        mock_db_pos.symbol = "EURUSD"
+        mock_db_pos.position_type = PositionType.BUY.value
+        mock_db_pos.status = PositionStatus.OPEN.value
+        mock_db_pos.entry_price = 1.1000
+        mock_db_pos.stop_loss = 1.0950
+        mock_db_pos.take_profit = 1.1150
+        mock_db_pos.volume = 1.0
+        mock_db_pos.pip_size = 0.0001
+        mock_db_pos.pip_value_per_lot = 10.0
+        mock_db_pos.open_time = datetime.now()
+        mock_db_pos.close_time = None
+        mock_db_pos.close_price = None
+        mock_db_pos.current_price = 1.1050
+        mock_db_pos.current_profit_pips = profit_pips
+        mock_db_pos.current_pnl_usd = 50.0
+        mock_db_pos.risk_amount_usd = 50.0
+        mock_db_pos.potential_profit_usd = 150.0
+        mock_db_pos.breakeven_activated = breakeven
+        mock_db_pos.trailing_activated = trailing
+        mock_db_pos.meta_data = {"ticket": "12345"}
+        mock_db_pos.ticket = 12345
+        return mock_db_pos
+
+    def _mock_session_with_position(self, db_pos):
+        """Build mock session yielding the given DB position."""
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [db_pos]
+        mock_session.execute = AsyncMock(return_value=mock_result)
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        return mock_session_context
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_restores_breakeven_tracking(self, mock_get_session, position_manager):
+        """Lines 302-304: Restore breakeven tracking when position has breakeven_activated."""
+        db_pos = self._build_mock_db_position(breakeven=True)
+        mock_get_session.return_value = self._mock_session_with_position(db_pos)
+
+        await position_manager.load_positions_from_db()
+
+        # Verify position loaded and breakeven tracking restored
+        assert "pos_auto_001" in position_manager.positions
+        assert "pos_auto_001" in position_manager.breakeven_manager.breakeven_positions
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_restores_trailing_tracking(self, mock_get_session, position_manager):
+        """Lines 306-311: Restore trailing tracking when position has trailing_activated."""
+        db_pos = self._build_mock_db_position(trailing=True, profit_pips=30.0)
+        mock_get_session.return_value = self._mock_session_with_position(db_pos)
+
+        await position_manager.load_positions_from_db()
+
+        # Verify position loaded and trailing tracking restored
+        assert "pos_auto_001" in position_manager.positions
+        assert "pos_auto_001" in position_manager.trailing_stop_manager.trailing_active
+        assert position_manager.trailing_stop_manager.highest_profit["pos_auto_001"] == 30.0
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_load_restores_both_automations(self, mock_get_session, position_manager):
+        """Both breakeven and trailing restored when both activated."""
+        db_pos = self._build_mock_db_position(breakeven=True, trailing=True, profit_pips=45.0)
+        mock_get_session.return_value = self._mock_session_with_position(db_pos)
+
+        await position_manager.load_positions_from_db()
+
+        assert "pos_auto_001" in position_manager.breakeven_manager.breakeven_positions
+        assert "pos_auto_001" in position_manager.trailing_stop_manager.trailing_active
+
+
+class TestSavePositionMetadataFallback:
+    """Test save_position metadata fallbacks (coverage gap fix)."""
+
+    @pytest.mark.asyncio
+    @patch("trading_bot.position.position_manager.get_session")
+    async def test_save_position_confluence_from_metadata(
+        self, mock_get_session, position_manager, buy_signal
+    ):
+        """Lines 346-347: confluence_score fallback to metadata when attribute missing/zero."""
+        # Create position - confluence_score will be 75 from signal
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        # Force confluence_score to 0 so fallback kicks in
+        position.confluence_score = 0
+        position.metadata = {"confluence_score": 88.0, "ticket": 99999}
+        position.ticket = 99999
+
+        # Mock session
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None  # New position
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+
+        mock_session_context = MagicMock()
+        mock_session_context.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_context.__aexit__ = AsyncMock(return_value=None)
+        mock_get_session.return_value = mock_session_context
+
+        # Save position - should pull confluence from metadata
+        await position_manager.save_position(position)
+
+        # Verify save happened
+        mock_session.add.assert_called_once()
+        added_db_pos = mock_session.add.call_args[0][0]
+        # The confluence_score from metadata should be used
+        assert added_db_pos.confluence_score == 88.0
