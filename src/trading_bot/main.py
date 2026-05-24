@@ -648,74 +648,8 @@ class TradingBot:
             # Get dry-run mode (needed for MT5 position check)
             is_dry_run = self.config.get("trading", {}).get("dry_run", False)
 
-            # Step 1: Check if we already have a position for this symbol (SKIP if exists)
-            # Check both database positions and MT5 positions
-
-            # Normalize signal symbol for comparison
-            signal_symbol_normalized = signal.symbol
-            if self.symbol_mapper:
-                try:
-                    signal_symbol_normalized = self.symbol_mapper.normalize_symbol(signal.symbol)
-                except Exception:
-                    signal_symbol_normalized = signal.symbol.upper().strip()
-
-            # Check database positions
-            open_positions = self.position_manager.get_open_positions()
-            existing_for_symbol = []
-            for p in open_positions:
-                # Normalize position symbol for comparison
-                pos_symbol_normalized = p.symbol
-                if self.symbol_mapper:
-                    try:
-                        # Try to convert broker symbol to universal if needed
-                        pos_symbol_normalized = self.symbol_mapper.convert_to_universal_symbol(
-                            p.symbol, self.active_broker
-                        )
-                    except Exception:
-                        # Fallback to normalize
-                        try:
-                            pos_symbol_normalized = self.symbol_mapper.normalize_symbol(p.symbol)
-                        except Exception:
-                            pos_symbol_normalized = p.symbol.upper().strip()
-                else:
-                    pos_symbol_normalized = p.symbol.upper().strip()
-
-                # Compare normalized symbols
-                if pos_symbol_normalized == signal_symbol_normalized:
-                    existing_for_symbol.append(p)
-
-            # Also check MT5 positions (in case database is out of sync)
-            if not existing_for_symbol and not is_dry_run and self.mt5 and self.mt5.is_connected():
-                try:
-                    # Convert signal symbol to broker symbol
-                    broker_symbol = signal.symbol
-                    if self.symbol_mapper:
-                        try:
-                            broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                                signal.symbol, self.active_broker
-                            )
-                        except Exception:
-                            pass
-
-                    # Check MT5 for open positions with this symbol
-                    mt5_positions = self.mt5.get_positions(symbol=broker_symbol)
-                    if mt5_positions:
-                        logger.info(
-                            f"  ⏭️  Skipping signal for {signal.symbol} - found {len(mt5_positions)} "
-                            f"open position(s) in MT5 (broker: {broker_symbol})"
-                        )
-                        # Silent skip - no notification needed (this is expected behavior)
-                        return
-                except Exception as e:
-                    logger.debug(f"  Could not check MT5 positions for {signal.symbol}: {e}")
-
-            if existing_for_symbol:
-                logger.info(
-                    f"  ⏭️  Skipping signal for {signal.symbol} - already have {len(existing_for_symbol)} "
-                    f"open position(s): {[p.position_id for p in existing_for_symbol]} "
-                    f"(symbols: {[p.symbol for p in existing_for_symbol]})"
-                )
-                # Silent skip - no notification needed (this is expected behavior)
+            # Step 1: Skip if duplicate position exists (database or MT5)
+            if self._has_duplicate_position(signal, is_dry_run):
                 return
 
             # Step 2: Check exposure limits (position limits per symbol/total)
@@ -748,120 +682,19 @@ class TradingBot:
             )  # Default to False for live trading
             real_entry_price = signal.entry_price  # Default to signal price
 
+            order_result = None
             if not is_dry_run:
-                # Detailed MT5 connection check with logging
-                mt5_status = "unknown"
-                if self.mt5 is None:
-                    mt5_status = "MT5 connector is None"
-                    logger.warning(f"  ⚠️ MT5 connector not initialized: {mt5_status}")
-                elif not hasattr(self.mt5, "is_connected"):
-                    mt5_status = "MT5 connector missing is_connected method"
-                    logger.warning(f"  ⚠️ MT5 connector invalid: {mt5_status}")
-                elif not self.mt5.is_connected():
-                    # Get detailed connection status
-                    try:
-                        health = (
-                            self.mt5.health_check() if hasattr(self.mt5, "health_check") else {}
-                        )
-                        mt5_status = (
-                            f"is_connected()=False, "
-                            f"_is_connected={getattr(self.mt5, '_is_connected', 'unknown')}, "
-                            f"terminal_connected={health.get('connected', 'unknown')}, "
-                            f"trade_allowed={health.get('trade_allowed', 'unknown')}"
-                        )
-                    except Exception as e:
-                        mt5_status = f"Error checking connection: {e}"
-                    logger.warning(f"  ⚠️ MT5 connection check failed: {mt5_status}")
-                else:
-                    # MT5 is connected - proceed with trade
-                    logger.debug("  ✅ MT5 connection verified: ready for trade execution")
-
-                if not self.mt5 or not self.mt5.is_connected():
-                    error_msg = f"  ⚠️ Cannot execute trade: MT5 not connected ({mt5_status})"
-                    logger.warning(error_msg)
-
-                    # Send notification to Telegram
-                    if self.notification_manager:
-                        try:
-                            notification_text = (
-                                f"❌ **MT5 Connection Error**\n"
-                                f"📊 Symbol: `{signal.symbol}`\n"
-                                f"📈 Direction: `{signal.direction.value}`\n"
-                                f"💰 Entry: `{signal.entry_price:.5f}`\n"
-                                f"🛑 SL: `{signal.stop_loss:.5f}`\n"
-                                f"🎯 TP: `{signal.take_profit:.5f}`\n"
-                                f"⚠️ **Error**: MT5 is not connected. Trade execution skipped."
-                            )
-                            await self.notification_manager.send_message(
-                                notification_text,
-                                level=NotificationLevel.ERROR,
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"  ⚠️ Failed to send MT5 connection error notification: {e}"
-                            )
-
-                    return
-
-                logger.info(f"  🚀 Executing LIVE order for {signal.symbol}...")
-
-                # Convert to broker symbol if mapper is available
-                execute_symbol = signal.symbol
-                if self.symbol_mapper:
-                    try:
-                        execute_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                            signal.symbol, self.active_broker
-                        )
-                        logger.debug(
-                            f"  Converted {signal.symbol} to {execute_symbol} for execution"
-                        )
-                    except Exception as e:
-                        logger.warning(f"  Could not convert {signal.symbol} for execution: {e}")
-
-                order_result = self.mt5.place_order(
-                    symbol=execute_symbol,
-                    order_type=signal.direction.value,
-                    volume=position_size,
-                    price=signal.entry_price,
-                    sl=signal.stop_loss,
-                    tp=signal.take_profit,
-                    comment=f"Signal {signal.signal_id}",
-                )
-
-                if order_result.get("success") is False:
-                    error_msg = order_result.get("error", "Unknown error")
-                    error_code = order_result.get("error_code", 0)
-                    error_description = order_result.get(
-                        "error_description", "No description available"
-                    )
-
-                    logger.error(
-                        f"  ❌ MT5 Order Execution Failed for {signal.symbol}: {error_msg} (code: {error_code})"
-                    )
-
-                    notification_text = (
-                        f"❌ **MT5 Order Failed**\n"
-                        f"Symbol: `{signal.symbol}`\n"
-                        f"Direction: `{signal.direction.value}`\n"
-                        f"Volume: `{position_size}`\n"
-                        f"Error: `{error_msg}`\n"
-                        f"Error Code: `{error_code}`\n"
-                        f"Description: `{error_description}`"
-                    )
-
-                    await self.notification_manager.send_message(
-                        notification_text,
-                        level=NotificationLevel.ERROR,
-                    )
-                    return
-
-                logger.info(f"  ✅ MT5 Order Executed: Ticket {order_result.get('order')}")
+                # Send live order to MT5 (handles connection check + order placement)
+                order_result = await self._execute_mt5_order(signal, position_size)
+                if order_result is None:
+                    return  # MT5 not connected or order rejected (notifications already sent)
 
                 # Update entry price from actual execution price
                 if "price" in order_result:
                     real_entry_price = float(order_result["price"])
                     logger.info(
-                        f"  📝 Execution Price Updated: {signal.entry_price:.5f} -> {real_entry_price:.5f}"
+                        f"  📝 Execution Price Updated: "
+                        f"{signal.entry_price:.5f} -> {real_entry_price:.5f}"
                     )
 
                 # Format confluence breakdown
@@ -1096,6 +929,185 @@ class TradingBot:
         except Exception as e:
             logger.error(f"  ❌ Error executing signal {signal.symbol}: {e}")
             raise
+
+    async def _execute_mt5_order(self, signal, position_size: float) -> dict | None:
+        """Execute a live order on MT5 with connection check and error handling.
+
+        Steps:
+            1. Verify MT5 connection (notify on failure)
+            2. Convert signal symbol to broker format
+            3. Place order via mt5.place_order()
+            4. Handle order rejection with notification
+
+        Returns:
+            order_result dict on success, None if connection failed or order rejected.
+            All failure paths send notifications and log errors before returning None.
+        """
+        # Step 1: Verify MT5 connection
+        if not self._is_mt5_ready_for_trading(signal):
+            return None
+
+        # Step 2: Convert to broker symbol
+        execute_symbol = self._convert_to_broker_symbol_safe(signal.symbol)
+        if execute_symbol != signal.symbol:
+            logger.debug(f"  Converted {signal.symbol} to {execute_symbol} for execution")
+
+        logger.info(f"  🚀 Executing LIVE order for {signal.symbol}...")
+
+        # Step 3: Place order
+        order_result = self.mt5.place_order(
+            symbol=execute_symbol,
+            order_type=signal.direction.value,
+            volume=position_size,
+            price=signal.entry_price,
+            sl=signal.stop_loss,
+            tp=signal.take_profit,
+            comment=f"Signal {signal.signal_id}",
+        )
+
+        # Step 4: Handle rejection
+        if order_result.get("success") is False:
+            await self._notify_order_failed(signal, position_size, order_result)
+            return None
+
+        logger.info(f"  ✅ MT5 Order Executed: Ticket {order_result.get('order')}")
+        return order_result
+
+    def _is_mt5_ready_for_trading(self, signal) -> bool:
+        """Check MT5 is connected and ready. Sends notification + returns False on failure."""
+        mt5_status = self._diagnose_mt5_connection()
+        if self.mt5 and self.mt5.is_connected():
+            logger.debug("  ✅ MT5 connection verified: ready for trade execution")
+            return True
+
+        logger.warning(f"  ⚠️ Cannot execute trade: MT5 not connected ({mt5_status})")
+        if self.notification_manager:
+            try:
+                asyncio.create_task(
+                    self.notification_manager.send_message(
+                        f"❌ **MT5 Connection Error**\n"
+                        f"📊 Symbol: `{signal.symbol}`\n"
+                        f"📈 Direction: `{signal.direction.value}`\n"
+                        f"💰 Entry: `{signal.entry_price:.5f}`\n"
+                        f"🛑 SL: `{signal.stop_loss:.5f}`\n"
+                        f"🎯 TP: `{signal.take_profit:.5f}`\n"
+                        f"⚠️ **Error**: MT5 is not connected. Trade execution skipped.",
+                        level=NotificationLevel.ERROR,
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"  ⚠️ Failed to send MT5 connection error notification: {e}")
+        return False
+
+    def _diagnose_mt5_connection(self) -> str:
+        """Return a human-readable string describing current MT5 connection state."""
+        if self.mt5 is None:
+            return "MT5 connector is None"
+        if not hasattr(self.mt5, "is_connected"):
+            return "MT5 connector missing is_connected method"
+        if not self.mt5.is_connected():
+            try:
+                health = self.mt5.health_check() if hasattr(self.mt5, "health_check") else {}
+                return (
+                    f"is_connected()=False, "
+                    f"_is_connected={getattr(self.mt5, '_is_connected', 'unknown')}, "
+                    f"terminal_connected={health.get('connected', 'unknown')}, "
+                    f"trade_allowed={health.get('trade_allowed', 'unknown')}"
+                )
+            except Exception as e:
+                return f"Error checking connection: {e}"
+        return "connected"
+
+    async def _notify_order_failed(self, signal, position_size: float, order_result: dict) -> None:
+        """Send order failure notification with error details from MT5 result."""
+        error_msg = order_result.get("error", "Unknown error")
+        error_code = order_result.get("error_code", 0)
+        error_description = order_result.get("error_description", "No description available")
+
+        logger.error(
+            f"  ❌ MT5 Order Execution Failed for {signal.symbol}: "
+            f"{error_msg} (code: {error_code})"
+        )
+
+        await self.notification_manager.send_message(
+            f"❌ **MT5 Order Failed**\n"
+            f"Symbol: `{signal.symbol}`\n"
+            f"Direction: `{signal.direction.value}`\n"
+            f"Volume: `{position_size}`\n"
+            f"Error: `{error_msg}`\n"
+            f"Error Code: `{error_code}`\n"
+            f"Description: `{error_description}`",
+            level=NotificationLevel.ERROR,
+        )
+
+    def _has_duplicate_position(self, signal, is_dry_run: bool) -> bool:
+        """Check if an open position already exists for this signal's symbol.
+
+        Checks both:
+        1. In-memory position_manager state (DB-backed)
+        2. Live MT5 positions (in case DB is out of sync)
+
+        Returns:
+            True if duplicate exists (signal should be skipped), False otherwise.
+        """
+        signal_symbol_norm = self._normalize_symbol(signal.symbol)
+
+        # Check DB-backed positions
+        existing = [
+            p
+            for p in self.position_manager.get_open_positions()
+            if self._normalize_position_symbol(p.symbol) == signal_symbol_norm
+        ]
+        if existing:
+            logger.info(
+                f"  ⏭️  Skipping signal for {signal.symbol} - already have {len(existing)} "
+                f"open position(s): {[p.position_id for p in existing]} "
+                f"(symbols: {[p.symbol for p in existing]})"
+            )
+            return True
+
+        # Check live MT5 positions (DB might be out of sync)
+        if not is_dry_run and self.mt5 and self.mt5.is_connected():
+            try:
+                broker_symbol = self._convert_to_broker_symbol_safe(signal.symbol)
+                mt5_positions = self.mt5.get_positions(symbol=broker_symbol)
+                if mt5_positions:
+                    logger.info(
+                        f"  ⏭️  Skipping signal for {signal.symbol} - found {len(mt5_positions)} "
+                        f"open position(s) in MT5 (broker: {broker_symbol})"
+                    )
+                    return True
+            except Exception as e:
+                logger.debug(f"  Could not check MT5 positions for {signal.symbol}: {e}")
+
+        return False
+
+    def _normalize_symbol(self, symbol: str) -> str:
+        """Normalize a symbol via symbol_mapper, with fallback to upper().strip()."""
+        if self.symbol_mapper:
+            try:
+                return self.symbol_mapper.normalize_symbol(symbol)
+            except Exception:
+                pass
+        return symbol.upper().strip()
+
+    def _normalize_position_symbol(self, symbol: str) -> str:
+        """Normalize a position's stored symbol back to universal form for comparison."""
+        if not self.symbol_mapper:
+            return symbol.upper().strip()
+        try:
+            return self.symbol_mapper.convert_to_universal_symbol(symbol, self.active_broker)
+        except Exception:
+            return self._normalize_symbol(symbol)
+
+    def _convert_to_broker_symbol_safe(self, symbol: str) -> str:
+        """Convert symbol to broker format, returning input symbol on any failure."""
+        if not self.symbol_mapper:
+            return symbol
+        try:
+            return self.symbol_mapper.convert_to_broker_symbol(symbol, self.active_broker)
+        except Exception:
+            return symbol
 
     async def _validate_signal_risk(self, signal):
         """Validate signal against risk management rules."""
@@ -2554,119 +2566,25 @@ class TradingBot:
         return generate_mock_ohlcv(symbol, timeframe, count)
 
     async def _analyze_symbol(self, symbol: str):
-        """
-        Analyze a symbol using strategy system.
+        """Analyze a symbol using the strategy system and execute resulting signals.
 
         Args:
             symbol: Trading symbol (internal/universal format)
         """
-        # Check market hours first
+        # Pre-flight: skip if market closed
         if not self._is_market_open(symbol):
             logger.debug(f"Skipping {symbol}: Market closed (Weekend)")
             return
 
         try:
-            # Convert internal symbol to broker symbol if mapper is available
-            broker_symbol = symbol
-            if self.symbol_mapper:
-                try:
-                    broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                        symbol, self.active_broker
-                    )
-                    logger.debug(f"🔍 Analyzing {symbol} (broker: {broker_symbol})...")
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to convert symbol {symbol} to broker format: {e} - using as-is"
-                    )
-                    broker_symbol = symbol
-            else:
-                logger.debug(f"🔍 Analyzing {symbol}...")
+            broker_symbol = self._convert_to_broker_symbol(symbol)
+            is_dry_run = self.config.get("trading", {}).get("dry_run", False)
+            is_mock_mode = self.mt5 is None
 
-            is_dry_run = self.config.get("trading", {}).get(
-                "dry_run", False
-            )  # Default to False for live trading
-            is_mock_mode = self.mt5 is None  # Mock MT5 mode (no real connection)
-
-            strategy_results = []
-
-            # --- MTF Mode Logic ---
-            if self.mtf_mode and self.mtf_analyzer:
-                # Fetch data for Zone TF and Entry TF
-                zone_data = None
-                entry_data = None
-
-                if self.data_manager and not is_dry_run and not is_mock_mode:
-                    try:
-                        # Fetch Zone TF data (needs more history for patterns)
-                        zone_data = self.data_manager.get_ohlcv(
-                            symbol=broker_symbol,
-                            timeframe=self.zone_timeframe,
-                            count=200,
-                            enabled_symbols=self.symbols,
-                        )
-
-                        # Fetch Entry TF data
-                        entry_data = self.data_manager.get_ohlcv(
-                            symbol=broker_symbol,
-                            timeframe=self.entry_timeframe,
-                            count=100,
-                            enabled_symbols=self.symbols,
-                        )
-                    except Exception as e:
-                        logger.warning(f"Error fetching real data for {symbol}: {e}")
-                        # Fallback to mock if strictly allowed, otherwise skip
-                        if not is_dry_run:
-                            return
-
-                # Handle Mock Data Generation for MTF
-                if (zone_data is None or entry_data is None) and (is_dry_run or is_mock_mode):
-                    logger.debug(f"Generating MTF mock data for {symbol}")
-                    zone_data = self._generate_mock_data(symbol, self.zone_timeframe, count=200)
-                    entry_data = self._generate_mock_data(symbol, self.entry_timeframe, count=100)
-
-                if zone_data is None or zone_data.empty or entry_data is None or entry_data.empty:
-                    logger.warning(f"Insufficient data for MTF analysis of {symbol}")
-                    return
-
-                # Run MTF Analysis
-                strategy_results = await self.mtf_analyzer.analyze(
-                    symbol=symbol,
-                    zone_tf_data=zone_data,
-                    entry_tf_data=entry_data,
-                    zone_tf=self.zone_timeframe,
-                    entry_tf=self.entry_timeframe,
-                )
-
-            # --- Single TF Mode Logic (Legacy) ---
-            else:
-                # Original logic for single timeframe
-                data = None
-
-                if self.data_manager and not is_dry_run and not is_mock_mode:
-                    try:
-                        data = self.data_manager.get_ohlcv(
-                            symbol=broker_symbol,
-                            timeframe=self.timeframe,
-                            count=100,
-                            enabled_symbols=self.symbols,
-                        )
-                    except Exception as e:
-                        logger.warning(f"Error fetching real data for {symbol}: {e}")
-                        if not is_dry_run:
-                            return
-
-                if data is None and (is_dry_run or is_mock_mode):
-                    logger.debug(f"Generating mock data for {symbol} ({self.timeframe})")
-                    data = self._generate_mock_data(symbol, self.timeframe)
-
-                if data is None or data.empty:
-                    logger.warning(f"No data available for {symbol}")
-                    return
-
-                # Run Legacy Strategy Analysis
-                strategy_results = await self.strategy_manager.analyze_symbol(
-                    symbol, data, self.timeframe
-                )
+            # Run strategy analysis (MTF or single TF)
+            strategy_results = await self._run_strategy_analysis(
+                symbol, broker_symbol, is_dry_run, is_mock_mode
+            )
 
             if not strategy_results:
                 logger.debug(f"{symbol}: No strategy results generated")
@@ -2674,19 +2592,121 @@ class TradingBot:
 
             logger.info(f"📊 {symbol}: Received {len(strategy_results)} results")
 
-            # Aggregate signals via SignalAggregator
-            # MTF results are also compatible with signal aggregation
+            # Aggregate and execute signals
             signals = await self.signal_aggregator.aggregate_signals(strategy_results)
-
             if not signals:
                 logger.debug(f"{symbol}: No valid signals after aggregation")
                 return
 
             logger.info(f"✅ {symbol}: Generated {len(signals)} trading signals")
-
-            # Execute signals (Phase 3: position execution)
             for signal in signals:
                 await self._execute_signal(signal)
 
         except Exception as e:
             logger.error(f"Error analyzing {symbol}: {e}", exc_info=True)
+
+    def _convert_to_broker_symbol(self, symbol: str) -> str:
+        """Convert internal symbol to broker-specific format (e.g., EURUSD → EURUSDc)."""
+        if not self.symbol_mapper:
+            logger.debug(f"🔍 Analyzing {symbol}...")
+            return symbol
+        try:
+            broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
+                symbol, self.active_broker
+            )
+            logger.debug(f"🔍 Analyzing {symbol} (broker: {broker_symbol})...")
+            return broker_symbol
+        except Exception as e:
+            logger.warning(
+                f"Failed to convert symbol {symbol} to broker format: {e} - using as-is"
+            )
+            return symbol
+
+    async def _run_strategy_analysis(
+        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
+    ) -> list:
+        """Dispatch to MTF or single-TF strategy analysis based on mode."""
+        if self.mtf_mode and self.mtf_analyzer:
+            return await self._run_mtf_analysis(symbol, broker_symbol, is_dry_run, is_mock_mode)
+        return await self._run_single_tf_analysis(symbol, broker_symbol, is_dry_run, is_mock_mode)
+
+    async def _run_mtf_analysis(
+        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
+    ) -> list:
+        """Fetch Zone TF + Entry TF data and run MTF analyzer."""
+        zone_data, entry_data = self._fetch_mtf_data(
+            symbol, broker_symbol, is_dry_run, is_mock_mode
+        )
+        if zone_data is None or zone_data.empty or entry_data is None or entry_data.empty:
+            logger.warning(f"Insufficient data for MTF analysis of {symbol}")
+            return []
+        return await self.mtf_analyzer.analyze(
+            symbol=symbol,
+            zone_tf_data=zone_data,
+            entry_tf_data=entry_data,
+            zone_tf=self.zone_timeframe,
+            entry_tf=self.entry_timeframe,
+        )
+
+    def _fetch_mtf_data(
+        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
+    ) -> tuple:
+        """Fetch (zone_data, entry_data) from MT5 or generate mock data."""
+        zone_data = None
+        entry_data = None
+
+        if self.data_manager and not is_dry_run and not is_mock_mode:
+            try:
+                zone_data = self.data_manager.get_ohlcv(
+                    symbol=broker_symbol,
+                    timeframe=self.zone_timeframe,
+                    count=200,
+                    enabled_symbols=self.symbols,
+                )
+                entry_data = self.data_manager.get_ohlcv(
+                    symbol=broker_symbol,
+                    timeframe=self.entry_timeframe,
+                    count=100,
+                    enabled_symbols=self.symbols,
+                )
+            except Exception as e:
+                logger.warning(f"Error fetching real data for {symbol}: {e}")
+                if not is_dry_run:
+                    return None, None
+
+        # Fallback to mock data for dry-run/mock modes
+        if (zone_data is None or entry_data is None) and (is_dry_run or is_mock_mode):
+            logger.debug(f"Generating MTF mock data for {symbol}")
+            zone_data = self._generate_mock_data(symbol, self.zone_timeframe, count=200)
+            entry_data = self._generate_mock_data(symbol, self.entry_timeframe, count=100)
+
+        return zone_data, entry_data
+
+    async def _run_single_tf_analysis(
+        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
+    ) -> list:
+        """Fetch single timeframe data and run legacy strategy_manager analysis."""
+        data = None
+
+        if self.data_manager and not is_dry_run and not is_mock_mode:
+            try:
+                data = self.data_manager.get_ohlcv(
+                    symbol=broker_symbol,
+                    timeframe=self.timeframe,
+                    count=100,
+                    enabled_symbols=self.symbols,
+                )
+            except Exception as e:
+                logger.warning(f"Error fetching real data for {symbol}: {e}")
+                if not is_dry_run:
+                    return []
+
+        if data is None and (is_dry_run or is_mock_mode):
+            logger.debug(f"Generating mock data for {symbol} ({self.timeframe})")
+            data = self._generate_mock_data(symbol, self.timeframe)
+
+        if data is None or data.empty:
+            logger.warning(f"No data available for {symbol}")
+            return []
+
+        return await self.strategy_manager.analyze_symbol(symbol, data, self.timeframe)
