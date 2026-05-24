@@ -84,6 +84,13 @@ class TradingBot:
             self.symbol_mapper = None
             self.active_broker = None
 
+        # Initialize symbol resolver (asset class + broker→internal conversion)
+        from .utils.symbol_resolver import SymbolResolver
+
+        self._symbol_resolver = SymbolResolver(
+            symbol_mapper=self.symbol_mapper, active_broker=self.active_broker
+        )
+
         # Initialize Notification Manager
         self.notification_manager = NotificationManager(self.config)
 
@@ -1285,97 +1292,12 @@ class TradingBot:
             return fallback_lot
 
     def _get_asset_class(self, symbol):
-        """Determine asset class from symbol using config."""
-        try:
-            # Load asset classes from config
-            if not hasattr(self, "_asset_classes"):
-                from .connectors.symbol_mapper import SymbolMapper
-
-                symbol_mapper = SymbolMapper()
-                self._asset_classes = symbol_mapper.asset_classes
-
-            # First, try to find exact match in config (for internal symbols)
-            for asset_class, symbols in self._asset_classes.items():
-                if symbol in symbols:
-                    # Map to the expected format for position/risk managers
-                    if asset_class == "commodities":
-                        return "commodities"
-                    elif asset_class == "forex":
-                        # Further classify forex pairs
-                        if symbol.endswith("JPY"):
-                            return "forex_jpy"
-                        else:
-                            return "forex_major"
-                    elif asset_class == "crypto":
-                        return "crypto"
-                    elif asset_class == "index":
-                        return "index"
-                    else:
-                        return asset_class
-
-            # If not found, try to convert broker symbol back to internal symbol
-            internal_symbol = self._convert_broker_to_internal_symbol(symbol)
-            if internal_symbol != symbol:
-                # Try again with internal symbol
-                return self._get_asset_class(internal_symbol)
-
-            # Default fallback - try to determine from symbol pattern
-            if any(c in symbol for c in ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"]):
-                # It's a forex pair
-                if symbol.endswith("JPY") or "JPY" in symbol:
-                    return "forex_jpy"
-                else:
-                    return "forex_major"
-            elif any(c in symbol for c in ["XAU", "XAG", "WTI", "BRENT"]):
-                return "commodities"
-            elif any(c in symbol for c in ["BTC", "ETH", "LTC", "BCH", "XRP"]):
-                return "crypto"
-            elif any(c in symbol for c in ["US30", "SPX", "NAS", "UK100", "GER", "JPN", "CHN"]):
-                return "index"
-
-            # Final fallback
-            return "forex_major"
-
-        except Exception as e:
-            logger.error(f"Error determining asset class for {symbol}: {e}")
-            return "forex_major"  # Safe default
+        """Determine asset class from symbol. Delegates to SymbolResolver."""
+        return self._symbol_resolver.get_asset_class(symbol)
 
     def _convert_broker_to_internal_symbol(self, symbol):
-        """Convert broker symbol back to internal symbol format."""
-        try:
-            if not self.symbol_mapper:
-                return symbol
-
-            # First normalize the broker symbol
-            normalized_broker_symbol = self.symbol_mapper.normalize_symbol(symbol)
-
-            # Get broker name
-            broker_name = self.active_broker.lower()
-
-            # Check reverse mappings
-            if hasattr(self.symbol_mapper, "_reverse_mappings"):
-                if broker_name in self.symbol_mapper._reverse_mappings:
-                    reverse_mappings = self.symbol_mapper._reverse_mappings[broker_name]
-                    if normalized_broker_symbol in reverse_mappings:
-                        return reverse_mappings[normalized_broker_symbol]
-
-            # If not found in reverse mappings, try to strip broker suffixes
-            # Common suffixes: 'c' for cent, 'm' for standard, etc.
-            clean_symbol = normalized_broker_symbol.rstrip("cm")
-
-            # Try again with clean symbol
-            if hasattr(self.symbol_mapper, "_reverse_mappings"):
-                if broker_name in self.symbol_mapper._reverse_mappings:
-                    reverse_mappings = self.symbol_mapper._reverse_mappings[broker_name]
-                    if clean_symbol in reverse_mappings:
-                        return reverse_mappings[clean_symbol]
-
-            # Final fallback - return normalized symbol
-            return normalized_broker_symbol
-
-        except Exception as e:
-            logger.debug(f"Error converting broker symbol {symbol}: {e}")
-            return symbol
+        """Convert broker symbol to internal format. Delegates to SymbolResolver."""
+        return self._symbol_resolver.convert_broker_to_internal_symbol(symbol)
 
     async def _manage_positions(self):
         """Update and manage all open positions."""
@@ -2620,116 +2542,16 @@ class TradingBot:
                 await asyncio.sleep(300)  # Retry after 5 mins on error
 
     def _is_market_open(self, symbol: str) -> bool:
-        """
-        Check if market is open for the symbol.
+        """Check if market is open for the symbol. Delegates to utils.market_hours."""
+        from .utils.market_hours import is_market_open
 
-        Args:
-            symbol: Trading symbol
-
-        Returns:
-            True if market is likely open, False otherwise
-        """
-        from datetime import datetime
-
-        # Get asset class
-        asset_class = self._get_asset_class(symbol)
-
-        # Crypto is always open
-        if asset_class == "crypto":
-            return True
-
-        # Get current UTC time
-        now = datetime.now(UTC)
-        weekday = now.weekday()  # 0=Monday, ..., 5=Saturday, 6=Sunday
-        hour = now.hour
-
-        # Weekend logic for Forex/Commodities (Simplified)
-        # Saturday: Closed
-        if weekday == 5:
-            return False
-
-        # Sunday: Closed before 21:00 UTC (approx market open)
-        if weekday == 6 and hour < 21:
-            return False
-
-        # Friday: Closed after 22:00 UTC (approx market close)
-        if weekday == 4 and hour >= 22:
-            return False
-
-        return True
+        return is_market_open(self._get_asset_class(symbol))
 
     def _generate_mock_data(self, symbol: str, timeframe: str, count: int = 100):
-        """Generate mock OHLCV data for dry-run."""
-        try:
-            from datetime import datetime, timedelta
+        """Generate mock OHLCV data for dry-run. Delegates to utils.mock_data."""
+        from .utils.mock_data import generate_mock_ohlcv
 
-            import numpy as np
-            import pandas as pd
-
-            # Determine base price based on symbol
-            base_price = 1.1000
-            if "JPY" in symbol:
-                base_price = 145.00
-            elif "XAU" in symbol:
-                base_price = 2000.00
-            elif "BTC" in symbol:
-                base_price = 90000.00
-            elif "ETH" in symbol:
-                base_price = 3000.00
-            elif "GBP" in symbol:
-                base_price = 1.2500
-
-            # Generate random walk with consolidation at the end
-            prices = [base_price]
-            for i in range(count - 1):
-                # Force consolidation/range for the last 20 candles to ensure a zone exists at current price
-                # This ensures "is_price_at_zone" returns True for testing
-                if i > count - 25:
-                    # Small random movement to create a tight range (Consolidation)
-                    change = np.random.normal(0, 0.0001) * prices[-1]
-                else:
-                    # Normal trending movement
-                    change = prices[-1] * np.random.normal(0, 0.0005)
-
-                prices.append(prices[-1] + change)
-
-            # Create timestamps
-            # Simple approximation: 1 hour per candle
-            timestamps = [datetime.now() - timedelta(hours=i) for i in range(count)]
-            timestamps.reverse()
-
-            # Create DataFrame
-            df = pd.DataFrame(
-                {
-                    "time": timestamps,
-                    "open": prices,
-                    "high": [p * (1 + abs(np.random.normal(0, 0.001))) for p in prices],
-                    "low": [p * (1 - abs(np.random.normal(0, 0.001))) for p in prices],
-                    "close": [p * (1 + np.random.normal(0, 0.0005)) for p in prices],
-                    "tick_volume": np.random.randint(100, 500, count),
-                    "spread": np.random.randint(0, 10, count),
-                    "real_volume": np.random.randint(100, 500, count),
-                }
-            )
-
-            # Map tick_volume to volume (required by strategy)
-            df["volume"] = df["tick_volume"]
-
-            # Set time as index to ensure .to_pydatetime() works
-            df.set_index("time", inplace=True)
-
-            # Ensure high/low consistency
-            df["high"] = df[["open", "close", "high"]].max(axis=1)
-            df["low"] = df[["open", "close", "low"]].min(axis=1)
-
-            return df
-
-        except ImportError:
-            logger.error("Pandas/Numpy not available for mock data generation")
-            return None
-        except Exception as e:
-            logger.error(f"Error generating mock data: {e}")
-            return None
+        return generate_mock_ohlcv(symbol, timeframe, count)
 
     async def _analyze_symbol(self, symbol: str):
         """
