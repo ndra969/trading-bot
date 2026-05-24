@@ -107,9 +107,11 @@ For runtime issues, use these commands instead of running CLI manually:
 
 ```
 src/trading_bot/
+  cli.py  config.py  main.py
   connectors/  data/  executors/  position/
   risk/  strategies/  utils/
-tests/    1605+ tests
+  exceptions/  analytics/
+tests/    1611+ tests (unit, integration, utils)
 config/   YAML configs
 docs/     User docs
 specs/    Internal specs (archived)

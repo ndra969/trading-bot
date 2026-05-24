@@ -164,7 +164,7 @@ logger.debug(f"Strategy analysis: {analysis_result}")
 | Unit tests | 85% min | `tests/unit/` |
 | Critical components | 95% min | `tests/unit/test_risk_*.py` |
 | Integration tests | Required | `tests/integration/` |
-| Property tests | For math invariants | `tests/properties/` |
+| Property tests | For math invariants | Planned (Hypothesis available) |
 
 ### Test Naming
 

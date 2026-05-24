@@ -14,6 +14,14 @@ from .mt5_exceptions import (
     MT5TerminalNotRunningError,
     MT5VersionIncompatibleError,
 )
+from .strategy_exceptions import (
+    ConfluenceCalculationError,
+    InsufficientDataError,
+    SignalGenerationError,
+    StrategyException,
+    ZoneDetectionError,
+    ZoneValidationError,
+)
 
 __all__ = [
     # MT5 Exceptions
@@ -28,4 +36,11 @@ __all__ = [
     "ConnectorError",
     "ConnectionFailedError",
     "DataRetrievalError",
+    # Strategy Exceptions
+    "StrategyException",
+    "ZoneDetectionError",
+    "ZoneValidationError",
+    "InsufficientDataError",
+    "SignalGenerationError",
+    "ConfluenceCalculationError",
 ]

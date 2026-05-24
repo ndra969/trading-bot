@@ -219,15 +219,17 @@ src/trading_bot/
 ├── data/                   # Database layer
 │   ├── models.py           # SQLAlchemy models
 │   ├── repositories/       # Data access
-│   └── services/           # Business logic
+│   └── services/           # Business logic (account sync, selector)
 ├── executors/              # Trading type executors
 ├── position/               # Position management
-│   ├── automation/         # Breakeven, trailing
+│   ├── automation/         # Breakeven, trailing, partial close
 │   └── asset_managers/     # Asset-specific logic
 ├── risk/                   # Risk management
 ├── strategies/             # Trading strategies
 │   ├── foundation/         # S&D zones
 │   └── enhancement/        # 7 enhancement layers
+├── exceptions/             # Custom exceptions (MT5, connector, strategy)
+├── analytics/              # Performance analysis (standalone)
 └── utils/                  # Utilities
 ```
 
