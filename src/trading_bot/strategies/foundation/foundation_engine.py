@@ -351,6 +351,477 @@ class FoundationEngine:
 
         return sl_price, sl_distance_pips
 
+    def _passes_zone_quality_filters(
+        self,
+        symbol: str,
+        zone: DetectedZone,
+        asset_class: str,
+        zone_height_pips: float,
+    ) -> bool:
+        """Apply asset-specific zone quality filters (width + strength).
+
+        Returns:
+            True if zone passes all filters, False if rejected.
+        """
+        if asset_class == "commodities":
+            # Filter 1: Zone Width (Precision Filter)
+            # Gold can have larger zones due to volatility, allow more flexibility
+            max_zone_width = 1000.0  # pips
+            if zone_height_pips > max_zone_width:
+                logger.warning(
+                    f"{symbol}: REJECTED - Zone too wide ({zone_height_pips:.1f} pips > {max_zone_width} pips). "
+                    f"Wide zones lack precision and increase risk."
+                )
+                return False
+
+            # Filter 2: Zone Strength (Quality Filter)
+            min_zone_strength = 0.4
+            if zone.strength < min_zone_strength:
+                logger.warning(
+                    f"{symbol}: REJECTED - Zone strength too low ({zone.strength:.2f} < {min_zone_strength}). "
+                    f"Only trade reasonably tested zones."
+                )
+                return False
+
+        elif asset_class == "crypto":
+            # Filter 1: Zone Width (Precision Filter)
+            # Max 600 pips for BTCUSD to prevent huge risk
+            max_zone_width = 600.0  # pips
+            if zone_height_pips > max_zone_width:
+                logger.warning(
+                    f"{symbol}: REJECTED - Zone too wide ({zone_height_pips:.1f} pips > {max_zone_width} pips). "
+                    f"Wide zones increase risk beyond acceptable limits for crypto."
+                )
+                return False
+
+            # Filter 2: Zone Strength - Crypto requires strong zones
+            min_zone_strength = 0.5
+            if zone.strength < min_zone_strength:
+                logger.warning(
+                    f"{symbol}: REJECTED - Zone strength too low ({zone.strength:.2f} < {min_zone_strength}). "
+                    f"Crypto requires strong zones due to high volatility."
+                )
+                return False
+
+        return True
+
+    def _build_strategy_result(
+        self,
+        symbol: str,
+        zone: DetectedZone,
+        direction: SignalDirection,
+        entry_price: float,
+        stop_loss: float,
+        take_profit: float,
+        timeframe: str,
+        final_score: float,
+        weighted_foundation_score: float,
+        weighted_enhancement_score: float,
+        layer_scores: dict,
+        layer_details: dict,
+        current_price: float,
+    ) -> StrategyResult:
+        """Build the final StrategyResult after all filters have passed.
+
+        Generates zone_id, logs the successful signal, and packages all
+        confluence data into metadata for downstream consumers.
+        """
+        zone_id = (
+            f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
+        )
+
+        logger.info(
+            f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
+            f"Confluence: {final_score:.1f}% (Foundation: {weighted_foundation_score:.1f}%, "
+            f"Enhancement: {weighted_enhancement_score:.1f}%) | "
+            f"Layers: {list(layer_scores.keys())} | "
+            f"Price: {current_price:.5f}"
+        )
+
+        result = StrategyResult(
+            strategy_name="foundation",
+            symbol=symbol,
+            score=final_score,
+            direction=direction,
+            entry_price=entry_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            timeframe=timeframe,
+            metadata={
+                "zone_id": zone_id,
+                "zone_type": zone.zone_type.value,
+                "foundation_score": weighted_foundation_score,
+                "enhancement_score": weighted_enhancement_score,
+                "layer_scores": layer_scores,
+                "layer_details": layer_details,
+            },
+        )
+
+        logger.debug(
+            f"Created signal: {direction.value} {symbol} "
+            f"(Total Score: {final_score:.1f}, Layers: {list(layer_scores.keys())})"
+        )
+        return result
+
+    def _passes_final_quality_filters(
+        self,
+        symbol: str,
+        direction: SignalDirection,
+        asset_class: str,
+        final_score: float,
+        weighted_foundation_score: float,
+        weighted_enhancement_score: float,
+        layer_scores: dict,
+        h1_trend_bias: str | None,
+        data: pd.DataFrame,
+        current_price: float,
+        current_range: float,
+        avg_range: float,
+    ) -> bool:
+        """Apply final quality filters after confluence scoring.
+
+        Filter chain (order matters):
+            1. Universal minimum confluence (75% default, skipped for commodities)
+            2. Price action confirmation requirement (if configured)
+            3. Universal H1 Sniper Gate (counter-trend block - all assets)
+            4. Commodities-specific:
+               - Dynamic score threshold (PHASE 5.8) - higher for counter-trend
+               - Technical confirmation gate (PHASE 5.1) - require ≥1 layer
+
+        Returns:
+            True if signal passes all filters, False if rejected.
+        """
+        signal_gen = self.config.get("signal_generation", {})
+
+        # 1. UNIVERSAL Minimum Confluence (skipped for commodities - dynamic threshold below)
+        min_confluence_global = signal_gen.get("quality_thresholds", {}).get(
+            "min_confluence_score", 75.0
+        )
+        if asset_class != "commodities" and final_score < min_confluence_global:
+            logger.info(
+                f"{symbol}: REJECTED - Confluence too low ({final_score:.1f}% < {min_confluence_global}%). "
+                f"Active layers: {list(layer_scores.keys())}, "
+                f"Foundation: {weighted_foundation_score:.1f}%, "
+                f"Enhancement: {weighted_enhancement_score:.1f}%"
+            )
+            return False
+
+        # 2. Price Action Confirmation Requirement
+        if signal_gen.get("validation_rules", {}).get("require_price_action", False):
+            min_pa_score = signal_gen.get("quality_thresholds", {}).get(
+                "min_price_action_score", 10.0
+            )
+            # price_action layer_score = raw_confidence * 0.15, so raw = score / 0.15
+            pa_weighted = layer_scores.get("price_action", 0.0)
+            pa_raw = (pa_weighted / 0.15) if pa_weighted > 0 else 0.0
+
+            if pa_raw < min_pa_score:
+                logger.warning(
+                    f"{symbol}: REJECTED - Price action confirmation required but insufficient "
+                    f"(score: {pa_raw:.1f}% < min: {min_pa_score}%). "
+                    f"No clear rejection pattern detected."
+                )
+                return False
+            logger.debug(
+                f"{symbol}: ✅ Price action confirmed (score: {pa_raw:.1f}% ≥ {min_pa_score}%)"
+            )
+
+        # 3. UNIVERSAL H1 Sniper Gate - blocks counter-trend trades on ALL asset classes
+        if h1_trend_bias == "BEARISH" and direction == SignalDirection.BUY:
+            logger.warning(
+                f"{symbol}: REJECTED - H1 Trend is BEARISH. "
+                f"Counter-trend BUY blocked by SNIPER Gate (Universal)."
+            )
+            return False
+        if h1_trend_bias == "BULLISH" and direction == SignalDirection.SELL:
+            logger.warning(
+                f"{symbol}: REJECTED - H1 Trend is BULLISH. "
+                f"Counter-trend SELL blocked by SNIPER Gate (Universal)."
+            )
+            return False
+
+        # 4. Commodities-specific filters
+        if asset_class == "commodities":
+            # 4a. Dynamic score threshold (PHASE 5.8) - higher for counter-trend
+            is_counter_trend = self._is_counter_trend(
+                direction, data, current_price, current_range, avg_range
+            )
+            # Threshold: 15 for trend-following, 18-20 for counter-trend
+            min_score_threshold = 15.0
+            if is_counter_trend:
+                min_score_threshold = 18.0 if current_range > avg_range * 1.5 else 20.0
+
+            if final_score < min_score_threshold:
+                logger.warning(
+                    f"{symbol}: REJECTED - {'Counter-trend ' if is_counter_trend else ''}"
+                    f"Score too low ({final_score:.1f} < {min_score_threshold}). "
+                    f"Need more confluence for "
+                    f"{'reversals' if is_counter_trend else 'trend-following'}. "
+                    f"Active layers: {list(layer_scores.keys())}"
+                )
+                return False
+
+            # 4b. Technical Confirmation Gate (PHASE 5.1) - require at least one layer
+            if not layer_scores:
+                logger.warning(
+                    f"{symbol}: REJECTED - No technical confirmation. "
+                    f"Gold trades require at least one enhancement layer."
+                )
+                return False
+
+        return True
+
+    def _is_counter_trend(
+        self,
+        direction: SignalDirection,
+        data: pd.DataFrame,
+        current_price: float,
+        current_range: float,
+        avg_range: float,
+    ) -> bool:
+        """Detect if signal direction is counter to the prevailing trend.
+
+        Uses EMA 100 reference, but switches to EMA 20 during high volatility
+        (current_range > 1.5x avg_range) - Reactive Threshold (Phase 5.23).
+        """
+        if len(data) < 100:
+            return False
+
+        ema_ref = data["close"].ewm(span=100, adjust=False).mean().iloc[-1]
+        if current_range > avg_range * 1.5:
+            ema_ref = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+
+        if direction == SignalDirection.BUY and current_price < ema_ref:
+            return True
+        if direction == SignalDirection.SELL and current_price > ema_ref:
+            return True
+        return False
+
+    def _calculate_confluence_score(
+        self, zone: DetectedZone, raw_confidences: dict
+    ) -> tuple[float, float, float]:
+        """Calculate weighted confluence score from foundation + enhancement layers.
+
+        Uses weights from `confluence_weights` config section:
+            foundation: 0.30 (S&D zone strength)
+            trendline: 0.20, price_action: 0.15, fibonacci: 0.12,
+            breakout: 0.12, structure: 0.08, rsi: 0.10, ma: 0.08
+
+        Returns:
+            (final_score, weighted_foundation_score, weighted_enhancement_score)
+            All capped at 100.0 max for final_score.
+        """
+        weights = self.config.get("confluence_weights", {})
+
+        # Foundation score (zone strength * foundation weight, default 0.30)
+        foundation_weight = weights.get("foundation", 0.30)
+        weighted_foundation_score = zone.strength * foundation_weight
+
+        # Enhancement score: sum of (raw_confidence * weight) per active layer
+        weighted_enhancement_score = sum(
+            raw_confidences.get(layer, 0.0) * weights.get(layer, 0.0)
+            for layer in ("rsi", "ma", "trendline", "price_action", "fibonacci", "structure")
+        )
+
+        # Final score capped at 100
+        final_score = min(weighted_foundation_score + weighted_enhancement_score, 100.0)
+        return final_score, weighted_foundation_score, weighted_enhancement_score
+
+    async def _run_enhancement_analyzers(
+        self,
+        symbol: str,
+        direction: SignalDirection,
+        is_demand: bool,
+        zone_type_str: str,
+        timeframe: str,
+        asset_class: str,
+        opens: list,
+        highs: list,
+        lows: list,
+        closes: list,
+        current_price: float,
+    ) -> tuple[dict, dict, dict] | None:
+        """Run all enhancement layer analyzers with hard-rejection gates.
+
+        Enhancement layers (in order):
+            1. RSI Analysis (10%) - blocks if RSI strongly against direction
+            2. Moving Average (8%)
+            3. Trendline (20%)
+            4. Price Action (15%) - REQUIRED, supports NEUTRAL patterns
+            5. Fibonacci (12%)
+            6. Structure (8%) - blocks if commodities + >90% opposite
+            7. Breakout (12%) - skipped at zone entry (used for confirmation later)
+
+        Returns:
+            (layer_scores, layer_details, raw_confidences) or None if hard-rejected.
+            - layer_scores: pre-weighted contribution per layer (debug/metadata)
+            - layer_details: full analyzer result details per layer
+            - raw_confidences: raw analyzer confidence (0-100) per layer, used for
+              final weighted score calculation via config-driven weights
+        """
+        layer_scores: dict = {}
+        layer_details: dict = {}
+        raw_confidences: dict = {}
+
+        # 1. RSI Analysis (Weight: 0.10) - with hard rejection gate
+        rsi_res = await self.rsi_analyzer.analyze_rsi_signal(
+            symbol, closes, timeframe, zone_type_str
+        )
+
+        # CRITICAL: Block signal if RSI is strongly against direction
+        # RSI oversold (< 35) blocks SELL, overbought (> 65) blocks BUY
+        if direction == SignalDirection.SELL and rsi_res.details.get("condition") == "OVERSOLD":
+            logger.warning(
+                f"{symbol}: REJECTING SELL signal - RSI is oversold ({rsi_res.rsi_value:.1f}). "
+                f"Cannot short when market is already oversold."
+            )
+            return None
+        elif (
+            direction == SignalDirection.BUY
+            and rsi_res.details.get("condition") == "OVERBOUGHT"
+        ):
+            logger.warning(
+                f"{symbol}: REJECTING BUY signal - RSI is overbought ({rsi_res.rsi_value:.1f}). "
+                f"Cannot buy when market is already overbought."
+            )
+            return None
+
+        if rsi_res.signal_type == direction.name:
+            layer_scores["rsi"] = rsi_res.confidence * 0.10
+            layer_details["rsi"] = rsi_res.details
+            raw_confidences["rsi"] = rsi_res.confidence
+
+        # 2. Moving Average (Weight: 0.08)
+        ma_res = await self.ma_analyzer.analyze_ma_signal(symbol, closes, timeframe, zone_type_str)
+        if ma_res.signal_type == direction.name:
+            layer_scores["ma"] = ma_res.confidence * 0.08
+            layer_details["ma"] = ma_res.details
+            raw_confidences["ma"] = ma_res.confidence
+
+        # 3. Trendline (Weight: 0.20)
+        tl_res = await self.trendline_analyzer.analyze_trendline_signal(symbol, closes, timeframe)
+        if (is_demand and "SUPPORT" in tl_res.signal_type) or (
+            not is_demand and "RESISTANCE" in tl_res.signal_type
+        ):
+            layer_scores["trendline"] = tl_res.confidence * 0.20
+            layer_details["trendline"] = tl_res.details
+            raw_confidences["trendline"] = tl_res.confidence
+
+        # 4. Price Action (Weight: 0.15) - REQUIRED for entry quality
+        pa_res = await self.price_action_analyzer.analyze_pattern(
+            symbol, opens, highs, lows, closes, zone_type_str
+        )
+        self._score_price_action(symbol, pa_res, direction, layer_scores, layer_details)
+        if pa_res is not None:
+            raw_confidences["price_action"] = pa_res.confidence
+
+        # 5. Fibonacci (Weight: 0.12)
+        fib_res = await self.fibonacci_analyzer.analyze_fibonacci(
+            symbol, highs, lows, current_price, zone_type_str
+        )
+        if fib_res:
+            # fib_res.score is raw points (10-20), normalize to 0-100 then apply weight
+            norm_conf = (fib_res.score / 20.0) * 100.0
+            layer_scores["fibonacci"] = norm_conf * 0.12
+            layer_details["fibonacci"] = fib_res.details
+            raw_confidences["fibonacci"] = norm_conf
+
+        # 6. Structure (Weight: 0.08) - with hard rejection gate for commodities
+        struct_res = await self.structure_analyzer.analyze_structure(symbol, highs, lows, closes)
+        # PHASE 5.22: Adjusted alignment for Commodities
+        if asset_class == "commodities" and struct_res:
+            # Only reject if structure is OVERWHELMINGLY opposite (confidence > 90%)
+            if struct_res.direction != direction.name and struct_res.confidence > 90.0:
+                logger.warning(
+                    f"{symbol}: REJECTED - Extremely strong market structure misalignment "
+                    f"({struct_res.direction} {struct_res.confidence:.1f}% vs {direction.name})"
+                )
+                return None
+            elif struct_res.direction != direction.name:
+                logger.debug(
+                    f"{symbol}: Weak/Moderate market structure misalignment "
+                    f"({struct_res.direction} {struct_res.confidence:.1f}%). "
+                    f"Proceeding due to High-Vol Trend alignment."
+                )
+
+        if struct_res and struct_res.direction == direction.name:
+            layer_scores["structure"] = struct_res.confidence * 0.08
+            layer_scores["structure_type"] = struct_res.structure_type
+            layer_details["structure"] = struct_res.details
+            raw_confidences["structure"] = struct_res.confidence
+
+        # 7. Breakout (Weight: 0.12) - skipped at zone entry, used for confirmation later
+        # BreakoutRetest is for re-entry; here we are AT zone, expecting bounce or break.
+
+        return layer_scores, layer_details, raw_confidences
+
+    def _score_price_action(
+        self,
+        symbol: str,
+        pa_res,
+        direction: SignalDirection,
+        layer_scores: dict,
+        layer_details: dict,
+    ) -> None:
+        """Score price action layer; mutates layer_scores and layer_details.
+
+        Handles three cases:
+        - Direction match → full weighted score (confidence * 0.15)
+        - NEUTRAL pattern (Inside Bar, Doji) → reduced score (50% of confidence * 0.15)
+        - Wrong direction or no pattern → score 0.0 with status logged
+        """
+        if not pa_res:
+            layer_scores["price_action"] = 0.0
+            layer_details["price_action"] = {"status": "no_pattern"}
+            logger.debug(f"{symbol}: No price action pattern detected")
+            return
+
+        # Direction matches - full score
+        if pa_res.direction == direction.name:
+            layer_scores["price_action"] = pa_res.confidence * 0.15
+            layer_details["price_action"] = {
+                **pa_res.details,
+                "pattern_type": pa_res.pattern_type,
+                "direction": pa_res.direction,
+                "confidence": pa_res.confidence,
+                "status": "detected",
+            }
+            logger.debug(
+                f"{symbol}: Price action pattern detected: {pa_res.pattern_type} "
+                f"({pa_res.direction}, confidence: {pa_res.confidence:.1f}%)"
+            )
+            return
+
+        # NEUTRAL patterns (Inside Bar, Doji) - reduced score (50%)
+        if pa_res.direction == "NEUTRAL":
+            layer_scores["price_action"] = (pa_res.confidence * 0.5) * 0.15
+            layer_details["price_action"] = {
+                **pa_res.details,
+                "pattern_type": pa_res.pattern_type,
+                "direction": pa_res.direction,
+                "confidence": pa_res.confidence,
+                "status": "neutral_pattern",
+                "original_confidence": pa_res.confidence,
+            }
+            logger.debug(
+                f"{symbol}: Price action NEUTRAL pattern detected: {pa_res.pattern_type} "
+                f"(confidence: {pa_res.confidence:.1f}%, reduced to {pa_res.confidence * 0.5:.1f}%)"
+            )
+            return
+
+        # Wrong direction - no score
+        layer_scores["price_action"] = 0.0
+        layer_details["price_action"] = {
+            "status": "wrong_direction",
+            "detected_pattern": pa_res.pattern_type,
+            "detected_direction": pa_res.direction,
+            "required_direction": direction.name,
+        }
+        logger.debug(
+            f"{symbol}: Price action pattern detected but wrong direction: "
+            f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name}"
+        )
+
     async def _create_signal_from_zone(
         self,
         symbol: str,
@@ -403,53 +874,11 @@ class FoundationEngine:
             zone_height = zone.upper_bound - zone.lower_bound
             zone_height_pips = zone_height / pip_size
 
-            # ═══════════════════════════════════════════════════════
-            # QUALITY FILTERS: Asset-specific zone validation
-            # ═══════════════════════════════════════════════════════
-            if asset_class == "commodities":
-                # Filter 1: Zone Width (Precision Filter)
-                # RELAXED: Increased max zone width to 1000 pips for XAUUSD
-                # Gold can have larger zones due to volatility, allow more flexibility
-                max_acceptable_zone_width = 1000.0  # pips (increased from 500.0)
-                if zone_height_pips > max_acceptable_zone_width:
-                    logger.warning(
-                        f"{symbol}: REJECTED - Zone too wide ({zone_height_pips:.1f} pips > {max_acceptable_zone_width} pips). "
-                        f"Wide zones lack precision and increase risk."
-                    )
-                    return None
-
-                # Filter 2: Zone Strength (Quality Filter)
-                # RELAXED: Lowered min strength to 0.4 to allow more setups
-                # Only trade moderately strong zones. Min strength 0.4 (was 0.5)
-                min_zone_strength = 0.4  # Reduced from 0.5
-                if zone.strength < min_zone_strength:
-                    logger.warning(
-                        f"{symbol}: REJECTED - Zone strength too low ({zone.strength:.2f} < {min_zone_strength}). "
-                        f"Only trade reasonably tested zones."
-                    )
-                    return None
-
-            elif asset_class == "crypto":
-                # Filter 1: Zone Width (Precision Filter)
-                # Crypto has extreme volatility, but we still need reasonable zones
-                # Max 600 pips for BTCUSD to prevent huge risk
-                max_acceptable_zone_width = 600.0  # pips
-                if zone_height_pips > max_acceptable_zone_width:
-                    logger.warning(
-                        f"{symbol}: REJECTED - Zone too wide ({zone_height_pips:.1f} pips > {max_acceptable_zone_width} pips). "
-                        f"Wide zones increase risk beyond acceptable limits for crypto."
-                    )
-                    return None
-
-                # Filter 2: Zone Strength (Quality Filter)
-                # Require strong zones for crypto due to high volatility
-                min_zone_strength = 0.5  # Higher threshold for crypto
-                if zone.strength < min_zone_strength:
-                    logger.warning(
-                        f"{symbol}: REJECTED - Zone strength too low ({zone.strength:.2f} < {min_zone_strength}). "
-                        f"Crypto requires strong zones due to high volatility."
-                    )
-                    return None
+            # Apply asset-specific zone quality filters
+            if not self._passes_zone_quality_filters(
+                symbol, zone, asset_class, zone_height_pips
+            ):
+                return None
 
             # -------------------------------------------------------------------------
             # SL & DISTANCE CALCULATION (Refactored 2026-01-22)
@@ -962,401 +1391,61 @@ class FoundationEngine:
             highs = data["high"].tolist()
             lows = data["low"].tolist()
 
-            # Calculate Enhancement Scores
-            enhancement_score = 0.0
-            layer_scores = {}
-            layer_details = {}
-
-            # 1. RSI Analysis (Weight: 0.10)
-            rsi_res = await self.rsi_analyzer.analyze_rsi_signal(
-                symbol, closes, timeframe, zone_type_str
-            )
-
-            # CRITICAL: Block signal if RSI is strongly against direction
-            # RSI oversold (< 35) should block SELL signals
-            # RSI overbought (> 65) should block BUY signals
-            if direction == SignalDirection.SELL and rsi_res.details.get("condition") == "OVERSOLD":
-                logger.warning(
-                    f"{symbol}: REJECTING SELL signal - RSI is oversold ({rsi_res.rsi_value:.1f}). "
-                    f"Cannot short when market is already oversold."
-                )
-                return None
-            elif (
-                direction == SignalDirection.BUY
-                and rsi_res.details.get("condition") == "OVERBOUGHT"
-            ):
-                logger.warning(
-                    f"{symbol}: REJECTING BUY signal - RSI is overbought ({rsi_res.rsi_value:.1f}). "
-                    f"Cannot buy when market is already overbought."
-                )
-                return None
-
-            if rsi_res.signal_type == direction.name:  # Only add if aligns
-                score = rsi_res.confidence * 0.10
-                enhancement_score += score
-                layer_scores["rsi"] = score
-                layer_details["rsi"] = rsi_res.details
-
-            # 2. Moving Average (Weight: 0.08)
-            ma_res = await self.ma_analyzer.analyze_ma_signal(
-                symbol, closes, timeframe, zone_type_str
-            )
-            if ma_res.signal_type == direction.name:
-                score = ma_res.confidence * 0.08
-                enhancement_score += score
-                layer_scores["ma"] = score
-                layer_details["ma"] = ma_res.details
-
-            # 3. Trendline (Weight: 0.20)
-            tl_res = await self.trendline_analyzer.analyze_trendline_signal(
-                symbol, closes, timeframe
-            )
-            if (is_demand and "SUPPORT" in tl_res.signal_type) or (
-                not is_demand and "RESISTANCE" in tl_res.signal_type
-            ):
-                score = tl_res.confidence * 0.20
-                enhancement_score += score
-                layer_scores["trendline"] = score
-                layer_details["trendline"] = tl_res.details
-
-            # 4. Price Action (Weight: 0.15) - REQUIRED for entry quality
-            pa_res = await self.price_action_analyzer.analyze_pattern(
-                symbol, opens, highs, lows, closes, zone_type_str
-            )
-            price_action_score = 0.0
-            if pa_res:
-                # Accept pattern if direction matches OR if pattern is NEUTRAL (Inside Bar, Doji)
-                # NEUTRAL patterns can work for both BUY and SELL, but with lower confidence
-                if pa_res.direction == direction.name:
-                    price_action_score = pa_res.confidence * 0.15
-                    enhancement_score += price_action_score
-                    layer_scores["price_action"] = price_action_score
-                    layer_details["price_action"] = {
-                        **pa_res.details,
-                        "pattern_type": pa_res.pattern_type,
-                        "direction": pa_res.direction,
-                        "confidence": pa_res.confidence,
-                        "status": "detected",
-                    }
-                    logger.debug(
-                        f"{symbol}: Price action pattern detected: {pa_res.pattern_type} "
-                        f"({pa_res.direction}, confidence: {pa_res.confidence:.1f}%)"
-                    )
-                elif pa_res.direction == "NEUTRAL":
-                    # NEUTRAL patterns (Inside Bar, Doji) can be used but with reduced score
-                    # Use 50% of original confidence for NEUTRAL patterns
-                    price_action_score = (pa_res.confidence * 0.5) * 0.15
-                    enhancement_score += price_action_score
-                    layer_scores["price_action"] = price_action_score
-                    layer_details["price_action"] = {
-                        **pa_res.details,
-                        "pattern_type": pa_res.pattern_type,
-                        "direction": pa_res.direction,
-                        "confidence": pa_res.confidence,
-                        "status": "neutral_pattern",
-                        "original_confidence": pa_res.confidence,
-                    }
-                    logger.debug(
-                        f"{symbol}: Price action NEUTRAL pattern detected: {pa_res.pattern_type} "
-                        f"(confidence: {pa_res.confidence:.1f}%, reduced to {pa_res.confidence * 0.5:.1f}% for NEUTRAL)"
-                    )
-                else:
-                    # Wrong direction - log for debugging
-                    layer_scores["price_action"] = 0.0
-                    layer_details["price_action"] = {
-                        "status": "wrong_direction",
-                        "detected_pattern": pa_res.pattern_type,
-                        "detected_direction": pa_res.direction,
-                        "required_direction": direction.name,
-                    }
-                    logger.debug(
-                        f"{symbol}: Price action pattern detected but wrong direction: "
-                        f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name}"
-                    )
-            else:
-                # No price action pattern detected
-                layer_scores["price_action"] = 0.0
-                layer_details["price_action"] = {"status": "no_pattern"}
-                logger.debug(f"{symbol}: No price action pattern detected")
-
-            # 5. Fibonacci (Weight: 0.12)
-            fib_res = await self.fibonacci_analyzer.analyze_fibonacci(
-                symbol, highs, lows, current_price, zone_type_str
-            )
-            if fib_res:
-                score = (
-                    fib_res.score * 0.12
-                )  # Base score (10-20) * weight? No, fib_res.score is small (10-20).
-                # Need to normalize. Fib score 20 is max. 20/20 * 100 * 0.12 = 12 points.
-                # fib_res.score is raw points (10, 15, 20).
-                # Let's say max raw score is 20. Confidence = (score/20)*100.
-                norm_conf = (fib_res.score / 20.0) * 100.0
-                score = norm_conf * 0.12
-                enhancement_score += score
-                layer_scores["fibonacci"] = score
-                layer_details["fibonacci"] = fib_res.details
-
-            # 6. Structure (Weight: 0.08)
-            struct_res = await self.structure_analyzer.analyze_structure(
-                symbol, highs, lows, closes
-            )
-            # PHASE 5.22 Mastery: Adjusted alignment for Commodities
-            if asset_class == "commodities" and struct_res:
-                # Only reject if structure is OVERWHELMINGLY opposite (confidence > 90%)
-                if struct_res.direction != direction.name and struct_res.confidence > 90.0:
-                    logger.warning(
-                        f"{symbol}: REJECTED - Extremely strong market structure misalignment ({struct_res.direction} {struct_res.confidence:.1f}% vs {direction.name})"
-                    )
-                    return None
-                elif struct_res.direction != direction.name:
-                    logger.debug(
-                        f"{symbol}: Weak/Moderate market structure misalignment ({struct_res.direction} {struct_res.confidence:.1f}%). Proceeding due to High-Vol Trend alignment."
-                    )
-
-            if struct_res and struct_res.direction == direction.name:
-                score = struct_res.confidence * 0.08
-                enhancement_score += score
-                layer_scores["structure"] = score
-                layer_scores["structure_type"] = struct_res.structure_type
-                layer_details["structure"] = struct_res.details
-
-            # 7. Breakout (Weight: 0.12) - Only relevant if price is breaking OUT of zone?
-            # Actually BreakoutRetest is for re-entry. Here we are AT zone.
-            # Maybe check if we are bouncing (Price Action) or breaking through (Invalidation).
-            # Breakout Analyzer logic checks if price breaks a level.
-            # If Demand Zone, we want price to bounce UP (not break down).
-            # So we check if price breaks ABOVE the zone's upper bound? (Confirmation)
-            # Let's skip Breakout for initial Zone Entry signal, it's more for confirmation later.
-            # Or use it to confirm the bounce started?
-
-            # -------------------------------------------------------------------------
-            # SCORE CALCULATION (Weighted Sum based on YAML Config)
-            # -------------------------------------------------------------------------
-            # We use the weights defined in config/strategy_parameters.yaml
-
-            # Get weights from config (defaulting to the values seen in yaml if missing)
-            weights = self.config.get("confluence_weights", {})
-
-            # Base Zone Score (Weight: foundation - typically 0.30)
-            foundation_weight = weights.get("foundation", 0.30)
-            weighted_foundation_score = zone.strength * foundation_weight
-
-            # Enhancement Scores
-            # We calculate the weighted contribution of each active layer
-            weighted_enhancement_score = 0.0
-
-            # Helper to add weighted score
-            def add_weighted_layer(name, raw_confidence):
-                nonlocal weighted_enhancement_score
-                w = weights.get(name, 0.0)  # Get weight from config
-                # raw_confidence is 0-100 (or close to it)
-                # Contribution = raw_confidence * weight
-                contribution = raw_confidence * w
-                weighted_enhancement_score += contribution
-                return contribution
-
-            # Reset layer scores for metadata to show weighted contribution or raw?
-            # Let's keep layer_scores as raw confidence in metadata for debugging,
-            # but calculation uses weights.
-
-            if "rsi" in layer_scores:
-                # layer_scores['rsi'] was stored as weighted in previous steps?
-                # Wait, in the code above we calculated: score = rsi_res.confidence * 0.10
-                # We need to use the RAW confidence from the analyzer result, NOT the pre-weighted one.
-                # rsi_res.confidence is the raw value (0-100).
-                add_weighted_layer("rsi", rsi_res.confidence)
-
-            if "ma" in layer_scores:
-                add_weighted_layer("ma", ma_res.confidence)
-            if "trendline" in layer_scores:
-                add_weighted_layer("trendline", tl_res.confidence)
-            if "price_action" in layer_scores and pa_res is not None:
-                add_weighted_layer("price_action", pa_res.confidence)
-
-            # Fibonacci score was normalized to 0-100 in previous step
-            if "fibonacci" in layer_scores:
-                # recalculate raw confidence from the normalized calc we did
-                raw_fib = (fib_res.score / 20.0) * 100.0
-                add_weighted_layer("fibonacci", raw_fib)
-
-            if "structure" in layer_scores:
-                add_weighted_layer("structure", struct_res.confidence)
-
-            # Final Score Calculation
-            # Sum of (Score * Weight). Max possible score is 100 if all weights sum to 1.0
-            # and all components have 100 confidence.
-            final_score = weighted_foundation_score + weighted_enhancement_score
-
-            # Ensure we don't exceed 100
-            final_score = min(final_score, 100.0)
-
-            # ═══════════════════════════════════════════════════════
-            # QUALITY FILTER: UNIVERSAL Minimum Score
-            # Apply strict confluence filter to ALL asset classes
-            # ═══════════════════════════════════════════════════════
-
-            # Get minimum confluence from config (default: 75%)
-            min_confluence_global = (
-                self.config.get("signal_generation", {})
-                .get("quality_thresholds", {})
-                .get("min_confluence_score", 75.0)
-            )
-
-            # Apply UNIVERSAL minimum confluence check (Skip for Commodities as they have dynamic thresholds)
-            if asset_class != "commodities" and final_score < min_confluence_global:
-                logger.info(
-                    f"{symbol}: REJECTED - Confluence too low ({final_score:.1f}% < {min_confluence_global}%). "
-                    f"Active layers: {list(layer_scores.keys())}, "
-                    f"Foundation: {weighted_foundation_score:.1f}%, "
-                    f"Enhancement: {weighted_enhancement_score:.1f}%"
-                )
-                return None
-
-            # ═══════════════════════════════════════════════════════
-            # PRICE ACTION CONFIRMATION REQUIREMENT (NEW)
-            # Require price action confirmation to prevent premature entries
-            # ═══════════════════════════════════════════════════════
-            require_price_action = (
-                self.config.get("signal_generation", {})
-                .get("validation_rules", {})
-                .get("require_price_action", False)
-            )
-
-            if require_price_action:
-                min_price_action_score = (
-                    self.config.get("signal_generation", {})
-                    .get("quality_thresholds", {})
-                    .get("min_price_action_score", 10.0)
-                )
-
-                # Check if price action score meets minimum requirement
-                price_action_raw_score = layer_scores.get("price_action", 0.0)
-                # Convert back to raw confidence (0-100) from weighted score
-                # price_action_score = raw_confidence * 0.15, so raw = price_action_score / 0.15
-                price_action_raw_confidence = (
-                    (price_action_raw_score / 0.15) if price_action_raw_score > 0 else 0.0
-                )
-
-                if price_action_raw_confidence < min_price_action_score:
-                    logger.warning(
-                        f"{symbol}: REJECTED - Price action confirmation required but insufficient "
-                        f"(score: {price_action_raw_confidence:.1f}% < min: {min_price_action_score}%). "
-                        f"No clear rejection pattern detected. Waiting for price action confirmation."
-                    )
-                    return None
-                else:
-                    logger.debug(
-                        f"{symbol}: ✅ Price action confirmed (score: {price_action_raw_confidence:.1f}% ≥ {min_price_action_score}%)"
-                    )
-
-            # ═══════════════════════════════════════════════════════
-            # UNIVERSAL H1 SNIPER GATE (FIX 2026-04-09)
-            # Apply H1 Trend Gate to ALL asset classes (forex + commodities + crypto)
-            # Previously this only ran inside the 'if asset_class == commodities' block —
-            # meaning forex pairs were NEVER filtered by H1 trend bias. This caused
-            # counter-trend trades on EURUSD, USDJPY, USDCHF, EURJPY etc.
-            # ═══════════════════════════════════════════════════════
-            if h1_trend_bias == "BEARISH" and direction == SignalDirection.BUY:
-                logger.warning(
-                    f"{symbol}: REJECTED - H1 Trend is BEARISH. "
-                    f"Counter-trend BUY blocked by SNIPER Gate (Universal)."
-                )
-                return None
-            if h1_trend_bias == "BULLISH" and direction == SignalDirection.SELL:
-                logger.warning(
-                    f"{symbol}: REJECTED - H1 Trend is BULLISH. "
-                    f"Counter-trend SELL blocked by SNIPER Gate (Universal)."
-                )
-                return None
-
-            # ═══════════════════════════════════════════════════════
-            # ADDITIONAL QUALITY FILTERS: Asset-specific refinements
-            # ═══════════════════════════════════════════════════════
-            if asset_class == "commodities":
-                # === DYNAMIC SCORE THRESHOLD (PHASE 5.8) ===
-                # Require higher confluence for counter-trend reversals
-                is_counter_trend = False
-                if len(data) >= 100:
-                    # Reactive Threshold (Phase 5.23): Use faster EMA during volatility
-                    ema_ref = data["close"].ewm(span=100, adjust=False).mean().iloc[-1]
-                    if current_range > avg_range * 1.5:
-                        ema_ref = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-
-                    if direction == SignalDirection.BUY and current_price < ema_ref:
-                        is_counter_trend = True
-                    elif direction == SignalDirection.SELL and current_price > ema_ref:
-                        is_counter_trend = True
-
-                # RELAXED: Lower thresholds to allow more setups for XAUUSD backtest
-                # Dynamic Threshold: 20.0 for counter-trend, 15.0 for trend-following (further reduced)
-                min_score_threshold = 15.0  # Reduced from 18.0 to allow more trades
-                if is_counter_trend:
-                    min_score_threshold = (
-                        18.0 if current_range > avg_range * 1.5 else 20.0
-                    )  # Reduced from 22.0/25.0
-
-                if final_score < min_score_threshold:
-                    logger.warning(
-                        f"{symbol}: REJECTED - {'Counter-trend ' if is_counter_trend else ''}Score too low ({final_score:.1f} < {min_score_threshold}). "
-                        f"Need more confluence for {'reversals' if is_counter_trend else 'trend-following'}. "
-                        f"Active layers: {list(layer_scores.keys())}"
-                    )
-                    return None
-
-                # === DIRECTIONAL BIAS FILTER (PHASE 5.24: Strict Gate) ===
-                # NOTE: Universal H1 Sniper Gate is now applied ABOVE (before this block)
-                # for ALL asset classes. The check below is kept as documentation only
-                # and is no longer needed since it's already handled universally above.
-
-                # Technical Confirmation Gate (Phase 5.1)
-                # Require at least ONE technical indicator confirmation
-                if not layer_scores:
-                    logger.warning(
-                        f"{symbol}: REJECTED - No technical confirmation. "
-                        f"Gold trades require at least one enhancement layer (MA, PA, RSI, Fibo, etc.)."
-                    )
-                    return None
-
-            # Generate zone_id
-            zone_id = (
-                f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
-            )
-
-            # Log successful signal creation with detailed confluence breakdown
-            logger.info(
-                f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
-                f"Confluence: {final_score:.1f}% (Foundation: {weighted_foundation_score:.1f}%, "
-                f"Enhancement: {weighted_enhancement_score:.1f}%) | "
-                f"Layers: {list(layer_scores.keys())} | "
-                f"Price: {current_price:.5f}"
-            )
-
-            # Create result
-            result = StrategyResult(
-                strategy_name="foundation",
+            # Run enhancement layer analysis with hard-rejection gates
+            enhancement_result = await self._run_enhancement_analyzers(
                 symbol=symbol,
-                score=final_score,
+                direction=direction,
+                is_demand=is_demand,
+                zone_type_str=zone_type_str,
+                timeframe=timeframe,
+                asset_class=asset_class,
+                opens=opens,
+                highs=highs,
+                lows=lows,
+                closes=closes,
+                current_price=current_price,
+            )
+            if enhancement_result is None:
+                return None  # Hard rejection by RSI block or structure block
+            layer_scores, layer_details, raw_confidences = enhancement_result
+
+            # Calculate final confluence score using config-driven weights
+            final_score, weighted_foundation_score, weighted_enhancement_score = (
+                self._calculate_confluence_score(zone, raw_confidences)
+            )
+
+            # Apply final quality filters (min confluence, price action req, H1 gate, etc)
+            if not self._passes_final_quality_filters(
+                symbol=symbol,
+                direction=direction,
+                asset_class=asset_class,
+                final_score=final_score,
+                weighted_foundation_score=weighted_foundation_score,
+                weighted_enhancement_score=weighted_enhancement_score,
+                layer_scores=layer_scores,
+                h1_trend_bias=h1_trend_bias,
+                data=data,
+                current_price=current_price,
+                current_range=current_range,
+                avg_range=avg_range,
+            ):
+                return None
+
+            return self._build_strategy_result(
+                symbol=symbol,
+                zone=zone,
                 direction=direction,
                 entry_price=entry_price,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
                 timeframe=timeframe,
-                metadata={
-                    "zone_id": zone_id,
-                    "zone_type": zone.zone_type.value,
-                    "foundation_score": weighted_foundation_score,
-                    "enhancement_score": weighted_enhancement_score,
-                    "layer_scores": layer_scores,
-                    "layer_details": layer_details,
-                },
+                final_score=final_score,
+                weighted_foundation_score=weighted_foundation_score,
+                weighted_enhancement_score=weighted_enhancement_score,
+                layer_scores=layer_scores,
+                layer_details=layer_details,
+                current_price=current_price,
             )
-
-            logger.debug(
-                f"Created signal: {direction.value} {symbol} "
-                f"(Total Score: {final_score:.1f}, Layers: {list(layer_scores.keys())})"
-            )
-
-            return result
 
         except Exception as e:
             logger.error(f"Error creating signal from zone: {e}")
