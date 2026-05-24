@@ -3,7 +3,7 @@ Trailing Stop Manager - Dynamic trailing stop management.
 
 Automatically adjusts stop loss as profit increases.
 
-Week 15.5.2 Enhancements:
+ATR Week 15.5.2 Enhancements: Tiered Trailing Enhancements:
 - ATR-based dynamic trailing (adaptive to volatility)
 - Tiered trailing (progressive distances based on profit level)
 - Session-aware adjustment (wider during volatile sessions)
@@ -397,7 +397,7 @@ class TrailingStopManager:
         """Get count of positions with active trailing."""
         return len(self.trailing_active)
 
-    # ========== Week 15.5.2: ATR-Based Trailing Methods ==========
+    # ========== ATR-Based Trailing Methods ==========
 
     def get_atr(self, symbol: str, timeframe: str = "H1") -> float | None:
         """
@@ -490,7 +490,7 @@ class TrailingStopManager:
             settings = self._get_settings(asset_class)
             return settings.get("activation_pips", atr_config.fallback_activation_pips)
 
-    # ========== Week 15.5.2: Tiered Trailing Methods ==========
+    # ========== Tiered Trailing Methods ==========
 
     def get_tiered_distance(self, position: dict) -> float:
         """
@@ -572,7 +572,7 @@ class TrailingStopManager:
         # Return the WIDER distance (more conservative)
         return max(distances)
 
-    # ========== Week 15.5.2: Session-Aware Trailing Methods ==========
+    # ========== Session-Aware Trailing Methods ==========
 
     def get_current_session(self) -> str:
         """

@@ -1,7 +1,8 @@
 """
-Position Manager
+MT5 Position Query
 
-Handles MT5 position tracking and monitoring.
+Handles MT5 position tracking and monitoring (read operations only).
+For position lifecycle management, see trading_bot.position.position_manager.
 """
 
 from datetime import datetime
@@ -21,7 +22,7 @@ from ..utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class PositionManager:
+class MT5PositionQuery:
     """
     MT5 Position Manager.
 

@@ -59,9 +59,8 @@ class SignalAggregator:
                 "fibonacci": 0.12,  # Fibonacci
                 "breakout_retest": 0.12,  # Breakout/Retest
                 "rsi": 0.10,  # RSI Analysis
-                "structure": 0.08,  # Market Structure
+                "structure": 0.08,  # Market Structure (BOS/CHoCH) - used by foundation_engine
                 "ma": 0.08,  # Moving Average
-                "market_structure": 0.08,  # Alias for structure
                 "volume_profile": 0.05,
                 "multi_timeframe": 0.05,
             }

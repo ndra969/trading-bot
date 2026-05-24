@@ -16,7 +16,7 @@ except ImportError:
     MT5_AVAILABLE = False
     mt5 = None
 
-from trading_bot.connectors.position_manager import PositionManager
+from trading_bot.connectors.mt5_position_query import MT5PositionQuery
 from trading_bot.exceptions import MT5ConnectionError
 
 
@@ -42,27 +42,27 @@ def mock_symbol_manager():
 
 @pytest.fixture
 def position_manager(mock_mt5_connector, mock_symbol_manager):
-    """Create PositionManager instance."""
-    with patch("trading_bot.connectors.position_manager.MT5_AVAILABLE", True):
-        with patch("trading_bot.connectors.position_manager.mt5"):
-            return PositionManager(mock_mt5_connector, mock_symbol_manager)
+    """Create MT5PositionQuery instance."""
+    with patch("trading_bot.connectors.mt5_position_query.MT5_AVAILABLE", True):
+        with patch("trading_bot.connectors.mt5_position_query.mt5"):
+            return MT5PositionQuery(mock_mt5_connector, mock_symbol_manager)
 
 
-class TestPositionManagerInitialization:
-    """Test PositionManager initialization."""
+class TestMT5PositionQueryInitialization:
+    """Test MT5PositionQuery initialization."""
 
     def test_init_success(self, mock_mt5_connector, mock_symbol_manager):
         """Test successful initialization."""
-        with patch("trading_bot.connectors.position_manager.MT5_AVAILABLE", True):
-            manager = PositionManager(mock_mt5_connector, mock_symbol_manager)
+        with patch("trading_bot.connectors.mt5_position_query.MT5_AVAILABLE", True):
+            manager = MT5PositionQuery(mock_mt5_connector, mock_symbol_manager)
             assert manager.connector == mock_mt5_connector
             assert manager.symbol_manager == mock_symbol_manager
 
     def test_init_mt5_not_available(self, mock_mt5_connector, mock_symbol_manager):
         """Test initialization fails when MT5 not available."""
-        with patch("trading_bot.connectors.position_manager.MT5_AVAILABLE", False):
+        with patch("trading_bot.connectors.mt5_position_query.MT5_AVAILABLE", False):
             with pytest.raises(ImportError, match="MetaTrader5 package not available"):
-                PositionManager(mock_mt5_connector, mock_symbol_manager)
+                MT5PositionQuery(mock_mt5_connector, mock_symbol_manager)
 
 
 class TestPositionDiscovery:
@@ -70,7 +70,7 @@ class TestPositionDiscovery:
 
     def test_get_all_positions_success(self, position_manager):
         """Test getting all positions successfully."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos1 = Mock()
             mock_pos1._asdict.return_value = {
                 "ticket": 12345,
@@ -97,7 +97,7 @@ class TestPositionDiscovery:
 
     def test_get_all_positions_empty(self, position_manager):
         """Test getting positions when none exist."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             positions = position_manager.get_all_positions()
@@ -113,7 +113,7 @@ class TestPositionDiscovery:
 
     def test_get_all_positions_exception(self, position_manager):
         """Test exception handling in get_all_positions (line 64-66)."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.side_effect = Exception("Unexpected error")
 
             positions = position_manager.get_all_positions()
@@ -123,7 +123,7 @@ class TestPositionDiscovery:
 
     def test_get_positions_by_symbol_success(self, position_manager):
         """Test getting positions by symbol."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -141,7 +141,7 @@ class TestPositionDiscovery:
 
     def test_get_positions_by_symbol_empty(self, position_manager):
         """Test getting positions by symbol when none exist."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             positions = position_manager.get_positions_by_symbol("EURUSD")
@@ -157,7 +157,7 @@ class TestPositionDiscovery:
 
     def test_get_positions_by_symbol_exception(self, position_manager):
         """Test exception handling in get_positions_by_symbol (line 87-89)."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.side_effect = Exception("Unexpected error")
 
             positions = position_manager.get_positions_by_symbol("EURUSD")
@@ -167,7 +167,7 @@ class TestPositionDiscovery:
 
     def test_get_position_by_ticket_success(self, position_manager):
         """Test getting position by ticket."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -185,7 +185,7 @@ class TestPositionDiscovery:
 
     def test_get_position_by_ticket_not_found(self, position_manager):
         """Test getting position by ticket when not found."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             position = position_manager.get_position_by_ticket(99999)
@@ -201,7 +201,7 @@ class TestPositionDiscovery:
 
     def test_get_position_by_ticket_exception(self, position_manager):
         """Test exception handling in get_position_by_ticket (line 109-111)."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.side_effect = Exception("Unexpected error")
 
             position = position_manager.get_position_by_ticket(12345)
@@ -215,7 +215,7 @@ class TestPositionCounting:
 
     def test_get_position_count(self, position_manager):
         """Test getting total position count."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos1 = Mock()
             mock_pos1._asdict.return_value = {"ticket": 12345}
             mock_pos2 = Mock()
@@ -228,7 +228,7 @@ class TestPositionCounting:
 
     def test_get_position_count_by_symbol(self, position_manager):
         """Test getting position count by symbol."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {"ticket": 12345, "symbol": "EURUSD"}
             mock_mt5.positions_get.return_value = [mock_pos]
@@ -243,7 +243,7 @@ class TestProfitLossCalculation:
 
     def test_calculate_position_profit_positive(self, position_manager):
         """Test calculating profit for profitable position."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -257,7 +257,7 @@ class TestProfitLossCalculation:
 
     def test_calculate_position_profit_negative(self, position_manager):
         """Test calculating profit for losing position."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -271,7 +271,7 @@ class TestProfitLossCalculation:
 
     def test_calculate_position_profit_not_found(self, position_manager):
         """Test calculating profit when position not found."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             profit = position_manager.calculate_position_profit(99999)
@@ -280,7 +280,7 @@ class TestProfitLossCalculation:
 
     def test_calculate_position_pips_buy_profitable(self, position_manager, mock_symbol_manager):
         """Test calculating pips for profitable BUY position."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -301,7 +301,7 @@ class TestProfitLossCalculation:
 
     def test_calculate_position_pips_sell_profitable(self, position_manager, mock_symbol_manager):
         """Test calculating pips for profitable SELL position."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12346,
@@ -322,7 +322,7 @@ class TestProfitLossCalculation:
 
     def test_calculate_position_pips_not_found(self, position_manager):
         """Test calculating pips when position not found (line 164)."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             pips = position_manager.calculate_position_pips(99999)
@@ -331,7 +331,7 @@ class TestProfitLossCalculation:
 
     def test_get_total_profit(self, position_manager):
         """Test getting total profit from all positions."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos1 = Mock()
             mock_pos1._asdict.return_value = {"profit": 10.0}
             mock_pos2 = Mock()
@@ -350,7 +350,7 @@ class TestPositionSummary:
 
     def test_get_position_summary(self, position_manager):
         """Test getting position summary."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos1 = Mock()
             mock_pos1._asdict.return_value = {
                 "ticket": 12345,
@@ -381,7 +381,7 @@ class TestPositionSummary:
 
     def test_get_position_details(self, position_manager, mock_symbol_manager):
         """Test getting detailed position information."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             from datetime import datetime
 
             mock_pos = Mock()
@@ -420,7 +420,7 @@ class TestPositionSummary:
 
     def test_get_position_details_not_found(self, position_manager):
         """Test getting details when position not found."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             details = position_manager.get_position_details(99999)
@@ -433,7 +433,7 @@ class TestPositionProfitability:
 
     def test_is_position_profitable_true(self, position_manager):
         """Test checking profitable position."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -447,7 +447,7 @@ class TestPositionProfitability:
 
     def test_is_position_profitable_false(self, position_manager):
         """Test checking unprofitable position."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,
@@ -461,7 +461,7 @@ class TestPositionProfitability:
 
     def test_is_position_profitable_zero_threshold(self, position_manager):
         """Test checking profitability with zero threshold."""
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_pos = Mock()
             mock_pos._asdict.return_value = {
                 "ticket": 12345,

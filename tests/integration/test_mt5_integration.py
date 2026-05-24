@@ -14,7 +14,7 @@ from trading_bot.connectors.account_manager import AccountManager
 from trading_bot.connectors.data_manager import DataManager
 from trading_bot.connectors.mt5_connector import MT5Connector
 from trading_bot.connectors.order_manager import OrderManager
-from trading_bot.connectors.position_manager import PositionManager
+from trading_bot.connectors.mt5_position_query import MT5PositionQuery
 from trading_bot.connectors.symbol_manager import SymbolManager
 
 
@@ -30,7 +30,7 @@ def mock_mt5_connector():
         patch("trading_bot.connectors.symbol_manager.mt5", new=mock_mt5),
         patch("trading_bot.connectors.data_manager.mt5", new=mock_mt5),
         patch("trading_bot.connectors.order_manager.mt5", new=mock_mt5),
-        patch("trading_bot.connectors.position_manager.mt5", new=mock_mt5),
+        patch("trading_bot.connectors.mt5_position_query.mt5", new=mock_mt5),
     ]
 
     for p in patches:
@@ -172,12 +172,12 @@ class TestMT5ManagerIntegration:
             assert result.get("retcode") == 10009
 
     def test_position_manager_integration(self, mock_mt5_connector):
-        """Test PositionManager integration with MT5Connector and SymbolManager."""
+        """Test MT5PositionQuery integration with MT5Connector and SymbolManager."""
         symbol_manager = SymbolManager(mock_mt5_connector)
-        position_manager = PositionManager(mock_mt5_connector, symbol_manager)
+        position_manager = MT5PositionQuery(mock_mt5_connector, symbol_manager)
 
         # Test position retrieval
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_position = Mock()
             mock_position.ticket = 12345
             mock_position.symbol = "EURUSD"
@@ -217,7 +217,7 @@ class TestCompleteTradingWorkflow:
         account_manager = AccountManager(mock_mt5_connector)
         symbol_manager = SymbolManager(mock_mt5_connector)
         order_manager = OrderManager(mock_mt5_connector, symbol_manager)
-        position_manager = PositionManager(mock_mt5_connector, symbol_manager)
+        position_manager = MT5PositionQuery(mock_mt5_connector, symbol_manager)
 
         # Step 1: Check account balance
         balance = account_manager.get_balance()
@@ -258,7 +258,7 @@ class TestCompleteTradingWorkflow:
             assert result is not None
 
         # Step 4: Check positions
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = []
             positions = position_manager.get_all_positions()
             assert isinstance(positions, list)
@@ -292,7 +292,7 @@ class TestCompleteTradingWorkflow:
     def test_position_monitoring_workflow(self, mock_mt5_connector):
         """Test position monitoring workflow."""
         symbol_manager = SymbolManager(mock_mt5_connector)
-        position_manager = PositionManager(mock_mt5_connector, symbol_manager)
+        position_manager = MT5PositionQuery(mock_mt5_connector, symbol_manager)
         account_manager = AccountManager(mock_mt5_connector)
 
         # Step 1: Get account equity
@@ -300,7 +300,7 @@ class TestCompleteTradingWorkflow:
         assert equity > 0
 
         # Step 2: Get all positions
-        with patch("trading_bot.connectors.position_manager.mt5") as mock_mt5:
+        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_position = Mock()
             mock_position.ticket = 12345
             mock_position.symbol = "EURUSD"

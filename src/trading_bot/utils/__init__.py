@@ -1,5 +1,14 @@
-"""Utility modules for the trading bot."""
+"""Utility modules for the trading bot.
+
+Note: NotificationManager and NotificationLevel must be imported directly from
+notification_manager module to avoid circular imports with config.py.
+"""
 
 from .logger import get_logger, setup_logger
+from .timeframe_manager import TimeframeManager
 
-__all__ = ["setup_logger", "get_logger"]
+__all__ = [
+    "setup_logger",
+    "get_logger",
+    "TimeframeManager",
+]

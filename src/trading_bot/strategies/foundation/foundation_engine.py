@@ -1191,7 +1191,7 @@ class FoundationEngine:
             final_score = min(final_score, 100.0)
 
             # ═══════════════════════════════════════════════════════
-            # QUALITY FILTER: UNIVERSAL Minimum Score (Week 15.5.3)
+            # QUALITY FILTER: UNIVERSAL Minimum Score
             # Apply strict confluence filter to ALL asset classes
             # ═══════════════════════════════════════════════════════
 
