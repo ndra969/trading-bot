@@ -61,7 +61,7 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 3
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 3
     min_volume_lots: 0.01
     max_volume_lots: 1.0
@@ -85,7 +85,7 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 75
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -109,7 +109,7 @@ symbols:
     trading_sessions: ["tokyo", "london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 3
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -133,7 +133,7 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -157,7 +157,7 @@ symbols:
     trading_sessions: ["sydney", "tokyo", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -181,7 +181,7 @@ symbols:
     trading_sessions: ["london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -205,7 +205,7 @@ symbols:
     trading_sessions: ["tokyo", "london", "new_york"]
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% - Safe for 5 positions (5 × 0.4% = 2% max)
+    risk_per_trade: 0.002  # 0.2% - Halved for drawdown protection (5 × 0.2% = 1% max)
     max_spread_pips: 4
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -220,7 +220,7 @@ symbols:
     trading_sessions: ["london", "new_york"]  # Tokyo + London overlap
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% per trade
+    risk_per_trade: 0.002  # 0.2% per trade (halved for drawdown protection)
     max_spread_pips: 5  # JPY pairs have wider spreads
     min_volume_lots: 0.01
     max_volume_lots: 0.5
@@ -244,7 +244,7 @@ symbols:
     trading_sessions: ["tokyo", "london"]  # Best session for GBPJPY
     min_zone_strength: 70
     max_zones_per_session: 2
-    risk_per_trade: 0.004  # 0.4% per trade
+    risk_per_trade: 0.002  # 0.2% per trade (halved for drawdown protection)
     max_spread_pips: 6  # GBPJPY more volatile
     min_volume_lots: 0.01
     max_volume_lots: 0.5
