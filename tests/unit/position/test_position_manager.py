@@ -320,6 +320,46 @@ class TestCheckAndClosePositions:
         assert len(closed) == 1
         assert position.status == PositionStatus.CLOSED
         assert position.close_price == 1.1155
+        assert position.close_reason == "TAKE_PROFIT"
+
+    def test_check_and_close_stop_loss_records_stop_loss_reason(
+        self, position_manager, buy_signal
+    ):
+        """Plain SL hit (no BE/trailing) records STOP_LOSS."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+
+        prices = {"EURUSD": 1.0945}
+        position_manager.check_and_close_positions(prices)
+
+        assert position.close_reason == "STOP_LOSS"
+
+    def test_check_and_close_sl_with_breakeven_records_breakeven_stop(
+        self, position_manager, buy_signal
+    ):
+        """SL hit after breakeven activated → BREAKEVEN_STOP."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+        position.breakeven_activated = True
+
+        prices = {"EURUSD": 1.0945}
+        position_manager.check_and_close_positions(prices)
+
+        assert position.close_reason == "BREAKEVEN_STOP"
+
+    def test_check_and_close_sl_with_trailing_records_trailing_stop(
+        self, position_manager, buy_signal
+    ):
+        """SL hit after trailing activated → TRAILING_STOP (priority over BE)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        position_manager.open_position(position.position_id)
+        position.breakeven_activated = True
+        position.trailing_activated = True
+
+        prices = {"EURUSD": 1.0945}
+        position_manager.check_and_close_positions(prices)
+
+        assert position.close_reason == "TRAILING_STOP"
 
     def test_check_and_close_no_hits(self, position_manager, buy_signal):
         """Test that position stays open when SL/TP not hit."""
@@ -1612,7 +1652,7 @@ class TestMaxDurationChecking:
         assert result is True
         assert position.is_closed  # Position should be closed
         assert position.close_price == 1.1050
-        assert "Max Duration" in position.metadata.get("close_reason", "")
+        assert position.metadata.get("close_reason") == "MAX_DURATION"
 
     def test_check_max_duration_with_pnl_profit_check(self, position_manager, buy_signal):
         """Test _check_max_duration uses both pips and USD to determine profit (line 677)."""
@@ -1717,7 +1757,7 @@ class TestCheckAndClosePositionsMaxDuration:
         # Verify position was closed
         assert len(closed) == 1
         assert position.is_closed
-        assert "Max Duration" in position.metadata.get("close_reason", "")
+        assert position.metadata.get("close_reason") == "MAX_DURATION"
 
 
 class TestRestoreAutomationTracking:

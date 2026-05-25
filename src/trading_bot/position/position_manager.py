@@ -13,6 +13,7 @@ from trading_bot.data.database import get_session
 from trading_bot.data.models import Position as DBPosition
 from trading_bot.position.automation.breakeven_manager import BreakevenManager
 from trading_bot.position.automation.trailing_stop_manager import TrailingStopManager
+from trading_bot.position.close_reason import CloseReason
 from trading_bot.position.pip_calculator import PipCalculator
 from trading_bot.position.position_models import Position, PositionStatus, PositionType
 from trading_bot.position.position_tracker import PositionTracker
@@ -129,9 +130,7 @@ class PositionManager:
             return "loaded"
 
         except ValueError as e:
-            logger.warning(
-                f"Skipping invalid position {db_pos.position_id} ({db_pos.symbol}): {e}"
-            )
+            logger.warning(f"Skipping invalid position {db_pos.position_id} ({db_pos.symbol}): {e}")
             return "invalid"
         except Exception as e:
             logger.error(
@@ -252,9 +251,7 @@ class PositionManager:
         """Load ticket from metadata or DB column."""
         if "ticket" in metadata:
             position.ticket = int(metadata["ticket"])
-            logger.debug(
-                f"Loaded ticket {position.ticket} for position {position.position_id}"
-            )
+            logger.debug(f"Loaded ticket {position.ticket} for position {position.position_id}")
         elif db_pos.ticket:
             position.ticket = db_pos.ticket
             logger.debug(
@@ -284,9 +281,7 @@ class PositionManager:
         db_pos.close_price = position.close_price
         await session.commit()
 
-        logger.info(
-            f"🚫 Closed orphaned position {position.position_id} in database (no ticket)"
-        )
+        logger.info(f"🚫 Closed orphaned position {position.position_id} in database (no ticket)")
         return True
 
     def _register_position_in_memory(self, position: Position) -> None:
@@ -305,9 +300,9 @@ class PositionManager:
 
             if position.trailing_activated:
                 self.trailing_stop_manager.trailing_active.add(position.position_id)
-                self.trailing_stop_manager.highest_profit[position.position_id] = (
-                    position.current_profit_pips
-                )
+                self.trailing_stop_manager.highest_profit[
+                    position.position_id
+                ] = position.current_profit_pips
                 logger.debug(f"Restored trailing tracking for {position.position_id}")
 
     def _log_load_summary(self, count: int, invalid_count: int) -> None:
@@ -614,7 +609,7 @@ class PositionManager:
         self.tracker.update_position_price(position, current_price)
 
     def close_position(
-        self, position_id: str, close_price: float, reason: str = "Manual"
+        self, position_id: str, close_price: float, reason: str = "MANUAL"
     ) -> dict | None:
         """
         Close a position.
@@ -622,7 +617,7 @@ class PositionManager:
         Args:
             position_id: Position ID to close
             close_price: Price at which to close
-            reason: Reason for closing
+            reason: CloseReason enum value (string form, e.g. "STOP_LOSS")
 
         Returns:
             Dictionary with close results or None if not found
@@ -632,6 +627,7 @@ class PositionManager:
             return None
 
         result = self.tracker.close_position(position, close_price)
+        position.close_reason = reason
         position.metadata["close_reason"] = reason
 
         return result
@@ -739,11 +735,18 @@ class PositionManager:
                 closed_positions.append(position)
                 continue
 
-            # Check stop loss
+            # Check stop loss — disambiguate via position flags
             if self.tracker.check_stop_loss(position):
                 logger.info(f"Stop loss hit for {position.position_id}: {position.symbol}")
                 self.tracker.close_position(position, current_price)
-                position.metadata["close_reason"] = "Stop Loss"
+                if position.trailing_activated:
+                    sl_reason = CloseReason.TRAILING_STOP
+                elif position.breakeven_activated:
+                    sl_reason = CloseReason.BREAKEVEN_STOP
+                else:
+                    sl_reason = CloseReason.STOP_LOSS
+                position.close_reason = sl_reason.value
+                position.metadata["close_reason"] = sl_reason.value
                 closed_positions.append(position)
                 continue
 
@@ -751,7 +754,8 @@ class PositionManager:
             if self.tracker.check_take_profit(position):
                 logger.info(f"Take profit hit for {position.position_id}: {position.symbol}")
                 self.tracker.close_position(position, current_price)
-                position.metadata["close_reason"] = "Take Profit"
+                position.close_reason = CloseReason.TAKE_PROFIT.value
+                position.metadata["close_reason"] = CloseReason.TAKE_PROFIT.value
                 closed_positions.append(position)
 
         return closed_positions
@@ -824,7 +828,9 @@ class PositionManager:
                 f"({profit_pips:.1f} pips, ${pnl_usd:.2f}) - closing position"
             )
             self.tracker.close_position(position, current_price)
-            position.metadata["close_reason"] = f"Max Duration ({max_duration_hours}h) - Profit"
+            position.close_reason = CloseReason.MAX_DURATION.value
+            position.metadata["close_reason"] = CloseReason.MAX_DURATION.value
+            position.metadata["max_duration_hours"] = max_duration_hours
             return True
 
         return False

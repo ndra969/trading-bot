@@ -13,6 +13,7 @@ from .connectors.symbol_mapper import SymbolMapper
 from .position.automation.breakeven_manager import BreakevenManager
 from .position.automation.partial_close_manager import PartialCloseManager
 from .position.automation.trailing_stop_manager import TrailingStopManager
+from .position.close_reason import CloseReason, resolve_close_reason
 from .position.pip_calculator import PipCalculator
 from .position.position_manager import PositionManager
 from .position.position_models import Position
@@ -22,6 +23,7 @@ from .risk.portfolio_risk_manager import PortfolioRiskManager
 from .strategies.foundation.foundation_engine import FoundationEngine
 from .strategies.signal_aggregator import SignalAggregator
 from .strategies.strategy_manager import StrategyManager
+from .utils.config_validator import validate_position_management_config
 from .utils.logger import get_logger
 from .utils.notification_manager import NotificationLevel, NotificationManager
 
@@ -125,6 +127,9 @@ class TradingBot:
         logger.info("🚀 Starting trading bot...")
 
         try:
+            # Validate config invariants before doing any work
+            validate_position_management_config(self.config)
+
             # Check dry-run mode from config
             is_dry_run = self.config.get("trading", {}).get("dry_run", False)
 
@@ -1019,10 +1024,12 @@ class TradingBot:
         return "connected"
 
     # MT5 error codes that don't warrant user notification (expected/transient)
-    _SILENT_MT5_ERROR_CODES: frozenset[int] = frozenset({
-        10018,  # Market is closed
-        10035,  # Market is closed (alt code)
-    })
+    _SILENT_MT5_ERROR_CODES: frozenset[int] = frozenset(
+        {
+            10018,  # Market is closed
+            10035,  # Market is closed (alt code)
+        }
+    )
 
     async def _notify_order_failed(self, signal, position_size: float, order_result: dict) -> None:
         """Log order failure and notify user (unless error code is silenced).
@@ -1353,9 +1360,7 @@ class TradingBot:
         if position.metadata and position.metadata.get("ticket"):
             ticket = int(position.metadata["ticket"])
             position.ticket = ticket  # Cache on object
-            logger.debug(
-                f"  🎫 Found ticket {ticket} from metadata for {position.position_id}"
-            )
+            logger.debug(f"  🎫 Found ticket {ticket} from metadata for {position.position_id}")
             return ticket
 
         # 3. MT5 lookup by symbol + entry_price (recovery)
@@ -1420,9 +1425,7 @@ class TradingBot:
                 ticket = position.metadata.get("ticket")
 
             if ticket:
-                mt5_tickets = {
-                    p.get("ticket") for p in self.mt5.get_positions() if p.get("ticket")
-                }
+                mt5_tickets = {p.get("ticket") for p in self.mt5.get_positions() if p.get("ticket")}
                 if ticket not in mt5_tickets:
                     logger.warning(
                         f"  ⚠️ SKIPPING AUTOMATION: Position {position.position_id} "
@@ -1470,9 +1473,7 @@ class TradingBot:
 
         # Re-check after MT5 verification
         if not position.is_open:
-            logger.debug(
-                f"  ⚠️ Position {position.position_id} closed during MT5 check - skipping"
-            )
+            logger.debug(f"  ⚠️ Position {position.position_id} closed during MT5 check - skipping")
             return
 
         # 3. Get current price
@@ -1523,15 +1524,17 @@ class TradingBot:
             f"  ⚠️ Position {position.position_id} (Ticket {ticket}) "
             f"not found in MT5 during update - closing position"
         )
-        close_price, pnl, _ = self._resolve_mt5_deal_details(
+        close_price, pnl, comment, mt5_reason = self._resolve_mt5_deal_details(
             ticket, position.current_price or position.entry_price
         )
+        reason = resolve_close_reason(position, mt5_reason)
         await self._finalize_closed_position(
             position,
             close_price=close_price,
             pnl=pnl,
-            reason="Sync: Closed in MT5 (during update)",
+            reason=reason,
             is_dry_run=is_dry_run,
+            log_comment=comment,
         )
         logger.info(
             f"  ✅ Closed position {position.position_id} during update check | P&L: ${pnl:.2f}"
@@ -1567,31 +1570,23 @@ class TradingBot:
             if universal_symbol not in self.symbols:
                 continue
 
-            logger.info(
-                f"  🔄 Syncing MT5 position {mt5_ticket} ({broker_symbol}) to database..."
-            )
+            logger.info(f"  🔄 Syncing MT5 position {mt5_ticket} ({broker_symbol}) to database...")
             try:
                 position = self._build_position_from_mt5(universal_symbol, mt5_pos)
-                self.position_manager.update_position(
-                    position.position_id, position.current_price
-                )
+                self.position_manager.update_position(position.position_id, position.current_price)
                 await self.position_manager.save_position(position, is_dry_run=is_dry_run)
                 logger.info(
                     f"  ✅ Synced MT5 position {mt5_ticket} ({universal_symbol}) to database"
                 )
             except Exception as e:
-                logger.error(
-                    f"  ❌ Failed to sync MT5 position {mt5_ticket}: {e}", exc_info=True
-                )
+                logger.error(f"  ❌ Failed to sync MT5 position {mt5_ticket}: {e}", exc_info=True)
 
     def _broker_to_universal_symbol(self, broker_symbol: str) -> str:
         """Convert broker symbol to universal format, with fallback to suffix-strip."""
         if not self.symbol_mapper:
             return broker_symbol
         try:
-            return self.symbol_mapper.convert_to_universal_symbol(
-                broker_symbol, self.active_broker
-            )
+            return self.symbol_mapper.convert_to_universal_symbol(broker_symbol, self.active_broker)
         except Exception:
             return broker_symbol.rstrip("cmCM")
 
@@ -1599,9 +1594,7 @@ class TradingBot:
         """Construct a Position from MT5 position dict for DB sync."""
         from .position.position_models import Position, PositionStatus, PositionType
 
-        position_type = (
-            PositionType.BUY if mt5_pos.get("type", 0) == 0 else PositionType.SELL
-        )
+        position_type = PositionType.BUY if mt5_pos.get("type", 0) == 0 else PositionType.SELL
         entry_price = mt5_pos.get("price_open", 0)
         current_price = mt5_pos.get("price_current", entry_price)
         sl = mt5_pos.get("sl", 0)
@@ -1612,17 +1605,19 @@ class TradingBot:
         pip_calc = PipCalculator()
         pip_size = pip_calc.get_pip_size(universal_symbol)
         pip_value_per_lot = (
-            pip_calc.calculate_pip_value(universal_symbol, 1.0) / pip_size
-            if pip_size > 0
-            else 10.0
+            pip_calc.calculate_pip_value(universal_symbol, 1.0) / pip_size if pip_size > 0 else 10.0
         )
 
         # Provide safe SL/TP defaults if MT5 returns 0 (rare but possible)
-        safe_sl = sl if sl > 0 else (
-            entry_price - 0.001 if position_type == PositionType.BUY else entry_price + 0.001
+        safe_sl = (
+            sl
+            if sl > 0
+            else (entry_price - 0.001 if position_type == PositionType.BUY else entry_price + 0.001)
         )
-        safe_tp = tp if tp > 0 else (
-            entry_price + 0.002 if position_type == PositionType.BUY else entry_price - 0.002
+        safe_tp = (
+            tp
+            if tp > 0
+            else (entry_price + 0.002 if position_type == PositionType.BUY else entry_price - 0.002)
         )
 
         position = Position(
@@ -1671,28 +1666,38 @@ class TradingBot:
 
     def _resolve_mt5_deal_details(
         self, ticket: int, fallback_price: float
-    ) -> tuple[float, float, str]:
-        """Fetch close price + P&L from MT5 deal history for a given ticket.
+    ) -> tuple[float, float, str, int | None]:
+        """Fetch close price + P&L + MT5 reason from MT5 deal history.
 
         Returns:
-            (close_price, pnl, comment) tuple. Falls back to (fallback_price, 0.0,
-            "Closed in MT5") when deal history is unavailable.
+            (close_price, pnl, comment, mt5_deal_reason) tuple.
+            mt5_deal_reason is the MT5 DEAL_REASON_* code (int) or None if
+            deal history is unavailable.
         """
         deal = self.mt5.get_history_deal(ticket)
         if not deal:
             logger.warning(
                 f"  ⚠️ No deal history found for ticket {ticket} - using estimated close"
             )
-            return fallback_price, 0.0, "Closed in MT5"
+            return fallback_price, 0.0, "Closed in MT5", None
 
         close_price = deal.get("price", fallback_price)
         pnl = deal.get("profit", 0.0) + deal.get("swap", 0.0) + deal.get("commission", 0.0)
         comment = f"MT5 History: {deal.get('comment', '')}"
-        logger.debug(f"  📝 Deal found: Price {close_price:.5f}, P&L ${pnl:.2f}")
-        return close_price, pnl, comment
+        mt5_reason = deal.get("reason")
+        logger.debug(
+            f"  📝 Deal found: Price {close_price:.5f}, P&L ${pnl:.2f}, " f"MT5 reason={mt5_reason}"
+        )
+        return close_price, pnl, comment, mt5_reason
 
     async def _finalize_closed_position(
-        self, position, close_price: float, pnl: float, reason: str, is_dry_run: bool
+        self,
+        position,
+        close_price: float,
+        pnl: float,
+        reason: CloseReason,
+        is_dry_run: bool,
+        log_comment: str | None = None,
     ) -> None:
         """Common cleanup after closing a position: save, update balance, unregister exposure.
 
@@ -1703,11 +1708,14 @@ class TradingBot:
             position: Position that was just closed
             close_price: Price at which position was closed
             pnl: Realized P&L in USD (0 if unknown)
-            reason: Close reason string (logged + recorded)
+            reason: Canonical CloseReason enum value (recorded to DB)
             is_dry_run: Skip DB saves when True
+            log_comment: Optional extra context for logging (e.g., MT5 deal comment)
         """
         # Close in position_manager state
-        result = self.position_manager.close_position(position.position_id, close_price, reason)
+        result = self.position_manager.close_position(
+            position.position_id, close_price, reason.value
+        )
         if result:
             result["pnl_usd"] = pnl
 
@@ -1717,6 +1725,9 @@ class TradingBot:
         # Update session aggregations
         await self._update_session_on_position_close(position, result)
 
+        if log_comment:
+            logger.debug(f"  📝 Close context for {position.position_id}: {log_comment}")
+
         # Update portfolio balance with realized P&L
         if self.portfolio_risk and pnl:
             self.portfolio_risk.update_balance(self.portfolio_risk.current_balance + pnl)
@@ -1724,9 +1735,7 @@ class TradingBot:
         # Release exposure slot
         if self.exposure_manager:
             asset_class = self._get_asset_class(position.symbol)
-            self.exposure_manager.unregister_position(
-                position.symbol, asset_class, position.volume
-            )
+            self.exposure_manager.unregister_position(position.symbol, asset_class, position.volume)
 
     async def _manage_positions(self):
         """Update and manage all open positions."""
@@ -1814,8 +1823,9 @@ class TradingBot:
                             position,
                             close_price=close_price,
                             pnl=0.0,
-                            reason="Orphaned position: No ticket found",
+                            reason=CloseReason.ORPHANED,
                             is_dry_run=is_dry_run,
+                            log_comment="Orphaned: no ticket found after all lookups",
                         )
                         logger.info(
                             f"  🚫 Closed orphaned position {position.position_id} at {close_price:.5f}"
@@ -1832,19 +1842,19 @@ class TradingBot:
                             f"  👻 Position {position.position_id} (Ticket {ticket}) "
                             f"not found in MT5 - Assuming CLOSED"
                         )
-                        close_price, pnl, comment = self._resolve_mt5_deal_details(
+                        close_price, pnl, comment, mt5_reason = self._resolve_mt5_deal_details(
                             ticket, position.entry_price
                         )
+                        reason = resolve_close_reason(position, mt5_reason)
                         await self._finalize_closed_position(
                             position,
                             close_price=close_price,
                             pnl=pnl,
-                            reason=f"Sync: {comment}",
+                            reason=reason,
                             is_dry_run=is_dry_run,
+                            log_comment=comment,
                         )
-                        logger.info(
-                            f"  ✅ Synced Close: {position.position_id} | P&L: ${pnl:.2f}"
-                        )
+                        logger.info(f"  ✅ Synced Close: {position.position_id} | P&L: ${pnl:.2f}")
                         continue
                     # Case 2: Position has NO ticket - check if symbol exists in MT5
                     broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
@@ -1871,8 +1881,9 @@ class TradingBot:
                         position,
                         close_price=close_price,
                         pnl=pnl,
-                        reason="Sync: Closed in MT5 (no ticket)",
+                        reason=CloseReason.MT5_MISSING,
                         is_dry_run=is_dry_run,
+                        log_comment="No ticket and symbol absent from MT5",
                     )
                     logger.info(
                         f"  ✅ Synced Close (no ticket): {position.position_id} | "
@@ -1883,9 +1894,7 @@ class TradingBot:
                     logger.debug(f"  ✅ All {len(open_positions)} positions still open in MT5")
 
                 # Sync MT5 positions that aren't in our DB (e.g., skipped during load)
-                await self._sync_mt5_only_positions_to_db(
-                    open_positions, mt5_positions, is_dry_run
-                )
+                await self._sync_mt5_only_positions_to_db(open_positions, mt5_positions, is_dry_run)
 
             # Update positions with current prices
             # CRITICAL: Re-fetch open positions after reconciliation to exclude closed ones
@@ -2074,22 +2083,16 @@ class TradingBot:
             ticket = self._resolve_mt5_ticket(position, broker_symbol)
 
             if ticket:
-                res = self.mt5.modify_position(
-                    ticket=ticket, sl=new_sl, tp=position.take_profit
-                )
+                res = self.mt5.modify_position(ticket=ticket, sl=new_sl, tp=position.take_profit)
                 if res.get("success") and res.get("modified"):
                     mt5_modified = True
-                    logger.info(
-                        f"  ✅ MT5 Trailing SL Updated: Ticket {ticket} -> {new_sl:.5f}"
-                    )
+                    logger.info(f"  ✅ MT5 Trailing SL Updated: Ticket {ticket} -> {new_sl:.5f}")
                 elif res.get("success"):
                     logger.debug(
                         f"  ℹ️ MT5 Trailing SL already at {new_sl:.5f} (no changes needed)"
                     )
                 else:
-                    logger.warning(
-                        f"  ⚠️ MT5 Trailing SL Update Failed: {res.get('message')}"
-                    )
+                    logger.warning(f"  ⚠️ MT5 Trailing SL Update Failed: {res.get('message')}")
             else:
                 logger.warning(
                     f"  ⚠️ No ticket found for {position.position_id} - cannot update MT5"
@@ -2109,9 +2112,7 @@ class TradingBot:
             return True  # Skip partial close (orig early-return semantics)
 
         # Live trading: notify only if MT5 actually modified
-        await self._notify_trailing_update(
-            position, old_sl, new_sl, sl_movement_pips, mt5_modified
-        )
+        await self._notify_trailing_update(position, old_sl, new_sl, sl_movement_pips, mt5_modified)
         return False
 
     async def _activate_trailing_if_needed(self, position, is_dry_run: bool) -> None:
@@ -2181,9 +2182,7 @@ class TradingBot:
                 level=NotificationLevel.INFO,
                 sound=False,
             )
-            logger.debug(
-                f"  📱 Trailing stop notification sent for {position.position_id}"
-            )
+            logger.debug(f"  📱 Trailing stop notification sent for {position.position_id}")
         except Exception as e:
             logger.warning(f"  ⚠️ Failed to send trailing stop notification: {e}")
 
@@ -2210,9 +2209,7 @@ class TradingBot:
             logger.debug(f"  ⏭️ Skipping partial close for {position.position_id}: {e}")
             return
         except Exception as e:
-            logger.error(
-                f"  ❌ Error executing partial close for {position.position_id}: {e}"
-            )
+            logger.error(f"  ❌ Error executing partial close for {position.position_id}: {e}")
             return
 
         if not (result and result.get("closed_volume", 0) > 0):
@@ -2233,8 +2230,7 @@ class TradingBot:
                 )
                 if mt5_result:
                     logger.info(
-                        f"  ✅ MT5 Partial Close: Ticket {ticket}, "
-                        f"Volume {closed_volume:.3f}"
+                        f"  ✅ MT5 Partial Close: Ticket {ticket}, " f"Volume {closed_volume:.3f}"
                     )
                 else:
                     logger.error(
@@ -2295,19 +2291,13 @@ class TradingBot:
                     f"  🔧 Modifying MT5 position {ticket}: "
                     f"SL={new_sl:.5f}, TP={position.take_profit:.5f}"
                 )
-                res = self.mt5.modify_position(
-                    ticket=ticket, sl=new_sl, tp=position.take_profit
-                )
+                res = self.mt5.modify_position(ticket=ticket, sl=new_sl, tp=position.take_profit)
                 if res.get("success"):
                     if res.get("modified"):
                         mt5_modified = True
-                        logger.info(
-                            f"  ✅ MT5 SL Modified: Ticket {ticket} -> {new_sl:.5f}"
-                        )
+                        logger.info(f"  ✅ MT5 SL Modified: Ticket {ticket} -> {new_sl:.5f}")
                     else:
-                        logger.debug(
-                            f"  ℹ️ MT5 SL already at {new_sl:.5f} (no changes needed)"
-                        )
+                        logger.debug(f"  ℹ️ MT5 SL already at {new_sl:.5f} (no changes needed)")
                 else:
                     logger.warning(
                         f"  ⚠️ MT5 SL Modification Failed for ticket {ticket} "
@@ -2320,15 +2310,11 @@ class TradingBot:
                 )
 
             # Check if already at breakeven (avoid duplicate notifications)
-            is_already_at_breakeven = self.breakeven_manager.is_at_breakeven(
-                position.position_id
-            )
+            is_already_at_breakeven = self.breakeven_manager.is_at_breakeven(position.position_id)
 
             # Save + notify based on state
             if mt5_modified and not is_already_at_breakeven:
-                logger.info(
-                    f"  🔄 BREAKEVEN: {position.position_id} SL moved to {new_sl:.5f}"
-                )
+                logger.info(f"  🔄 BREAKEVEN: {position.position_id} SL moved to {new_sl:.5f}")
                 await self.position_manager.save_position(position, is_dry_run=is_dry_run)
                 logger.info(f"  💾 Breakeven SL saved to database: {new_sl:.5f}")
                 if self.notification_manager:
@@ -2358,13 +2344,10 @@ class TradingBot:
         elif is_dry_run:
             # Dry-run: save to DB but skip MT5 + notification
             logger.info(
-                f"  🔄 BREAKEVEN (DRY-RUN): {position.position_id} "
-                f"SL moved to {new_sl:.5f}"
+                f"  🔄 BREAKEVEN (DRY-RUN): {position.position_id} " f"SL moved to {new_sl:.5f}"
             )
             await self.position_manager.save_position(position, is_dry_run=is_dry_run)
-            logger.info(
-                "  💾 Breakeven SL saved to database (dry-run, no notification)"
-            )
+            logger.info("  💾 Breakeven SL saved to database (dry-run, no notification)")
 
     async def _check_position_closure(self):
         """Check for stop loss and take profit hits."""
@@ -2383,29 +2366,35 @@ class TradingBot:
                     if current_price is None:
                         continue
 
-                    # Check if SL or TP is hit
+                    # Check if SL or TP is hit (price-based fallback; MT5 is authoritative)
                     should_close = False
-                    close_reason = None
+                    tp_hit = False
 
                     if position.position_type == "BUY":
                         if current_price <= position.stop_loss:
                             should_close = True
-                            close_reason = "Stop Loss"
                         elif current_price >= position.take_profit:
-                            should_close = True
-                            close_reason = "Take Profit"
+                            should_close, tp_hit = True, True
                     else:  # SELL
                         if current_price >= position.stop_loss:
                             should_close = True
-                            close_reason = "Stop Loss"
                         elif current_price <= position.take_profit:
-                            should_close = True
-                            close_reason = "Take Profit"
+                            should_close, tp_hit = True, True
 
                     if should_close:
+                        # Disambiguate SL hit via position flags (same logic as resolver)
+                        if tp_hit:
+                            close_reason = CloseReason.TAKE_PROFIT
+                        elif position.trailing_activated:
+                            close_reason = CloseReason.TRAILING_STOP
+                        elif position.breakeven_activated:
+                            close_reason = CloseReason.BREAKEVEN_STOP
+                        else:
+                            close_reason = CloseReason.STOP_LOSS
+
                         # Close position
                         result = self.position_manager.close_position(
-                            position.position_id, current_price, close_reason
+                            position.position_id, current_price, close_reason.value
                         )
 
                         if result:
@@ -2430,7 +2419,7 @@ class TradingBot:
 
                             logger.info(
                                 f"  ✅ POSITION CLOSED: {position.position_id} | "
-                                f"{close_reason} | "
+                                f"{close_reason.value} | "
                                 f"P&L: ${result['pnl_usd']:.2f} | "
                                 f"Pips: {result['pips']:.1f}"
                             )
@@ -2441,7 +2430,7 @@ class TradingBot:
                             await self.notification_manager.send_message(
                                 f"{pnl_emoji} **POSITION CLOSED**\n"
                                 f"🆔 `{position.position_id}`\n"
-                                f"📝 Reason: `{close_reason}`\n"
+                                f"📝 Reason: `{close_reason.value}`\n"
                                 f"💵 P&L: **${result['pnl_usd']:.2f}**\n"
                                 f"📏 Pips: `{result['pips']:.1f}`",
                                 level=(
@@ -2631,15 +2620,11 @@ class TradingBot:
             logger.debug(f"🔍 Analyzing {symbol}...")
             return symbol
         try:
-            broker_symbol = self.symbol_mapper.convert_to_broker_symbol(
-                symbol, self.active_broker
-            )
+            broker_symbol = self.symbol_mapper.convert_to_broker_symbol(symbol, self.active_broker)
             logger.debug(f"🔍 Analyzing {symbol} (broker: {broker_symbol})...")
             return broker_symbol
         except Exception as e:
-            logger.warning(
-                f"Failed to convert symbol {symbol} to broker format: {e} - using as-is"
-            )
+            logger.warning(f"Failed to convert symbol {symbol} to broker format: {e} - using as-is")
             return symbol
 
     async def _run_strategy_analysis(

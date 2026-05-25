@@ -88,6 +88,7 @@ async def test_sync_position_closed_in_mt5_with_ticket(trading_bot):
         "swap": 0.0,
         "commission": 0.0,
         "comment": "Closed by SL",
+        "reason": 4,  # DEAL_REASON_SL
     }
 
     # Mock close_position and save_position
@@ -116,9 +117,9 @@ async def test_sync_position_closed_in_mt5_with_ticket(trading_bot):
     # Run sync
     await trading_bot._manage_positions()
 
-    # Verify position was closed
+    # Verify position was closed with canonical CloseReason
     trading_bot.position_manager.close_position.assert_called_once_with(
-        "pos_001", 1.1050, "Sync: MT5 History: Closed by SL"
+        "pos_001", 1.1050, "STOP_LOSS"
     )
     # save_position is called once during sync close, and once more during update
     # But since position is closed, second call shouldn't happen
@@ -182,7 +183,8 @@ async def test_sync_position_closed_in_mt5_no_ticket_no_symbol_match(trading_bot
     call_args = trading_bot.position_manager.close_position.call_args
     assert call_args[0][0] == "pos_002"
     assert call_args[0][1] == 1.1050  # Current price
-    assert "Sync: Closed in MT5 (no ticket)" in call_args[0][2]
+    # No ticket → orphaned path
+    assert call_args[0][2] == "ORPHANED"
 
     # save_position is called at least once during sync close
     assert trading_bot.position_manager.save_position.call_count >= 1
@@ -315,7 +317,8 @@ async def test_sync_position_no_history_deal(trading_bot):
     call_args = trading_bot.position_manager.close_position.call_args
     assert call_args[0][0] == "pos_005"
     assert call_args[0][1] == 1.1000  # Entry price as fallback
-    assert "Sync: Closed in MT5" in call_args[0][2]
+    # No MT5 deal info available → resolver returns UNKNOWN
+    assert call_args[0][2] == "UNKNOWN"
 
     # save_position is called at least once during sync close
     assert trading_bot.position_manager.save_position.call_count >= 1
