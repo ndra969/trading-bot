@@ -1993,333 +1993,378 @@ class TradingBot:
                 f"sl={position.stop_loss:.5f}"
             )
 
-            # Breakeven check
-            be_should_move = self.breakeven_manager.should_move_to_breakeven(position)
-            logger.debug(
-                f"  Breakeven check for {position.position_id}: should_move={be_should_move}, "
-                f"profit={position.current_profit_pips:.1f} pips"
-            )
-            if self.breakeven_manager.should_move_to_breakeven(position):
-                new_sl = self.breakeven_manager.move_to_breakeven(position)
-                if new_sl:
-                    # Sync with MT5 if live
-                    is_dry_run = self.config.get("trading", {}).get(
-                        "dry_run", False
-                    )  # Default to False for live trading
-                    if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                        broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
-                        ticket = self._resolve_mt5_ticket(position, broker_symbol)
-                        mt5_modified = False
-                        if ticket:
-                            logger.debug(
-                                f"  🔧 Modifying MT5 position {ticket}: SL={new_sl:.5f}, TP={position.take_profit:.5f}"
-                            )
-                            res = self.mt5.modify_position(
-                                ticket=ticket, sl=new_sl, tp=position.take_profit
-                            )
-                            if res.get("success"):
-                                if res.get("modified"):
-                                    mt5_modified = True
-                                    logger.info(
-                                        f"  ✅ MT5 SL Modified: Ticket {ticket} -> {new_sl:.5f}"
-                                    )
-                                else:
-                                    logger.debug(
-                                        f"  ℹ️ MT5 SL already at {new_sl:.5f} (no changes needed)"
-                                    )
-                            else:
-                                logger.warning(
-                                    f"  ⚠️ MT5 SL Modification Failed for ticket {ticket} ({broker_symbol}): {res.get('message')}"
-                                )
-                        else:
-                            logger.error(
-                                f"  ❌ Cannot modify MT5 position: No ticket found for {position.position_id} ({broker_symbol})"
-                            )
+            await self._handle_breakeven_automation(position, is_dry_run)
 
-                        # Check if position is already at breakeven (to avoid duplicate notifications)
-                        is_already_at_breakeven = self.breakeven_manager.is_at_breakeven(
-                            position.position_id
-                        )
+            # Trailing stop (activation + update). Returns True if caller should skip
+            # remaining automation (preserves original early-return behavior on edge cases)
+            if await self._handle_trailing_automation(position, is_dry_run):
+                return
 
-                        # Only save to DB and send notification if MT5 was actually modified
-                        # AND position is not already at breakeven (to avoid duplicate notifications)
-                        # CRITICAL: Skip notifications in dry-run mode
-                        if mt5_modified and not is_already_at_breakeven:
-                            logger.info(
-                                f"  🔄 BREAKEVEN: {position.position_id} SL moved to {new_sl:.5f}"
-                            )
-                            await self.position_manager.save_position(
-                                position, is_dry_run=is_dry_run
-                            )
-                            logger.info(f"  💾 Breakeven SL saved to database: {new_sl:.5f}")
-
-                            # Only send notification in LIVE trading (not dry-run)
-                            if not is_dry_run and self.notification_manager:
-                                await self.notification_manager.send_message(
-                                    f"🛡️ **BREAKEVEN SECURED**\n"
-                                    f"📊 Symbol: `{position.symbol}`\n"
-                                    f"🆔 Position: `{position.position_id}`\n"
-                                    f"🛑 SL Moved: `{new_sl:.5f}`\n"
-                                    f"🔒 Risk Free",
-                                    level=NotificationLevel.INFO,
-                                    sound=False,
-                                )
-                        elif is_dry_run and not is_already_at_breakeven:
-                            # Dry-run: Save to DB but skip notification
-                            logger.info(
-                                f"  🔄 BREAKEVEN (DRY-RUN): {position.position_id} SL moved to {new_sl:.5f}"
-                            )
-                            await self.position_manager.save_position(
-                                position, is_dry_run=is_dry_run
-                            )
-                            logger.info(
-                                "  💾 Breakeven SL saved to database (dry-run, no notification)"
-                            )
-                        elif mt5_modified or is_dry_run:
-                            # MT5 modified but already at breakeven (duplicate check)
-                            logger.debug(
-                                f"  ℹ️ Breakeven already set for {position.position_id}, skipping notification"
-                            )
-                            await self.position_manager.save_position(
-                                position, is_dry_run=is_dry_run
-                            )
-                            logger.debug("  💾 Position saved to database (already at breakeven)")
-                        else:
-                            # MT5 not modified (already at breakeven or modification failed)
-                            # Still save to DB to keep in sync, but no notification
-                            await self.position_manager.save_position(
-                                position, is_dry_run=is_dry_run
-                            )
-                            logger.debug(
-                                f"  💾 Position saved to database (MT5 not modified: {res.get('message') if ticket else 'no ticket'})"
-                            )
-
-            # Trailing stop activation check (first time)
-            ts_should_activate = self.trailing_manager.should_activate_trailing(position)
-            logger.debug(
-                f"  Trailing activation check for {position.position_id}: "
-                f"should_activate={ts_should_activate}, "
-                f"profit={position.current_profit_pips:.1f} pips, "
-                f"already_active={position.position_id in self.trailing_manager.trailing_active}"
-            )
-            if ts_should_activate:
-                self.trailing_manager.activate_trailing(position)
-                logger.info(
-                    f"  🎯 TRAILING ACTIVATED: {position.position_id} at {position.current_profit_pips:.1f} pips"
-                )
-                await self.position_manager.save_position(position, is_dry_run=is_dry_run)
-                # Notify trailing activation (only in LIVE trading, skip in dry-run)
-                if not is_dry_run and self.notification_manager:
-                    await self.notification_manager.send_message(
-                        f"🎯 **TRAILING STOP ACTIVATED**\n"
-                        f"📊 Symbol: `{position.symbol}`\n"
-                        f"🆔 Position: `{position.position_id}`\n"
-                        f"💰 Profit: `{position.current_profit_pips:.1f} pips`\n"
-                        f"🛑 SL: `{position.stop_loss:.5f}`",
-                        level=NotificationLevel.INFO,
-                        sound=False,
-                    )
-
-            # Trailing stop update check (after activation)
-            ts_should_update = self.trailing_manager.should_update_trailing_stop(position)
-            logger.debug(
-                f"  Trailing update check for {position.position_id}: "
-                f"should_update={ts_should_update}, "
-                f"profit={position.current_profit_pips:.1f} pips, "
-                f"current_price={position.current_price:.5f}, "
-                f"current_sl={position.stop_loss:.5f}"
-            )
-            if ts_should_update:
-                old_sl = position.stop_loss
-                new_sl = self.trailing_manager.update_trailing_stop(position)
-
-                # Check if SL actually changed (update_trailing_stop may return same SL if no improvement)
-                if new_sl and new_sl != old_sl:
-                    # Validate pip_size before calculation
-                    if position.pip_size <= 0:
-                        logger.error(
-                            f"  ❌ Invalid pip_size {position.pip_size} for {position.position_id} "
-                            f"({position.symbol}) - cannot calculate movement"
-                        )
-                        return  # Skip this position's trailing update
-
-                    # Calculate SL movement in pips for notification threshold
-                    sl_movement_pips = abs(new_sl - old_sl) / position.pip_size
-
-                    # Validate movement is reasonable (prevent huge movements from incorrect data)
-                    # For forex major: max 500 pips, for JPY: max 5000 pips, for commodities: max 10000 pips
-                    max_movement_pips = {
-                        "forex_major": 500.0,
-                        "forex_jpy": 5000.0,
-                        "commodities": 10000.0,
-                        "crypto": 1000.0,
-                    }
-                    asset_class = self._get_asset_class(position.symbol)
-                    max_allowed = max_movement_pips.get(asset_class, 1000.0)
-
-                    if sl_movement_pips > max_allowed:
-                        logger.error(
-                            f"  ❌ SUSPICIOUS TRAILING MOVEMENT: {position.position_id} ({position.symbol})\n"
-                            f"     SL: {old_sl:.5f} → {new_sl:.5f}\n"
-                            f"     Movement: {sl_movement_pips:.1f} pips (max allowed: {max_allowed:.1f})\n"
-                            f"     pip_size: {position.pip_size}, current_price: {position.current_price}\n"
-                            f"     This suggests incorrect old_sl or pip_size - skipping notification"
-                        )
-                        # Still save the position but don't send notification
-                        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
-                        return  # Skip notification for suspicious movement
-
-                    # Sync with MT5 if live
-                    is_dry_run = self.config.get("trading", {}).get(
-                        "dry_run", False
-                    )  # Default to False for live trading
-                    mt5_modified = False
-
-                    if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                        broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
-                        ticket = self._resolve_mt5_ticket(position, broker_symbol)
-
-                        if ticket:
-                            res = self.mt5.modify_position(
-                                ticket=ticket, sl=new_sl, tp=position.take_profit
-                            )
-                            if res.get("success") and res.get("modified"):
-                                mt5_modified = True
-                                logger.info(
-                                    f"  ✅ MT5 Trailing SL Updated: Ticket {ticket} -> {new_sl:.5f}"
-                                )
-                            elif res.get("success"):
-                                logger.debug(
-                                    f"  ℹ️ MT5 Trailing SL already at {new_sl:.5f} (no changes needed)"
-                                )
-                            else:
-                                logger.warning(
-                                    f"  ⚠️ MT5 Trailing SL Update Failed: {res.get('message')}"
-                                )
-                        else:
-                            logger.warning(
-                                f"  ⚠️ No ticket found for {position.position_id} - cannot update MT5"
-                            )
-
-                    # Always save to DB if SL changed (even if MT5 didn't modify)
-                    logger.info(f"  🔄 TRAILING: {position.position_id} SL moved to {new_sl:.5f}")
-                    await self.position_manager.save_position(position, is_dry_run=is_dry_run)
-                    logger.info(f"  💾 Trailing SL saved to database: {new_sl:.5f}")
-
-                    # Notify trailing update - ONLY if MT5 was successfully modified (for live trading)
-                    # CRITICAL: Skip notifications in dry-run mode
-                    # CRITICAL: Don't send "success" notification if MT5 update failed
-
-                    # Early return if dry-run mode - skip all notifications
-                    if is_dry_run:
-                        logger.debug(
-                            f"  🧪 Dry-run mode: Skipping trailing stop notification for {position.position_id}"
-                        )
-                        return  # Exit early - no notification in dry-run
-
-                    # Only proceed with notifications if NOT in dry-run mode
-                    should_notify = False
-                    mt5_status = ""
-
-                    if mt5_modified:
-                        # Live trading: only notify if MT5 was successfully modified
-                        should_notify = True
-                        mt5_status = "✅ MT5 Updated"
-                    elif self.mt5 and self.mt5.is_connected():
-                        # Live trading but MT5 update failed or no ticket
-                        should_notify = False
-                        mt5_status = "❌ MT5 Update Failed"
-                        logger.warning(
-                            f"  ⚠️ Not sending notification for {position.position_id}: "
-                            f"MT5 update failed or no ticket found"
-                        )
-
-                    if self.notification_manager and should_notify:
-                        try:
-                            await self.notification_manager.send_message(
-                                f"🔄 **TRAILING STOP UPDATED**\n"
-                                f"📊 Symbol: `{position.symbol}`\n"
-                                f"🆔 Position: `{position.position_id}`\n"
-                                f"🛑 SL: `{old_sl:.5f}` → `{new_sl:.5f}`\n"
-                                f"📈 Movement: `{sl_movement_pips:.1f} pips`\n"
-                                f"💰 Profit: `{position.current_profit_pips:.1f} pips`\n"
-                                f"💵 P&L: `${position.current_pnl_usd:.2f}`\n"
-                                f"🔧 Status: {mt5_status}",
-                                level=NotificationLevel.INFO,
-                                sound=False,
-                            )
-                            logger.debug(
-                                f"  📱 Trailing stop notification sent for {position.position_id} ({mt5_status})"
-                            )
-                        except Exception as e:
-                            logger.warning(f"  ⚠️ Failed to send trailing stop notification: {e}")
-                else:
-                    logger.debug(
-                        f"  ℹ️ Trailing stop unchanged for {position.position_id} (SL: {old_sl:.5f})"
-                    )
-
-            # Partial close check
-            if self.partial_manager.should_close_partial(position):
-                current_price = await self._get_current_price(position.symbol)
-                try:
-                    result = self.partial_manager.execute_partial_close(position, current_price)
-
-                    if result and result.get("closed_volume", 0) > 0:
-                        closed_volume = result["closed_volume"]
-
-                        # Sync with MT5 if live
-                        is_dry_run = self.config.get("trading", {}).get(
-                            "dry_run", False
-                        )  # Default to False for live trading
-                        if not is_dry_run and self.mt5 and self.mt5.is_connected():
-                            broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
-                            ticket = self._resolve_mt5_ticket(position, broker_symbol)
-
-                            if ticket:
-                                # Close partial volume in MT5
-                                mt5_result = self.mt5.close_position(
-                                    ticket=ticket,
-                                    volume=closed_volume,
-                                    comment=f"Partial Close {position.position_id}",
-                                )
-                                if mt5_result:
-                                    logger.info(
-                                        f"  ✅ MT5 Partial Close: Ticket {ticket}, Volume {closed_volume:.3f}"
-                                    )
-                                else:
-                                    logger.error(
-                                        f"  ❌ MT5 Partial Close Failed: Ticket {ticket}, Volume {closed_volume:.3f}"
-                                    )
-                            else:
-                                logger.warning(
-                                    f"  ⚠️ Cannot partial close: No ticket found for {position.position_id}"
-                                )
-
-                        logger.info(
-                            f"  🔄 PARTIAL CLOSE: {position.position_id} "
-                            f"Closed {closed_volume:.3f} at {current_price:.5f} "
-                            f"P&L: ${result['profit_usd']:.2f}"
-                        )
-                        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
-                        # Only send notification in LIVE trading (not dry-run)
-                        if not is_dry_run and self.notification_manager:
-                            await self.notification_manager.send_message(
-                                f"💰 **PARTIAL PROFIT TAKEN**\n"
-                                f"🆔 `{position.position_id}`\n"
-                                f"📊 Closed: `{closed_volume:.3f}` lots\n"
-                                f"💵 Profit: **${result['profit_usd']:.2f}**",
-                                level=NotificationLevel.SUCCESS,
-                            )
-                except ValueError as e:
-                    # Volume too small for partial close - this is expected for small positions
-                    logger.debug(f"  ⏭️ Skipping partial close for {position.position_id}: {e}")
-                except Exception as e:
-                    logger.error(
-                        f"  ❌ Error executing partial close for {position.position_id}: {e}"
-                    )
+            await self._handle_partial_close_automation(position, is_dry_run)
 
         except Exception as e:
             logger.error(f"Error checking automation for position {position.position_id}: {e}")
+
+    # Max sane SL movement per trailing update (sanity check against bad pip_size data)
+    _MAX_TRAILING_MOVEMENT_PIPS: dict[str, float] = {
+        "forex_major": 500.0,
+        "forex_jpy": 5000.0,
+        "commodities": 10000.0,
+        "crypto": 1000.0,
+    }
+
+    async def _handle_trailing_automation(self, position, is_dry_run: bool) -> bool:
+        """Activate trailing stop on threshold, then update SL as price moves.
+
+        Returns:
+            True if caller should skip remaining automation (preserves original
+            early-return semantics on bad pip_size, suspicious movement, or
+            dry-run after update). False to continue normal flow.
+        """
+        # 1. Activation check (first time trailing reaches threshold)
+        await self._activate_trailing_if_needed(position, is_dry_run)
+
+        # 2. Update check (after activation, SL trails price)
+        if not self.trailing_manager.should_update_trailing_stop(position):
+            return False
+
+        old_sl = position.stop_loss
+        new_sl = self.trailing_manager.update_trailing_stop(position)
+        logger.debug(
+            f"  Trailing update check for {position.position_id}: "
+            f"should_update=True, profit={position.current_profit_pips:.1f} pips, "
+            f"current_price={position.current_price:.5f}, current_sl={old_sl:.5f}"
+        )
+
+        if not (new_sl and new_sl != old_sl):
+            logger.debug(
+                f"  ℹ️ Trailing stop unchanged for {position.position_id} (SL: {old_sl:.5f})"
+            )
+            return False
+
+        # Sanity check: invalid pip_size makes movement calculation impossible
+        if position.pip_size <= 0:
+            logger.error(
+                f"  ❌ Invalid pip_size {position.pip_size} for {position.position_id} "
+                f"({position.symbol}) - cannot calculate movement"
+            )
+            return True  # Skip partial close too (orig early-return semantics)
+
+        # Sanity check: movement should be within reasonable bounds
+        sl_movement_pips = abs(new_sl - old_sl) / position.pip_size
+        asset_class = self._get_asset_class(position.symbol)
+        max_allowed = self._MAX_TRAILING_MOVEMENT_PIPS.get(asset_class, 1000.0)
+
+        if sl_movement_pips > max_allowed:
+            logger.error(
+                f"  ❌ SUSPICIOUS TRAILING MOVEMENT: {position.position_id} "
+                f"({position.symbol})\n"
+                f"     SL: {old_sl:.5f} → {new_sl:.5f}\n"
+                f"     Movement: {sl_movement_pips:.1f} pips (max allowed: {max_allowed:.1f})\n"
+                f"     pip_size: {position.pip_size}, current_price: {position.current_price}\n"
+                f"     This suggests incorrect old_sl or pip_size - skipping notification"
+            )
+            await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+            return True  # Skip partial close too (orig early-return semantics)
+
+        # Sync new SL with MT5 (live only)
+        mt5_modified = False
+        if not is_dry_run and self.mt5 and self.mt5.is_connected():
+            broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+            ticket = self._resolve_mt5_ticket(position, broker_symbol)
+
+            if ticket:
+                res = self.mt5.modify_position(
+                    ticket=ticket, sl=new_sl, tp=position.take_profit
+                )
+                if res.get("success") and res.get("modified"):
+                    mt5_modified = True
+                    logger.info(
+                        f"  ✅ MT5 Trailing SL Updated: Ticket {ticket} -> {new_sl:.5f}"
+                    )
+                elif res.get("success"):
+                    logger.debug(
+                        f"  ℹ️ MT5 Trailing SL already at {new_sl:.5f} (no changes needed)"
+                    )
+                else:
+                    logger.warning(
+                        f"  ⚠️ MT5 Trailing SL Update Failed: {res.get('message')}"
+                    )
+            else:
+                logger.warning(
+                    f"  ⚠️ No ticket found for {position.position_id} - cannot update MT5"
+                )
+
+        # Always save to DB even if MT5 didn't modify (keeps local state consistent)
+        logger.info(f"  🔄 TRAILING: {position.position_id} SL moved to {new_sl:.5f}")
+        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+        logger.info(f"  💾 Trailing SL saved to database: {new_sl:.5f}")
+
+        # Dry-run: skip notifications + skip partial close (preserves original behavior)
+        if is_dry_run:
+            logger.debug(
+                f"  🧪 Dry-run mode: Skipping trailing stop notification for "
+                f"{position.position_id}"
+            )
+            return True  # Skip partial close (orig early-return semantics)
+
+        # Live trading: notify only if MT5 actually modified
+        await self._notify_trailing_update(
+            position, old_sl, new_sl, sl_movement_pips, mt5_modified
+        )
+        return False
+
+    async def _activate_trailing_if_needed(self, position, is_dry_run: bool) -> None:
+        """Activate trailing stop tracking once profit threshold reached (once per position)."""
+        ts_should_activate = self.trailing_manager.should_activate_trailing(position)
+        logger.debug(
+            f"  Trailing activation check for {position.position_id}: "
+            f"should_activate={ts_should_activate}, "
+            f"profit={position.current_profit_pips:.1f} pips, "
+            f"already_active={position.position_id in self.trailing_manager.trailing_active}"
+        )
+        if not ts_should_activate:
+            return
+
+        self.trailing_manager.activate_trailing(position)
+        logger.info(
+            f"  🎯 TRAILING ACTIVATED: {position.position_id} at "
+            f"{position.current_profit_pips:.1f} pips"
+        )
+        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+
+        if not is_dry_run and self.notification_manager:
+            await self.notification_manager.send_message(
+                f"🎯 **TRAILING STOP ACTIVATED**\n"
+                f"📊 Symbol: `{position.symbol}`\n"
+                f"🆔 Position: `{position.position_id}`\n"
+                f"💰 Profit: `{position.current_profit_pips:.1f} pips`\n"
+                f"🛑 SL: `{position.stop_loss:.5f}`",
+                level=NotificationLevel.INFO,
+                sound=False,
+            )
+
+    async def _notify_trailing_update(
+        self,
+        position,
+        old_sl: float,
+        new_sl: float,
+        sl_movement_pips: float,
+        mt5_modified: bool,
+    ) -> None:
+        """Send trailing-stop-updated notification (live mode only).
+
+        Only notifies if MT5 modification succeeded - prevents false "updated"
+        alerts when MT5 sync actually failed.
+        """
+        if not mt5_modified:
+            if self.mt5 and self.mt5.is_connected():
+                logger.warning(
+                    f"  ⚠️ Not sending notification for {position.position_id}: "
+                    f"MT5 update failed or no ticket found"
+                )
+            return
+
+        if not self.notification_manager:
+            return
+
+        try:
+            await self.notification_manager.send_message(
+                f"🔄 **TRAILING STOP UPDATED**\n"
+                f"📊 Symbol: `{position.symbol}`\n"
+                f"🆔 Position: `{position.position_id}`\n"
+                f"🛑 SL: `{old_sl:.5f}` → `{new_sl:.5f}`\n"
+                f"📈 Movement: `{sl_movement_pips:.1f} pips`\n"
+                f"💰 Profit: `{position.current_profit_pips:.1f} pips`\n"
+                f"💵 P&L: `${position.current_pnl_usd:.2f}`\n"
+                f"🔧 Status: ✅ MT5 Updated",
+                level=NotificationLevel.INFO,
+                sound=False,
+            )
+            logger.debug(
+                f"  📱 Trailing stop notification sent for {position.position_id}"
+            )
+        except Exception as e:
+            logger.warning(f"  ⚠️ Failed to send trailing stop notification: {e}")
+
+    async def _handle_partial_close_automation(self, position, is_dry_run: bool) -> None:
+        """Take partial profit at predefined volume levels (e.g., 25% at TP1, 50% at TP2).
+
+        Side effects:
+            - Closes partial volume on MT5 (live trading only)
+            - Saves updated position state to DB
+            - Sends Telegram notification (live only)
+
+        Silently skips if volume is too small for partial close (expected
+        edge case for small positions, not an error).
+        """
+        if not self.partial_manager.should_close_partial(position):
+            return
+
+        current_price = await self._get_current_price(position.symbol)
+
+        try:
+            result = self.partial_manager.execute_partial_close(position, current_price)
+        except ValueError as e:
+            # Volume too small for partial close - expected for small positions
+            logger.debug(f"  ⏭️ Skipping partial close for {position.position_id}: {e}")
+            return
+        except Exception as e:
+            logger.error(
+                f"  ❌ Error executing partial close for {position.position_id}: {e}"
+            )
+            return
+
+        if not (result and result.get("closed_volume", 0) > 0):
+            return
+
+        closed_volume = result["closed_volume"]
+
+        # Sync partial close with MT5 (live only)
+        if not is_dry_run and self.mt5 and self.mt5.is_connected():
+            broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+            ticket = self._resolve_mt5_ticket(position, broker_symbol)
+
+            if ticket:
+                mt5_result = self.mt5.close_position(
+                    ticket=ticket,
+                    volume=closed_volume,
+                    comment=f"Partial Close {position.position_id}",
+                )
+                if mt5_result:
+                    logger.info(
+                        f"  ✅ MT5 Partial Close: Ticket {ticket}, "
+                        f"Volume {closed_volume:.3f}"
+                    )
+                else:
+                    logger.error(
+                        f"  ❌ MT5 Partial Close Failed: Ticket {ticket}, "
+                        f"Volume {closed_volume:.3f}"
+                    )
+            else:
+                logger.warning(
+                    f"  ⚠️ Cannot partial close: No ticket found for {position.position_id}"
+                )
+
+        logger.info(
+            f"  🔄 PARTIAL CLOSE: {position.position_id} "
+            f"Closed {closed_volume:.3f} at {current_price:.5f} "
+            f"P&L: ${result['profit_usd']:.2f}"
+        )
+        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+
+        # Send notification (live only)
+        if not is_dry_run and self.notification_manager:
+            await self.notification_manager.send_message(
+                f"💰 **PARTIAL PROFIT TAKEN**\n"
+                f"🆔 `{position.position_id}`\n"
+                f"📊 Closed: `{closed_volume:.3f}` lots\n"
+                f"💵 Profit: **${result['profit_usd']:.2f}**",
+                level=NotificationLevel.SUCCESS,
+            )
+
+    async def _handle_breakeven_automation(self, position, is_dry_run: bool) -> None:
+        """Move SL to breakeven once profit threshold reached.
+
+        Side effects:
+            - Modifies SL via MT5 modify_position (live trading)
+            - Saves position to DB
+            - Sends Telegram notification (live only, once - deduplicates re-triggers)
+        """
+        be_should_move = self.breakeven_manager.should_move_to_breakeven(position)
+        logger.debug(
+            f"  Breakeven check for {position.position_id}: should_move={be_should_move}, "
+            f"profit={position.current_profit_pips:.1f} pips"
+        )
+
+        if not be_should_move:
+            return
+
+        new_sl = self.breakeven_manager.move_to_breakeven(position)
+        if not new_sl:
+            return
+
+        # MT5 modification only for live trading
+        if not is_dry_run and self.mt5 and self.mt5.is_connected():
+            broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+            ticket = self._resolve_mt5_ticket(position, broker_symbol)
+            mt5_modified = False
+            res: dict = {}
+            if ticket:
+                logger.debug(
+                    f"  🔧 Modifying MT5 position {ticket}: "
+                    f"SL={new_sl:.5f}, TP={position.take_profit:.5f}"
+                )
+                res = self.mt5.modify_position(
+                    ticket=ticket, sl=new_sl, tp=position.take_profit
+                )
+                if res.get("success"):
+                    if res.get("modified"):
+                        mt5_modified = True
+                        logger.info(
+                            f"  ✅ MT5 SL Modified: Ticket {ticket} -> {new_sl:.5f}"
+                        )
+                    else:
+                        logger.debug(
+                            f"  ℹ️ MT5 SL already at {new_sl:.5f} (no changes needed)"
+                        )
+                else:
+                    logger.warning(
+                        f"  ⚠️ MT5 SL Modification Failed for ticket {ticket} "
+                        f"({broker_symbol}): {res.get('message')}"
+                    )
+            else:
+                logger.error(
+                    f"  ❌ Cannot modify MT5 position: No ticket found for "
+                    f"{position.position_id} ({broker_symbol})"
+                )
+
+            # Check if already at breakeven (avoid duplicate notifications)
+            is_already_at_breakeven = self.breakeven_manager.is_at_breakeven(
+                position.position_id
+            )
+
+            # Save + notify based on state
+            if mt5_modified and not is_already_at_breakeven:
+                logger.info(
+                    f"  🔄 BREAKEVEN: {position.position_id} SL moved to {new_sl:.5f}"
+                )
+                await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+                logger.info(f"  💾 Breakeven SL saved to database: {new_sl:.5f}")
+                if self.notification_manager:
+                    await self.notification_manager.send_message(
+                        f"🛡️ **BREAKEVEN SECURED**\n"
+                        f"📊 Symbol: `{position.symbol}`\n"
+                        f"🆔 Position: `{position.position_id}`\n"
+                        f"🛑 SL Moved: `{new_sl:.5f}`\n"
+                        f"🔒 Risk Free",
+                        level=NotificationLevel.INFO,
+                        sound=False,
+                    )
+            elif mt5_modified:
+                # Already at breakeven (duplicate check)
+                logger.debug(
+                    f"  ℹ️ Breakeven already set for {position.position_id}, skipping notification"
+                )
+                await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+                logger.debug("  💾 Position saved to database (already at breakeven)")
+            else:
+                # MT5 not modified (failed or already set)
+                await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+                logger.debug(
+                    f"  💾 Position saved (MT5 not modified: "
+                    f"{res.get('message') if ticket else 'no ticket'})"
+                )
+        elif is_dry_run:
+            # Dry-run: save to DB but skip MT5 + notification
+            logger.info(
+                f"  🔄 BREAKEVEN (DRY-RUN): {position.position_id} "
+                f"SL moved to {new_sl:.5f}"
+            )
+            await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+            logger.info(
+                "  💾 Breakeven SL saved to database (dry-run, no notification)"
+            )
 
     async def _check_position_closure(self):
         """Check for stop loss and take profit hits."""
