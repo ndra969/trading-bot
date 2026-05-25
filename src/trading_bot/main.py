@@ -1018,8 +1018,18 @@ class TradingBot:
                 return f"Error checking connection: {e}"
         return "connected"
 
+    # MT5 error codes that don't warrant user notification (expected/transient)
+    _SILENT_MT5_ERROR_CODES: frozenset[int] = frozenset({
+        10018,  # Market is closed
+        10035,  # Market is closed (alt code)
+    })
+
     async def _notify_order_failed(self, signal, position_size: float, order_result: dict) -> None:
-        """Send order failure notification with error details from MT5 result."""
+        """Log order failure and notify user (unless error code is silenced).
+
+        Some errors (e.g. market closed) are expected and don't warrant
+        Telegram alerts - we log them but skip the notification.
+        """
         error_msg = order_result.get("error", "Unknown error")
         error_code = order_result.get("error_code", 0)
         error_description = order_result.get("error_description", "No description available")
@@ -1028,6 +1038,14 @@ class TradingBot:
             f"  ❌ MT5 Order Execution Failed for {signal.symbol}: "
             f"{error_msg} (code: {error_code})"
         )
+
+        # Skip notification for expected/transient errors (market closed, etc.)
+        if error_code in self._SILENT_MT5_ERROR_CODES:
+            logger.debug(
+                f"  🔕 Silent error code {error_code} ({error_description}) - "
+                f"no notification sent"
+            )
+            return
 
         await self.notification_manager.send_message(
             f"❌ **MT5 Order Failed**\n"
