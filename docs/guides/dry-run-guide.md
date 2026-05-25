@@ -14,6 +14,26 @@ Dry-run simulates trading operations without sending real orders:
 - ❌ No real orders sent
 - ❌ No real money at risk
 
+## Implementation
+
+Two mechanisms cooperate to enforce dry-run safety:
+
+1. **Inline checks** — Code paths use `if not is_dry_run:` before any MT5 write
+   operation. This is the active mechanism in `main.py` today.
+
+2. **DryRunMT5Wrapper** (`connectors/dry_run_wrapper.py`) — Transparent
+   wrapper around `MT5Connector` that intercepts write ops (`place_order`,
+   `modify_position`, `close_position`) and returns simulated results.
+   Read ops (`get_positions`, `is_connected`, etc.) pass through.
+   Available as a future-cleanup option to remove scattered inline checks.
+
+   Inspect simulated history:
+   ```python
+   wrapper.get_simulated_orders()         # All simulated orders
+   wrapper.get_simulated_modifications()  # All SL/TP modifications
+   wrapper.get_simulated_closes()         # All close operations
+   ```
+
 ## Usage
 
 ### Three Modes

@@ -239,7 +239,7 @@ omit = [
     "*/tests/*",
     "*/test_*",
     "*/__init__.py",
-    "*/dry_run_wrapper.py",  # Future feature, not yet implemented
+    # NOTE: dry_run_wrapper.py removed from omit list (now implemented with tests)
     "*/main.py",  # Main entry point - integration tested via CLI
 ]
 
