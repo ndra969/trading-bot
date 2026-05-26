@@ -78,9 +78,13 @@ TradingBot (orchestrator, ~500 lines)
 - [x] `_is_market_open()` → `utils/market_hours.py`
 - [x] `_generate_mock_data()` → `utils/mock_data.py`
 
-**Phase 2: Extract ExecutionService** ⏳ Deferred
-- [ ] Create `src/trading_bot/services/execution_service.py`
-- [ ] Move: `_execute_signal`, `_validate_signal_risk`, `_check_exposure_limits`, `_calculate_position_size`
+**Phase 2: Extract ExecutionService** ✅ Done
+- [x] Create `src/trading_bot/services/execution_service.py`
+- [x] Move: `_execute_signal`, `_validate_signal_risk`, `_check_exposure_limits`, `_calculate_position_size`,
+      `_execute_mt5_order`, `_is_mt5_ready_for_trading`, `_diagnose_mt5_connection`,
+      `_notify_order_failed`, `_has_duplicate_position`
+- [x] Bonus: deduplicated the live/dry-run notification formatter (was 90 lines duplicated)
+- [x] main.py shrunk from 2763 → 2099 lines (-664)
 
 **Phase 3: Extract PositionOrchestrator** ⏳ Deferred
 - [ ] Create `src/trading_bot/services/position_orchestrator.py`
