@@ -273,6 +273,41 @@ class TestGetBreakevenParameters:
         assert buffer == 20.0
 
 
+class TestPerSymbolBreakeven:
+    """Per-symbol overrides take priority over asset-class defaults."""
+
+    def test_per_symbol_override_used(self):
+        from trading_bot.position.automation.breakeven_manager import BreakevenManager
+
+        cfg = {
+            "position_management": {
+                "commodities": {"breakeven_trigger": 50, "breakeven_offset": 10},
+            },
+            "symbols": {
+                "XAUUSD": {"breakeven_trigger": 175, "breakeven_offset": 20},
+            },
+        }
+        mgr = BreakevenManager(config=cfg)
+        assert mgr.get_breakeven_distance("XAUUSD") == 175
+        assert mgr.get_breakeven_buffer("XAUUSD") == 20
+
+    def test_symbol_without_override_uses_asset_default(self):
+        from trading_bot.position.automation.breakeven_manager import BreakevenManager
+
+        cfg = {
+            "position_management": {
+                "commodities": {"breakeven_trigger": 50, "breakeven_offset": 10},
+            },
+            "symbols": {
+                "XAUUSD": {"breakeven_trigger": 175, "breakeven_offset": 20},
+            },
+        }
+        mgr = BreakevenManager(config=cfg)
+        # XAGUSD has no per-symbol override → falls back to commodities defaults
+        assert mgr.get_breakeven_distance("XAGUSD") == 50
+        assert mgr.get_breakeven_buffer("XAGUSD") == 10
+
+
 class TestResetPosition:
     """Test reset_position method."""
 

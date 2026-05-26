@@ -289,10 +289,14 @@ symbols:
     max_take_profit_pips: 1200              # $120 maximum TP
     default_risk_reward_ratio: 2.0          # Default 1:2 R:R (if TP not specified)
 
-    # Trailing Stop Configuration (dynamic based on SL distance)
-    use_dynamic_trailing: true              # Calculate trailing params from SL
-    trailing_activation_percent: 0.35       # Activate at 35% of SL distance
-    trailing_limit_percent: 0.12            # Trail 12% of SL distance behind high
+    # Per-symbol Breakeven & Trailing (overrides commodities asset-class defaults
+    # in default.yaml). Scaled to gold's wider SL — BE at ~50% of default SL = 1R,
+    # trailing activates at ~80% = 1.5R, so trades have room to develop before
+    # automation locks them.
+    breakeven_trigger: 175       # 50% of 350-pip default SL ($17.5 profit)
+    breakeven_offset: 20         # $2 buffer (wider gap for volatile fills)
+    trailing_activation: 280     # 80% of default SL ($28 profit) before trail
+    trailing_distance: 100       # $10 trail distance (proportional to volatility)
 
   XAGUSD:
     enabled: true  # Enabled for testing
@@ -320,6 +324,13 @@ symbols:
     min_take_profit_pips: 60               # $30 minimum TP (2:1 R:R)
     max_take_profit_pips: 200              # $100 maximum TP
     default_risk_reward_ratio: 2.0
+
+    # Per-symbol Breakeven & Trailing (silver-scaled, separate from gold).
+    # Silver SL default 50 pips → BE at 50% = 25 pips ($12.5), trail at 80% = 40.
+    breakeven_trigger: 25        # 50% of 50-pip default SL ($12.5 profit)
+    breakeven_offset: 5          # $2.5 buffer
+    trailing_activation: 40      # 80% of default SL ($20 profit)
+    trailing_distance: 15        # $7.5 trail distance
 
   # Crypto
   BTCUSD:

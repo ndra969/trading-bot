@@ -479,17 +479,48 @@ class TestGetSettingsNewConfig:
             }
         }
         manager = TrailingStopManager(config=new_config)
-        settings = manager._get_settings("forex_major")
+        settings = manager._get_settings("EURUSD", "forex_major")
         assert settings["activation_pips"] == 25.0
         assert settings["limit_pips"] == 12.0
 
     def test_get_settings_old_config_structure(self, mock_config):
         """Test _get_settings falls back to old trade_management structure."""
         manager = TrailingStopManager(config=mock_config)
-        settings = manager._get_settings("forex_jpy")
+        settings = manager._get_settings("USDJPY", "forex_jpy")
         # Should use old structure overrides
         assert settings["activation_pips"] == 100.0
         assert settings["limit_pips"] == 20.0
+
+    def test_per_symbol_override_wins(self):
+        """Per-symbol config overrides asset-class config."""
+        cfg = {
+            "position_management": {
+                "commodities": {"trailing_activation": 80, "trailing_distance": 40},
+            },
+            "symbols": {
+                "XAUUSD": {"trailing_activation": 280, "trailing_distance": 100},
+            },
+        }
+        manager = TrailingStopManager(config=cfg)
+        settings = manager._get_settings("XAUUSD", "commodities")
+        assert settings["activation_pips"] == 280
+        assert settings["limit_pips"] == 100
+
+    def test_other_symbol_uses_asset_class_default(self):
+        """Symbol without override falls back to asset-class config."""
+        cfg = {
+            "position_management": {
+                "commodities": {"trailing_activation": 80, "trailing_distance": 40},
+            },
+            "symbols": {
+                "XAUUSD": {"trailing_activation": 280, "trailing_distance": 100},
+            },
+        }
+        manager = TrailingStopManager(config=cfg)
+        # XAGUSD has no per-symbol override → falls back to commodities defaults
+        settings = manager._get_settings("XAGUSD", "commodities")
+        assert settings["activation_pips"] == 80
+        assert settings["limit_pips"] == 40
 
 
 class TestATRBasedTrailing:

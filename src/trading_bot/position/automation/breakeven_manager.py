@@ -40,28 +40,24 @@ class BreakevenManager:
 
         logger.debug("BreakevenManager initialized")
 
-    def _get_settings(self, asset_class: str) -> dict:
-        """
-        Get breakeven settings for asset class.
+    def _get_settings(self, symbol: str, asset_class: str) -> dict:
+        """Get breakeven settings with per-symbol > asset-class fallback.
 
-        Uses position_management config structure from docs:
-        position_management:
-          forex_major:
-            breakeven_trigger: 15
-            breakeven_offset: 2
+        Priority:
+            1. symbols.{SYMBOL}.breakeven_trigger / breakeven_offset
+               (active_symbols.yaml — for per-symbol tuning, e.g. gold vs silver)
+            2. position_management.{asset_class}.breakeven_trigger / breakeven_offset
+               (default.yaml — shared across an asset class)
+            3. Hardcoded defaults (15 trigger, 2 offset)
         """
+        symbol_cfg = self.config.get("symbols", {}).get(symbol, {})
         pm_config = self.config.get("position_management", {})
-
-        # Get asset-specific config (flat structure as per docs)
         asset_config = pm_config.get(asset_class, {})
 
-        # Map from docs field names to internal field names
-        settings = {
-            "trigger_pips": asset_config.get("breakeven_trigger", 15.0),
-            "offset_pips": asset_config.get("breakeven_offset", 2.0),
-        }
+        trigger = symbol_cfg.get("breakeven_trigger", asset_config.get("breakeven_trigger", 15.0))
+        offset = symbol_cfg.get("breakeven_offset", asset_config.get("breakeven_offset", 2.0))
 
-        return settings
+        return {"trigger_pips": trigger, "offset_pips": offset}
 
     def should_move_to_breakeven(self, position: Position) -> bool:
         """
@@ -92,7 +88,7 @@ class BreakevenManager:
 
         # Get breakeven trigger distance
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(position.symbol, asset_class)
         trigger_distance = settings.get("trigger_pips", 15.0)
 
         # Log current status for debugging
@@ -131,7 +127,7 @@ class BreakevenManager:
 
         # Get asset class and buffer
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(position.symbol, asset_class)
         buffer_pips = settings.get("offset_pips", 2.0)
         pip_size = position.pip_size
 
@@ -183,7 +179,7 @@ class BreakevenManager:
             Breakeven trigger distance in pips
         """
         asset_class = self.pip_calculator._determine_asset_class(symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(symbol, asset_class)
         return settings.get("trigger_pips", 15.0)
 
     def get_breakeven_buffer(self, symbol: str) -> float:
@@ -197,7 +193,7 @@ class BreakevenManager:
             Breakeven buffer in pips
         """
         asset_class = self.pip_calculator._determine_asset_class(symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(symbol, asset_class)
         return settings.get("offset_pips", 2.0)
 
     def reset_position(self, position_id: str) -> None:

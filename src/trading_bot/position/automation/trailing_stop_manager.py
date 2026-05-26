@@ -131,37 +131,38 @@ class TrailingStopManager:
 
         return tiered_configs
 
-    def _get_settings(self, asset_class: str) -> dict:
-        """
-        Get trailing settings for asset class.
+    def _get_settings(self, symbol: str, asset_class: str) -> dict:
+        """Get trailing settings with per-symbol > asset-class fallback.
 
-        Supports both old and new config structures for backward compatibility:
-        - New: position_management.forex_major.trailing_activation
-        - Old: trade_management.overrides.forex_jpy.trailing_stop.activation_pips
+        Priority:
+            1. symbols.{SYMBOL}.trailing_activation / trailing_distance
+               (active_symbols.yaml — per-symbol tuning)
+            2. position_management.{asset_class}.trailing_activation / trailing_distance
+               (default.yaml — shared across asset class)
+            3. trade_management legacy structure (kept for backward compat)
+            4. Hardcoded defaults (20 activation, 10 limit)
         """
-        # Try new structure first (position_management)
+        symbol_cfg = self.config.get("symbols", {}).get(symbol, {})
+
         pm_config = self.config.get("position_management", {})
         asset_config = pm_config.get(asset_class, {})
 
-        if asset_config:
-            # New structure found
-            return {
-                "activation_pips": asset_config.get("trailing_activation", 20.0),
-                "limit_pips": asset_config.get("trailing_distance", 10.0),
-            }
+        if asset_config or symbol_cfg.get("trailing_activation") is not None:
+            activation = symbol_cfg.get(
+                "trailing_activation", asset_config.get("trailing_activation", 20.0)
+            )
+            limit = symbol_cfg.get("trailing_distance", asset_config.get("trailing_distance", 10.0))
+            return {"activation_pips": activation, "limit_pips": limit}
 
-        # Fallback to old structure (trade_management)
+        # Legacy fallback
         tm_config = self.config.get("trade_management", {})
         defaults = tm_config.get("defaults", {}).get("trailing_stop", {})
         overrides = tm_config.get("overrides", {}).get(asset_class, {}).get("trailing_stop", {})
-
-        # Use override if available, otherwise use default
-        activation_pips = overrides.get("activation_pips", defaults.get("activation_pips", 20.0))
-        limit_pips = overrides.get("limit_pips", defaults.get("limit_pips", 10.0))
-
         return {
-            "activation_pips": activation_pips,
-            "limit_pips": limit_pips,
+            "activation_pips": overrides.get(
+                "activation_pips", defaults.get("activation_pips", 20.0)
+            ),
+            "limit_pips": overrides.get("limit_pips", defaults.get("limit_pips", 10.0)),
         }
 
     def should_activate_trailing(self, position: Position) -> bool:
@@ -186,7 +187,7 @@ class TrailingStopManager:
 
         # Get activation threshold from config
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(position.symbol, asset_class)
         threshold_pips = settings.get("activation_pips", 20.0)
 
         # Check if profit exceeds threshold
@@ -255,7 +256,7 @@ class TrailingStopManager:
         # Also check if we can improve stop loss based on current price
         # This handles cases where profit fluctuates but price still allows better SL
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(position.symbol, asset_class)
         trailing_distance = settings.get("limit_pips", 10.0)
         pip_size = position.pip_size
         trailing_price = trailing_distance * pip_size
@@ -306,7 +307,7 @@ class TrailingStopManager:
 
         # Get trailing distance
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(position.symbol, asset_class)
         trailing_distance = settings.get("limit_pips", 10.0)
         pip_size = position.pip_size
 
@@ -365,7 +366,7 @@ class TrailingStopManager:
             Trailing distance in pips
         """
         asset_class = self.pip_calculator._determine_asset_class(symbol)
-        settings = self._get_settings(asset_class)
+        settings = self._get_settings(symbol, asset_class)
         return settings.get("limit_pips", 10.0)
 
     def get_highest_profit(self, position_id: str) -> float:
@@ -477,7 +478,7 @@ class TrailingStopManager:
 
         # If ATR-based trailing not enabled for this asset class, use fallback
         if not atr_config.use_atr_trailing:
-            settings = self._get_settings(asset_class)
+            settings = self._get_settings(symbol, asset_class)
             return settings.get("activation_pips", 20.0)
 
         # Try to get ATR
@@ -487,7 +488,7 @@ class TrailingStopManager:
             return self.calculate_atr_activation(atr, asset_class)
         else:
             # Fallback to fixed pips from config
-            settings = self._get_settings(asset_class)
+            settings = self._get_settings(symbol, asset_class)
             return settings.get("activation_pips", atr_config.fallback_activation_pips)
 
     # ========== Tiered Trailing Methods ==========
