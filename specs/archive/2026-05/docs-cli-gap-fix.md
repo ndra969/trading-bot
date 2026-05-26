@@ -1,13 +1,22 @@
 # Docs Reality Gap Fix
 
-**Status**: Planned
+**Status**: ✅ Resolved
 **Priority**: 🔴 High (docs mislead users)
-**Estimated Effort**: 1-2 hours
-**Date**: 2026-05-24
+**Date**: 2026-05-24, completed 2026-05-26
 
 Fix documentation that references features/commands that don't exist.
 
-## Issues Found
+## Resolution Summary
+
+| Issue | Status |
+|---|---|
+| A. CLI gap (67 docs vs 9 actual) | ✅ All fake commands now marked 📋 Planned across docs (`841e1bc`). Top-level cli-reference has Implemented/Planned sections |
+| B. Trading types (4 vs 1) | ✅ Already correct in `trading-types-guide.md` (header table + per-type status badge) |
+| C. DryRunWrapper integration | ✅ Wrapper implemented (`b5a01fe`), docs updated, main.py integration deferred (documented in refactor-codebase.md Refactor 11) |
+| D. ConservativeRiskManager | ✅ Deleted (refactor-codebase.md Refactor 7). No remaining doc references. |
+| E. PerformanceAnalyzer | ✅ Deleted (refactor-codebase.md Refactor 7). Dead script `scripts/analyze_trading_performance.py` removed in cleanup |
+
+## Issues Found (Original)
 
 ### A. CLI Commands Gap (67 documented vs 9 actual)
 ### B. Trading Types Gap (4 documented vs 1 implemented)

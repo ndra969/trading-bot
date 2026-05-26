@@ -20,9 +20,13 @@ specs/
 
 | Spec | Status | Priority |
 |------|--------|----------|
-| [code-review-2026-05.md](active/code-review-2026-05.md) | ⏳ In Progress | 🟢 Active |
-| [docs-cli-gap-fix.md](active/docs-cli-gap-fix.md) | 📋 Planned | 🔴 High |
-| [refactor-codebase.md](active/refactor-codebase.md) | 📋 Planned | 🟠 Medium |
+| [refactor-codebase.md](active/refactor-codebase.md) | 🟡 Mostly complete — service extraction deferred | 🟢 Low |
+| [strategy-tuning.md](active/strategy-tuning.md) | 🟢 Round 1 applied, observation phase | 🟠 Medium |
+
+## Recently Archived (2026-05)
+
+- [code-review-2026-05.md](archive/2026-05/code-review-2026-05.md) — module-by-module audit (✅ Completed 2026-05-24)
+- [docs-cli-gap-fix.md](archive/2026-05/docs-cli-gap-fix.md) — fake CLI references resolved (✅ Completed 2026-05-26)
 
 ---
 
