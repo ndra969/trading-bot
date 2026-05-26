@@ -1,0 +1,29 @@
+# Test Configuration
+# Mirrors development settings but points MT5 at the Broker A terminal so
+# dry-run sessions don't fight with an active Broker B development instance.
+#
+# Usage:
+#   uv run trading-bot --config test start --dry-run                 # mock MT5
+#   uv run trading-bot --config test start --dry-run --connect-mt5   # real data, simulated orders
+
+trading:
+  dry_run: true               # Always start in dry-run for this config
+  risk_per_trade: 0.001       # 0.1% — same conservative bar as development
+  max_concurrent_positions: 3
+  confluence_threshold: 70.0
+  market_validation: false    # Skip market hours validation for off-hours testing
+
+telegram:
+  enabled: false              # Silent in test — no notification spam
+
+logging:
+  level: "DEBUG"
+  file_path: "./logs/trading_bot_test.log"  # Separate log file from dev
+
+# MT5 Configuration — Broker A terminal, same account as development
+mt5:
+  terminal_path: "C:\\Program Files\\MetaTrader 5\\Broker A"
+  login: 159394302
+  # password: set via .env.test if needed
+  server: "Exness-MT5Real20"
+  connection_timeout: 60

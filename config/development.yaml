@@ -16,9 +16,11 @@ logging:
 
 # MT5 Configuration for Development
 mt5:
-  path: "C:\\Program Files\\MetaTrader 5\\Broker B"
+  # NOTE: field names must match MT5Config in src/trading_bot/config.py — pydantic
+  # silently drops unknowns. Previous keys (path, timeout) were never applied.
+  terminal_path: "C:\\Program Files\\MetaTrader 5\\Broker B"
   # IMPORTANT: Set these to prevent auto-switch to test server
   login: 159394302
   # password: "your_password"  # Uncomment and set if needed
   server: "Exness-MT5Real20"  # Force specific server to prevent auto-switch
-  timeout: 60000
+  connection_timeout: 60
