@@ -426,9 +426,7 @@ class FoundationEngine:
         Generates zone_id, logs the successful signal, and packages all
         confluence data into metadata for downstream consumers.
         """
-        zone_id = (
-            f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
-        )
+        zone_id = f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
 
         logger.info(
             f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
@@ -542,14 +540,17 @@ class FoundationEngine:
 
         # 4. Commodities-specific filters
         if asset_class == "commodities":
-            # 4a. Dynamic score threshold (PHASE 5.8) - higher for counter-trend
+            # 4a. Dynamic score threshold (raised in drawdown response: 15/18-20 → 40/50)
+            # Commodities used to bypass the 75% global threshold entirely. Recent
+            # drawdown traced back to commodity losers passing through with weak
+            # confluence. Still below forex's 75% because gold reacts strongly to
+            # foundation (S&D) without always needing every enhancement layer.
             is_counter_trend = self._is_counter_trend(
                 direction, data, current_price, current_range, avg_range
             )
-            # Threshold: 15 for trend-following, 18-20 for counter-trend
-            min_score_threshold = 15.0
+            min_score_threshold = 40.0
             if is_counter_trend:
-                min_score_threshold = 18.0 if current_range > avg_range * 1.5 else 20.0
+                min_score_threshold = 50.0
 
             if final_score < min_score_threshold:
                 logger.warning(
@@ -676,10 +677,7 @@ class FoundationEngine:
                 f"Cannot short when market is already oversold."
             )
             return None
-        elif (
-            direction == SignalDirection.BUY
-            and rsi_res.details.get("condition") == "OVERBOUGHT"
-        ):
+        elif direction == SignalDirection.BUY and rsi_res.details.get("condition") == "OVERBOUGHT":
             logger.warning(
                 f"{symbol}: REJECTING BUY signal - RSI is overbought ({rsi_res.rsi_value:.1f}). "
                 f"Cannot buy when market is already overbought."
@@ -875,9 +873,7 @@ class FoundationEngine:
             zone_height_pips = zone_height / pip_size
 
             # Apply asset-specific zone quality filters
-            if not self._passes_zone_quality_filters(
-                symbol, zone, asset_class, zone_height_pips
-            ):
+            if not self._passes_zone_quality_filters(symbol, zone, asset_class, zone_height_pips):
                 return None
 
             # -------------------------------------------------------------------------
@@ -1410,9 +1406,11 @@ class FoundationEngine:
             layer_scores, layer_details, raw_confidences = enhancement_result
 
             # Calculate final confluence score using config-driven weights
-            final_score, weighted_foundation_score, weighted_enhancement_score = (
-                self._calculate_confluence_score(zone, raw_confidences)
-            )
+            (
+                final_score,
+                weighted_foundation_score,
+                weighted_enhancement_score,
+            ) = self._calculate_confluence_score(zone, raw_confidences)
 
             # Apply final quality filters (min confluence, price action req, H1 gate, etc)
             if not self._passes_final_quality_filters(

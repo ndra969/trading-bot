@@ -276,16 +276,17 @@ symbols:
     use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
 
     # Stop Loss / Take Profit Configuration (10 pips = $1 for Gold)
-    # Zone-based SL: Dynamically calculated from zone size with limits
+    # Widened for volatility (gold H1 ATR ~30-80 pips, daily ~150-300 pips).
+    # Previous min 80 pips ($8) was within 1x ATR — false stop-outs from noise.
     use_zone_based_sl: true                 # Calculate SL from zone size
     zone_sl_buffer_multiplier: 1.2          # Place SL 20% beyond zone boundary
-    min_stop_loss_pips: 80                  # $8 minimum (prevents too tight stops)
-    max_stop_loss_pips: 300                 # $30 maximum (prevents too wide stops)
-    default_stop_loss_pips: 150             # $15 fallback if zone-based calculation fails
+    min_stop_loss_pips: 200                 # $20 minimum (2-3x H1 ATR — breathing room)
+    max_stop_loss_pips: 600                 # $60 maximum (caps worst-case loss)
+    default_stop_loss_pips: 350             # $35 fallback if zone-based calculation fails
 
-    # Take Profit Configuration
-    min_take_profit_pips: 100               # $10 minimum TP
-    max_take_profit_pips: 600               # $60 maximum TP
+    # Take Profit Configuration (raised to maintain 2:1 R:R against wider SL)
+    min_take_profit_pips: 400               # $40 minimum TP
+    max_take_profit_pips: 1200              # $120 maximum TP
     default_risk_reward_ratio: 2.0          # Default 1:2 R:R (if TP not specified)
 
     # Trailing Stop Configuration (dynamic based on SL distance)
@@ -308,15 +309,16 @@ symbols:
     use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
 
     # Stop Loss / Take Profit Configuration (Silver - FIXED pip size 0.01)
-    # With pip size 0.01 and pip value $0.50 per 0.01 lot:
-    # 1 pip = $0.50, so 8 pips = $4, 40 pips = $20
+    # With pip size 0.01 and pip value $0.50 per 0.01 lot.
+    # Widened for volatility (silver H1 ATR ~10-30 pips, daily ~50-150 pips).
+    # Previous min 8 pips ($4) hit by ordinary noise constantly.
     use_zone_based_sl: true                # Zone-based for commodities
     zone_sl_buffer_multiplier: 1.2
-    min_stop_loss_pips: 8                  # $4 minimum (8 pips × $0.50)
-    max_stop_loss_pips: 40                 # $20 maximum (40 pips × $0.50)
-    default_stop_loss_pips: 16             # $8 default (16 pips × $0.50)
-    min_take_profit_pips: 12               # $6 minimum TP
-    max_take_profit_pips: 60               # $30 maximum TP
+    min_stop_loss_pips: 30                 # $15 minimum (2-3x H1 ATR)
+    max_stop_loss_pips: 100                # $50 maximum (caps worst-case)
+    default_stop_loss_pips: 50             # $25 default fallback
+    min_take_profit_pips: 60               # $30 minimum TP (2:1 R:R)
+    max_take_profit_pips: 200              # $100 maximum TP
     default_risk_reward_ratio: 2.0
 
   # Crypto
