@@ -14,7 +14,7 @@ confluence_weights:
   price_action: 0.15         # Price Action patterns
   fibonacci: 0.12            # Fibonacci levels
   breakout_retest: 0.12      # Breakout confirmation
-  market_structure: 0.08     # Structure (BOS/CHoCH)
+  structure: 0.08            # Market Structure (BOS/CHoCH) — key must match foundation_engine
   rsi: 0.10                  # RSI Analysis
   ma: 0.08                   # Moving Average alignment
   volume_profile: 0.05       # (Optional) Volume profile

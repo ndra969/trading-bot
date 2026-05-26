@@ -358,6 +358,14 @@ symbols:
     max_take_profit_pips: 5000             # $5000 max TP
     default_risk_reward_ratio: 2.0
 
+    # Per-symbol Breakeven & Trailing (scales to BTC's $800 default SL).
+    # Crypto asset-class defaults (BE 400 / trail 600) are already BTC-tuned,
+    # but pinning here makes the intent explicit at the symbol level.
+    breakeven_trigger: 400       # $400 = 50% of $800 default SL (1R lock-in)
+    breakeven_offset: 50         # $50 buffer
+    trailing_activation: 640     # $640 = 80% of default SL (1.6R)
+    trailing_distance: 200       # $200 trail (proportional to BTC vol)
+
 # Trading session schedules
 trading_sessions:
   sydney:

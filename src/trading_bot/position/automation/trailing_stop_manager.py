@@ -3,7 +3,7 @@ Trailing Stop Manager - Dynamic trailing stop management.
 
 Automatically adjusts stop loss as profit increases.
 
-ATR Week 15.5.2 Enhancements: Tiered Trailing Enhancements:
+Supports three trailing modes (configurable per asset class):
 - ATR-based dynamic trailing (adaptive to volatility)
 - Tiered trailing (progressive distances based on profit level)
 - Session-aware adjustment (wider during volatile sessions)
