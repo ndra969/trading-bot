@@ -1,132 +1,106 @@
 # Strategy Tuning Plan
 
-**Status**: Planned
+**Status**: 🟢 Tuning round 1 applied — observation phase
 **Priority**: 🟠 Medium
-**Date**: 2026-05-24
+**Date**: 2026-05-24, last updated 2026-05-26
 **Context**: Account size $2000, day_trading mode
 
 Tune strategy parameters for small account ($2K) to balance trade frequency vs quality.
 
-## Current Issues
+## Round 1 Applied (2026-05-25 to 2026-05-26)
 
-### 1. Confluence Threshold Too Low
+Triggered by ~3% drawdown ($1980 from $2040 starting). Per-symbol P&L showed
+XAU/XAG dominating losses. Fixes applied:
 
-**Config**: `day_trading.confluence_threshold: 30.0`
-**Docs/intended**: minimum 65% confluence
-**Impact**: Low-quality signals accepted (3 of 8 layers agreeing is enough)
+| Change | Commit | Effect |
+|---|---|---|
+| Risk per trade: forex 0.4% → 0.2% | `832a2b1` | Worst-case daily exposure halved (5 × 0.2% = 1% vs 2%) |
+| Commodities confluence: 15/18-20 → 40/50 | `84b930d` | Stops weak signals bypassing forex's 75% bar |
+| XAU SL: min 80 → 200, default 150 → 350, max 300 → 600 pips | `84b930d` | Within 2-3x H1 ATR (was within 1x) |
+| XAG SL: min 8 → 30, default 16 → 50, max 40 → 100 pips | `84b930d` | Same reasoning, scaled to silver pip value |
+| Per-symbol BE/trailing | `67173fe` | Gold/silver each get scaled BE (~50% of SL) and trailing (~80% of SL) |
+| close_reason now canonical enum | `b72031c` | Position outcomes properly classified for analysis |
+| Slippage + market_session captured | `29d1e27` | Per-trade data quality improved for tuning |
+
+**Observation phase:** Run for ~1 week, then review per-symbol P&L by `close_reason`
+and `market_session` to decide round 2 adjustments.
+
+---
+
+## Previous Findings (Pre-Round 1)
+
+### 1. Confluence Threshold
+
+**Forex**: `day_trading.confluence_threshold: 30.0` is intentionally low to keep
+trade frequency reasonable on a small account. Commodities bypassed even this and
+only required 15-20% — patched in `84b930d` to require 40-50%.
 
 ### 2. Risk Per Trade Was Buggy (FIXED)
 
-**Was**: 0.01% (`$0.20` on $2K) → volume always clamped to 0.01
-**Now**: 1.0% (`$20` on $2K) → realistic volumes per asset
+**Was (pre-fix)**: 0.01% (`$0.20` on $2K) → volume always clamped to 0.01
+**After fix `756457f`**: percent-based, defaults at 1%
+**After tuning `832a2b1`**: forex halved to 0.2%, commodities remain 0.1%
 
 ### 3. Per-Symbol Dynamic Volume Flag
 
-**Status**: ✅ Already exists in `active_symbols.yaml` as `use_dynamic_lot_size`
-**Action**: Verify all pairs have the flag explicitly set (no global default)
+✅ Resolved — all 12 symbols in `active_symbols.yaml` have `use_dynamic_lot_size`
+explicitly set. Forex (USD + JPY) = true, XAUUSD/XAGUSD/BTCUSD = false (fixed 0.01).
 
-## Recommended Settings for $2000 Account
+---
 
-### Day Trading Conservative (Recommended Start)
-
-```yaml
-day_trading:
-  risk_per_trade: 0.005          # 0.5% = $10/trade (was 1%)
-  max_positions: 3               # Was 5
-  confluence_threshold: 65.0     # Was 30.0
-  max_loss_per_day: 0.015        # 1.5% = $30 (was 2%)
-```
-
-Max exposure: 3 × 0.5% = 1.5% per moment, $45 daily max loss.
-
-### Day Trading Balanced (Current After Fix)
+## Current Settings (2026-05-26)
 
 ```yaml
-day_trading:
-  risk_per_trade: 0.01           # 1% = $20/trade
-  max_positions: 5
-  confluence_threshold: 65.0     # Raise from 30 to 65
-  max_loss_per_day: 0.02         # 2% = $40
+# Forex pairs (EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD, EURJPY, GBPJPY)
+risk_per_trade: 0.002        # 0.2% — halved for drawdown protection
+use_dynamic_lot_size: true   # risk-based sizing
+
+# XAUUSD (gold) — fixed 0.01 lot, wider SL
+risk_per_trade: 0.001
+use_dynamic_lot_size: false
+min_stop_loss_pips: 200      # $20 (2-3x H1 ATR)
+default_stop_loss_pips: 350  # $35
+max_stop_loss_pips: 600      # $60
+breakeven_trigger: 175       # ≈50% of default SL
+trailing_activation: 280     # ≈80% of default SL
+
+# XAGUSD (silver) — fixed 0.01 lot, scaled for silver pip value
+risk_per_trade: 0.001
+use_dynamic_lot_size: false
+min_stop_loss_pips: 30       # $15
+default_stop_loss_pips: 50   # $25
+max_stop_loss_pips: 100      # $50
+breakeven_trigger: 25
+trailing_activation: 40
+
+# BTCUSD — fixed 0.01 lot
+risk_per_trade: 0.001
+use_dynamic_lot_size: false  # No per-symbol BE/trailing yet — uses crypto defaults
 ```
 
-Max exposure: 5 × 1% = 5% per moment, $40 daily max loss.
+Commodities confluence threshold (in `foundation_engine._passes_final_quality_filters`):
+- Trend-following: 40 (was 15)
+- Counter-trend mild vol: 50 (was 20)
+- Counter-trend high vol: 50 (was 18)
 
-### Day Trading Aggressive
+## Round 2 Candidates (Pending Observation Data)
 
-```yaml
-day_trading:
-  risk_per_trade: 0.015          # 1.5% = $30/trade
-  max_positions: 4
-  confluence_threshold: 60.0
-  max_loss_per_day: 0.03         # 3% = $60
-```
+- [ ] BTCUSD per-symbol BE/trailing (currently shares `crypto` asset class defaults)
+- [ ] Confluence threshold tuning for forex (currently 30% via day_trading config)
+- [ ] Market-session filtering — analyze whether one session is consistently losing
+- [ ] Slippage analysis — high slippage symbols may need spread filter tightening
+- [ ] Backfill `close_reason` for the 478 closed positions? (User said no; revisit if needed)
 
-Max exposure: 4 × 1.5% = 6% per moment, $60 daily max loss.
+## Verification
 
-## Per-Pair Dynamic Volume Configuration
-
-Each pair must have `use_dynamic_lot_size` explicitly:
-
-```yaml
-# config/active_symbols.yaml
-EURUSD:
-  use_dynamic_lot_size: true   # Calculate from risk
-  min_volume_lots: 0.01
-  max_volume_lots: 1.0
-
-XAUUSD:
-  use_dynamic_lot_size: false  # Fixed 0.01 (for high volatility)
-  min_volume_lots: 0.01        # Used as fixed when dynamic=false
-
-BTCUSD:
-  use_dynamic_lot_size: false  # Crypto too volatile for small account
-  min_volume_lots: 0.01        # Fixed minimum
-  max_volume_lots: 0.1
-```
-
-**Rule**: If `use_dynamic_lot_size: false`, the bot uses `min_volume_lots` as fixed size.
-
-## Audit Tasks
-
-- [ ] List all pairs in active_symbols.yaml
-- [ ] Verify each has `use_dynamic_lot_size` explicitly set
-- [ ] Add flag with safe default (false) for any missing pair
-- [ ] Document recommended settings per pair
-
-## Strategy Per-Asset Tuning Recommendations
-
-### Forex Majors (EURUSD, GBPUSD, etc.)
-- `use_dynamic_lot_size: true` (risk-based calculation)
-- 30 pip SL, 60 pip TP (1:2 RR)
-- Min confluence 65%
-
-### Forex JPY (USDJPY, EURJPY, etc.)
-- `use_dynamic_lot_size: true`
-- 40 pip SL (400 points - JPY pairs use 0.01 pip)
-- More conservative due to volatility
-
-### Commodities (XAUUSD, XAGUSD)
-- `use_dynamic_lot_size: false` for small accounts
-- Fixed 0.01 lot (Gold volatile, can lose $10-20 per 100 pips)
-- Higher SL (100+ pips)
-- Min confluence 70% (strict)
-
-### Crypto (BTCUSD)
-- `use_dynamic_lot_size: false` for small accounts ⚠️
-- Fixed micro lot (0.01)
-- Very wide SL (500+ pips for BTC)
-- Min confluence 75% (very strict)
-- Consider only trading during low volatility periods
-
-## Open Questions
-
-- [ ] Which preset to use? (Conservative/Balanced/Aggressive)
-- [ ] Should we add a CLI command to switch presets?
-- [ ] Test each preset in dry-run for a week?
-- [ ] Track win rate per preset?
+- [x] Run `verify-data` CLI against MT5 to confirm position data matches reality
+- [x] Confirm config validator catches inverted BE/trailing thresholds (per-symbol too)
+- [x] All 1517 unit tests pass after every change
 
 ## Related
 
 - [code-review-2026-05.md](code-review-2026-05.md)
 - [refactor-codebase.md](refactor-codebase.md)
-- Bug fix commit: `756457f` (risk_per_trade decimal/percent)
+- Bug fix commit: `756457f` (risk_per_trade decimal/percent normalization)
+- Tuning round 1 commits: `832a2b1`, `84b930d`, `67173fe`
+- Data tracking commits: `b72031c`, `29d1e27`
