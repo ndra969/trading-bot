@@ -167,6 +167,49 @@ alembic upgrade head
 
 ---
 
+## Position Data Issues
+
+### close_reason Doesn't Match What MT5 Showed
+
+Every closed position carries one of these canonical `close_reason` values
+(see `src/trading_bot/position/close_reason.py`):
+
+| Reason | When recorded |
+|---|---|
+| `TAKE_PROFIT` | MT5 deal closed with reason=TP |
+| `STOP_LOSS` | MT5 SL hit, position had neither breakeven nor trailing activated |
+| `BREAKEVEN_STOP` | MT5 SL hit AFTER breakeven was activated → close near entry, intended profit |
+| `TRAILING_STOP` | MT5 SL hit AFTER trailing was activated → guaranteed profit (SL never moves backward) |
+| `MAX_DURATION` | Bot force-closed after timeout (only while in profit) |
+| `MANUAL` | Bot-initiated close not matching another category |
+| `MARGIN_STOPOUT` | MT5 stopped out due to margin (account-level) |
+| `ROLLOVER` | MT5 rollover (rare) |
+| `ORPHANED` | Position had no ticket after lookup — closed defensively |
+| `MT5_MISSING` | Ticket existed but disappeared from MT5 without a deal record |
+| `UNKNOWN` | No MT5 deal info and no bot intent — fallback |
+
+If the value seems off, run `uv run trading-bot verify-data` to cross-check
+recent closes against MT5's deal history.
+
+### Stale ACTIVE Trading Sessions
+
+The bot creates a new `trading_sessions` row at each startup. Crashes/kills
+that bypass graceful shutdown leave the row at `ACTIVE` forever.
+
+**Fix**: Restart the bot. `_initialize_session_management` now closes any
+abandoned ACTIVE sessions for the current account (`close_abandoned_sessions`)
+before creating a new one. `end_time` is set to the session's last `updated_at`,
+preserving the real cutoff.
+
+### Position-Session Attribution
+
+Aggregations (`total_trades`, `total_pnl_usd`) are credited to the session
+the position was *opened in* (`position.session_id`), not the current one.
+A position opened in session A and closed in session B counts against A —
+without this, restarts during a long-running trade would inflate B and leave A empty.
+
+---
+
 ## Performance Issues
 
 ### High Memory Usage

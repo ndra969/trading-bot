@@ -213,7 +213,7 @@ Each type tracks separate metrics:
 - Risk-adjusted returns
 
 ```bash
-# View performance by type
+# 📋 Planned (not yet implemented). Query DB directly for now:
 uv run trading-bot performance --by-type
 ```
 

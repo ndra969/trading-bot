@@ -55,6 +55,19 @@ uv run trading-bot config show
 uv run trading-bot config validate
 ```
 
+### Data Integrity
+
+```bash
+# Cross-check recent closed positions in DB against MT5 deal history.
+# Shows mismatches in close_price, P&L, or close_reason. Empty table = clean.
+uv run trading-bot verify-data
+uv run trading-bot verify-data --limit 50               # Check last 50 closes
+uv run trading-bot verify-data --symbol EURUSD          # Filter to one symbol
+```
+
+Requires MT5 connected first (`mt5 connect`). Useful after a bot crash to
+confirm DB reflects what actually happened in the broker.
+
 ### Project Info
 
 ```bash
