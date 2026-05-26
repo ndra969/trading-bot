@@ -244,6 +244,132 @@ def start(ctx, dry_run, connect_mt5):
         sys.exit(1)
 
 
+@cli.command(name="verify-data")
+@click.option("--limit", default=20, help="Number of recent closed positions to verify")
+@click.option("--symbol", default=None, help="Filter by symbol (e.g., EURUSD)")
+@click.pass_context
+def verify_data(ctx, limit, symbol):
+    """Cross-check recent CLOSED positions in DB against MT5 deal history.
+
+    For each position, fetches the MT5 deal by ticket and compares:
+    - close_price (DB vs MT5)
+    - realized P&L (DB vs MT5)
+    - MT5 deal.reason matches DB close_reason
+
+    Discrepancies are shown in a table. Empty table = data is accurate.
+    """
+    import asyncio
+
+    asyncio.run(_run_verify_data(ctx, limit, symbol))
+
+
+async def _run_verify_data(ctx, limit, symbol):
+    from sqlalchemy import desc, select
+
+    from .data.database import get_session, init_database
+    from .data.models import Position as DBPosition
+    from .position.close_reason import (
+        resolve_close_reason,
+    )
+
+    config = ctx.obj["config"]
+    init_database(config.database.url)
+
+    global _mt5_connector
+    if not _mt5_connector or not _mt5_connector.is_connected():
+        console.print("[red]MT5 not connected.[/red] Run 'mt5 connect' first.")
+        return
+
+    async with get_session() as session:
+        stmt = (
+            select(DBPosition)
+            .where(DBPosition.status == "CLOSED", DBPosition.ticket.isnot(None))
+            .order_by(desc(DBPosition.close_time))
+            .limit(limit)
+        )
+        if symbol:
+            stmt = stmt.where(DBPosition.symbol == symbol)
+        result = await session.execute(stmt)
+        positions = list(result.scalars().all())
+
+    if not positions:
+        console.print("[yellow]No CLOSED positions with tickets found.[/yellow]")
+        return
+
+    table = Table(title=f"Verify {len(positions)} positions vs MT5 history")
+    table.add_column("Ticket", style="cyan")
+    table.add_column("Symbol", style="cyan")
+    table.add_column("DB Close", style="white")
+    table.add_column("MT5 Close", style="white")
+    table.add_column("Δ pips", style="yellow")
+    table.add_column("DB P&L", style="white")
+    table.add_column("MT5 P&L", style="white")
+    table.add_column("DB Reason", style="white")
+    table.add_column("Expected", style="green")
+
+    mismatches = 0
+    for p in positions:
+        deal = _mt5_connector.get_history_deal(p.ticket)
+        if not deal:
+            table.add_row(
+                str(p.ticket),
+                p.symbol,
+                f"{p.close_price:.5f}",
+                "[red]N/A[/red]",
+                "-",
+                f"${p.current_pnl_usd:.2f}",
+                "-",
+                p.close_reason or "NULL",
+                "-",
+            )
+            mismatches += 1
+            continue
+
+        mt5_price = deal.get("price", 0)
+        mt5_pnl = deal.get("profit", 0.0) + deal.get("swap", 0.0) + deal.get("commission", 0.0)
+        mt5_reason_code = deal.get("reason")
+        expected_reason = resolve_close_reason(_db_pos_as_position(p), mt5_reason_code).value
+
+        pip_diff = abs((p.close_price or 0) - mt5_price) / (p.pip_size or 0.0001)
+        reason_match = p.close_reason == expected_reason
+
+        style = (
+            ""
+            if (pip_diff < 1 and abs(mt5_pnl - p.current_pnl_usd) < 0.5 and reason_match)
+            else "red"
+        )
+        if style == "red":
+            mismatches += 1
+
+        table.add_row(
+            f"[{style}]{p.ticket}[/{style}]" if style else str(p.ticket),
+            p.symbol,
+            f"{p.close_price:.5f}" if p.close_price else "NULL",
+            f"{mt5_price:.5f}",
+            f"{pip_diff:.1f}",
+            f"${p.current_pnl_usd:.2f}",
+            f"${mt5_pnl:.2f}",
+            p.close_reason or "NULL",
+            expected_reason,
+        )
+
+    console.print(table)
+    if mismatches > 0:
+        console.print(f"[red]⚠ {mismatches} discrepancies found[/red]")
+    else:
+        console.print(f"[green]✓ All {len(positions)} positions match MT5 history[/green]")
+
+
+def _db_pos_as_position(db_pos):
+    """Light shim so resolve_close_reason can read .breakeven_activated / .trailing_activated."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        breakeven_activated=db_pos.breakeven_activated,
+        trailing_activated=db_pos.trailing_activated,
+    )
+
+
 @cli.command()
 @click.pass_context
 def stop(ctx):

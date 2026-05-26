@@ -239,9 +239,6 @@ class PositionManager:
             max_profit_pips=db_pos.max_profit_pips,
             max_drawdown_pips=db_pos.max_drawdown_pips,
             holding_time_seconds=db_pos.holding_time_seconds,
-            quality_score=db_pos.quality_score,
-            signal_confidence=db_pos.signal_confidence,
-            execution_duration_ms=db_pos.execution_duration_ms,
             slippage_pips=db_pos.slippage_pips,
             closing_slippage_pips=db_pos.closing_slippage_pips,
             metadata=metadata,
@@ -428,9 +425,6 @@ class PositionManager:
                     db_pos.max_profit_pips = position.max_profit_pips
                     db_pos.max_drawdown_pips = position.max_drawdown_pips
                     db_pos.holding_time_seconds = position.holding_time_seconds
-                    db_pos.quality_score = position.quality_score
-                    db_pos.signal_confidence = position.signal_confidence
-                    db_pos.execution_duration_ms = position.execution_duration_ms
                     db_pos.slippage_pips = position.slippage_pips
                     db_pos.closing_slippage_pips = position.closing_slippage_pips
                     db_pos.meta_data = position.metadata  # Keep metadata for backward compatibility
@@ -466,16 +460,13 @@ class PositionManager:
                         exit_type=position.exit_type,  # Add exit_type
                         entry_to_sl_pips=position.entry_to_sl_pips,  # Add entry_to_sl_pips
                         entry_to_tp_pips=position.entry_to_tp_pips,  # Add entry_to_tp_pips
-                        mae_pips=position.mae_pips,  # Add mae_pips
-                        mfe_pips=position.mfe_pips,  # Add mfe_pips
-                        max_profit_pips=position.max_profit_pips,  # Add max_profit_pips
-                        max_drawdown_pips=position.max_drawdown_pips,  # Add max_drawdown_pips
-                        holding_time_seconds=position.holding_time_seconds,  # Add holding_time_seconds
-                        quality_score=position.quality_score,  # Add quality_score
-                        signal_confidence=position.signal_confidence,  # Add signal_confidence
-                        execution_duration_ms=position.execution_duration_ms,  # Add execution_duration_ms
-                        slippage_pips=position.slippage_pips,  # Add slippage_pips
-                        closing_slippage_pips=position.closing_slippage_pips,  # Add closing_slippage_pips
+                        mae_pips=position.mae_pips,
+                        mfe_pips=position.mfe_pips,
+                        max_profit_pips=position.max_profit_pips,
+                        max_drawdown_pips=position.max_drawdown_pips,
+                        holding_time_seconds=position.holding_time_seconds,
+                        slippage_pips=position.slippage_pips,
+                        closing_slippage_pips=position.closing_slippage_pips,
                         open_time=position.open_time,
                         meta_data=position.metadata,
                     )

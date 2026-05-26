@@ -25,6 +25,7 @@ from .strategies.signal_aggregator import SignalAggregator
 from .strategies.strategy_manager import StrategyManager
 from .utils.config_validator import validate_position_management_config
 from .utils.logger import get_logger
+from .utils.market_session import derive_market_session
 from .utils.notification_manager import NotificationLevel, NotificationManager
 
 logger = get_logger(__name__)
@@ -456,6 +457,16 @@ class TradingBot:
                 if mt5_balance is not None and mt5_balance > 0:
                     starting_balance = float(mt5_balance)
 
+            # Step 4b: Close any sessions left ACTIVE by previous crashes.
+            # Bot may have been killed without graceful shutdown; those
+            # sessions stay ACTIVE forever otherwise.
+            if account_id is not None:
+                closed = await self.session_repository.close_abandoned_sessions(
+                    account_id=account_id, ending_balance=starting_balance
+                )
+                if closed > 0:
+                    logger.info(f"🧹 Closed {closed} abandoned session(s) from previous runs")
+
             # Step 5: Generate unique session_id
             try:
                 config_hash_short = hash_config(config_dict)[:8]
@@ -511,14 +522,24 @@ class TradingBot:
             self.current_session = None
 
     async def _update_session_on_position_close(self, position: Position, result: dict | None):
-        """
-        Update session aggregations when a position closes.
+        """Update session aggregations when a position closes.
+
+        Attributes the close to the session the position was OPENED in
+        (position.session_id), not the bot's currently-active session.
+        Without this, a position opened in session A but closed in session
+        B (after a bot restart) would inflate B's stats and leave A's at 0.
 
         Args:
             position: Closed position
             result: Close result dict with pnl_usd and pips
         """
-        if not self.current_session or not self.session_repository or not result:
+        if not self.session_repository or not result:
+            return
+
+        target_session_id = position.session_id or (
+            self.current_session.session_id if self.current_session else None
+        )
+        if not target_session_id:
             return
 
         try:
@@ -528,14 +549,15 @@ class TradingBot:
             gross_loss = abs(pnl_usd) if not is_winner else 0.0
 
             await self.session_repository.update_aggregations(
-                session_id=self.current_session.session_id,
+                session_id=target_session_id,
                 pnl=pnl_usd,
                 is_winner=is_winner,
                 gross_profit=gross_profit,
                 gross_loss=gross_loss,
             )
             logger.debug(
-                f"  📊 Session aggregations updated: " f"P&L=${pnl_usd:.2f}, Winner={is_winner}"
+                f"  📊 Session aggregations updated ({target_session_id}): "
+                f"P&L=${pnl_usd:.2f}, Winner={is_winner}"
             )
         except Exception as e:
             logger.warning(f"Error updating session aggregations: {e}")
@@ -891,6 +913,22 @@ class TradingBot:
             position.metadata["confluence_score"] = signal.confluence_score
             logger.debug(
                 f"  📊 Confluence Score: {signal.confluence_score:.1f}% (saved to position)"
+            )
+
+            # Capture entry slippage: signal price vs actual fill price (live only)
+            if not is_dry_run and original_signal_price and real_entry_price:
+                pip_size = position.pip_size or 0.0001
+                slippage = abs(real_entry_price - original_signal_price) / pip_size
+                position.slippage_pips = slippage
+                if slippage > 0.5:
+                    logger.info(
+                        f"  📏 Entry slippage: {slippage:.1f} pips "
+                        f"(signal {original_signal_price:.5f} → fill {real_entry_price:.5f})"
+                    )
+
+            # Derive market session bucket from open_time (for time-of-day analytics)
+            position.metadata["market_session"] = derive_market_session(
+                position.open_time or datetime.now(UTC)
             )
 
             # Add ticket if available (store in metadata for persistence)

@@ -104,8 +104,8 @@ tmp/
 Thumbs.db
 .DS_Store
 
-# Data files
-data/
+# Data files (anchored to repo root so src/trading_bot/data/ is NOT ignored)
+/data/
 *.csv
 *.json
 *.pkl

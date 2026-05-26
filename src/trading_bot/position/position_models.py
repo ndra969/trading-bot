@@ -68,9 +68,6 @@ class Position:
         max_profit_pips: Maximum profit achieved in pips
         max_drawdown_pips: Maximum drawdown in pips
         holding_time_seconds: Duration position was held
-        quality_score: Position quality score (0-100)
-        signal_confidence: Signal confidence score (0-100)
-        execution_duration_ms: Time taken to execute position (ms)
         slippage_pips: Slippage at entry in pips
         closing_slippage_pips: Slippage at exit in pips
         metadata: Additional position metadata
@@ -113,9 +110,6 @@ class Position:
     max_profit_pips: float = 0.0  # Maximum profit achieved
     max_drawdown_pips: float = 0.0  # Maximum drawdown
     holding_time_seconds: int = 0  # Duration held
-    quality_score: float = 0.0  # Position quality
-    signal_confidence: float = 0.0  # Signal confidence
-    execution_duration_ms: int = 0  # Execution time
     slippage_pips: float = 0.0  # Entry slippage
     closing_slippage_pips: float = 0.0  # Exit slippage
     metadata: dict = field(default_factory=dict)
