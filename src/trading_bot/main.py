@@ -258,16 +258,27 @@ class TradingBot:
         logger.info("✅ Trading bot stopped")
 
     async def _initialize_mt5(self):
-        """Initialize MT5 connection."""
+        """Initialize MT5 connection.
+
+        Used as a fallback when CLI didn't successfully create + initialize the
+        MT5Connector (e.g., live mode but CLI's initialize() failed). Pulls
+        credentials from the loaded config rather than assuming defaults.
+        """
         logger.info("Initializing MT5 connection...")
 
         # If MT5 already set (from CLI), use it
         if self.mt5 is None:
-            self.mt5 = MT5Connector()
-            await self.mt5.connect()
+            mt5_cfg = self.config.get("mt5", {}) if isinstance(self.config, dict) else {}
+            self.mt5 = MT5Connector(
+                terminal_path=mt5_cfg.get("terminal_path"),
+                login=mt5_cfg.get("login"),
+                password=mt5_cfg.get("password"),
+                server=mt5_cfg.get("server"),
+                timeout=mt5_cfg.get("connection_timeout", 30),
+            )
 
-            # Verify connection
-            if not await self.mt5.is_connected():
+            # MT5Connector.initialize() is synchronous and returns bool
+            if not self.mt5.initialize():
                 raise ConnectionError("Failed to connect to MT5")
 
             # Initialize data manager (requires symbol_manager)

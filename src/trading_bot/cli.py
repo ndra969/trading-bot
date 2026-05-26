@@ -63,6 +63,14 @@ def start(ctx, dry_run, connect_mt5):
 
     console.print("[bold green]Starting Trading Bot...[/bold green]")
 
+    # If --dry-run not passed on CLI, fall back to config (e.g. test.yaml sets it).
+    # Without this, --config test (dry_run: true) was silently overridden to live mode
+    # because the CLI flag defaulted to False.
+    if not dry_run:
+        dry_run = bool(config.get("trading", {}).get("dry_run", False))
+        if dry_run:
+            console.print("[yellow]DRY-RUN: enabled from config (trading.dry_run)[/yellow]")
+
     # Determine MT5 mode based on flags
     use_mock_mt5 = False
     if dry_run:

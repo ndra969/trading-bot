@@ -16,10 +16,12 @@ logging:
 
 # MT5 Configuration for Development
 mt5:
-  # NOTE: field names must match MT5Config in src/trading_bot/config.py — pydantic
-  # silently drops unknowns. Previous keys (path, timeout) were never applied.
-  terminal_path: "C:\\Program Files\\MetaTrader 5\\Broker B"
-  # IMPORTANT: Set these to prevent auto-switch to test server
+  # terminal_path intentionally NOT set — bot attaches to whichever MT5
+  # terminal (Broker B) the user already has running and logged in.
+  # Setting terminal_path forces mt5.initialize(path=...) which can't
+  # login without a password, so leaving it empty preserves the
+  # "use running terminal" workflow.
+  #   Expected terminal: C:\Program Files\MetaTrader 5\Broker B
   login: 159394302
   # password: "your_password"  # Uncomment and set if needed
   server: "Exness-MT5Real20"  # Force specific server to prevent auto-switch
