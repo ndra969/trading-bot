@@ -1,19 +1,21 @@
-# Test Configuration
-# Dry-run by default. Intended workflow: routine testing uses mock MT5 (no
-# real broker needed); only enable --connect-mt5 for occasional real-data
-# verification.
+# Test Configuration — Mock MT5 Only
+#
+# This config is for safe, isolated testing without touching any real broker
+# account. dry_run is forced true; no real credentials are stored here.
 #
 # Usage:
-#   uv run trading-bot --config test start                  # mock MT5 (safe, default)
-#   uv run trading-bot --config test start --connect-mt5    # real MT5 (see notes)
+#   uv run trading-bot --config test start
 #
-# IMPORTANT: MT5 Python is single-instance-per-process. With Broker B's
-# terminal running for development, --connect-mt5 will either IPC-timeout or
-# silently attach to Broker B. For Broker A connection:
-#   1. Close Broker B's terminal first, AND
-#   2. Manually launch Broker A's terminal64.exe and login (cache creds), AND
-#   3. Then run with --connect-mt5
-# Or just don't pass --connect-mt5 — mock MT5 needs none of this.
+# Mock mode behavior:
+#   - No MT5 terminal connection
+#   - Simulated account: 12345678 with $10,000 balance (from cli.py mock)
+#   - All orders simulated in memory; no orders sent anywhere
+#   - Safe to run while development bot (Broker B) is active
+#
+# --connect-mt5 with this config is NOT recommended: there are no
+# credentials here, so MT5 would just attach to whichever terminal happens
+# to be running (likely Broker B from dev). If you need real-data testing,
+# use --config development with --dry-run --connect-mt5 instead.
 
 trading:
   dry_run: true               # Always start in dry-run for this config
@@ -29,14 +31,9 @@ logging:
   level: "DEBUG"
   file_path: "./logs/trading_bot_test.log"  # Separate log file from dev
 
-# MT5 Configuration — same account as development; intended Broker A terminal
+# MT5 Configuration — intentionally empty
+# Real credentials are NOT defined here to prevent accidental production
+# connect. Mock MT5 mode bypasses this entirely. If you need real MT5
+# data for an isolated test, use --config development with --dry-run.
 mt5:
-  # terminal_path intentionally NOT set. Forcing path=Broker A here would
-  # IPC-timeout while Broker B is running (single-instance-per-process limit).
-  # When you've manually closed Broker B and launched Broker A, this config
-  # attaches to it cleanly.
-  #   Expected terminal: C:\Program Files\MetaTrader 5\Broker A
-  login: 159394302
-  # password: set MT5_PASSWORD in .env.test if terminal isn't logged in
-  server: "Exness-MT5Real20"
   connection_timeout: 60
