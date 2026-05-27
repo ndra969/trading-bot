@@ -58,11 +58,19 @@ class IntradayExecutor(TradingTypeExecutor):
 
         self.pip_calculator = PipCalculator()
 
-        # Zone cache - refresh H1 zones every 60 minutes
+        # Zone cache — refresh H1 zones at the configured interval. Reads from
+        # trading.mtf.zone_cache_duration_minutes; falls back to 60 minutes.
         self.zone_cache: dict[str, tuple[list, datetime]] = {}
-        self.zone_cache_duration_minutes = 60
+        self.zone_cache_duration_minutes = (
+            self.config.get("trading", {})
+            .get("mtf", {})
+            .get("zone_cache_duration_minutes", 60)
+        )
 
-        logger.info("IntradayExecutor initialization complete")
+        logger.info(
+            f"IntradayExecutor initialization complete "
+            f"(zone cache: {self.zone_cache_duration_minutes} min)"
+        )
 
     async def execute_trading_loop(self, symbols: list[str]) -> None:
         """

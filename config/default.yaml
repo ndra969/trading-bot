@@ -6,7 +6,7 @@ trading:
   mtf:
     zone_timeframe: H1
     entry_timeframe: M30
-    zone_cache_minutes: 60
+    zone_cache_duration_minutes: 60   # Refresh H1 zones every N minutes
 
   watchlist:
     - symbol: EURUSD
