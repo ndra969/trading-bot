@@ -39,9 +39,9 @@ class ExposureManager:
         self.max_positions_per_symbol = self.config.get("risk_management", {}).get(
             "max_positions_per_symbol", 1
         )
-        self.max_total_positions = self.config.get("risk_management", {}).get(
-            "max_total_positions", 10
-        )
+        # NOTE: global "max_total_positions" removed — per-asset-class limits
+        # in active_symbols.yaml are the single source of truth. Sum of class
+        # limits is the effective total cap.
         self.max_leverage = self.config.get("risk_management", {}).get("max_leverage", 10.0)
 
         # Asset class exposure limits (percentage of portfolio)
@@ -82,7 +82,6 @@ class ExposureManager:
         logger.info(
             f"ExposureManager initialized: "
             f"Max positions/symbol: {self.max_positions_per_symbol}, "
-            f"Max total: {self.max_total_positions}, "
             f"Asset class limits: {self.max_positions_per_asset_class}, "
             f"Correlation checking: {self.correlation_enabled}"
         )
@@ -120,13 +119,8 @@ class ExposureManager:
                     f"Asset class {asset_class} limit reached: {current_asset_class_positions}/{max_for_asset_class}",
                 )
 
-        # Check total positions limit
-        total_positions = sum(self.positions_by_symbol.values())
-        if total_positions >= self.max_total_positions:
-            return (
-                False,
-                f"Total position limit reached: {total_positions}/{self.max_total_positions}",
-            )
+        # No global total-positions check — per-asset-class limits above are
+        # the single source of truth for position count caps.
 
         # Check correlation conflicts (if direction provided)
         if direction and self.correlation_enabled:
@@ -272,7 +266,7 @@ class ExposureManager:
             "positions_by_asset_class": dict(self.positions_by_asset_class),
             "currency_exposure": dict(self.currency_exposure),
             "max_positions_per_symbol": self.max_positions_per_symbol,
-            "max_total_positions": self.max_total_positions,
+            "max_positions_per_asset_class": dict(self.max_positions_per_asset_class),
         }
 
     def _build_correlation_groups(self) -> dict[str, list[str]]:

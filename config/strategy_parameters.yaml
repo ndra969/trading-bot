@@ -46,12 +46,11 @@ fibonacci:
   tolerance: 0.0005
 
 structure:
-  swing_window: 5
-  bos_confirmation_candles: 2
+  lookback: 50                # Bars to look back for swing detection
 
 breakout:
-  min_momentum: 1.5
-  volume_threshold: 1.2
+  volume_threshold: 1.2       # Minimum volume ratio vs average for valid breakout
+  min_body_ratio: 0.6         # Candle body must be ≥60% of total range
 
 # Signal Aggregator Configuration
 signal_aggregator:
@@ -192,43 +191,8 @@ signal_generation:
       commodities: 600.0          # Maximum 600 pips TP distance for commodities (Gold: $60)
       crypto: 200.0               # Maximum 200 pips TP distance for crypto
 
-# Multi-Timeframe Analysis Configuration
-timeframe_analysis:
-  # Trading Type Adaptive Timeframes
-  trading_type_timeframes:
-    scalping:
-      primary: "M5"              # Primary analysis timeframe
-      confluence: ["M15", "H1"]  # Confluence timeframes
-
-    day_trading:
-      primary: "H1"
-      confluence: ["H4", "D1"]
-
-    swing_trading:
-      primary: "H4"
-      confluence: ["D1", "W1"]
-
-    position_trading:
-      primary: "D1"
-      confluence: ["W1", "MN1"]
-
-  # Analysis Parameters
-  analysis_settings:
-    min_confluence_score: 30.0   # Synchronized with signal_generation threshold
-    timeframes_required: 2       # Minimum timeframes for validation
-    cache_duration_minutes: 5    # Cache duration for analysis results
-    max_analysis_time_seconds: 10 # Maximum time for analysis
-
-# Performance Settings
-performance:
-  cache_enabled: true
-  cache_duration_minutes: 5
-  max_analysis_time_seconds: 10
-  async_processing: true
-  max_concurrent_analysis: 5
-
-# Database Settings
-database:
-  zone_retention_days: 7         # Keep zones for 7 days
-  cleanup_interval_hours: 24     # Cleanup old zones every 24 hours
-  max_zones_per_symbol: 50       # Maximum zones stored per symbol
+# NOTE: removed sections (no code consumers as of 2026-05-27):
+#   - timeframe_analysis.*  (mtf_analyzer takes timeframes as method args)
+#   - performance.*         (no generic cache/async layer reads these)
+#   - database.*            (no zone retention/cleanup logic implemented)
+# If reintroduced, add the corresponding reader code + tests.

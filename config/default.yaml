@@ -134,7 +134,8 @@ position_management:
 # Risk Management Configuration
 risk_management:
   max_positions_per_symbol: 1
-  max_total_positions: 10
+  # Note: global "max_total_positions" removed — per-asset-class limits in
+  # active_symbols.yaml are the single source of truth (sum = effective cap).
   max_leverage: 10.0
   max_asset_class_exposure_percent: 40.0
 

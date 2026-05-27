@@ -29,8 +29,17 @@ class SupplyDemandStrategy:
         """
         self.config = config or {}
 
+        # ZoneDetector expects a flat config: zone_detection params at the top
+        # plus scoring_weights as a nested dict. Merge them here so the YAML
+        # nesting stays semantically meaningful while the detector still gets
+        # the shape it expects.
+        detector_config = {
+            **self.config.get("zone_detection", {}),
+            "scoring_weights": self.config.get("scoring_weights", {}),
+        }
+
         # Initialize components
-        self.detector = ZoneDetector(self.config.get("zone_detection", {}))
+        self.detector = ZoneDetector(detector_config)
         self.manager = ZoneManager(
             config=self.config.get("zone_management", {}), use_database=use_database
         )

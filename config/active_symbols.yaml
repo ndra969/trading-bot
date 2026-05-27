@@ -3,44 +3,47 @@
 
 # Global settings
 enabled: true
-max_concurrent_symbols: 12  # Increased to accommodate 7 forex majors + 2 forex crosses + 2 commodities + 1 crypto
+# Total position cap = sum of per-asset-class max_concurrent_positions below.
+# No separate global limit — single source of truth via per-class settings.
 max_positions_per_symbol: 1
 
 # Asset class settings
+# Total cap = sum below (= 10 during observation phase).
+# Goal: collect enough trades across classes for tuning round 2.
 asset_classes:
   forex_majors:
     enabled: true
-    max_concurrent_positions: 3
+    max_concurrent_positions: 5      # Raised 3→5 for observation
     preferred_timeframes: ["M15", "H1", "H4"]
     trading_sessions: ["london", "new_york"]
 
   forex_major:  # Alias for PipCalculator compatibility
     enabled: true
-    max_concurrent_positions: 3
+    max_concurrent_positions: 5      # Same as forex_majors
     preferred_timeframes: ["M15", "H1", "H4"]
     trading_sessions: ["london", "new_york"]
 
   forex_crosses:
-    enabled: true  # Enabled for EURJPY and GBPJPY
-    max_concurrent_positions: 2  # Max 2 cross pairs
+    enabled: true
+    max_concurrent_positions: 3      # Raised 2→3 (EURJPY/GBPJPY)
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
 
   forex_jpy:
     enabled: true  # JPY pairs (auto-detected by PipCalculator)
-    max_concurrent_positions: 2  # Max 2 JPY positions
+    max_concurrent_positions: 3      # Raised 2→3 — pip_calculator routes JPY pairs here
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["tokyo", "london"]
 
   commodities:
-    enabled: true  # Enabled for XAUUSD trading
-    max_concurrent_positions: 1
+    enabled: true  # XAUUSD, XAGUSD
+    max_concurrent_positions: 1      # Keep — high volatility
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["london", "new_york"]
 
   crypto:
-    enabled: true  # Enabled for BTCUSD trading
-    max_concurrent_positions: 1
+    enabled: true  # BTCUSD
+    max_concurrent_positions: 1      # Keep — high volatility
     preferred_timeframes: ["H1", "H4"]
     trading_sessions: ["24/7"]
 

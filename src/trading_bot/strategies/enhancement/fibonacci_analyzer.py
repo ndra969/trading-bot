@@ -38,11 +38,18 @@ class FibonacciAnalyzer:
 
     def __init__(self, config: dict):
         self.config = config
-        self.lookback = config.get("fibonacci", {}).get("lookback", 100)
-        self.tolerance = config.get("fibonacci", {}).get("tolerance", 0.0005)  # Price tolerance
+        fib_cfg = config.get("fibonacci", {})
+        self.lookback = fib_cfg.get("lookback", 100)
+        self.tolerance = fib_cfg.get("tolerance", 0.0005)  # Price tolerance
 
-        # Key levels and their scores
-        self.levels = {0.382: 10, 0.500: 15, 0.618: 20, 0.786: 10}  # Golden Ratio
+        # Key levels and their scores — config keys are stringified floats
+        # ("0.382") in YAML; coerce back to float here. Falls back to the
+        # classical Golden Ratio set if no config provided.
+        levels_cfg = fib_cfg.get("levels")
+        if isinstance(levels_cfg, dict) and levels_cfg:
+            self.levels = {float(k): float(v) for k, v in levels_cfg.items()}
+        else:
+            self.levels = {0.382: 10, 0.500: 15, 0.618: 20, 0.786: 10}
 
     async def analyze_fibonacci(
         self, symbol: str, highs: list[float], lows: list[float], zone_price: float, zone_type: str

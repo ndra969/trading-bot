@@ -25,19 +25,19 @@ class TestExposureManagerInitialization:
         """Test initialization with default config."""
         manager = ExposureManager()
         assert manager.max_positions_per_symbol == 1
-        assert manager.max_total_positions == 10
+        assert manager.max_leverage == 10.0
 
     def test_initialization_custom_config(self):
         """Test initialization with custom config."""
         config = {
             "risk_management": {
                 "max_positions_per_symbol": 2,
-                "max_total_positions": 20,
+                "max_leverage": 5.0,
             }
         }
         manager = ExposureManager(config)
         assert manager.max_positions_per_symbol == 2
-        assert manager.max_total_positions == 20
+        assert manager.max_leverage == 5.0
 
 
 class TestCanOpenPosition:
@@ -65,19 +65,24 @@ class TestCanOpenPosition:
         assert can_open is False
         assert "Symbol limit reached" in reason
 
-    def test_can_open_position_total_limit_reached(self, exposure_manager):
-        """Test cannot open when total position limit reached."""
-        # Register 10 positions (max limit)
-        for i in range(10):
-            exposure_manager.register_position(f"SYMBOL{i}", "forex_major", 1.0)
+    def test_can_open_position_asset_class_limit_reached(self, exposure_manager):
+        """Test cannot open when per-asset-class limit reached.
 
-        # Try to open 11th position
+        Replaces the previous "total position limit" test — global limit was
+        removed in favor of per-asset-class caps (single source of truth).
+        """
+        # Configure forex_major limit at 2 so the test fires deterministically
+        exposure_manager.max_positions_per_asset_class["forex_major"] = 2
+        exposure_manager.register_position("EURUSD", "forex_major", 1.0)
+        exposure_manager.register_position("GBPUSD", "forex_major", 1.0)
+
+        # Third forex_major attempt should be rejected
         can_open, reason = exposure_manager.can_open_position(
-            symbol="NEWSY", asset_class="forex_major", risk_amount=200.0
+            symbol="AUDUSD", asset_class="forex_major", risk_amount=200.0
         )
 
         assert can_open is False
-        assert "Total position limit" in reason
+        assert "Asset class forex_major limit reached" in reason
 
 
 class TestRegisterPosition:
