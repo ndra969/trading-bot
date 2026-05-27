@@ -93,20 +93,66 @@ supply_demand:
 
 # Signal Generation Configuration
 signal_generation:
-  # Signal Quality Requirements
+  # Signal Quality Requirements — per asset class
+  # foundation_engine looks up `<asset_class>` first, falls back to `default`.
+  # Asset classes recognised: forex_major, forex_jpy, commodities, crypto.
   quality_thresholds:
-    min_confluence_score: 30.0   # Lowered to 30% to increase trade frequency while maintaining quality
-    min_foundation_score: 30.0   # Minimum foundation S&D score (Raised for quality)
-    min_price_action_score: 10.0  # Minimum price action score (NEW: require price action confirmation)
-    max_signals_per_symbol: 1    # Maximum signals per symbol
-    signal_refresh_interval: 300  # Signal refresh interval (seconds)
+    # Fallback for any asset_class not explicitly defined below.
+    default:
+      min_confluence_score: 65.0
+      min_foundation_score: 50.0
+      min_price_action_score: 15.0
 
-  # Signal Validation Rules
+    forex_major:
+      min_confluence_score: 75.0       # Tight signals — forex majors are clean
+      min_foundation_score: 60.0
+      min_price_action_score: 15.0
+
+    forex_jpy:
+      min_confluence_score: 70.0       # Slightly looser — JPY pairs more volatile
+      min_foundation_score: 55.0
+      min_price_action_score: 15.0
+
+    commodities:
+      min_confluence_score: 40.0           # Trend-following entries
+      min_confluence_score_counter: 50.0   # Counter-trend (raised post-drawdown)
+      min_foundation_score: 30.0           # Gold reacts strongly to foundation alone
+      min_price_action_score: 10.0
+
+    crypto:
+      min_confluence_score: 60.0       # Extreme volatility needs strong confluence
+      min_foundation_score: 45.0
+      min_price_action_score: 15.0
+
+    # Globals (apply to all asset classes)
+    max_signals_per_symbol: 1
+    signal_refresh_interval: 300
+
+  # Signal Validation Rules — per asset class with `default` fallback
   validation_rules:
-    require_foundation: true     # Foundation strategy required
-    require_price_action: false  # Temporarily disabled for testing - will enable after validation
-    conflict_prevention: true    # Prevent conflicting signals
-    market_hours_validation: true # Validate market hours
+    default:
+      require_foundation: true
+      require_price_action: true
+
+    forex_major:
+      require_foundation: true
+      require_price_action: true
+
+    forex_jpy:
+      require_foundation: true
+      require_price_action: true
+
+    commodities:
+      require_foundation: true
+      require_price_action: false   # Gold often moves on macro without clean PA
+
+    crypto:
+      require_foundation: true
+      require_price_action: true    # Crypto needs PA confirmation due to volatility
+
+    # Globals
+    conflict_prevention: true       # Prevent conflicting signals (all assets)
+    market_hours_validation: true   # Validate market hours (all assets)
 
   # Risk/Reward Requirements
   risk_reward:

@@ -478,26 +478,43 @@ class FoundationEngine:
     ) -> bool:
         """Apply final quality filters after confluence scoring.
 
+        All thresholds resolved per asset class from
+        ``signal_generation.quality_thresholds.<asset_class>`` with a
+        fallback to ``quality_thresholds.default``. Same for
+        ``validation_rules``.
+
         Filter chain (order matters):
-            1. Universal minimum confluence (75% default, skipped for commodities)
-            2. Price action confirmation requirement (if configured)
-            3. Universal H1 Sniper Gate (counter-trend block - all assets)
-            4. Commodities-specific:
-               - Dynamic score threshold (PHASE 5.8) - higher for counter-trend
-               - Technical confirmation gate (PHASE 5.1) - require ≥1 layer
+            1. Asset-class minimum confluence
+               (commodities uses a separate counter-trend threshold)
+            2. Price action confirmation requirement (per asset)
+            3. Universal H1 Sniper Gate (counter-trend block, all assets)
+            4. Commodities-specific: require at least one enhancement layer
 
         Returns:
             True if signal passes all filters, False if rejected.
         """
-        signal_gen = self.config.get("signal_generation", {})
+        thresholds = self._resolve_quality_thresholds(asset_class)
+        rules = self._resolve_validation_rules(asset_class)
 
-        # 1. UNIVERSAL Minimum Confluence (skipped for commodities - dynamic threshold below)
-        min_confluence_global = signal_gen.get("quality_thresholds", {}).get(
-            "min_confluence_score", 75.0
-        )
-        if asset_class != "commodities" and final_score < min_confluence_global:
+        # 1. Asset-class minimum confluence
+        is_counter_trend_commodity = False
+        if asset_class == "commodities":
+            is_counter_trend_commodity = self._is_counter_trend(
+                direction, data, current_price, current_range, avg_range
+            )
+            min_confluence = (
+                thresholds.get("min_confluence_score_counter", 50.0)
+                if is_counter_trend_commodity
+                else thresholds.get("min_confluence_score", 40.0)
+            )
+        else:
+            min_confluence = thresholds.get("min_confluence_score", 65.0)
+
+        if final_score < min_confluence:
+            counter_label = "Counter-trend " if is_counter_trend_commodity else ""
             logger.info(
-                f"{symbol}: REJECTED - Confluence too low ({final_score:.1f}% < {min_confluence_global}%). "
+                f"{symbol}: REJECTED - {counter_label}Confluence too low "
+                f"({final_score:.1f}% < {min_confluence}%, asset_class={asset_class}). "
                 f"Active layers: {list(layer_scores.keys())}, "
                 f"Foundation: {weighted_foundation_score:.1f}%, "
                 f"Enhancement: {weighted_enhancement_score:.1f}%"
@@ -505,10 +522,8 @@ class FoundationEngine:
             return False
 
         # 2. Price Action Confirmation Requirement
-        if signal_gen.get("validation_rules", {}).get("require_price_action", False):
-            min_pa_score = signal_gen.get("quality_thresholds", {}).get(
-                "min_price_action_score", 10.0
-            )
+        if rules.get("require_price_action", False):
+            min_pa_score = thresholds.get("min_price_action_score", 10.0)
             # price_action layer_score = raw_confidence * 0.15, so raw = score / 0.15
             pa_weighted = layer_scores.get("price_action", 0.0)
             pa_raw = (pa_weighted / 0.15) if pa_weighted > 0 else 0.0
@@ -538,39 +553,68 @@ class FoundationEngine:
             )
             return False
 
-        # 4. Commodities-specific filters
-        if asset_class == "commodities":
-            # 4a. Dynamic score threshold (raised in drawdown response: 15/18-20 → 40/50)
-            # Commodities used to bypass the 75% global threshold entirely. Recent
-            # drawdown traced back to commodity losers passing through with weak
-            # confluence. Still below forex's 75% because gold reacts strongly to
-            # foundation (S&D) without always needing every enhancement layer.
-            is_counter_trend = self._is_counter_trend(
-                direction, data, current_price, current_range, avg_range
+        # 4. Commodities-specific: at least one enhancement layer required
+        if asset_class == "commodities" and not layer_scores:
+            logger.warning(
+                f"{symbol}: REJECTED - No technical confirmation. "
+                f"Gold trades require at least one enhancement layer."
             )
-            min_score_threshold = 40.0
-            if is_counter_trend:
-                min_score_threshold = 50.0
-
-            if final_score < min_score_threshold:
-                logger.warning(
-                    f"{symbol}: REJECTED - {'Counter-trend ' if is_counter_trend else ''}"
-                    f"Score too low ({final_score:.1f} < {min_score_threshold}). "
-                    f"Need more confluence for "
-                    f"{'reversals' if is_counter_trend else 'trend-following'}. "
-                    f"Active layers: {list(layer_scores.keys())}"
-                )
-                return False
-
-            # 4b. Technical Confirmation Gate (PHASE 5.1) - require at least one layer
-            if not layer_scores:
-                logger.warning(
-                    f"{symbol}: REJECTED - No technical confirmation. "
-                    f"Gold trades require at least one enhancement layer."
-                )
-                return False
+            return False
 
         return True
+
+    def _resolve_quality_thresholds(self, asset_class: str) -> dict:
+        """Resolve per-asset quality thresholds with fallback to default.
+
+        Reads ``signal_generation.quality_thresholds.<asset_class>`` and
+        falls back to ``quality_thresholds.default``. Supports the legacy
+        flat structure (where ``min_confluence_score`` etc. live directly
+        under ``quality_thresholds``) for backward compatibility.
+        """
+        qt = self.config.get("signal_generation", {}).get("quality_thresholds", {})
+        per_asset = qt.get(asset_class)
+        if isinstance(per_asset, dict):
+            # Merge default + per-asset (per-asset wins). Fall back to legacy
+            # flat values for keys missing from both.
+            default = qt.get("default", {}) if isinstance(qt.get("default"), dict) else {}
+            merged = {**self._legacy_flat_thresholds(qt), **default, **per_asset}
+            return merged
+
+        # No per-asset entry → use default, falling back to legacy flat layout
+        default = qt.get("default")
+        if isinstance(default, dict):
+            return {**self._legacy_flat_thresholds(qt), **default}
+        return self._legacy_flat_thresholds(qt)
+
+    @staticmethod
+    def _legacy_flat_thresholds(qt: dict) -> dict:
+        """Extract recognised top-level keys from the old flat schema."""
+        legacy_keys = (
+            "min_confluence_score",
+            "min_confluence_score_counter",
+            "min_foundation_score",
+            "min_price_action_score",
+        )
+        return {k: qt[k] for k in legacy_keys if k in qt and not isinstance(qt[k], dict)}
+
+    def _resolve_validation_rules(self, asset_class: str) -> dict:
+        """Resolve per-asset validation rules with fallback to default."""
+        vr = self.config.get("signal_generation", {}).get("validation_rules", {})
+        per_asset = vr.get(asset_class)
+        if isinstance(per_asset, dict):
+            default = vr.get("default", {}) if isinstance(vr.get("default"), dict) else {}
+            return {**self._legacy_flat_rules(vr), **default, **per_asset}
+
+        default = vr.get("default")
+        if isinstance(default, dict):
+            return {**self._legacy_flat_rules(vr), **default}
+        return self._legacy_flat_rules(vr)
+
+    @staticmethod
+    def _legacy_flat_rules(vr: dict) -> dict:
+        """Extract recognised top-level keys from the old flat schema."""
+        legacy_keys = ("require_foundation", "require_price_action")
+        return {k: vr[k] for k in legacy_keys if k in vr and not isinstance(vr[k], dict)}
 
     def _is_counter_trend(
         self,
