@@ -864,6 +864,6 @@ class MT5Connector:
         self.initialize()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+    def __exit__(self, *_exc_info):
+        """Context manager exit (exception info unused — always shut down)."""
         self.shutdown()
