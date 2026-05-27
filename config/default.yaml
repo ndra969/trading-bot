@@ -131,6 +131,19 @@ position_management:
     tier_thresholds: [500, 1000, 2000]  # Profit levels in USD/pips
     tier_distances: [300, 500, 800]     # Trailing distance per tier
 
+# Partial Close Configuration
+# Disabled by default — for small/cent accounts, 25% of 0.01 lot is below
+# MT5's 0.01 minimum so partial close cannot actually fire. Set enabled: true
+# when positions are large enough (e.g., dynamic lot >= 0.04 so 25% = 0.01).
+#
+# Level structure (when enabled, hardcoded in partial_close_manager.py):
+#   Level 1: at 50% of TP distance, close 25% of remaining volume
+#   Level 2: at 80% of TP distance, close 50% of remaining
+# Each level fires once per position. Trailing stop runs independently
+# (no conflict — trailing moves SL, partial reduces volume).
+partial_close:
+  enabled: false
+
 # Risk Management Configuration
 risk_management:
   max_positions_per_symbol: 1

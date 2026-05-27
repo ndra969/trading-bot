@@ -73,7 +73,17 @@ class PartialCloseManager:
         # Track remaining volume: position_id -> remaining volume
         self.remaining_volume: dict[str, float] = {}
 
-        logger.debug("PartialCloseManager initialized")
+        # Disabled by default — for small/cent accounts, 25% of 0.01 lot is
+        # below MT5's 0.01 minimum so partial close silently never fires
+        # anyway. Explicit flag prevents the misleading "should-fire-but-
+        # skipped" log noise and documents the intent.
+        self.enabled = bool(
+            self.config.get("partial_close", {}).get("enabled", False)
+        )
+
+        logger.info(
+            f"PartialCloseManager initialized (enabled={self.enabled})"
+        )
 
     def initialize_position(self, position: Position) -> None:
         """
@@ -164,6 +174,10 @@ class PartialCloseManager:
         Returns:
             True if partial close should happen
         """
+        # Global disable check
+        if not self.enabled:
+            return False
+
         # Position must be open
         if not position.is_open:
             return False

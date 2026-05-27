@@ -11,8 +11,13 @@ from trading_bot.position.position_models import Position, PositionStatus, Posit
 
 @pytest.fixture
 def partial_manager():
-    """Create a PartialCloseManager instance."""
-    return PartialCloseManager()
+    """Create a PartialCloseManager instance with partial-close enabled.
+
+    Defaults to disabled per config (small/cent accounts can't satisfy the
+    0.01-lot minimum on a 25% close anyway). Tests that exercise the
+    fire-on-level logic need it explicitly on.
+    """
+    return PartialCloseManager(config={"partial_close": {"enabled": True}})
 
 
 @pytest.fixture
