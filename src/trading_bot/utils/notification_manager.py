@@ -46,6 +46,12 @@ class NotificationManager:
         """
         self.config = config
 
+        # Currency unit for balance / P&L display. Cent accounts (broker name
+        # contains "cent") use "USC" so summaries don't claim USD when the
+        # underlying values are really cents.
+        active_broker = config.get("active_broker", "") if isinstance(config, dict) else ""
+        self.currency_unit = "USC" if "cent" in (active_broker or "").lower() else "USD"
+
         # Handle both Configuration object and dictionary
         if hasattr(config, "telegram"):
             self.telegram_config = config.telegram
@@ -180,7 +186,7 @@ class NotificationManager:
 
         message = (
             "💓 **Bot Heartbeat**\n"
-            f"💰 Balance: `${balance:,.2f}`\n"
+            f"💰 Balance: `{balance:,.2f} {self.currency_unit}`\n"
             f"📈 Open Positions: `{positions}`\n"
             "🟢 System Status: **Online**"
         )
@@ -207,10 +213,10 @@ class NotificationManager:
         message = (
             f"{header_emoji} **Daily Report**\n"
             f"📅 Date: `{report.get('date', 'Today')}`\n"
-            f"💵 P&L: **${pnl:,.2f}**\n"
+            f"💵 P&L: **{pnl:,.2f} {self.currency_unit}**\n"
             f"🔢 Trades: `{trades_count}`\n"
             f"🎯 Win Rate: `{win_rate:.1f}%`\n"
-            f"💰 Final Balance: `${report.get('balance', 0.0):,.2f}`"
+            f"💰 Final Balance: `{report.get('balance', 0.0):,.2f} {self.currency_unit}`"
         )
 
         await self.send_message(message, level=NotificationLevel.SUCCESS)

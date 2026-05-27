@@ -90,6 +90,17 @@ class TradingBot:
             self.symbol_mapper = None
             self.active_broker = None
 
+        # Account type detection — derive from broker name. Cent accounts use
+        # 1/100 lot sizing and report balances/P&L in the cent currency (USC).
+        # The math is unit-consistent so bot calculations are fine, but display
+        # labels and recorded values need the right unit suffix to be readable.
+        self.is_cent_account = bool(self.active_broker and "cent" in self.active_broker.lower())
+        self.account_currency_unit = "USC" if self.is_cent_account else "USD"
+        logger.info(
+            f"📊 Account type: {'CENT' if self.is_cent_account else 'STANDARD'} "
+            f"(display unit: {self.account_currency_unit}, broker: {self.active_broker})"
+        )
+
         # Initialize symbol resolver (asset class + broker→internal conversion)
         from .utils.symbol_resolver import SymbolResolver
 
@@ -704,7 +715,8 @@ class TradingBot:
                 # Check if balance changed significantly (more than 1%)
                 if abs(mt5_balance - current_balance) / current_balance > 0.01:
                     logger.info(
-                        f"💰 Balance updated: ${current_balance:,.2f} → ${mt5_balance:,.2f} "
+                        f"💰 Balance updated: {current_balance:,.2f} → {mt5_balance:,.2f} "
+                        f"{self.account_currency_unit} "
                         f"(Change: {(mt5_balance - current_balance):+.2f}, "
                         f"{(mt5_balance - current_balance) / current_balance * 100:+.1f}%)"
                     )
@@ -1566,7 +1578,7 @@ class TradingBot:
                 f"🛑 SL: `{old_sl:.5f}` → `{new_sl:.5f}`\n"
                 f"📈 Movement: `{sl_movement_pips:.1f} pips`\n"
                 f"💰 Profit: `{position.current_profit_pips:.1f} pips`\n"
-                f"💵 P&L: `${position.current_pnl_usd:.2f}`\n"
+                f"💵 P&L: `{position.current_pnl_usd:.2f} {self.account_currency_unit}`\n"
                 f"🔧 Status: ✅ MT5 Updated",
                 level=NotificationLevel.INFO,
                 sound=False,
@@ -1634,7 +1646,7 @@ class TradingBot:
         logger.info(
             f"  🔄 PARTIAL CLOSE: {position.position_id} "
             f"Closed {closed_volume:.3f} at {current_price:.5f} "
-            f"P&L: ${result['profit_usd']:.2f}"
+            f"P&L: {result['profit_usd']:.2f} {self.account_currency_unit}"
         )
         await self.position_manager.save_position(position, is_dry_run=is_dry_run)
 
@@ -1644,7 +1656,7 @@ class TradingBot:
                 f"💰 **PARTIAL PROFIT TAKEN**\n"
                 f"🆔 `{position.position_id}`\n"
                 f"📊 Closed: `{closed_volume:.3f}` lots\n"
-                f"💵 Profit: **${result['profit_usd']:.2f}**",
+                f"💵 Profit: **{result['profit_usd']:.2f} {self.account_currency_unit}**",
                 level=NotificationLevel.SUCCESS,
             )
 
@@ -1809,7 +1821,7 @@ class TradingBot:
                             logger.info(
                                 f"  ✅ POSITION CLOSED: {position.position_id} | "
                                 f"{close_reason.value} | "
-                                f"P&L: ${result['pnl_usd']:.2f} | "
+                                f"P&L: {result['pnl_usd']:.2f} {self.account_currency_unit} | "
                                 f"Pips: {result['pips']:.1f}"
                             )
 
@@ -1820,7 +1832,7 @@ class TradingBot:
                                 f"{pnl_emoji} **POSITION CLOSED**\n"
                                 f"🆔 `{position.position_id}`\n"
                                 f"📝 Reason: `{close_reason.value}`\n"
-                                f"💵 P&L: **${result['pnl_usd']:.2f}**\n"
+                                f"💵 P&L: **{result['pnl_usd']:.2f} {self.account_currency_unit}**\n"
                                 f"📏 Pips: `{result['pips']:.1f}`",
                                 level=(
                                     NotificationLevel.SUCCESS

@@ -139,7 +139,7 @@ async def test_heartbeat_formatting(notification_manager):
 
     item = await notification_manager.queue.get()
     assert "💓 **Bot Heartbeat**" in item["text"]
-    assert "$1,234.56" in item["text"]
+    assert "1,234.56 USD" in item["text"]
     assert "5" in item["text"]
 
 
@@ -385,10 +385,10 @@ async def test_send_daily_report_success(notification_manager):
     item = await notification_manager.queue.get()
     assert "📈 **Daily Report**" in item["text"]
     assert "2026-01-19" in item["text"]
-    assert "$1,250.50" in item["text"]
+    assert "1,250.50 USD" in item["text"]
     assert "15" in item["text"]
     assert "66.7%" in item["text"]
-    assert "$11,250.50" in item["text"]
+    assert "11,250.50 USD" in item["text"]
 
 
 @pytest.mark.asyncio
@@ -406,8 +406,8 @@ async def test_send_daily_report_with_loss(notification_manager):
     item = await notification_manager.queue.get()
     text = item["text"]
     assert "📉 **Daily Report**" in text
-    # Python formats negative numbers as "$-500.25" (dollar sign before minus)
-    assert "$-500.25" in text
+    # Negative P&L formats as "-500.25 USD" (currency unit suffix)
+    assert "-500.25 USD" in text
 
 
 @pytest.mark.asyncio
@@ -439,7 +439,7 @@ async def test_send_daily_report_with_default_values(notification_manager):
     assert "Today" in item["text"]  # Default date
     assert "0" in item["text"]  # Default trades_count
     assert "0.0%" in item["text"]  # Default win_rate
-    assert "$0.00" in item["text"]  # Default balance
+    assert "0.00 USD" in item["text"]  # Default balance
 
 
 @pytest.mark.asyncio

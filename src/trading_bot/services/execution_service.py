@@ -186,7 +186,8 @@ class ExecutionService:
             logger.info(
                 f"  ✅ POSITION OPENED: {position.position_id} | "
                 f"{position.position_type} {position.symbol} @ {position.entry_price:.5f} | "
-                f"Volume: {position.volume:.2f} | Risk: ${position.risk_amount_usd:.2f}"
+                f"Volume: {position.volume:.2f} | "
+                f"Risk: {position.risk_amount_usd:.2f} {self.bot.account_currency_unit}"
             )
 
         except Exception as e:
