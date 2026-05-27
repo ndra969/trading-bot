@@ -1,11 +1,6 @@
 # Production Configuration
 # Overrides default.yaml for production environment
 
-trading:
-  risk_per_trade: 0.005  # 0.5% risk for production
-  max_concurrent_positions: 10
-  confluence_threshold: 65.0
-
 telegram:
   enabled: true  # Enable notifications in production
 

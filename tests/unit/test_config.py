@@ -30,14 +30,12 @@ class TestConfiguration:
         assert db.pool_size > 0
 
     def test_trading_config(self):
-        """Test trading configuration."""
+        """Test trading configuration loads (now mostly a passthrough — runtime
+        knobs moved to per-symbol / per-asset-class configs)."""
         config = Configuration(env="development")
         trading = config.trading
 
         assert isinstance(trading, TradingConfig)
-        assert 0.001 <= trading.risk_per_trade <= 0.05
-        assert trading.max_concurrent_positions >= 1
-        assert 50.0 <= trading.confluence_threshold <= 100.0
 
     def test_telegram_config(self):
         """Test telegram configuration."""
@@ -62,9 +60,9 @@ class TestConfiguration:
         """Test getting configuration value by key."""
         config = Configuration(env="development")
 
-        # Test dot notation
-        risk = config.get("trading.risk_per_trade")
-        assert risk is not None
+        # Test dot notation on a stable trading subkey
+        broker = config.get("trading.active_broker")
+        assert broker is not None
 
         # Test default value
         unknown = config.get("unknown.key", "default")

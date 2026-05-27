@@ -660,9 +660,8 @@ def show(ctx):
     table.add_row("database.name", db_name)
     table.add_row("database.pool_size", str(config.database.pool_size))
 
-    # Trading
-    table.add_row("trading.risk_per_trade", str(config.trading.risk_per_trade))
-    table.add_row("trading.max_concurrent_positions", str(config.trading.max_concurrent_positions))
+    # Trading-specific knobs now live per-symbol / per-asset-class
+    # (see active_symbols.yaml and strategy_parameters.yaml).
 
     # Logging
     table.add_row("logging.level", config.logging.level)

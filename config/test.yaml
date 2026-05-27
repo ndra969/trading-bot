@@ -19,10 +19,6 @@
 
 trading:
   dry_run: true               # Always start in dry-run for this config
-  risk_per_trade: 0.001       # 0.1% — same conservative bar as development
-  max_concurrent_positions: 3
-  confluence_threshold: 70.0
-  market_validation: false    # Skip market hours validation for off-hours testing
 
 telegram:
   enabled: false              # Silent in test — no notification spam

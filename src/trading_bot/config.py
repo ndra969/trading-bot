@@ -37,11 +37,22 @@ class DatabaseConfig(BaseModel):
 
 
 class TradingConfig(BaseModel):
-    """Trading configuration."""
+    """Trading configuration.
 
-    risk_per_trade: float = Field(default=0.005, ge=0.001, le=0.05)
-    max_concurrent_positions: int = Field(default=5, ge=1, le=20)
-    confluence_threshold: float = Field(default=65.0, ge=50.0, le=100.0)
+    All runtime knobs (risk_per_trade, max_concurrent_positions,
+    confluence_threshold) moved to more specific config layers:
+      - risk_per_trade        → symbols.<SYMBOL>.risk_per_trade
+      - max_concurrent        → asset_classes.<CLASS>.max_concurrent_positions
+      - confluence_threshold  → signal_generation.quality_thresholds.<asset>
+
+    Kept as an empty placeholder so Configuration.trading still returns a
+    valid object and ``getattr(config.trading, "dry_run", ...)``
+    fallback patterns elsewhere keep working.
+    """
+
+    # Pydantic v2: allow unknown fields so dry_run / mode / etc. read via
+    # getattr() don't error out at parse time.
+    model_config = {"extra": "allow"}
 
 
 class LoggingConfig(BaseModel):

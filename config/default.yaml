@@ -34,9 +34,9 @@ trading:
     - symbol: BTCUSD
       enabled: true
 
-  risk_per_trade: 0.005
-  max_concurrent_positions: 5
-  confluence_threshold: 75.0  # Raised from 65% (Week 15.5.3 improvement)
+  # Note: risk_per_trade is now per-symbol (active_symbols.yaml)
+  # Note: max_concurrent_positions is now per-asset-class (active_symbols.yaml)
+  # Note: confluence_threshold is now per-asset-class (strategy_parameters.yaml)
   active_broker: exness_cent
 
 database:
