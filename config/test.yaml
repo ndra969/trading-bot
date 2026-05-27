@@ -1,10 +1,19 @@
 # Test Configuration
-# Mirrors development settings but points MT5 at the Broker A terminal so
-# dry-run sessions don't fight with an active Broker B development instance.
+# Dry-run by default. Intended workflow: routine testing uses mock MT5 (no
+# real broker needed); only enable --connect-mt5 for occasional real-data
+# verification.
 #
 # Usage:
-#   uv run trading-bot --config test start --dry-run                 # mock MT5
-#   uv run trading-bot --config test start --dry-run --connect-mt5   # real data, simulated orders
+#   uv run trading-bot --config test start                  # mock MT5 (safe, default)
+#   uv run trading-bot --config test start --connect-mt5    # real MT5 (see notes)
+#
+# IMPORTANT: MT5 Python is single-instance-per-process. With Broker B's
+# terminal running for development, --connect-mt5 will either IPC-timeout or
+# silently attach to Broker B. For Broker A connection:
+#   1. Close Broker B's terminal first, AND
+#   2. Manually launch Broker A's terminal64.exe and login (cache creds), AND
+#   3. Then run with --connect-mt5
+# Or just don't pass --connect-mt5 — mock MT5 needs none of this.
 
 trading:
   dry_run: true               # Always start in dry-run for this config
@@ -20,10 +29,14 @@ logging:
   level: "DEBUG"
   file_path: "./logs/trading_bot_test.log"  # Separate log file from dev
 
-# MT5 Configuration — Broker A terminal, same account as development
+# MT5 Configuration — same account as development; intended Broker A terminal
 mt5:
-  terminal_path: "C:\\Program Files\\MetaTrader 5\\Broker A"
+  # terminal_path intentionally NOT set. Forcing path=Broker A here would
+  # IPC-timeout while Broker B is running (single-instance-per-process limit).
+  # When you've manually closed Broker B and launched Broker A, this config
+  # attaches to it cleanly.
+  #   Expected terminal: C:\Program Files\MetaTrader 5\Broker A
   login: 159394302
-  # password: set via .env.test if needed
+  # password: set MT5_PASSWORD in .env.test if terminal isn't logged in
   server: "Exness-MT5Real20"
   connection_timeout: 60

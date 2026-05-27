@@ -110,6 +110,14 @@ class MT5Connector:
                     mt5.shutdown()
                     raise MT5TerminalNotRunningError()
 
+                # Verify we actually attached to the requested terminal. MT5's python
+                # lib will silently hand back an already-running terminal even when a
+                # different `path=` is requested (single-instance-per-process quirk).
+                # Without this check, --config test (Broker A) would silently end up
+                # on Broker B if dev was running. Fail loudly instead.
+                if self.terminal_path:
+                    self._verify_terminal_path()
+
                 # Check version compatibility
                 version = mt5.version()
                 if version and version[:3] < self.MIN_VERSION:
@@ -119,7 +127,11 @@ class MT5Connector:
                         min_version=".".join(map(str, self.MIN_VERSION)),
                     )
 
-                # Login if credentials provided
+                # Login only if all three credentials are present. mt5.login()
+                # rejects password=None with "Invalid password argument", so we
+                # can't use it to force a session switch without a real password.
+                # Without explicit login(), we rely on terminal_path verification
+                # above to fail loudly when MT5 attaches to the wrong terminal.
                 if self.login and self.password and self.server:
                     login_success = mt5.login(
                         login=self.login,
@@ -180,6 +192,39 @@ class MT5Connector:
                     ) from e
 
         return False
+
+    def _verify_terminal_path(self) -> None:
+        """Ensure the attached MT5 terminal matches the requested terminal_path.
+
+        Raises MT5ConnectionError (after mt5.shutdown()) if the terminal we
+        actually connected to isn't under the requested path. Compares
+        canonical paths via Path.resolve() to handle slashes/case differences.
+        """
+        from pathlib import Path
+
+        actual = self._terminal_info.get("path") if self._terminal_info else None
+        if not actual:
+            return  # Terminal didn't expose its path — can't verify, allow
+
+        try:
+            requested = Path(self.terminal_path).resolve()
+            actual_dir = Path(actual).resolve()
+            # actual is a directory; requested may be either a directory or terminal64.exe
+            if requested.is_file():
+                requested = requested.parent
+            same = actual_dir == requested
+        except Exception as e:
+            logger.warning(f"Could not normalize terminal paths for verification: {e}")
+            return  # Best-effort — don't block on filesystem oddities
+
+        if not same:
+            mt5.shutdown()
+            raise MT5ConnectionError(
+                f"MT5 attached to wrong terminal. Requested: {self.terminal_path}, "
+                f"actual: {actual}. Another MT5 instance is likely already running. "
+                f"Close it (or set MT5_PASSWORD to force-switch) and retry."
+            )
+        logger.debug(f"MT5 terminal path verified: {actual}")
 
     def shutdown(self) -> None:
         """Shutdown MT5 connection gracefully."""
