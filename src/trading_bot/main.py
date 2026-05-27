@@ -1952,10 +1952,15 @@ class TradingBot:
                 await asyncio.sleep(300)  # Retry after 5 mins on error
 
     def _is_market_open(self, symbol: str) -> bool:
-        """Check if market is open for the symbol. Delegates to utils.market_hours."""
+        """Check market open (weekend + per-symbol session filter)."""
         from .utils.market_hours import is_market_open
 
-        return is_market_open(self._get_asset_class(symbol))
+        asset_class = self._get_asset_class(symbol)
+        # Per-symbol allowed sessions from active_symbols.yaml. When absent,
+        # only the weekend rule applies (legacy behaviour).
+        symbol_cfg = self.config.get("symbols", {}).get(symbol, {})
+        allowed_sessions = symbol_cfg.get("trading_sessions")
+        return is_market_open(asset_class, allowed_sessions=allowed_sessions)
 
     def _generate_mock_data(self, symbol: str, timeframe: str, count: int = 100):
         """Generate mock OHLCV data for dry-run. Delegates to utils.mock_data."""
