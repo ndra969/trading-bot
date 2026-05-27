@@ -351,23 +351,23 @@ symbols:
     use_dynamic_lot_size: false  # Use fixed lot size (0.01) for testing
 
     # Stop Loss / Take Profit Configuration (Crypto - very high volatility)
-    # BTC 1 pip = $1 (usually). $67k price requires wide stops.
+    # BTC 1 pip = $1. Daily range typically $1500-3000, H1 ATR $200-500.
+    # Widened from previous (300/800/2000) which was within 1-2x H1 ATR
+    # — false stop-outs from ordinary noise.
     use_zone_based_sl: true                # Zone-based due to extreme volatility
-    zone_sl_buffer_multiplier: 1.5         # Wider buffer (was 1.3)
-    min_stop_loss_pips: 300                # $300 minimum (approx 0.5%)
-    max_stop_loss_pips: 2000               # $2000 maximum (approx 3%)
-    default_stop_loss_pips: 800            # $800 default (approx 1.2%)
-    min_take_profit_pips: 600              # $600 min TP
-    max_take_profit_pips: 5000             # $5000 max TP
+    zone_sl_buffer_multiplier: 1.5         # Wider buffer
+    min_stop_loss_pips: 600                # $600 minimum (1.5-2x H1 ATR)
+    max_stop_loss_pips: 4000               # $4000 maximum (~½ daily range)
+    default_stop_loss_pips: 1500           # $1500 default (3-4x H1 ATR)
+    min_take_profit_pips: 1200             # $1200 min TP (2:1 R:R vs new min SL)
+    max_take_profit_pips: 8000             # $8000 max TP (2-2.5x daily range)
     default_risk_reward_ratio: 2.0
 
-    # Per-symbol Breakeven & Trailing (scales to BTC's $800 default SL).
-    # Crypto asset-class defaults (BE 400 / trail 600) are already BTC-tuned,
-    # but pinning here makes the intent explicit at the symbol level.
-    breakeven_trigger: 400       # $400 = 50% of $800 default SL (1R lock-in)
+    # Per-symbol Breakeven & Trailing (scaled to new $1500 default SL).
+    breakeven_trigger: 750       # 50% of default SL (1R lock-in)
     breakeven_offset: 50         # $50 buffer
-    trailing_activation: 640     # $640 = 80% of default SL (1.6R)
-    trailing_distance: 200       # $200 trail (proportional to BTC vol)
+    trailing_activation: 1200    # 80% of default SL (1.6R)
+    trailing_distance: 400       # $400 trail distance
 
 # Trading session schedules
 trading_sessions:
