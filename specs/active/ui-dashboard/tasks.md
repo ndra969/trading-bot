@@ -3,16 +3,22 @@
 Backend first (data contract), then frontend against real endpoints.
 Each phase is independently shippable.
 
-## Phase 1 — Monorepo scaffolding (~30 min)
+## Phase 0 — Prerequisite (blocking)
 
-- [ ] Add `frontend/.next/`, `frontend/node_modules/`, `frontend/out/`
-      to `.gitignore`.
-- [ ] Create `src/trading_bot/api/__init__.py` package.
-- [ ] Add FastAPI/uvicorn confirmation to `pyproject.toml` (deps already
-      present; add an optional `[project.optional-dependencies] dashboard`
-      group if pinning extra libs).
-- [ ] Sanity: `uv run python -c "import trading_bot.api"` works.
-- [ ] Commit: `chore: scaffold api package + frontend gitignore`.
+- [ ] **[monorepo-restructure](../monorepo-restructure/tasks.md) must be
+      DONE first.** It creates `packages/api/` and `apps/dashboard/`
+      skeletons + the `trading_core` package this API imports. Do not
+      start Phase 1 until the monorepo restructure has landed and the
+      bot dry-run is verified green.
+
+## Phase 1 — Dashboard scaffolding (~30 min)
+
+- [ ] Add `apps/dashboard/.next/`, `node_modules/`, `out/` to
+      `.gitignore` (if monorepo spec didn't already).
+- [ ] Confirm `packages/api/src/trading_api/__init__.py` exists (from
+      monorepo spec) and `uv run python -c "import trading_api"` works.
+- [ ] Confirm `trading_api` can import `trading_core.data.repositories`.
+- [ ] Commit: `chore(api): confirm dashboard api scaffold`.
 
 ## Phase 2 — Read-only API (~2-3 hr)
 

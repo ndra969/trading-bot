@@ -19,43 +19,44 @@ same PostgreSQL the bot writes to.
 The bot process and the dashboard process are fully independent. Killing
 either never affects the other. They share only the database.
 
-## Monorepo layout
+## Monorepo layout (Opsi 3)
 
-Additive — nothing under `src/trading_bot/` moves.
+⚠️ **Depends on [monorepo-restructure](../monorepo-restructure/requirements.md)**
+landing first. That spec splits the repo into `packages/core` (shared
+data + config), `packages/worker` (bot engine), `packages/api`
+(FastAPI), and `apps/dashboard` (frontend). This dashboard spec FILLS
+the `api` and `dashboard` skeletons created there.
 
 ```
 trading-bot/
-├── src/trading_bot/
-│   ├── ... (existing bot, unchanged)
-│   └── api/                     # NEW FastAPI BFF
+├── packages/
+│   ├── core/src/trading_core/      # shared models/db/repositories/config
+│   ├── worker/src/trading_worker/  # bot engine (unchanged behaviour)
+│   └── api/src/trading_api/        # ← THIS SPEC fills it
 │       ├── __init__.py
-│       ├── app.py               # FastAPI app factory + router mount
-│       ├── deps.py              # read-only DB session dependency
-│       ├── schemas.py           # Pydantic response models
+│       ├── app.py                  # FastAPI app factory + router mount
+│       ├── deps.py                 # read-only DB session dependency
+│       ├── schemas.py              # Pydantic response models
 │       └── routers/
-│           ├── positions.py
-│           ├── account.py
-│           ├── sessions.py
-│           ├── signals.py
-│           └── analytics.py
-├── frontend/                    # NEW Next.js app
-│   ├── app/                     # App Router pages
-│   │   ├── page.tsx             # overview
-│   │   ├── positions/page.tsx
-│   │   ├── history/page.tsx
-│   │   └── analytics/page.tsx
-│   ├── lib/api.ts               # typed fetch client + poll hook
-│   ├── components/
-│   ├── package.json
-│   └── next.config.js
-├── tests/unit/api/              # NEW backend tests
-├── pyproject.toml               # add api extras if needed
-└── .gitignore                   # add frontend/.next, node_modules
+│           ├── positions.py  account.py  sessions.py
+│           ├── signals.py     analytics.py
+├── apps/
+│   └── dashboard/                  # ← THIS SPEC fills it (Next.js)
+│       ├── app/                    # App Router pages
+│       │   ├── page.tsx            # overview
+│       │   ├── positions/page.tsx
+│       │   ├── history/page.tsx
+│       │   └── analytics/page.tsx
+│       ├── lib/api.ts              # typed fetch client + poll hook
+│       ├── components/
+│       └── package.json
+└── packages/api/tests/             # backend tests (or tests/api/)
 ```
 
-**Decision**: FastAPI lives at `src/trading_bot/api/` (shares the package
-so it reuses models/repositories via normal imports). No separate
-`backend/` top-level — avoids duplicate dependency management.
+**Decision**: `trading_api` imports `trading_core.data.repositories` and
+`trading_core.data.models` — both api and worker depend only on core,
+never on each other (clean dependency tree). DB creds stay server-side
+(BFF); the frontend only ever talks to the API.
 
 ## API design (read-only)
 
