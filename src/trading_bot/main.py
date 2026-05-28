@@ -1750,6 +1750,67 @@ class TradingBot:
             await self.position_manager.save_position(position, is_dry_run=is_dry_run)
             logger.info("  💾 Breakeven SL saved to database (dry-run, no notification)")
 
+    async def _finalize_max_duration_close(self, position, is_dry_run: bool) -> None:
+        """Finalise a max-duration auto-close: MT5 close, DB save, notify.
+
+        position_manager._check_max_duration has already marked the position
+        CLOSED in memory (and set close_reason=MAX_DURATION). This routine
+        carries out the side effects MT5 + DB need.
+        """
+        # Mirror SL/TP close finalisation: compute realized P&L from tracker
+        # (already set by close_position via _check_max_duration).
+        pnl_usd = position.current_pnl_usd or 0.0
+        pips = position.current_profit_pips or 0.0
+
+        # Close the position on MT5 too (we initiated this, MT5 won't otherwise)
+        if not is_dry_run and self.mt5 and self.mt5.is_connected():
+            broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
+            ticket = self._resolve_mt5_ticket(position, broker_symbol)
+            if ticket:
+                try:
+                    self.mt5.close_position(
+                        ticket=ticket,
+                        volume=position.volume,
+                        comment=f"MaxDuration {position.position_id}",
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"  ❌ MT5 close failed for max-duration on {position.position_id}: {e}"
+                    )
+
+        # Unregister exposure
+        asset_class = self._get_asset_class(position.symbol)
+        self.exposure_manager.unregister_position(
+            position.symbol, asset_class, position.volume
+        )
+
+        # Update portfolio balance with realized P&L
+        self.portfolio_risk.update_balance(
+            self.portfolio_risk.current_balance + pnl_usd
+        )
+
+        # Persist + session aggregation
+        await self.position_manager.save_position(position, is_dry_run=is_dry_run)
+        await self._update_session_on_position_close(
+            position, {"pnl_usd": pnl_usd, "pips": pips}
+        )
+
+        logger.info(
+            f"  ⏰ POSITION CLOSED (MAX DURATION): {position.position_id} | "
+            f"P&L: {pnl_usd:.2f} {self.account_currency_unit} | Pips: {pips:.1f}"
+        )
+
+        if self.notification_manager:
+            pnl_emoji = "💰" if pnl_usd > 0 else "💸"
+            await self.notification_manager.send_message(
+                f"{pnl_emoji} **POSITION CLOSED (Max Duration)**\n"
+                f"🆔 `{position.position_id}`\n"
+                f"⏰ Reason: Max duration reached in profit\n"
+                f"💵 P&L: **{pnl_usd:.2f} {self.account_currency_unit}**\n"
+                f"📏 Pips: `{pips:.1f}`",
+                level=NotificationLevel.SUCCESS,
+            )
+
     async def _check_position_closure(self):
         """Check for stop loss and take profit hits."""
         try:
@@ -1766,6 +1827,17 @@ class TradingBot:
                     current_price = await self._get_current_price(position.symbol)
                     if current_price is None:
                         continue
+
+                    # Update position price + tracker state so duration / P&L
+                    # are fresh before the max-duration check below.
+                    self.position_manager.update_position(position.position_id, current_price)
+
+                    # Max-duration auto-close (only if position is in profit;
+                    # losing positions ride until SL/TP per design — see
+                    # position_manager._check_max_duration).
+                    if self.position_manager._check_max_duration(position, current_price):
+                        await self._finalize_max_duration_close(position, is_dry_run)
+                        continue  # Done with this position this tick
 
                     # Check if SL or TP is hit (price-based fallback; MT5 is authoritative)
                     should_close = False
