@@ -48,8 +48,11 @@ that also houses a frontend, without disrupting the live bot.
 - `cd frontend && npm run dev` serves the dashboard; it shows real data
   from the running bot's PostgreSQL.
 - Dashboard reflects new positions / closes within one poll interval.
-- Backend has unit tests (≥85% coverage on new `api/` code), reusing
-  existing repositories where possible.
+- Backend has unit tests (≥85% coverage on `trading_api`), gating like
+  the bot's tests — FastAPI TestClient, mocked data layer, and syrupy
+  snapshot assertions on response shapes. The API is NOT exempt from
+  tests. Code maintainable + testable: thin routers, DI'd DB session,
+  logic in small mockable functions (no business logic inline in handlers).
 - Zero impact on bot: starting/stopping the dashboard never touches MT5
   or bot process state.
 - P&L / balance figures show the correct currency unit (USC for cent).

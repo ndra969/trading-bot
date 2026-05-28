@@ -41,16 +41,20 @@ Each phase is independently shippable.
 - [ ] `routers/analytics.py`: `/by-asset`, `/by-session`,
       `/by-close-reason`, `/equity-curve`.
 
-### Tests
-- [ ] `tests/unit/api/` with FastAPI TestClient + mocked repositories.
-- [ ] Cover each endpoint: happy path + empty-data + currency unit.
-- [ ] `uv run pytest tests/unit/api/ --cov=src/trading_bot/api`
-      → ≥85%.
+### Tests (mandatory — API gates like the bot does)
+- [ ] Add `syrupy` to dev deps.
+- [ ] `packages/api/tests/` (or `tests/api/`) with FastAPI TestClient +
+      mocked repositories/DB session (never hit a real DB).
+- [ ] Per endpoint: happy path + empty-data + error + currency-unit.
+- [ ] syrupy snapshot assertions on each endpoint's JSON shape; explicit
+      assertions for P&L math + currency unit (don't let snapshots mask
+      business-critical fields).
+- [ ] `uv run pytest tests/api/ --cov=trading_api` → ≥85%.
 
 ### Verify
-- [ ] `uv run uvicorn trading_bot.api.app:app --port 8000`, hit each
-      endpoint with curl, confirm live data shape.
-- [ ] Commit: `feat(api): read-only dashboard endpoints`.
+- [ ] `uv run uvicorn trading_api.app:app --port 8000`, hit each
+      endpoint + open `/docs` (Swagger) + `/redoc`, confirm live shape.
+- [ ] Commit: `feat(api): read-only dashboard endpoints + tests`.
 
 ## Phase 3 — Frontend scaffold (~1-2 hr)
 

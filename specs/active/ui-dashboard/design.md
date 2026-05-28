@@ -143,15 +143,31 @@ in phase 1, but the middleware hook is stubbed.
 
 ## Test impact
 
-- New `tests/unit/api/` with FastAPI `TestClient`, mocking the DB
-  session / repositories. Target ≥85% on `api/`.
-- No change to existing bot tests.
-- Frontend: optional component tests later; not gating phase 1.
+The API is a first-class testable component — not an afterthought. The
+bot has tests; the API must too.
+
+- **API unit tests are mandatory** (`packages/api/tests/` or
+  `tests/api/`), gating the same way bot tests gate. Target ≥85%
+  coverage on `trading_api`.
+- **FastAPI `TestClient`** for endpoint tests.
+- **Mock the data layer** — patch repositories / DB session so API tests
+  never hit a real DB. Each endpoint: happy path, empty-data, error,
+  and currency-unit assertions.
+- **syrupy snapshot assertions** for JSON response shapes. Add `syrupy`
+  to the dev deps; assert each endpoint's serialized response against a
+  stored snapshot so schema drift is caught automatically. Combine with
+  explicit assertions for dynamic/business-critical fields (P&L math,
+  currency unit) that snapshots shouldn't mask.
+- **Maintainable + testable design**: thin routers, logic in small
+  testable functions/services, dependency-injected DB session so it's
+  trivially mockable. No business logic inline in route handlers.
+- Frontend: component tests optional in phase 1 (not gating), but the
+  `lib/api.ts` client should be structured to allow them later.
 
 ## Rollback plan
 
-Dashboard is purely additive. To remove: delete `src/trading_bot/api/`,
-`frontend/`, `tests/unit/api/`, and the gitignore lines. Bot untouched.
+Dashboard is purely additive. To remove: delete `packages/api/`,
+`apps/dashboard/`, their tests, and the gitignore lines. Worker untouched.
 
 ## What "done" looks like
 
