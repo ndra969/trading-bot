@@ -21,6 +21,7 @@ Multi-asset trading bot (Forex/Commodities/Crypto) with MT5. Python 3.12+, UV, C
 | `/dry-run` | Validate bot (MANDATORY pre-commit) |
 | `/commit [quick\|full]` | Pre-commit validation |
 | `/new <cat>/<name>` | New doc |
+| `/spec <name>` | New 3-file spec (requirements/design/tasks) |
 
 ### Operations
 | Cmd | Purpose |
@@ -88,6 +89,12 @@ Full standards: `docs/guides/coding-standards.md`
 /test && /quality fix && /dry-run
 ```
 
+**Docs/specs-only commits**: when a commit touches ONLY `docs/`, `specs/`,
+`.claude/`, or `*.md` files (no `src/` or `tests/` changes), commit with
+`--no-verify` — the pre-commit hook runs the full test suite which is
+irrelevant for documentation and just wastes time / risks the stash-restore
+conflict. Code/test changes always run the full hook.
+
 ## Debugging & Monitoring
 
 For runtime issues, use these commands instead of running CLI manually:
@@ -110,12 +117,16 @@ src/trading_bot/
   cli.py  config.py  main.py
   connectors/  data/  executors/  position/
   risk/  strategies/  utils/  exceptions/
-tests/    1444+ tests (unit, integration, utils)
+tests/    1534+ tests (unit, integration, utils)
 config/   YAML configs
 docs/     User docs
-specs/    Internal specs (archived)
+specs/    active/ (3-file specs: requirements+design+tasks) · archive/
 alembic/  DB migrations
 ```
+
+> New planned work → scaffold a spec with `/spec <name>` (creates
+> `specs/active/<name>/{requirements,design,tasks}.md`). Archive to
+> `specs/archive/YYYY-MM/` when resolved.
 
 ## Configuration
 
