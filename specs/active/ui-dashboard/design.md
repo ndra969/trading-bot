@@ -58,9 +58,27 @@ trading-bot/
 never on each other (clean dependency tree). DB creds stay server-side
 (BFF); the frontend only ever talks to the API.
 
+## Tech stack (latest, mainstream)
+
+Use current stable, widely-adopted versions — no bleeding edge, no
+abandoned libs.
+
+- **Backend**: FastAPI (latest stable) + uvicorn. Swagger UI is built in
+  — FastAPI auto-serves interactive OpenAPI docs at `/docs` (and ReDoc at
+  `/redoc`). Pydantic v2 response models drive the schema. No extra docs
+  tooling needed.
+- **DB access**: existing SQLAlchemy 2.0 async + asyncpg (reused from core).
+- **Frontend**: Next.js (latest stable, App Router) + TypeScript +
+  React 18+. Charts: `lightweight-charts` (TradingView) for equity/price;
+  `recharts` for bar/pie analytics. Data fetching: native fetch + a small
+  poll hook (add TanStack Query only if polling grows complex).
+- Pin to latest stable at implementation time; prefer the most-downloaded
+  option when choosing between equivalents.
+
 ## API design (read-only)
 
 All endpoints `GET`, JSON, no mutations. Versioned under `/api/v1`.
+Interactive Swagger docs auto-served at `/docs`, ReDoc at `/redoc`.
 
 | Endpoint | Returns |
 |----------|---------|

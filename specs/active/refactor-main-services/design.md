@@ -32,7 +32,7 @@ class PositionOrchestrator:
 
 ## Phase 3 — PositionOrchestrator
 
-### Target file: `src/trading_bot/services/position_orchestrator.py`
+### Target file: `packages/worker/src/trading_worker/services/position_orchestrator.py`
 
 ### Methods moved from `TradingBot`:
 
@@ -94,7 +94,7 @@ exposure_manager, portfolio_risk, current_session) are set.
 
 ## Phase 4 — AnalysisService
 
-### Target file: `src/trading_bot/services/analysis_service.py`
+### Target file: `packages/worker/src/trading_worker/services/analysis_service.py`
 
 ### Methods moved from `TradingBot`:
 
@@ -129,12 +129,12 @@ to actually act on detected signals — the analysis service detects, the
 execution service executes. This composition is intentional: each
 service owns its lane.
 
-## Service file layout
+## Service file layout (post-monorepo)
 
 ```
-src/trading_bot/services/
+packages/worker/src/trading_worker/services/
 ├── __init__.py
-├── execution_service.py        (existing, Phase 2)
+├── execution_service.py        (existing, Phase 2 — moved by monorepo step)
 ├── position_orchestrator.py    (NEW, Phase 3)
 └── analysis_service.py         (NEW, Phase 4)
 ```

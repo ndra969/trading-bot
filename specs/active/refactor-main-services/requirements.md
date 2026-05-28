@@ -2,8 +2,10 @@
 
 **Status**: 📋 Planned
 **Priority**: 🟢 Low (cosmetic — no behavior change)
-**Date**: 2026-05-27
+**Date**: 2026-05-27, updated 2026-05-28
 **Predecessors**: Phase 1 (utilities) ✅, Phase 2 (ExecutionService) ✅ commit `9a98285`
+**Runs after**: [monorepo-restructure](../monorepo-restructure/requirements.md)
+— `main.py` lives at `packages/worker/src/trading_worker/main.py` by then.
 
 ## Context
 
@@ -13,9 +15,16 @@ file still acts as the catch-all for position management and signal analysis
 on top of pure orchestration. Two more service extractions (Phase 3 & 4)
 would bring main.py to ~1000-1200 lines — purely an orchestrator.
 
-This is **deferred work** done only after the live observation phase
-stabilises. There is **no functional change** — this is purely an
-organisation refactor.
+**Sequencing (decided 2026-05-28)**: this runs AS A SEPARATE STEP right
+after monorepo-restructure, in the same focused session but a separate
+commit. The monorepo step is a pure mechanical move (copy + import
+rewrite); this step is a logic refactor (method extraction). Keeping them
+in distinct commits means a test failure points clearly at one or the
+other. After monorepo, the new service files land in
+`packages/worker/src/trading_worker/services/`.
+
+There is **no functional change** — this is purely an organisation
+refactor.
 
 ## Goals
 

@@ -66,6 +66,14 @@ a clean tree and lets worker + api deploy independently later.
 The old `trading_bot` name retires. CLI command stays `trading-bot`
 (user-facing), but its entry point becomes `trading_worker.cli:cli`.
 
+## Dependency policy
+
+When writing each package's `pyproject.toml`, pin to **latest stable**
+versions of mainstream libs (SQLAlchemy 2.0, pydantic v2, asyncpg,
+fastapi, uvicorn, etc.). Prefer the most-widely-used option between
+equivalents. Carry forward versions from the current root
+`pyproject.toml`, bumping to latest stable where safe.
+
 ## uv workspace
 
 Root `pyproject.toml`:
@@ -140,23 +148,53 @@ imports rewritten. Subdivide into `tests/core/`, `tests/worker/`,
 `tests/api/` only if it becomes unwieldy later. Conftest/fixtures move
 with their imports.
 
-## Migration sequence (high level — detail in tasks.md)
+## Migration sequence — COPY first, verify, then remove
 
-1. Create branch + tag known-good commit.
-2. Create package skeletons (`packages/core|worker|api`, pyproject each,
-   root workspace config).
-3. `git mv` files into their new homes (preserves history).
-4. Sweep imports (core-bound first, then worker blanket).
-5. Fix alembic env + CLI entry point.
-6. `uv sync`; smoke-import each package.
-7. Full pytest + dry-run.
-8. Single commit (this is too big to bypass hooks — run full suite).
+**Strategy decision**: COPY files into the new packages (don't `git mv`).
+The old `src/trading_bot/` stays intact as a reference until the new
+structure is proven, so we can diff old-vs-new to confirm zero logic
+change. Only after verification do we delete the old tree.
+
+Tradeoff: git sees the copied files as new (per-file history resets at
+the new path). Accepted for the safety + diffability benefit.
+
+### Coexistence rule (critical during transition)
+
+While both trees exist:
+- The **running bot keeps using old `trading_bot`** — CLI entry point
+  stays `trading_bot.cli:cli` until the explicit cutover step.
+- New code imports `trading_core` / `trading_worker`; old code imports
+  `trading_bot`. **No file imports both.**
+- Verify against the NEW packages; old tests keep passing against old
+  code until cutover.
+
+### Steps (detail in tasks.md)
+
+1. Branch + tag known-good commit.
+2. Create package skeletons + root uv workspace config (old
+   `src/trading_bot` still the live package).
+3. **COPY** files into new homes (split core vs worker during copy).
+4. Rewrite imports in the COPIES only (core-bound first, then worker).
+5. Fix alembic env (point at `trading_core.data.models`) + add a
+   temporary `trading-bot-new = trading_worker.cli:cli` script so the
+   old `trading-bot` keeps working in parallel.
+6. `uv sync`; smoke-import each new package.
+7. Run the suite against the NEW packages; diff old-vs-new source to
+   confirm ONLY import lines + paths changed (the verification artifact).
+8. **Cutover**: flip `trading-bot` to `trading_worker.cli`, delete
+   `src/trading_bot/`, drop the temp `trading-bot-new` alias.
+9. Full pytest + dry-run on the cutover state.
+10. Commit (full hooks — this is code).
 
 ## Rollback plan
 
-Done on a branch. If anything is off: `git checkout main` / reset to the
-pre-restructure tag. Because it's pure move + import rewrite, revert is
-total. No DB/data involvement.
+Done on a branch, two safety nets:
+1. Pre-cutover: old `src/trading_bot/` still present + live — delete the
+   new `packages/` and you're back instantly.
+2. Post-cutover: `git checkout main` / reset to the pre-restructure tag.
+
+Copy + import-rewrite means a source diff old-vs-new shows ONLY import
+lines + file paths differing — that diff IS the proof of no logic change.
 
 ## What "done" looks like
 
