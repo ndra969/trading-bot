@@ -28,7 +28,7 @@ trading_types:
     max_positions: 5
     confluence_threshold: 30.0  # Lowered to 30% to increase trade frequency
     max_loss_per_day: 0.02  # 2%
-    max_position_duration_hours: 24  # Auto-close positions after 24 hours (intraday limit)
+    max_position_duration_hours: 48  # Auto-close after 2 days (zone-based H1/H4 trades need 1-2 sessions to develop; profit-only close — losers ride to SL/TP)
     timeframes: ["M15", "H1", "H4"]
     preferred_sessions: ["london", "new_york", "tokyo"]
     stop_loss_pips:
