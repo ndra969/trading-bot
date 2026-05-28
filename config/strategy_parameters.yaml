@@ -96,32 +96,41 @@ signal_generation:
   # foundation_engine looks up `<asset_class>` first, falls back to `default`.
   # Asset classes recognised: forex_major, forex_jpy, commodities, crypto.
   quality_thresholds:
-    # Fallback for any asset_class not explicitly defined below.
+    # Data-driven thresholds (2026-05-28). Calibrated against actual DB
+    # confluence distribution — earlier theoretical values (60-75%) would
+    # have blocked ALL signals since observed max confluence is only
+    # ~43-57% per asset. Set near each asset's p50 so we capture roughly
+    # half the historical signals for observation-phase data collection.
+    #
+    # Observed (closed positions): forex max 57.4 / p50 35.4; forex_jpy
+    # max 57.9 / p50 41.9; crypto max 42.8 / p50 34.3; commodities max
+    # 45.5 / p50 34.2. Confluence is currently a WEAK outcome predictor
+    # (win avg ≈ loss avg) — scoring likely under-tuned; revisit separately.
     default:
-      min_confluence_score: 65.0
-      min_foundation_score: 50.0
-      min_price_action_score: 15.0
+      min_confluence_score: 35.0
+      min_foundation_score: 30.0
+      min_price_action_score: 8.0
 
     forex_major:
-      min_confluence_score: 75.0       # Tight signals — forex majors are clean
-      min_foundation_score: 60.0
-      min_price_action_score: 15.0
+      min_confluence_score: 35.0       # ≈ p50 (35.4)
+      min_foundation_score: 30.0
+      min_price_action_score: 8.0
 
     forex_jpy:
-      min_confluence_score: 70.0       # Slightly looser — JPY pairs more volatile
-      min_foundation_score: 55.0
-      min_price_action_score: 15.0
+      min_confluence_score: 42.0       # ≈ p50 (41.9) — JPY signals naturally higher
+      min_foundation_score: 35.0
+      min_price_action_score: 8.0
 
     commodities:
-      min_confluence_score: 40.0           # Trend-following entries
-      min_confluence_score_counter: 50.0   # Counter-trend (raised post-drawdown)
-      min_foundation_score: 30.0           # Gold reacts strongly to foundation alone
-      min_price_action_score: 10.0
+      min_confluence_score: 32.0           # just below p50 (34.2)
+      min_confluence_score_counter: 38.0   # ~p90 for counter-trend caution
+      min_foundation_score: 25.0
+      min_price_action_score: 8.0
 
     crypto:
-      min_confluence_score: 60.0       # Extreme volatility needs strong confluence
-      min_foundation_score: 45.0
-      min_price_action_score: 15.0
+      min_confluence_score: 32.0       # just below p50 (34.3)
+      min_foundation_score: 28.0
+      min_price_action_score: 8.0
 
     # Globals (apply to all asset classes)
     max_signals_per_symbol: 1
