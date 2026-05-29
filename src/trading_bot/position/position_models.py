@@ -98,6 +98,8 @@ class Position:
     current_price: float | None = None
     current_profit_pips: float = 0.0
     current_pnl_usd: float = 0.0
+    realized_profit_pips: float = 0.0  # Final profit pips, frozen at close
+    realized_pnl_usd: float = 0.0  # Final P&L, frozen at close
     risk_amount_usd: float = 0.0
     potential_profit_usd: float = 0.0
     is_winner: bool | None = None  # Set when position is closed
@@ -203,6 +205,8 @@ class Position:
             "current_price": self.current_price,
             "current_profit_pips": self.current_profit_pips,
             "current_pnl_usd": self.current_pnl_usd,
+            "realized_profit_pips": self.realized_profit_pips,
+            "realized_pnl_usd": self.realized_pnl_usd,
             "risk_amount_usd": self.risk_amount_usd,
             "potential_profit_usd": self.potential_profit_usd,
             "is_winner": self.is_winner,

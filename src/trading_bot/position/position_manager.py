@@ -227,6 +227,8 @@ class PositionManager:
             current_price=db_pos.current_price,
             current_profit_pips=db_pos.current_profit_pips,
             current_pnl_usd=db_pos.current_pnl_usd,
+            realized_profit_pips=db_pos.realized_profit_pips,
+            realized_pnl_usd=db_pos.realized_pnl_usd,
             risk_amount_usd=db_pos.risk_amount_usd,
             potential_profit_usd=db_pos.potential_profit_usd,
             is_winner=db_pos.is_winner,
@@ -399,6 +401,8 @@ class PositionManager:
                     db_pos.close_price = position.close_price
                     db_pos.current_profit_pips = position.current_profit_pips
                     db_pos.current_pnl_usd = position.current_pnl_usd
+                    db_pos.realized_profit_pips = position.realized_profit_pips
+                    db_pos.realized_pnl_usd = position.realized_pnl_usd
                     db_pos.open_time = position.open_time
                     db_pos.close_time = position.close_time
                     db_pos.confluence_score = confluence_score  # Update confluence score
@@ -444,6 +448,8 @@ class PositionManager:
                         current_price=position.current_price,
                         current_profit_pips=position.current_profit_pips,
                         current_pnl_usd=position.current_pnl_usd,
+                        realized_profit_pips=position.realized_profit_pips,
+                        realized_pnl_usd=position.realized_pnl_usd,
                         risk_amount_usd=position.risk_amount_usd,
                         potential_profit_usd=position.potential_profit_usd,
                         confluence_score=confluence_score,  # Add confluence score

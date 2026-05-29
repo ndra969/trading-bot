@@ -171,6 +171,20 @@ class TestClosePosition:
         assert buy_position.close_price == 1.1050
         assert buy_position.current_profit_pips == pytest.approx(50.0, abs=0.1)
         assert buy_position.current_pnl_usd == pytest.approx(500.0, abs=1.0)
+        # realized_* frozen at close (immutable outcome for analytics)
+        assert buy_position.realized_profit_pips == pytest.approx(50.0, abs=0.1)
+        assert buy_position.realized_pnl_usd == pytest.approx(500.0, abs=1.0)
+
+    def test_close_position_freezes_realized_against_later_updates(self, tracker, buy_position):
+        """realized_* stays at the close value even if current_* mutates after."""
+        tracker.open_position(buy_position)
+        tracker.close_position(buy_position, 1.1050)
+        realized_pips = buy_position.realized_profit_pips
+        realized_pnl = buy_position.realized_pnl_usd
+        # A stray price update must not move realized_* (current_* may change)
+        tracker.update_position_price(buy_position, 1.1000)
+        assert buy_position.realized_profit_pips == realized_pips
+        assert buy_position.realized_pnl_usd == realized_pnl
 
     def test_close_position_with_loss(self, tracker, buy_position):
         """Test closing position with loss."""

@@ -204,6 +204,12 @@ class PositionTracker:
         pip_value = position.pip_value_per_lot
         position.current_pnl_usd = position.current_profit_pips * pip_value
 
+        # Freeze realized result at close (current_* keeps mutating on later
+        # price updates / reconciliation; realized_* is the immutable outcome
+        # used by analytics and reporting).
+        position.realized_profit_pips = position.current_profit_pips
+        position.realized_pnl_usd = position.current_pnl_usd
+
         # Set is_winner based on final P&L
         position.is_winner = position.current_pnl_usd > 0
 
