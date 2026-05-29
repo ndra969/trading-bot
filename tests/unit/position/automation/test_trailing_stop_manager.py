@@ -943,3 +943,60 @@ class TestReprMethod:
         str_repr = str(trailing_manager)
         repr_repr = repr(trailing_manager)
         assert str_repr == repr_repr
+
+
+class TestRatioBasedTrailing:
+    """Trailing activation/distance scaling with each position's stop distance."""
+
+    @pytest.fixture
+    def ratio_config(self):
+        return {
+            "position_management": {
+                "commodities": {
+                    "trailing_activation_r": 0.7,
+                    "trailing_distance_r": 0.4,
+                    "trailing_activation": 280.0,  # fixed fallback
+                    "trailing_distance": 100.0,
+                }
+            }
+        }
+
+    def _xau_sell(self, profit_pips, risk_pips):
+        pos = Position(
+            position_id="pos_xau",
+            symbol="XAUUSD",
+            position_type=PositionType.SELL,
+            entry_price=4432.226,
+            stop_loss=4451.039,
+            take_profit=4400.0,
+            volume=0.04,
+            pip_size=0.1,
+            pip_value_per_lot=1.0,
+            status=PositionStatus.OPEN,
+        )
+        pos.entry_to_sl_pips = risk_pips
+        pos.current_profit_pips = profit_pips
+        pos.current_price = 4432.226 - profit_pips * 0.1
+        return pos
+
+    def test_activates_at_ratio_of_risk(self, ratio_config):
+        mgr = TrailingStopManager(config=ratio_config)
+        # SL 188 -> 0.7R = 131.6 pips
+        assert mgr.should_activate_trailing(self._xau_sell(140.0, 188.1)) is True
+        assert mgr.should_activate_trailing(self._xau_sell(120.0, 188.1)) is False
+
+    def test_distance_scales_with_risk(self, ratio_config):
+        mgr = TrailingStopManager(config=ratio_config)
+        pos = self._xau_sell(140.0, 200.0)
+        settings = mgr._get_settings("XAUUSD", "commodities")
+        # 0.4 * 200 = 80 pips distance
+        assert mgr._resolve_distance_pips(pos, settings) == pytest.approx(80.0)
+
+    def test_fixed_fallback_when_risk_unknown(self, ratio_config):
+        mgr = TrailingStopManager(config=ratio_config)
+        pos = self._xau_sell(290.0, 0.0)  # risk unknown -> fixed 280
+        assert mgr.should_activate_trailing(pos) is True
+        pos2 = self._xau_sell(200.0, 0.0)
+        assert mgr.should_activate_trailing(pos2) is False
+        settings = mgr._get_settings("XAUUSD", "commodities")
+        assert mgr._resolve_distance_pips(pos2, settings) == 100.0

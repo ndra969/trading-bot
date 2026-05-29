@@ -116,6 +116,13 @@ class TestShouldClosePartial:
 
         assert partial_manager.should_close_partial(buy_position_forex) is True
 
+    def test_should_close_partial_disabled(self, buy_position_forex):
+        """Disabled manager never partial-closes (global off switch)."""
+        manager = PartialCloseManager(config={"partial_close": {"enabled": False}})
+        manager.initialize_position(buy_position_forex)
+        buy_position_forex.current_profit_pips = 75.0  # would hit level 1 if enabled
+        assert manager.should_close_partial(buy_position_forex) is False
+
     def test_should_close_partial_not_hit(self, partial_manager, buy_position_forex):
         """Test should not close partial when level not hit."""
         partial_manager.initialize_position(buy_position_forex)

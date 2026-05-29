@@ -147,12 +147,25 @@ class TrailingStopManager:
         pm_config = self.config.get("position_management", {})
         asset_config = pm_config.get(asset_class, {})
 
+        # Ratio-based settings (preferred): activation/distance as a fraction of
+        # the position's ACTUAL stop distance, so they auto-scale with the
+        # dynamic zone-based SL. None → fall back to the fixed pip values.
+        activation_r = symbol_cfg.get(
+            "trailing_activation_r", asset_config.get("trailing_activation_r")
+        )
+        distance_r = symbol_cfg.get("trailing_distance_r", asset_config.get("trailing_distance_r"))
+
         if asset_config or symbol_cfg.get("trailing_activation") is not None:
             activation = symbol_cfg.get(
                 "trailing_activation", asset_config.get("trailing_activation", 20.0)
             )
             limit = symbol_cfg.get("trailing_distance", asset_config.get("trailing_distance", 10.0))
-            return {"activation_pips": activation, "limit_pips": limit}
+            return {
+                "activation_pips": activation,
+                "limit_pips": limit,
+                "activation_r": activation_r,
+                "distance_r": distance_r,
+            }
 
         # Legacy fallback
         tm_config = self.config.get("trade_management", {})
@@ -164,6 +177,27 @@ class TrailingStopManager:
             ),
             "limit_pips": overrides.get("limit_pips", defaults.get("limit_pips", 10.0)),
         }
+
+    @staticmethod
+    def _initial_risk_pips(position: Position) -> float:
+        """Initial stop distance in pips, frozen at open (0 if unavailable)."""
+        return getattr(position, "entry_to_sl_pips", 0.0) or 0.0
+
+    def _resolve_activation_pips(self, position: Position, settings: dict) -> tuple[float, str]:
+        """Resolve trailing activation threshold in pips (ratio of risk if set)."""
+        activation_r = settings.get("activation_r")
+        risk_pips = self._initial_risk_pips(position)
+        if activation_r is not None and risk_pips > 0:
+            return activation_r * risk_pips, f"{activation_r:g}R"
+        return settings.get("activation_pips", 20.0), "fixed"
+
+    def _resolve_distance_pips(self, position: Position, settings: dict) -> float:
+        """Resolve trailing distance in pips (ratio of risk if set)."""
+        distance_r = settings.get("distance_r")
+        risk_pips = self._initial_risk_pips(position)
+        if distance_r is not None and risk_pips > 0:
+            return distance_r * risk_pips
+        return settings.get("limit_pips", 10.0)
 
     def should_activate_trailing(self, position: Position) -> bool:
         """
@@ -188,14 +222,14 @@ class TrailingStopManager:
         # Get activation threshold from config
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
         settings = self._get_settings(position.symbol, asset_class)
-        threshold_pips = settings.get("activation_pips", 20.0)
+        threshold_pips, threshold_mode = self._resolve_activation_pips(position, settings)
 
         # Check if profit exceeds threshold
         if position.current_profit_pips >= threshold_pips:
             logger.info(
                 f"🎯 Trailing stop ACTIVATED for {position.position_id} ({position.symbol}): "
                 f"{position.current_profit_pips:.1f} pips profit "
-                f"(threshold: {threshold_pips:.1f} pips)"
+                f"(threshold: {threshold_pips:.1f} pips, {threshold_mode})"
             )
             return True
         else:
@@ -257,7 +291,7 @@ class TrailingStopManager:
         # This handles cases where profit fluctuates but price still allows better SL
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
         settings = self._get_settings(position.symbol, asset_class)
-        trailing_distance = settings.get("limit_pips", 10.0)
+        trailing_distance = self._resolve_distance_pips(position, settings)
         pip_size = position.pip_size
         trailing_price = trailing_distance * pip_size
 
@@ -308,7 +342,7 @@ class TrailingStopManager:
         # Get trailing distance
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
         settings = self._get_settings(position.symbol, asset_class)
-        trailing_distance = settings.get("limit_pips", 10.0)
+        trailing_distance = self._resolve_distance_pips(position, settings)
         pip_size = position.pip_size
 
         # Calculate trailing distance in price units

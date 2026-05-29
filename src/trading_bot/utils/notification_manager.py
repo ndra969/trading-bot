@@ -5,7 +5,9 @@ Handles asynchronous message sending with queueing and rate limiting.
 """
 
 import asyncio
+import html
 import logging
+import re
 from enum import Enum
 from typing import Any
 
@@ -14,6 +16,30 @@ import httpx
 from trading_bot.config import Configuration
 
 logger = logging.getLogger(__name__)
+
+
+def markdownish_to_html(text: str) -> str:
+    """Convert the bot's `**bold**` / `` `code` `` markup to Telegram HTML.
+
+    Telegram's legacy "Markdown" parse mode chokes on:
+      - `**bold**` (that's MarkdownV2, not legacy — legacy uses single `*`)
+      - unbalanced `_` in dynamic content (position ids like pos_ab_12,
+        enum values like STOP_LOSS) → "can't parse entities" 400.
+
+    HTML parse mode only treats `&`, `<`, `>` specially, so dynamic
+    content with underscores/asterisks is safe. We:
+      1. HTML-escape the whole string (handles &, <, > in data),
+      2. convert **x** → <b>x</b>,
+      3. convert `x` → <code>x</code>.
+
+    Escaping first is safe because `*` and backtick aren't HTML-special,
+    so the markup survives step 1 and the dynamic content is already
+    escaped before it lands inside the tags.
+    """
+    escaped = html.escape(text, quote=False)
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped, flags=re.DOTALL)
+    escaped = re.sub(r"`([^`]+?)`", r"<code>\1</code>", escaped)
+    return escaped
 
 
 class NotificationLevel(Enum):
@@ -245,8 +271,11 @@ class NotificationManager:
 
                     data = {
                         "chat_id": chat_id,
-                        "text": payload["text"],
-                        "parse_mode": "Markdown",  # Use Markdown for bold/italic
+                        # HTML parse mode + converter: robust against the `_`
+                        # in position ids / enum values that broke legacy
+                        # Markdown with 400 "can't parse entities".
+                        "text": markdownish_to_html(payload["text"]),
+                        "parse_mode": "HTML",
                         "disable_notification": payload["disable_notification"],
                     }
 

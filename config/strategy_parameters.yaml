@@ -106,29 +106,33 @@ signal_generation:
     # max 57.9 / p50 41.9; crypto max 42.8 / p50 34.3; commodities max
     # 45.5 / p50 34.2. Confluence is currently a WEAK outcome predictor
     # (win avg ≈ loss avg) — scoring likely under-tuned; revisit separately.
+    # 2026-05-29 bump: raised ~6-7 pts above p50 (toward ~p65) to trim the
+    # weakest half of signals after a losing run, while staying below each
+    # asset's observed max so signals still flow. Confluence is still a weak
+    # predictor; this is a stopgap until the scoring revisit.
     default:
-      min_confluence_score: 35.0
+      min_confluence_score: 42.0
       min_foundation_score: 30.0
       min_price_action_score: 8.0
 
     forex_major:
-      min_confluence_score: 35.0       # ≈ p50 (35.4)
+      min_confluence_score: 42.0       # was 35 (p50 35.4); max observed 57.4
       min_foundation_score: 30.0
       min_price_action_score: 8.0
 
     forex_jpy:
-      min_confluence_score: 42.0       # ≈ p50 (41.9) — JPY signals naturally higher
+      min_confluence_score: 48.0       # was 42 (p50 41.9); max observed 57.9
       min_foundation_score: 35.0
       min_price_action_score: 8.0
 
     commodities:
-      min_confluence_score: 32.0           # just below p50 (34.2)
-      min_confluence_score_counter: 38.0   # ~p90 for counter-trend caution
+      min_confluence_score: 38.0           # was 32 (p50 34.2); max observed 45.5
+      min_confluence_score_counter: 42.0   # was 38 — stricter counter-trend
       min_foundation_score: 25.0
       min_price_action_score: 8.0
 
     crypto:
-      min_confluence_score: 32.0       # just below p50 (34.3)
+      min_confluence_score: 38.0       # was 32 (p50 34.3); max observed 42.8
       min_foundation_score: 28.0
       min_price_action_score: 8.0
 

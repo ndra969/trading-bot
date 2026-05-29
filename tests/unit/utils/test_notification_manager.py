@@ -4,7 +4,48 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from trading_bot.config import Configuration
-from trading_bot.utils.notification_manager import NotificationLevel, NotificationManager
+from trading_bot.utils.notification_manager import (
+    NotificationLevel,
+    NotificationManager,
+    markdownish_to_html,
+)
+
+
+class TestMarkdownishToHtml:
+    """Tests for the Telegram markup converter (regression for 400 errors)."""
+
+    def test_bold_converted(self):
+        assert markdownish_to_html("**Bold**") == "<b>Bold</b>"
+
+    def test_code_converted(self):
+        assert markdownish_to_html("`code`") == "<code>code</code>"
+
+    def test_underscores_in_position_id_preserved(self):
+        # Legacy Markdown choked on these unbalanced underscores -> 400.
+        out = markdownish_to_html("Position pos_8063aa334151 closed")
+        assert "pos_8063aa334151" in out
+
+    def test_underscores_in_enum_preserved(self):
+        out = markdownish_to_html("reason: STOP_LOSS")
+        assert "STOP_LOSS" in out
+
+    def test_html_special_chars_escaped(self):
+        out = markdownish_to_html("a & b < c > d")
+        assert "&amp;" in out
+        assert "&lt;" in out
+        assert "&gt;" in out
+
+    def test_data_with_underscores_inside_code_escaped_but_preserved(self):
+        out = markdownish_to_html("`pos_ab_12` & STOP_LOSS")
+        assert out == "<code>pos_ab_12</code> &amp; STOP_LOSS"
+
+    def test_real_close_notification_shape(self):
+        msg = "**Trade Closed** `pos_8063aa334151` reason: STOP_LOSS P&L: -5.00 USC"
+        out = markdownish_to_html(msg)
+        assert out == (
+            "<b>Trade Closed</b> <code>pos_8063aa334151</code> "
+            "reason: STOP_LOSS P&amp;L: -5.00 USC"
+        )
 
 
 @pytest.fixture
@@ -119,6 +160,7 @@ async def test_process_queue_sends_request(notification_manager):
         assert "123456:ABC-DEF" in args[0]
         assert kwargs["json"]["chat_id"] == "987654321"
         assert kwargs["json"]["text"] == "Test Message"
+        assert kwargs["json"]["parse_mode"] == "HTML"
 
 
 @pytest.mark.asyncio

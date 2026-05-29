@@ -57,7 +57,29 @@ class BreakevenManager:
         trigger = symbol_cfg.get("breakeven_trigger", asset_config.get("breakeven_trigger", 15.0))
         offset = symbol_cfg.get("breakeven_offset", asset_config.get("breakeven_offset", 2.0))
 
-        return {"trigger_pips": trigger, "offset_pips": offset}
+        # Ratio-based trigger (preferred): arm BE at a fraction of the position's
+        # ACTUAL stop distance, so the threshold auto-scales with the dynamic
+        # (zone-based) SL instead of a fixed pip count that drifts out of sync.
+        # None → fall back to the fixed `breakeven_trigger` pips above.
+        trigger_r = symbol_cfg.get("breakeven_trigger_r", asset_config.get("breakeven_trigger_r"))
+
+        return {"trigger_pips": trigger, "offset_pips": offset, "trigger_r": trigger_r}
+
+    def _resolve_trigger_pips(self, position: Position, settings: dict) -> tuple[float, str]:
+        """Resolve the breakeven trigger in pips for a position.
+
+        If a ratio (`trigger_r`) is configured and the position carries a valid
+        initial stop distance (`entry_to_sl_pips`), the trigger scales with that
+        distance (e.g. 0.4R). Otherwise falls back to the fixed pip trigger.
+
+        Returns:
+            (trigger_pips, mode) where mode is "ratio" or "fixed" for logging.
+        """
+        trigger_r = settings.get("trigger_r")
+        risk_pips = getattr(position, "entry_to_sl_pips", 0.0) or 0.0
+        if trigger_r is not None and risk_pips > 0:
+            return trigger_r * risk_pips, f"{trigger_r:g}R"
+        return settings.get("trigger_pips", 15.0), "fixed"
 
     def should_move_to_breakeven(self, position: Position) -> bool:
         """
@@ -89,13 +111,13 @@ class BreakevenManager:
         # Get breakeven trigger distance
         asset_class = self.pip_calculator._determine_asset_class(position.symbol)
         settings = self._get_settings(position.symbol, asset_class)
-        trigger_distance = settings.get("trigger_pips", 15.0)
+        trigger_distance, trigger_mode = self._resolve_trigger_pips(position, settings)
 
         # Log current status for debugging
         logger.debug(
             f"Breakeven check for {position.position_id} ({position.symbol}): "
             f"profit={position.current_profit_pips:.1f} pips, "
-            f"trigger={trigger_distance:.1f} pips, "
+            f"trigger={trigger_distance:.1f} pips ({trigger_mode}), "
             f"asset_class={asset_class}"
         )
 

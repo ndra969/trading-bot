@@ -68,6 +68,14 @@ position_management:
     trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
 
+    # Ratio-based (preferred): thresholds scale with each position's ACTUAL
+    # stop distance (entry_to_sl_pips), so they stay correct even when the
+    # zone-based SL differs from the fixed defaults below. Fixed pip values
+    # remain as the fallback when initial risk is unknown.
+    breakeven_trigger_r: 0.4       # Arm BE at 40% of risk (lock before reversal)
+    trailing_activation_r: 0.7     # Activate trailing at 0.7R
+    trailing_distance_r: 0.4       # Trail by 40% of risk
+
     # Fallback to fixed pips if ATR not available
     breakeven_trigger: 30      # More room (was 15 pips/points)
     breakeven_offset: 5        # Buffer
@@ -84,6 +92,11 @@ position_management:
     use_atr_trailing: true
     trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # Ratio-based (preferred): scales with each position's actual stop distance.
+    breakeven_trigger_r: 0.4
+    trailing_activation_r: 0.7
+    trailing_distance_r: 0.4
 
     # Fallback to fixed pips if ATR not available
     breakeven_trigger: 40     # JPY pairs are more volatile
@@ -102,6 +115,13 @@ position_management:
     trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR (More aggressive locking)
 
+    # Ratio-based (preferred): scales with each position's actual stop distance.
+    # Fixes the gold case where fixed BE (175) never armed because the real
+    # zone SL (~188) made it ~0.93R instead of the intended 0.5R.
+    breakeven_trigger_r: 0.4
+    trailing_activation_r: 0.7
+    trailing_distance_r: 0.4
+
     # Fallback to fixed pips if ATR not available
     breakeven_trigger: 50     # $0.50 move (activate sooner)
     breakeven_offset: 10      # $0.10 buffer
@@ -118,6 +138,13 @@ position_management:
     use_atr_trailing: true
     trailing_activation_multiplier: 1.5  # Activate after 1.5x ATR
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
+
+    # Ratio-based (preferred): scales with each position's actual stop distance.
+    # Fixes the BTC case where fixed BE (750) never armed though the trade
+    # peaked at +381 pips against a 607-pip SL (~0.63R) before reversing.
+    breakeven_trigger_r: 0.4
+    trailing_activation_r: 0.7
+    trailing_distance_r: 0.4
 
     # Fallback to fixed pips if ATR not available
     # For BTC price ~$67k, 1 pip usually = $1

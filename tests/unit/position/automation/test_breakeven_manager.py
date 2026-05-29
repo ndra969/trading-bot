@@ -335,3 +335,69 @@ class TestUtilityMethods:
         str_repr = str(breakeven_manager)
         assert "BreakevenManager" in str_repr
         assert "0 positions at BE" in str_repr
+
+
+class TestRatioBasedTrigger:
+    """Breakeven trigger scaling with each position's actual stop distance.
+
+    Regression for the gold/BTC bug: a fixed pip trigger never armed because
+    the dynamic zone-based SL made it nearly 1R. Ratio mode keys the trigger
+    off entry_to_sl_pips so it stays correct regardless of SL size.
+    """
+
+    @pytest.fixture
+    def ratio_config(self):
+        return {
+            "position_management": {
+                "commodities": {
+                    "breakeven_trigger_r": 0.4,
+                    "breakeven_trigger": 175.0,  # fixed fallback
+                    "breakeven_offset": 20.0,
+                }
+            }
+        }
+
+    def _xau_sell(self, profit_pips, risk_pips):
+        pos = Position(
+            position_id="pos_xau",
+            symbol="XAUUSD",
+            position_type=PositionType.SELL,
+            entry_price=4432.226,
+            stop_loss=4451.039,
+            take_profit=4400.0,
+            volume=0.04,
+            pip_size=0.1,
+            pip_value_per_lot=1.0,
+            status=PositionStatus.OPEN,
+        )
+        pos.entry_to_sl_pips = risk_pips
+        pos.current_profit_pips = profit_pips
+        pos.current_price = 4432.226 - profit_pips * 0.1
+        return pos
+
+    def test_arms_at_ratio_of_actual_risk(self, ratio_config):
+        mgr = BreakevenManager(config=ratio_config)
+        # SL 188 pips -> 0.4R = 75.2 pips. Real peak was +134 -> must arm.
+        assert mgr.should_move_to_breakeven(self._xau_sell(88.0, 188.1)) is True
+
+    def test_does_not_arm_below_ratio(self, ratio_config):
+        mgr = BreakevenManager(config=ratio_config)
+        assert mgr.should_move_to_breakeven(self._xau_sell(50.0, 188.1)) is False
+
+    def test_fixed_fallback_when_risk_unknown(self, ratio_config):
+        mgr = BreakevenManager(config=ratio_config)
+        # entry_to_sl_pips=0 -> falls back to fixed 175 pips
+        assert mgr.should_move_to_breakeven(self._xau_sell(100.0, 0.0)) is False
+        assert mgr.should_move_to_breakeven(self._xau_sell(180.0, 0.0)) is True
+
+    def test_resolve_trigger_pips_modes(self, ratio_config):
+        mgr = BreakevenManager(config=ratio_config)
+        pos = self._xau_sell(0.0, 200.0)
+        settings = mgr._get_settings("XAUUSD", "commodities")
+        pips, mode = mgr._resolve_trigger_pips(pos, settings)
+        assert pips == pytest.approx(80.0)  # 0.4 * 200
+        assert mode == "0.4R"
+        pos.entry_to_sl_pips = 0.0
+        pips, mode = mgr._resolve_trigger_pips(pos, settings)
+        assert pips == 175.0
+        assert mode == "fixed"
