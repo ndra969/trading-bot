@@ -110,7 +110,8 @@ class TestMT5ManagerIntegration:
         ohlcv = data_manager.get_ohlcv("EURUSD", timeframe="H1", count=10)
         assert isinstance(ohlcv, pd.DataFrame)
         assert len(ohlcv) > 0
-        assert "timestamp" in ohlcv.columns
+        # get_ohlcv sets timestamp as the index (zone-detection compatibility)
+        assert ohlcv.index.name == "timestamp"
         assert "open" in ohlcv.columns
         assert "close" in ohlcv.columns
 

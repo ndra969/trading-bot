@@ -135,16 +135,19 @@ class ZoneDetector:
         self.min_breakout_momentum = self.config.get("min_breakout_momentum", 0.7)
         self.min_volume_increase = self.config.get("min_volume_increase", 1.5)
 
-        # Scoring weights
-        self.scoring_weights = self.config.get(
-            "scoring_weights",
-            {
-                "strength_weight": 0.4,
-                "freshness_weight": 0.3,
-                "volume_weight": 0.2,
-                "touches_weight": 0.1,
-            },
-        )
+        # Scoring weights — merge over defaults so a partial/empty dict from
+        # the caller (e.g. supply_demand injects `scoring_weights: {}` when the
+        # config omits it) never drops a required key.
+        default_scoring_weights = {
+            "strength_weight": 0.4,
+            "freshness_weight": 0.3,
+            "volume_weight": 0.2,
+            "touches_weight": 0.1,
+        }
+        self.scoring_weights = {
+            **default_scoring_weights,
+            **(self.config.get("scoring_weights") or {}),
+        }
 
         logger.info(f"ZoneDetector initialized with min_strength={self.min_zone_strength}")
 
