@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from trading_worker.main import TradingBot
 from trading_worker.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.services.position_orchestrator import PositionOrchestrator
 
 
 @pytest.fixture
@@ -57,6 +58,10 @@ def trading_bot(mock_config):
         bot._get_current_price = AsyncMock(return_value=1.1000)
         bot._get_asset_class = MagicMock(return_value="forex")
 
+        # Position management lives in the orchestrator (normally wired in
+        # _initialize_position_risk_system, which start() calls).
+        bot.position_orchestrator = PositionOrchestrator(bot)
+
         yield bot
 
 
@@ -79,9 +84,9 @@ async def test_sync_position_closed_in_mt5_with_ticket(trading_bot):
     position.ticket = 12345
 
     # Setup: Position exists in DB but not in MT5
-    trading_worker.position_manager.get_open_positions.return_value = [position]
-    trading_worker.mt5.get_positions.return_value = []  # No positions in MT5
-    trading_worker.mt5.get_history_deal.return_value = {
+    trading_bot.position_manager.get_open_positions.return_value = [position]
+    trading_bot.mt5.get_positions.return_value = []  # No positions in MT5
+    trading_bot.mt5.get_history_deal.return_value = {
         "price": 1.1050,
         "profit": 50.0,
         "swap": 0.0,
@@ -91,11 +96,11 @@ async def test_sync_position_closed_in_mt5_with_ticket(trading_bot):
     }
 
     # Mock close_position and save_position
-    trading_worker.position_manager.close_position.return_value = {
+    trading_bot.position_manager.close_position.return_value = {
         "pnl_usd": 50.0,
         "pips": 50.0,
     }
-    trading_worker.position_manager.save_position = AsyncMock()
+    trading_bot.position_manager.save_position = AsyncMock()
 
     # After close_position is called, position status changes to CLOSED
     # So get_open_positions should return empty list after first call
@@ -111,26 +116,24 @@ async def test_sync_position_closed_in_mt5_with_ticket(trading_bot):
             # After close, position status is CLOSED, so not returned
             return []
 
-    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
     # Verify position was closed with canonical CloseReason
-    trading_worker.position_manager.close_position.assert_called_once_with(
+    trading_bot.position_manager.close_position.assert_called_once_with(
         "pos_001", 1.1050, "STOP_LOSS"
     )
     # save_position is called once during sync close, and once more during update
     # But since position is closed, second call shouldn't happen
-    assert trading_worker.position_manager.save_position.call_count >= 1
+    assert trading_bot.position_manager.save_position.call_count >= 1
 
     # Verify portfolio balance was updated
-    trading_worker.portfolio_risk.update_balance.assert_called_once_with(10050.0)
+    trading_bot.portfolio_risk.update_balance.assert_called_once_with(10050.0)
 
     # Verify exposure was unregistered
-    trading_worker.exposure_manager.unregister_position.assert_called_once_with(
-        "EURUSD", "forex", 1.0
-    )
+    trading_bot.exposure_manager.unregister_position.assert_called_once_with("EURUSD", "forex", 1.0)
 
 
 @pytest.mark.asyncio
@@ -153,16 +156,16 @@ async def test_sync_position_closed_in_mt5_no_ticket_no_symbol_match(trading_bot
     position.ticket = None
 
     # Setup: Position exists in DB but not in MT5 (no matching symbol)
-    trading_worker.position_manager.get_open_positions.return_value = [position]
-    trading_worker.mt5.get_positions.return_value = []  # No positions in MT5
-    trading_worker._get_current_price.return_value = 1.1050
+    trading_bot.position_manager.get_open_positions.return_value = [position]
+    trading_bot.mt5.get_positions.return_value = []  # No positions in MT5
+    trading_bot._get_current_price.return_value = 1.1050
 
     # Mock close_position and save_position
-    trading_worker.position_manager.close_position.return_value = {
+    trading_bot.position_manager.close_position.return_value = {
         "pnl_usd": 50.0,
         "pips": 50.0,
     }
-    trading_worker.position_manager.save_position = AsyncMock()
+    trading_bot.position_manager.save_position = AsyncMock()
 
     # After close_position is called, position status changes to CLOSED
     def mock_get_open_positions():
@@ -174,21 +177,21 @@ async def test_sync_position_closed_in_mt5_no_ticket_no_symbol_match(trading_bot
         else:
             return []
 
-    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
     # Verify position was closed with estimated price
-    trading_worker.position_manager.close_position.assert_called_once()
-    call_args = trading_worker.position_manager.close_position.call_args
+    trading_bot.position_manager.close_position.assert_called_once()
+    call_args = trading_bot.position_manager.close_position.call_args
     assert call_args[0][0] == "pos_002"
     assert call_args[0][1] == 1.1050  # Current price
     # No ticket → orphaned path
     assert call_args[0][2] == "ORPHANED"
 
     # save_position is called at least once during sync close
-    assert trading_worker.position_manager.save_position.call_count >= 1
+    assert trading_bot.position_manager.save_position.call_count >= 1
 
 
 @pytest.mark.asyncio
@@ -213,27 +216,27 @@ async def test_sync_position_still_open_in_mt5(trading_bot):
     def mock_get_open_positions():
         return [position]
 
-    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
-    trading_worker.mt5.get_positions.return_value = [
+    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_bot.mt5.get_positions.return_value = [
         {"ticket": 12345, "symbol": "EURUSDm", "price_open": 1.1000}
     ]
 
     # Mock update_position
-    trading_worker.position_manager.update_position = MagicMock()
-    trading_worker.position_manager.save_position = AsyncMock()
-    trading_worker._check_position_automation = AsyncMock()
+    trading_bot.position_manager.update_position = MagicMock()
+    trading_bot.position_manager.save_position = AsyncMock()
+    trading_bot.position_orchestrator._check_position_automation = AsyncMock()
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
     # Verify position was NOT closed
-    trading_worker.position_manager.close_position.assert_not_called()
+    trading_bot.position_manager.close_position.assert_not_called()
 
     # Verify position was updated with current price
-    trading_worker.position_manager.update_position.assert_called()
+    trading_bot.position_manager.update_position.assert_called()
 
     # Verify automation was checked (position still open)
-    trading_worker._check_position_automation.assert_called_once()
+    trading_bot.position_orchestrator._check_position_automation.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -254,18 +257,23 @@ async def test_sync_position_no_ticket_symbol_exists_in_mt5(trading_bot):
     )
     position.ticket = None
 
-    # Setup: Position exists in DB, symbol exists in MT5 but can't match
-    trading_worker.position_manager.get_open_positions.return_value = [position]
-    trading_worker.mt5.get_positions.return_value = [
+    # Setup: Position exists in DB; MT5 has a same-symbol position but with a
+    # different entry price, so it cannot be matched to ours.
+    trading_bot.position_manager.get_open_positions.return_value = [position]
+    trading_bot.mt5.get_positions.return_value = [
         {"ticket": 99999, "symbol": "EURUSDm", "price_open": 1.2000}  # Different entry price
     ]
-    trading_worker.symbol_mapper.convert_to_broker_symbol.return_value = "EURUSDm"
+    trading_bot.symbol_mapper.convert_to_broker_symbol.return_value = "EURUSDm"
+    trading_bot.position_manager.close_position.return_value = {"pnl_usd": 0.0, "pips": 0.0}
+    trading_bot.position_manager.save_position = AsyncMock()
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
-    # Verify position was NOT closed (can't reconcile)
-    trading_worker.position_manager.close_position.assert_not_called()
+    # A ticketless position that can't be matched to any MT5 position is
+    # reconciled by closing it as ORPHANED (see CloseReason.ORPHANED).
+    trading_bot.position_manager.close_position.assert_called_once()
+    assert trading_bot.position_manager.close_position.call_args.args[2] == "ORPHANED"
 
 
 @pytest.mark.asyncio
@@ -287,16 +295,16 @@ async def test_sync_position_no_history_deal(trading_bot):
     position.ticket = 12345
 
     # Setup: Position exists in DB but not in MT5, no history deal
-    trading_worker.position_manager.get_open_positions.return_value = [position]
-    trading_worker.mt5.get_positions.return_value = []
-    trading_worker.mt5.get_history_deal.return_value = None  # No history deal
+    trading_bot.position_manager.get_open_positions.return_value = [position]
+    trading_bot.mt5.get_positions.return_value = []
+    trading_bot.mt5.get_history_deal.return_value = None  # No history deal
 
     # Mock close_position and save_position
-    trading_worker.position_manager.close_position.return_value = {
+    trading_bot.position_manager.close_position.return_value = {
         "pnl_usd": 0.0,
         "pips": 0.0,
     }
-    trading_worker.position_manager.save_position = AsyncMock()
+    trading_bot.position_manager.save_position = AsyncMock()
 
     # After close_position is called, position status changes to CLOSED
     def mock_get_open_positions():
@@ -308,21 +316,21 @@ async def test_sync_position_no_history_deal(trading_bot):
         else:
             return []
 
-    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
     # Verify position was closed with entry price (fallback)
-    trading_worker.position_manager.close_position.assert_called_once()
-    call_args = trading_worker.position_manager.close_position.call_args
+    trading_bot.position_manager.close_position.assert_called_once()
+    call_args = trading_bot.position_manager.close_position.call_args
     assert call_args[0][0] == "pos_005"
     assert call_args[0][1] == 1.1000  # Entry price as fallback
     # No MT5 deal info available → resolver returns UNKNOWN
     assert call_args[0][2] == "UNKNOWN"
 
     # save_position is called at least once during sync close
-    assert trading_worker.position_manager.save_position.call_count >= 1
+    assert trading_bot.position_manager.save_position.call_count >= 1
 
 
 @pytest.mark.asyncio
@@ -346,20 +354,20 @@ async def test_sync_dry_run_mode(trading_bot, mock_config):
     )
     position.ticket = 12345
 
-    trading_worker.position_manager.get_open_positions.return_value = [position]
+    trading_bot.position_manager.get_open_positions.return_value = [position]
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
     # Verify MT5 sync was not called
-    trading_worker.mt5.get_positions.assert_not_called()
+    trading_bot.mt5.get_positions.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_sync_mt5_not_connected(trading_bot):
     """Test that sync is skipped when MT5 is not connected."""
     # Set MT5 as not connected
-    trading_worker.mt5.is_connected.return_value = False
+    trading_bot.mt5.is_connected.return_value = False
 
     # Create mock position
     position = Position(
@@ -375,10 +383,10 @@ async def test_sync_mt5_not_connected(trading_bot):
         status=PositionStatus.OPEN,
     )
 
-    trading_worker.position_manager.get_open_positions.return_value = [position]
+    trading_bot.position_manager.get_open_positions.return_value = [position]
 
     # Run sync
-    await trading_worker._manage_positions()
+    await trading_bot.position_orchestrator.manage_positions()
 
     # Verify MT5 sync was not called
-    trading_worker.mt5.get_positions.assert_not_called()
+    trading_bot.mt5.get_positions.assert_not_called()

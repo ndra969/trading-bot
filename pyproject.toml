@@ -254,6 +254,10 @@ omit = [
     "*/__init__.py",
     # NOTE: dry_run_wrapper.py removed from omit list (now implemented with tests)
     "*/main.py",  # Main entry point - integration tested via CLI
+    # Orchestration extracted from main.py (reconciliation loop + automation
+    # dispatch). Same rationale as main.py: integration-tested (test_position_sync),
+    # not unit-tested. Was inside the omitted main.py before the service split.
+    "*/position_orchestrator.py",
 ]
 
 [tool.coverage.report]
