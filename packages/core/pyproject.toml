@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-core"
+version = "2.0.0"
+description = "Shared core for the trading bot: data models, config, enums, utils"
+requires-python = ">=3.12"
+
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "aiosqlite>=0.19.0",
+    "asyncpg>=0.21.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trading_core"]

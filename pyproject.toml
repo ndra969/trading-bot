@@ -123,7 +123,20 @@ Repository = "https://github.com/yourusername/trading-bot"
 "Bug Tracker" = "https://github.com/yourusername/trading-bot/issues"
 
 [project.scripts]
+# Live CLI stays on the old package until the Phase 5 cutover. The new
+# workspace packages are added additively (copy-first migration) so the
+# running bot and its restart path are never broken mid-migration.
 trading-bot = "trading_bot.cli:cli"
+
+# uv workspace: the new monorepo packages live under packages/*. The root
+# project (old src/trading_bot) remains the live member until cutover.
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+trading-worker = { workspace = true }
+trading-api = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trading_bot"]

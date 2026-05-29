@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-api"
+version = "2.0.0"
+description = "Read-only FastAPI backend-for-frontend over the bot's database"
+requires-python = ">=3.12"
+
+dependencies = [
+    "trading-core",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.21.0",
+    "aiosqlite>=0.19.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trading_api"]

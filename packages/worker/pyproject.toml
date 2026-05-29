@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-worker"
+version = "2.0.0"
+description = "Trading bot engine: strategies, risk, position management, MT5 connectors"
+requires-python = ">=3.12"
+
+dependencies = [
+    "trading-core",
+    # CLI / output
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "loguru>=0.7.0",
+    # config
+    "everett[yaml]>=3.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+    # db / migrations
+    "sqlalchemy[asyncio]>=2.0.0",
+    "aiosqlite>=0.19.0",
+    "asyncpg>=0.21.0",
+    "psycopg2-binary>=2.9.11",
+    "alembic>=1.12.0",
+    # async / http
+    "httpx>=0.25.0",
+    "aiofiles>=23.0.0",
+    # data / indicators
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pandas-ta>=0.3.14b0",
+    "ta>=0.10.2",
+    "yfinance>=0.2.18",
+    # notifications
+    "python-telegram-bot>=20.0",
+    # trading platform (Windows-only; ignored elsewhere at runtime)
+    "metatrader5>=5.0.5260",
+    # utils
+    "schedule>=1.2.0",
+    "pytz>=2023.3",
+    "python-dateutil>=2.8.2",
+    "psutil>=7.1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trading_worker"]
