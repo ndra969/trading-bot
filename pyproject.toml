@@ -127,6 +127,9 @@ Repository = "https://github.com/yourusername/trading-bot"
 # workspace packages are added additively (copy-first migration) so the
 # running bot and its restart path are never broken mid-migration.
 trading-bot = "trading_bot.cli:cli"
+# Temporary alias to exercise the NEW worker package before cutover. Removed
+# at Phase 5 when `trading-bot` flips to trading_worker.cli:cli.
+trading-bot-new = "trading_worker.cli:cli"
 
 # uv workspace: the new monorepo packages live under packages/*. The root
 # project (old src/trading_bot) remains the live member until cutover.
