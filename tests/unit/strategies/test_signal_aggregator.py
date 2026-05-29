@@ -1,9 +1,8 @@
 """Tests for SignalAggregator."""
 
 import pytest
-
-from trading_bot.strategies.models import SignalDirection, StrategyResult
-from trading_bot.strategies.signal_aggregator import SignalAggregator
+from trading_worker.strategies.models import SignalDirection, StrategyResult
+from trading_worker.strategies.signal_aggregator import SignalAggregator
 
 
 @pytest.fixture
@@ -286,7 +285,7 @@ class TestSignalAggregation:
         # Mock TradingSignal to raise ValueError
         from unittest.mock import patch
 
-        with patch("trading_bot.strategies.signal_aggregator.TradingSignal") as mock_signal:
+        with patch("trading_worker.strategies.signal_aggregator.TradingSignal") as mock_signal:
             mock_signal.side_effect = ValueError("Invalid signal data")
 
             signals = await signal_aggregator.aggregate_signals([result])
@@ -366,7 +365,7 @@ class TestQualityFiltering:
 
     def test_filter_by_quality_all_pass(self, signal_aggregator):
         """Test filtering when all signals pass."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(
@@ -386,7 +385,7 @@ class TestQualityFiltering:
 
     def test_filter_by_quality_low_confluence(self, signal_aggregator):
         """Test filtering signals with low confluence score."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(
@@ -406,7 +405,7 @@ class TestQualityFiltering:
 
     def test_filter_by_quality_low_risk_reward(self, signal_aggregator):
         """Test filtering signals with low risk/reward ratio."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(
@@ -426,7 +425,7 @@ class TestQualityFiltering:
 
     def test_filter_by_quality_mixed(self, signal_aggregator):
         """Test filtering with mixed quality signals."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(
@@ -461,7 +460,7 @@ class TestConflictResolution:
 
     def test_resolve_conflicts_no_conflict(self, signal_aggregator):
         """Test when there are no conflicts."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(
@@ -481,7 +480,7 @@ class TestConflictResolution:
 
     def test_resolve_conflicts_highest_score(self, signal_aggregator):
         """Test conflict resolution by highest score."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(
@@ -512,7 +511,7 @@ class TestConflictResolution:
 
     def test_resolve_conflicts_first_signal(self):
         """Test conflict resolution by first signal."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         config = {"signal_aggregator": {"conflict_resolution": "first_signal"}}
         aggregator = SignalAggregator(config)
@@ -546,7 +545,7 @@ class TestConflictResolution:
 
     def test_resolve_conflicts_multiple_symbols(self, signal_aggregator):
         """Test conflict resolution with multiple symbols."""
-        from trading_bot.strategies.models import TradingSignal
+        from trading_worker.strategies.models import TradingSignal
 
         signals = [
             TradingSignal(

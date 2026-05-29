@@ -48,9 +48,11 @@ class SymbolMapper:
     def _load_config(self, config_path: str | None) -> dict:
         """Load symbol mapping configuration from YAML file."""
         if config_path is None:
-            # Default config path relative to project root
-            project_root = Path(__file__).parent.parent.parent.parent
-            config_path = project_root / "config" / "symbol_mapping.yaml"
+            # Config lives at the repo-root config/ dir. Resolve relative to the
+            # working directory (the bot/tests run from the repo root), matching
+            # Configuration's `Path("config")` convention — robust to the
+            # monorepo package nesting where __file__ depth is not the root.
+            config_path = Path("config") / "symbol_mapping.yaml"
 
         try:
             with open(config_path, encoding="utf-8") as f:

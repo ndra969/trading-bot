@@ -3,8 +3,7 @@
 from datetime import datetime
 
 import pytest
-
-from trading_bot.utils.market_session import derive_market_session
+from trading_core.utils.market_session import derive_market_session
 
 
 @pytest.mark.parametrize(

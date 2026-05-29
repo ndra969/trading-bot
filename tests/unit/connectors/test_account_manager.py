@@ -16,8 +16,8 @@ except ImportError:
     MT5_AVAILABLE = False
     mt5 = None
 
-from trading_bot.connectors.account_manager import AccountManager
-from trading_bot.exceptions import MT5ConnectionError
+from trading_worker.connectors.account_manager import AccountManager
+from trading_worker.exceptions import MT5ConnectionError
 
 
 @pytest.fixture
@@ -31,8 +31,8 @@ def mock_mt5_connector():
 @pytest.fixture
 def account_manager(mock_mt5_connector):
     """Create AccountManager instance."""
-    with patch("trading_bot.connectors.account_manager.MT5_AVAILABLE", True):
-        with patch("trading_bot.connectors.account_manager.mt5"):
+    with patch("trading_worker.connectors.account_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.account_manager.mt5"):
             return AccountManager(mock_mt5_connector)
 
 
@@ -41,13 +41,13 @@ class TestAccountManagerInitialization:
 
     def test_init_success(self, mock_mt5_connector):
         """Test successful initialization."""
-        with patch("trading_bot.connectors.account_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.account_manager.MT5_AVAILABLE", True):
             manager = AccountManager(mock_mt5_connector)
             assert manager.connector == mock_mt5_connector
 
     def test_init_mt5_not_available(self, mock_mt5_connector):
         """Test initialization fails when MT5 not available."""
-        with patch("trading_bot.connectors.account_manager.MT5_AVAILABLE", False):
+        with patch("trading_worker.connectors.account_manager.MT5_AVAILABLE", False):
             with pytest.raises(ImportError, match="MetaTrader5 package not available"):
                 AccountManager(mock_mt5_connector)
 
@@ -57,7 +57,7 @@ class TestAccountInfoRetrieval:
 
     def test_get_account_info_success(self, account_manager):
         """Test getting account info successfully."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {
                 "login": 12345,
@@ -92,7 +92,7 @@ class TestAccountInfoRetrieval:
 
     def test_get_account_info_none_result(self, account_manager):
         """Test getting account info when MT5 returns None."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_mt5.account_info.return_value = None
             mock_mt5.last_error.return_value = (10001, "Connection error")
 
@@ -105,7 +105,7 @@ class TestBalanceMonitoring:
 
     def test_get_balance(self, account_manager):
         """Test getting account balance."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"balance": 10000.0}
             mock_mt5.account_info.return_value = mock_account
@@ -116,7 +116,7 @@ class TestBalanceMonitoring:
 
     def test_get_equity(self, account_manager):
         """Test getting account equity."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"equity": 10050.0}
             mock_mt5.account_info.return_value = mock_account
@@ -127,7 +127,7 @@ class TestBalanceMonitoring:
 
     def test_get_profit(self, account_manager):
         """Test getting current profit/loss."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"profit": 50.0}
             mock_mt5.account_info.return_value = mock_account
@@ -142,7 +142,7 @@ class TestMarginTracking:
 
     def test_get_margin(self, account_manager):
         """Test getting used margin."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"margin": 50.0}
             mock_mt5.account_info.return_value = mock_account
@@ -153,7 +153,7 @@ class TestMarginTracking:
 
     def test_get_free_margin(self, account_manager):
         """Test getting free margin."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"margin_free": 10000.0}
             mock_mt5.account_info.return_value = mock_account
@@ -164,7 +164,7 @@ class TestMarginTracking:
 
     def test_get_margin_level(self, account_manager):
         """Test getting margin level percentage."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"margin_level": 20100.0}
             mock_mt5.account_info.return_value = mock_account
@@ -175,7 +175,7 @@ class TestMarginTracking:
 
     def test_get_margin_level_zero(self, account_manager):
         """Test getting margin level when zero (no positions)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"margin_level": 0.0}
             mock_mt5.account_info.return_value = mock_account
@@ -190,7 +190,7 @@ class TestAccountDetails:
 
     def test_get_leverage(self, account_manager):
         """Test getting account leverage."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"leverage": 100}
             mock_mt5.account_info.return_value = mock_account
@@ -201,7 +201,7 @@ class TestAccountDetails:
 
     def test_get_currency(self, account_manager):
         """Test getting account currency."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"currency": "USD"}
             mock_mt5.account_info.return_value = mock_account
@@ -212,7 +212,7 @@ class TestAccountDetails:
 
     def test_get_server(self, account_manager):
         """Test getting broker server name."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"server": "TestServer-Demo"}
             mock_mt5.account_info.return_value = mock_account
@@ -223,7 +223,7 @@ class TestAccountDetails:
 
     def test_get_company(self, account_manager):
         """Test getting broker company name."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"company": "TestBroker Ltd"}
             mock_mt5.account_info.return_value = mock_account
@@ -238,7 +238,7 @@ class TestTradingPermissions:
 
     def test_is_trade_allowed_true(self, account_manager):
         """Test checking if trading is allowed (True)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"trade_allowed": True}
             mock_mt5.account_info.return_value = mock_account
@@ -249,7 +249,7 @@ class TestTradingPermissions:
 
     def test_is_trade_allowed_false(self, account_manager):
         """Test checking if trading is allowed (False)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"trade_allowed": False}
             mock_mt5.account_info.return_value = mock_account
@@ -260,7 +260,7 @@ class TestTradingPermissions:
 
     def test_get_account_type_demo(self, account_manager):
         """Test getting account type (DEMO)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"trade_mode": 0}  # DEMO
             mock_mt5.account_info.return_value = mock_account
@@ -271,7 +271,7 @@ class TestTradingPermissions:
 
     def test_get_account_type_real(self, account_manager):
         """Test getting account type (REAL)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"trade_mode": 2}  # REAL
             mock_mt5.account_info.return_value = mock_account
@@ -282,7 +282,7 @@ class TestTradingPermissions:
 
     def test_get_account_type_contest(self, account_manager):
         """Test getting account type (CONTEST)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"trade_mode": 1}  # CONTEST
             mock_mt5.account_info.return_value = mock_account
@@ -293,7 +293,7 @@ class TestTradingPermissions:
 
     def test_get_account_type_unknown(self, account_manager):
         """Test getting account type (UNKNOWN)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {"trade_mode": 99}  # Unknown
             mock_mt5.account_info.return_value = mock_account
@@ -308,7 +308,7 @@ class TestAccountSummary:
 
     def test_get_summary(self, account_manager):
         """Test getting complete account summary."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_account = Mock()
             mock_account._asdict.return_value = {
                 "balance": 10000.0,
@@ -347,7 +347,7 @@ class TestErrorHandling:
 
     def test_get_account_info_exception(self, account_manager):
         """Test exception handling in get_account_info."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             mock_mt5.account_info.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5ConnectionError, match="Failed to retrieve account info"):
@@ -355,7 +355,7 @@ class TestErrorHandling:
 
     def test_get_account_info_mt5_connection_error_re_raise(self, account_manager):
         """Test MT5ConnectionError re-raise (line 64-65)."""
-        with patch("trading_bot.connectors.account_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.account_manager.mt5") as mock_mt5:
             # Simulate MT5ConnectionError being raised
             original_error = MT5ConnectionError("Original error")
             mock_mt5.account_info.side_effect = original_error

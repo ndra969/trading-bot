@@ -7,8 +7,7 @@ Verifies the close-reason classification logic that maps MT5 deal reasons
 from datetime import datetime
 
 import pytest
-
-from trading_bot.position.close_reason import (
+from trading_core.enums.close_reason import (
     MT5_DEAL_REASON_CLIENT,
     MT5_DEAL_REASON_EXPERT,
     MT5_DEAL_REASON_ROLLOVER,
@@ -18,7 +17,7 @@ from trading_bot.position.close_reason import (
     CloseReason,
     resolve_close_reason,
 )
-from trading_bot.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.position.position_models import Position, PositionStatus, PositionType
 
 
 def _make_position(
@@ -49,21 +48,15 @@ class TestServerSideCloses:
 
     def test_tp_always_returns_take_profit(self):
         pos = _make_position(breakeven_activated=True, trailing_activated=True)
-        assert (
-            resolve_close_reason(pos, MT5_DEAL_REASON_TP) == CloseReason.TAKE_PROFIT
-        )
+        assert resolve_close_reason(pos, MT5_DEAL_REASON_TP) == CloseReason.TAKE_PROFIT
 
     def test_so_returns_margin_stopout(self):
         pos = _make_position()
-        assert (
-            resolve_close_reason(pos, MT5_DEAL_REASON_SO) == CloseReason.MARGIN_STOPOUT
-        )
+        assert resolve_close_reason(pos, MT5_DEAL_REASON_SO) == CloseReason.MARGIN_STOPOUT
 
     def test_rollover_returns_rollover(self):
         pos = _make_position()
-        assert (
-            resolve_close_reason(pos, MT5_DEAL_REASON_ROLLOVER) == CloseReason.ROLLOVER
-        )
+        assert resolve_close_reason(pos, MT5_DEAL_REASON_ROLLOVER) == CloseReason.ROLLOVER
 
 
 class TestSLDisambiguation:
@@ -75,23 +68,17 @@ class TestSLDisambiguation:
 
     def test_sl_with_breakeven_only_is_breakeven_stop(self):
         pos = _make_position(breakeven_activated=True)
-        assert (
-            resolve_close_reason(pos, MT5_DEAL_REASON_SL) == CloseReason.BREAKEVEN_STOP
-        )
+        assert resolve_close_reason(pos, MT5_DEAL_REASON_SL) == CloseReason.BREAKEVEN_STOP
 
     def test_sl_with_trailing_is_trailing_stop(self):
         pos = _make_position(trailing_activated=True)
-        assert (
-            resolve_close_reason(pos, MT5_DEAL_REASON_SL) == CloseReason.TRAILING_STOP
-        )
+        assert resolve_close_reason(pos, MT5_DEAL_REASON_SL) == CloseReason.TRAILING_STOP
 
     def test_sl_with_both_flags_prefers_trailing(self):
         # Trailing only activates AFTER breakeven, and SL never moves backward,
         # so trailing is the more informative classification.
         pos = _make_position(breakeven_activated=True, trailing_activated=True)
-        assert (
-            resolve_close_reason(pos, MT5_DEAL_REASON_SL) == CloseReason.TRAILING_STOP
-        )
+        assert resolve_close_reason(pos, MT5_DEAL_REASON_SL) == CloseReason.TRAILING_STOP
 
 
 class TestBotInitiatedCloses:
@@ -100,18 +87,14 @@ class TestBotInitiatedCloses:
     def test_client_with_hint_uses_hint(self):
         pos = _make_position()
         assert (
-            resolve_close_reason(
-                pos, MT5_DEAL_REASON_CLIENT, CloseReason.MAX_DURATION
-            )
+            resolve_close_reason(pos, MT5_DEAL_REASON_CLIENT, CloseReason.MAX_DURATION)
             == CloseReason.MAX_DURATION
         )
 
     def test_expert_with_hint_uses_hint(self):
         pos = _make_position()
         assert (
-            resolve_close_reason(
-                pos, MT5_DEAL_REASON_EXPERT, CloseReason.MANUAL
-            )
+            resolve_close_reason(pos, MT5_DEAL_REASON_EXPERT, CloseReason.MANUAL)
             == CloseReason.MANUAL
         )
 
@@ -129,17 +112,11 @@ class TestMissingDealInfo:
 
     def test_no_deal_with_hint_uses_hint(self):
         pos = _make_position()
-        assert (
-            resolve_close_reason(pos, None, CloseReason.ORPHANED)
-            == CloseReason.ORPHANED
-        )
+        assert resolve_close_reason(pos, None, CloseReason.ORPHANED) == CloseReason.ORPHANED
 
     def test_no_deal_with_mt5_missing_hint(self):
         pos = _make_position()
-        assert (
-            resolve_close_reason(pos, None, CloseReason.MT5_MISSING)
-            == CloseReason.MT5_MISSING
-        )
+        assert resolve_close_reason(pos, None, CloseReason.MT5_MISSING) == CloseReason.MT5_MISSING
 
 
 class TestEnumValues:

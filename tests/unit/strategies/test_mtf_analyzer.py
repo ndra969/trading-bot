@@ -9,10 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 import pytest
-
-from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
-from trading_bot.strategies.models import SignalDirection, StrategyResult
-from trading_bot.strategies.mtf_analyzer import MTFAnalyzer, ZoneCache
+from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
+from trading_worker.strategies.models import SignalDirection, StrategyResult
+from trading_worker.strategies.mtf_analyzer import MTFAnalyzer, ZoneCache
 
 
 # Create dummy zone class if actual one is hard to instantiate or depends on complex types
@@ -265,12 +264,12 @@ class TestZoneCache:
         zones = [create_dummy_zone(2000.0)]
 
         # Mock datetime for set operation
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)
             cache.set(symbol="XAUUSD", zone_tf="H1", zones=zones)
 
         # Mock datetime for get operation - past TTL
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 13, 1, 1)
             result = cache.get(symbol="XAUUSD", zone_tf="H1")
             assert result is None
@@ -281,12 +280,12 @@ class TestZoneCache:
         zones = [create_dummy_zone(2000.0)]
 
         # Mock datetime for set operation
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)
             cache.set(symbol="XAUUSD", zone_tf="H1", zones=zones)
 
         # Mock datetime for get operation - still within TTL
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 30, 0)
             result = cache.get(symbol="XAUUSD", zone_tf="H1")
 
@@ -299,12 +298,12 @@ class TestZoneCache:
         zones = [create_dummy_zone(2000.0)]
 
         # Mock datetime for set operation
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)
             cache.set(symbol="XAUUSD", zone_tf="H1", zones=zones)
 
         # Mock datetime for get operation - past TTL
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 13, 1, 1)
             result = cache.get(symbol="XAUUSD", zone_tf="H1")
 
@@ -388,19 +387,19 @@ class TestZoneCache:
         zones = [create_dummy_zone(2000.0)]
 
         # Mock datetime for set operation
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)
             cache.set(symbol="XAUUSD", zone_tf="H1", zones=zones)
 
         # Exactly at TTL limit - should still be valid (age_minutes > ttl_minutes for expiry)
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 13, 0, 0)
             result = cache.get(symbol="XAUUSD", zone_tf="H1")
             # Age is exactly 60 minutes, not > 60, so should still be valid
             assert result is not None
 
         # One second past TTL
-        with patch("trading_bot.strategies.mtf_analyzer.datetime") as mock_datetime:
+        with patch("trading_worker.strategies.mtf_analyzer.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, 13, 0, 1)
             result = cache.get(symbol="XAUUSD", zone_tf="H1")
             assert result is None

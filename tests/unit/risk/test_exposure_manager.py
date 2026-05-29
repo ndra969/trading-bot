@@ -1,8 +1,7 @@
 """Tests for ExposureManager."""
 
 import pytest
-
-from trading_bot.risk.exposure_manager import ExposureManager
+from trading_worker.risk.exposure_manager import ExposureManager
 
 
 @pytest.fixture

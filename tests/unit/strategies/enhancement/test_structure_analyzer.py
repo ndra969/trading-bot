@@ -1,6 +1,5 @@
 import pytest
-
-from src.trading_bot.strategies.enhancement.structure_analyzer import MarketStructureAnalyzer
+from trading_worker.strategies.enhancement.structure_analyzer import MarketStructureAnalyzer
 
 
 @pytest.fixture

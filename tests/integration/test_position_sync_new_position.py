@@ -6,10 +6,9 @@ can be opened for the same symbol.
 """
 
 import pytest
-
-from trading_bot.position.position_manager import PositionManager
-from trading_bot.position.position_models import PositionStatus
-from trading_bot.strategies.models import SignalDirection, TradingSignal
+from trading_worker.position.position_manager import PositionManager
+from trading_worker.position.position_models import PositionStatus
+from trading_worker.strategies.models import SignalDirection, TradingSignal
 
 
 @pytest.fixture

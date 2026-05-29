@@ -4,11 +4,10 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
-
-from trading_bot.data.models import Position as DBPosition
-from trading_bot.position.position_manager import PositionManager
-from trading_bot.position.position_models import PositionStatus, PositionType
-from trading_bot.strategies.models import SignalDirection, TradingSignal
+from trading_core.data.models import Position as DBPosition
+from trading_worker.position.position_manager import PositionManager
+from trading_worker.position.position_models import PositionStatus, PositionType
+from trading_worker.strategies.models import SignalDirection, TradingSignal
 
 
 @pytest.fixture
@@ -322,9 +321,7 @@ class TestCheckAndClosePositions:
         assert position.close_price == 1.1155
         assert position.close_reason == "TAKE_PROFIT"
 
-    def test_check_and_close_stop_loss_records_stop_loss_reason(
-        self, position_manager, buy_signal
-    ):
+    def test_check_and_close_stop_loss_records_stop_loss_reason(self, position_manager, buy_signal):
         """Plain SL hit (no BE/trailing) records STOP_LOSS."""
         position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
         position_manager.open_position(position.position_id)
@@ -458,7 +455,7 @@ class TestDatabaseOperations:
     """Test database operations (load_positions_from_db, save_position)."""
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_success(self, mock_get_session, position_manager):
         """Test loading positions from database successfully."""
         # Create mock database position
@@ -503,7 +500,7 @@ class TestDatabaseOperations:
         assert position_manager.positions["pos_test_001"].symbol == "EURUSD"
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_invalid_pending_buy(
         self, mock_get_session, position_manager
     ):
@@ -548,7 +545,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_invalid_pending_buy_tp(
         self, mock_get_session, position_manager
     ):
@@ -593,7 +590,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_create_new(self, mock_get_session, position_manager, buy_signal):
         """Test saving new position to database."""
         # Create position
@@ -620,7 +617,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_update_existing(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -653,7 +650,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_invalid_pending_buy(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -686,7 +683,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_open_position_validation(
         self, mock_get_session, position_manager
     ):
@@ -731,7 +728,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_open_position_invalid_tp(
         self, mock_get_session, position_manager
     ):
@@ -776,7 +773,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_with_ticket(self, mock_get_session, position_manager):
         """Test loading position with ticket in metadata."""
         # Create mock position with ticket
@@ -821,7 +818,7 @@ class TestDatabaseOperations:
         assert position.ticket == 12345
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_value_error_handling(
         self, mock_get_session, position_manager
     ):
@@ -866,7 +863,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_exception_handling(
         self, mock_get_session, position_manager
     ):
@@ -896,7 +893,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_database_error(self, mock_get_session, position_manager):
         """Test handling database errors when loading positions."""
         # Mock session to raise exception
@@ -913,7 +910,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_with_ticket_sync(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -944,7 +941,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_pending_sell_validation(
         self, mock_get_session, position_manager, sell_signal
     ):
@@ -976,7 +973,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_open_negative_sl(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1008,7 +1005,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_open_negative_tp(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1040,7 +1037,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_database_error(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1060,7 +1057,7 @@ class TestDatabaseOperations:
         assert position.position_id in position_manager.positions
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_invalid_pending_sell(
         self, mock_get_session, position_manager
     ):
@@ -1127,7 +1124,7 @@ class TestDatabaseOperations:
         assert len(position_manager.positions) == 0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_ticket_sync_no_metadata(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1158,7 +1155,7 @@ class TestDatabaseOperations:
         assert position.metadata.get("ticket") == 99999
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_pending_sell_invalid_tp(
         self, mock_get_session, position_manager, sell_signal
     ):
@@ -1190,7 +1187,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_pending_buy_invalid_tp(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1222,7 +1219,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_positions_from_db_general_exception(
         self, mock_get_session, position_manager
     ):
@@ -1263,7 +1260,7 @@ class TestDatabaseOperations:
         # Patch Position to raise general exception (not ValueError) during creation
         # This triggers the Exception handler (lines 184-191)
         with patch(
-            "trading_bot.position.position_manager.Position",
+            "trading_worker.position.position_manager.Position",
             side_effect=RuntimeError("General error"),
         ):
             # Load positions - exception should be caught and logged
@@ -1334,7 +1331,7 @@ class TestOrphanedPositions:
     """Test handling of orphaned positions (OPEN positions without ticket)."""
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_orphaned_open_position_without_ticket(
         self, mock_get_session, position_manager
     ):
@@ -1387,7 +1384,7 @@ class TestOrphanedPositions:
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_pending_position_without_ticket_is_allowed(
         self, mock_get_session, position_manager
     ):
@@ -1438,7 +1435,7 @@ class TestSavePositionDryRun:
     """Test save_position in dry-run mode."""
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_dry_run_mode(self, mock_get_session, position_manager, buy_signal):
         """Test that save_position skips database in dry-run mode (lines 254-257)."""
         # Create position
@@ -1458,7 +1455,7 @@ class TestSavePositionConfluenceScore:
     """Test save_position with confluence_score handling."""
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_confluence_score_from_attribute(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1489,7 +1486,7 @@ class TestSavePositionConfluenceScore:
         assert added_pos.confluence_score == 85.5
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_ticket_from_metadata(
         self, mock_get_session, position_manager, buy_signal
     ):
@@ -1803,7 +1800,7 @@ class TestRestoreAutomationTracking:
         return mock_session_context
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_restores_breakeven_tracking(self, mock_get_session, position_manager):
         """Lines 302-304: Restore breakeven tracking when position has breakeven_activated."""
         db_pos = self._build_mock_db_position(breakeven=True)
@@ -1816,7 +1813,7 @@ class TestRestoreAutomationTracking:
         assert "pos_auto_001" in position_manager.breakeven_manager.breakeven_positions
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_restores_trailing_tracking(self, mock_get_session, position_manager):
         """Lines 306-311: Restore trailing tracking when position has trailing_activated."""
         db_pos = self._build_mock_db_position(trailing=True, profit_pips=30.0)
@@ -1830,7 +1827,7 @@ class TestRestoreAutomationTracking:
         assert position_manager.trailing_stop_manager.highest_profit["pos_auto_001"] == 30.0
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_load_restores_both_automations(self, mock_get_session, position_manager):
         """Both breakeven and trailing restored when both activated."""
         db_pos = self._build_mock_db_position(breakeven=True, trailing=True, profit_pips=45.0)
@@ -1846,7 +1843,7 @@ class TestSavePositionMetadataFallback:
     """Test save_position metadata fallbacks (coverage gap fix)."""
 
     @pytest.mark.asyncio
-    @patch("trading_bot.position.position_manager.get_session")
+    @patch("trading_worker.position.position_manager.get_session")
     async def test_save_position_confluence_from_metadata(
         self, mock_get_session, position_manager, buy_signal
     ):

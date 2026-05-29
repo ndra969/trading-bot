@@ -3,8 +3,7 @@ Unit tests for connector exceptions.
 """
 
 import pytest
-
-from trading_bot.exceptions.connector_exceptions import (
+from trading_worker.exceptions.connector_exceptions import (
     ConnectionFailedError,
     ConnectorError,
     DataRetrievalError,

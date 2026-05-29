@@ -4,7 +4,7 @@ Unit tests for config_hasher utility.
 Tests SHA256 hashing for configuration dictionaries.
 """
 
-from trading_bot.utils.config_hasher import (
+from trading_core.utils.config_hasher import (
     compare_configs,
     hash_config,
     verify_config_hash,

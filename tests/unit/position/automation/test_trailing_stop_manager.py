@@ -1,9 +1,8 @@
 """Tests for TrailingStopManager."""
 
 import pytest
-
-from trading_bot.position.automation.trailing_stop_manager import TrailingStopManager
-from trading_bot.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.position.automation.trailing_stop_manager import TrailingStopManager
+from trading_worker.position.position_models import Position, PositionStatus, PositionType
 
 pytest_plugins = ("pytest_mock",)
 
@@ -428,7 +427,7 @@ class TestTieredTrailingConfig:
 
     def test_tiered_trailing_config_default_initialization(self):
         """Test TieredTrailingConfig initializes with defaults."""
-        from trading_bot.position.automation.trailing_stop_manager import (
+        from trading_worker.position.automation.trailing_stop_manager import (
             TieredTrailingConfig,
         )
 
@@ -439,7 +438,7 @@ class TestTieredTrailingConfig:
 
     def test_tiered_trailing_config_custom_values(self):
         """Test TieredTrailingConfig with custom values."""
-        from trading_bot.position.automation.trailing_stop_manager import (
+        from trading_worker.position.automation.trailing_stop_manager import (
             TieredTrailingConfig,
         )
 
@@ -454,7 +453,7 @@ class TestTieredTrailingConfig:
 
     def test_tiered_trailing_config_mismatched_lengths_raises_error(self):
         """Test TieredTrailingConfig raises error when lengths don't match."""
-        from trading_bot.position.automation.trailing_stop_manager import (
+        from trading_worker.position.automation.trailing_stop_manager import (
             TieredTrailingConfig,
         )
 
@@ -757,7 +756,7 @@ class TestSessionAwareTrailing:
     def test_get_current_session_asian(self, trailing_manager, mocker):
         """Test get_current_session returns 'asian' session."""
         # Mock datetime.utcnow() to return 2:00 UTC (Asian session)
-        mock_dt = mocker.patch("trading_bot.position.automation.trailing_stop_manager.datetime")
+        mock_dt = mocker.patch("trading_worker.position.automation.trailing_stop_manager.datetime")
         mock_dt.utcnow.return_value.hour = 2
 
         session = trailing_manager.get_current_session()
@@ -766,7 +765,7 @@ class TestSessionAwareTrailing:
     def test_get_current_session_london_open(self, trailing_manager, mocker):
         """Test get_current_session returns 'london_open' session."""
         # Mock datetime.utcnow() to return 9:00 UTC (London open)
-        mock_dt = mocker.patch("trading_bot.position.automation.trailing_stop_manager.datetime")
+        mock_dt = mocker.patch("trading_worker.position.automation.trailing_stop_manager.datetime")
         mock_dt.utcnow.return_value.hour = 9
 
         session = trailing_manager.get_current_session()
@@ -775,7 +774,7 @@ class TestSessionAwareTrailing:
     def test_get_current_session_ny_open(self, trailing_manager, mocker):
         """Test get_current_session returns 'ny_open' session."""
         # Mock datetime.utcnow() to return 14:00 UTC (NY open)
-        mock_dt = mocker.patch("trading_bot.position.automation.trailing_stop_manager.datetime")
+        mock_dt = mocker.patch("trading_worker.position.automation.trailing_stop_manager.datetime")
         mock_dt.utcnow.return_value.hour = 14
 
         session = trailing_manager.get_current_session()
@@ -784,7 +783,7 @@ class TestSessionAwareTrailing:
     def test_get_current_session_regular(self, trailing_manager, mocker):
         """Test get_current_session returns 'regular' session."""
         # Mock datetime.utcnow() to return 16:00 UTC (regular hours)
-        mock_dt = mocker.patch("trading_bot.position.automation.trailing_stop_manager.datetime")
+        mock_dt = mocker.patch("trading_worker.position.automation.trailing_stop_manager.datetime")
         mock_dt.utcnow.return_value.hour = 16
 
         session = trailing_manager.get_current_session()

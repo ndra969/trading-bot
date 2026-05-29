@@ -13,10 +13,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import pytest_asyncio
-
-from trading_bot.executors.intraday_executor import IntradayExecutor
-from trading_bot.position.pip_calculator import PipCalculator
-from trading_bot.utils.logger import get_logger
+from trading_core.utils.logger import get_logger
+from trading_worker.executors.intraday_executor import IntradayExecutor
+from trading_worker.position.pip_calculator import PipCalculator
 
 logger = get_logger(__name__)
 

@@ -8,9 +8,8 @@ on positions that have been closed in MT5.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from trading_bot.main import TradingBot
-from trading_bot.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.main import TradingBot
+from trading_worker.position.position_models import Position, PositionStatus, PositionType
 
 
 @pytest.fixture
@@ -26,13 +25,13 @@ def mock_config():
 def trading_bot(mock_config):
     """Create TradingBot instance with mocked dependencies."""
     with (
-        patch("trading_bot.main.MT5Connector"),
-        patch("trading_bot.main.SymbolMapper"),
-        patch("trading_bot.main.FoundationEngine"),
-        patch("trading_bot.main.PositionManager"),
-        patch("trading_bot.main.PortfolioRiskManager"),
-        patch("trading_bot.main.ExposureManager"),
-        patch("trading_bot.main.NotificationManager"),
+        patch("trading_worker.main.MT5Connector"),
+        patch("trading_worker.main.SymbolMapper"),
+        patch("trading_worker.main.FoundationEngine"),
+        patch("trading_worker.main.PositionManager"),
+        patch("trading_worker.main.PortfolioRiskManager"),
+        patch("trading_worker.main.ExposureManager"),
+        patch("trading_worker.main.NotificationManager"),
     ):
 
         # Create bot instance
@@ -93,9 +92,9 @@ async def test_automation_not_run_on_position_closed_during_update(trading_bot):
         else:
             return []
 
-    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
-    trading_bot.mt5.get_positions.return_value = []  # No positions in MT5
-    trading_bot.mt5.get_history_deal.return_value = {
+    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_worker.mt5.get_positions.return_value = []  # No positions in MT5
+    trading_worker.mt5.get_history_deal.return_value = {
         "price": 1.1050,
         "profit": 50.0,
         "swap": 0.0,
@@ -103,20 +102,20 @@ async def test_automation_not_run_on_position_closed_during_update(trading_bot):
     }
 
     # Mock close_position
-    trading_bot.position_manager.close_position.return_value = {
+    trading_worker.position_manager.close_position.return_value = {
         "pnl_usd": 50.0,
         "pips": 50.0,
     }
-    trading_bot.position_manager.save_position = AsyncMock()
+    trading_worker.position_manager.save_position = AsyncMock()
 
     # Run sync
-    await trading_bot._manage_positions()
+    await trading_worker._manage_positions()
 
     # Verify position was closed during update check
-    trading_bot.position_manager.close_position.assert_called()
+    trading_worker.position_manager.close_position.assert_called()
 
     # CRITICAL: Verify automation was NOT called (position was closed)
-    trading_bot._check_position_automation.assert_not_called()
+    trading_worker._check_position_automation.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -142,22 +141,22 @@ async def test_automation_run_on_position_still_open(trading_bot):
     def mock_get_open_positions():
         return [position]
 
-    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
-    trading_bot.mt5.get_positions.return_value = [
+    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_worker.mt5.get_positions.return_value = [
         {"ticket": 12345, "symbol": "EURUSDm", "price_open": 1.1000}
     ]
 
-    trading_bot.position_manager.update_position = MagicMock()
-    trading_bot.position_manager.save_position = AsyncMock()
+    trading_worker.position_manager.update_position = MagicMock()
+    trading_worker.position_manager.save_position = AsyncMock()
 
     # Run sync
-    await trading_bot._manage_positions()
+    await trading_worker._manage_positions()
 
     # Verify position was NOT closed
-    trading_bot.position_manager.close_position.assert_not_called()
+    trading_worker.position_manager.close_position.assert_not_called()
 
     # Verify automation WAS called (position still open)
-    trading_bot._check_position_automation.assert_called_once_with(position)
+    trading_worker._check_position_automation.assert_called_once_with(position)
 
 
 @pytest.mark.asyncio
@@ -169,10 +168,10 @@ async def test_automation_not_run_on_position_already_closed(trading_bot):
         # get_open_positions should not return closed positions
         return []
 
-    trading_bot.position_manager.get_open_positions.side_effect = mock_get_open_positions
+    trading_worker.position_manager.get_open_positions.side_effect = mock_get_open_positions
 
     # Run sync
-    await trading_bot._manage_positions()
+    await trading_worker._manage_positions()
 
     # Verify automation was NOT called (position is closed)
-    trading_bot._check_position_automation.assert_not_called()
+    trading_worker._check_position_automation.assert_not_called()

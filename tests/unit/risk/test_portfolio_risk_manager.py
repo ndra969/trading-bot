@@ -3,8 +3,7 @@
 from datetime import datetime
 
 import pytest
-
-from trading_bot.risk.portfolio_risk_manager import PortfolioRiskManager
+from trading_worker.risk.portfolio_risk_manager import PortfolioRiskManager
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
 import pytest
-
-from src.trading_bot.strategies.enhancement.fibonacci_analyzer import FibonacciAnalyzer
+from trading_worker.strategies.enhancement.fibonacci_analyzer import FibonacciAnalyzer
 
 
 @pytest.fixture

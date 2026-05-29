@@ -3,8 +3,7 @@
 from datetime import datetime
 
 import pytest
-
-from trading_bot.position.position_models import (
+from trading_worker.position.position_models import (
     Position,
     PositionStatus,
     PositionType,

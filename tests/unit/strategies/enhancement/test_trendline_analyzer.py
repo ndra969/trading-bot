@@ -1,6 +1,5 @@
 import pytest
-
-from src.trading_bot.strategies.enhancement.trendline_analyzer import TrendlineAnalyzer
+from trading_worker.strategies.enhancement.trendline_analyzer import TrendlineAnalyzer
 
 
 @pytest.fixture

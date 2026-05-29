@@ -3,8 +3,7 @@
 from datetime import datetime
 
 import pytest
-
-from trading_bot.strategies.models import (
+from trading_worker.strategies.models import (
     SignalDirection,
     SignalStatus,
     StrategyResult,

@@ -16,8 +16,8 @@ except ImportError:
     MT5_AVAILABLE = False
     mt5 = None
 
-from trading_bot.connectors.symbol_manager import SymbolManager
-from trading_bot.exceptions import MT5ConnectionError, MT5SymbolError
+from trading_worker.connectors.symbol_manager import SymbolManager
+from trading_worker.exceptions import MT5ConnectionError, MT5SymbolError
 
 
 @pytest.fixture
@@ -31,8 +31,8 @@ def mock_mt5_connector():
 @pytest.fixture
 def symbol_manager(mock_mt5_connector):
     """Create SymbolManager instance."""
-    with patch("trading_bot.connectors.symbol_manager.MT5_AVAILABLE", True):
-        with patch("trading_bot.connectors.symbol_manager.mt5"):
+    with patch("trading_worker.connectors.symbol_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.symbol_manager.mt5"):
             return SymbolManager(mock_mt5_connector)
 
 
@@ -41,13 +41,13 @@ class TestSymbolManagerInitialization:
 
     def test_init_success(self, mock_mt5_connector):
         """Test successful initialization."""
-        with patch("trading_bot.connectors.symbol_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.symbol_manager.MT5_AVAILABLE", True):
             manager = SymbolManager(mock_mt5_connector)
             assert manager.connector == mock_mt5_connector
 
     def test_init_mt5_not_available(self, mock_mt5_connector):
         """Test initialization fails when MT5 not available."""
-        with patch("trading_bot.connectors.symbol_manager.MT5_AVAILABLE", False):
+        with patch("trading_worker.connectors.symbol_manager.MT5_AVAILABLE", False):
             with pytest.raises(ImportError, match="MetaTrader5 package not available"):
                 SymbolManager(mock_mt5_connector)
 
@@ -57,7 +57,7 @@ class TestSymbolDiscovery:
 
     def test_get_all_symbols_success(self, symbol_manager):
         """Test getting all symbols successfully."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbol:
                 def __init__(self, name):
@@ -78,7 +78,7 @@ class TestSymbolDiscovery:
 
     def test_get_all_symbols_empty(self, symbol_manager):
         """Test getting symbols when none exist."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbols_get.return_value = None
 
             symbols = symbol_manager.get_all_symbols()
@@ -94,7 +94,7 @@ class TestSymbolDiscovery:
 
     def test_get_all_symbols_exception(self, symbol_manager):
         """Test exception handling in get_all_symbols."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbols_get.side_effect = Exception("Unexpected error")
 
             symbols = symbol_manager.get_all_symbols()
@@ -107,7 +107,7 @@ class TestSymbolInfoRetrieval:
 
     def test_get_symbol_info_success(self, symbol_manager):
         """Test getting symbol info successfully."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -137,7 +137,7 @@ class TestSymbolInfoRetrieval:
 
     def test_get_symbol_info_none(self, symbol_manager):
         """Test getting symbol info when None returned."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.return_value = None
 
             with pytest.raises(MT5SymbolError, match="Symbol not found"):
@@ -156,7 +156,7 @@ class TestSymbolValidation:
 
     def test_validate_symbol_success(self, symbol_manager):
         """Test validating symbol successfully."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -175,7 +175,7 @@ class TestSymbolValidation:
 
     def test_validate_symbol_not_visible(self, symbol_manager):
         """Test validating symbol that is not visible."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -192,7 +192,7 @@ class TestSymbolValidation:
 
     def test_validate_symbol_not_tradable(self, symbol_manager):
         """Test validating symbol that is not tradable."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -209,7 +209,7 @@ class TestSymbolValidation:
 
     def test_validate_symbol_not_found(self, symbol_manager):
         """Test validating symbol that doesn't exist."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.return_value = None
 
             with pytest.raises(MT5SymbolError, match="Symbol not available"):
@@ -231,7 +231,7 @@ class TestSymbolSpecifications:
 
     def test_get_symbol_specs_success(self, symbol_manager):
         """Test getting symbol specifications successfully."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -264,7 +264,7 @@ class TestSymbolSpecifications:
 
     def test_get_bid_ask_success(self, symbol_manager):
         """Test getting bid/ask prices."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -283,7 +283,7 @@ class TestSymbolSpecifications:
 
     def test_get_spread_success(self, symbol_manager):
         """Test getting spread."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -304,7 +304,7 @@ class TestSymbolAvailability:
 
     def test_is_symbol_available_success(self, symbol_manager):
         """Test checking if symbol is available."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -321,7 +321,7 @@ class TestSymbolAvailability:
 
     def test_is_symbol_available_not_visible(self, symbol_manager):
         """Test checking symbol that is not visible."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -338,7 +338,7 @@ class TestSymbolAvailability:
 
     def test_is_symbol_available_not_found(self, symbol_manager):
         """Test checking symbol that doesn't exist."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.return_value = None
 
             is_available = symbol_manager.is_symbol_available("INVALID")
@@ -351,7 +351,7 @@ class TestTradingAllowed:
 
     def test_is_trading_allowed_success(self, symbol_manager):
         """Test checking if trading is allowed."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -368,7 +368,7 @@ class TestTradingAllowed:
 
     def test_is_trading_allowed_disabled(self, symbol_manager):
         """Test checking symbol with trading disabled."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbolInfo:
                 def __init__(self):
@@ -385,7 +385,7 @@ class TestTradingAllowed:
 
     def test_is_trading_allowed_not_found(self, symbol_manager):
         """Test checking trading allowed when symbol not found."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.return_value = None
 
             is_allowed = symbol_manager.is_trading_allowed("INVALID")
@@ -398,7 +398,7 @@ class TestSymbolSelection:
 
     def test_select_symbol_success(self, symbol_manager):
         """Test selecting symbol successfully."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_select.return_value = True
 
             result = symbol_manager.select_symbol("EURUSD")
@@ -408,7 +408,7 @@ class TestSymbolSelection:
 
     def test_select_symbol_failure(self, symbol_manager):
         """Test selecting symbol when it fails."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_select.return_value = False
 
             result = symbol_manager.select_symbol("INVALID")
@@ -424,7 +424,7 @@ class TestSymbolSelection:
 
     def test_select_symbol_exception(self, symbol_manager):
         """Test exception handling in select_symbol (line 204-206)."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_select.side_effect = Exception("Unexpected error")
 
             result = symbol_manager.select_symbol("EURUSD")
@@ -438,7 +438,7 @@ class TestSymbolSearch:
 
     def test_search_symbols_success(self, symbol_manager):
         """Test searching for symbols."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
 
             class MockSymbol:
                 def __init__(self, name):
@@ -460,7 +460,7 @@ class TestSymbolSearch:
 
     def test_search_symbols_empty(self, symbol_manager):
         """Test searching when no symbols match."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbols_get.return_value = []
 
             symbols = symbol_manager.get_all_symbols()
@@ -473,7 +473,7 @@ class TestErrorHandling:
 
     def test_get_symbol_info_exception(self, symbol_manager):
         """Test exception handling in get_symbol_info."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5SymbolError, match="Unexpected error"):
@@ -481,7 +481,7 @@ class TestErrorHandling:
 
     def test_get_all_symbols_exception_handling(self, symbol_manager):
         """Test exception handling in get_all_symbols."""
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbols_get.side_effect = Exception("Unexpected error")
 
             symbols = symbol_manager.get_all_symbols()

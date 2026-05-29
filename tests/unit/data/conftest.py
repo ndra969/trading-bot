@@ -5,8 +5,7 @@ Pytest fixtures for data layer tests.
 import os
 
 import pytest_asyncio
-
-from trading_bot.data.database import init_database
+from trading_core.data.database import init_database
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -46,4 +45,3 @@ async def setup_test_database():
         os.unlink(db_path)
     except Exception:
         pass  # Best effort cleanup
-

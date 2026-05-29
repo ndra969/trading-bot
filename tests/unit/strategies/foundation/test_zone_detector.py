@@ -8,11 +8,10 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import pytest
-
-from trading_bot.exceptions.strategy_exceptions import (
+from trading_worker.exceptions.strategy_exceptions import (
     InsufficientDataError,
 )
-from trading_bot.strategies.foundation.zone_detector import (
+from trading_worker.strategies.foundation.zone_detector import (
     DetectedZone,
     ZoneDetector,
     ZoneType,
@@ -593,7 +592,7 @@ class TestEdgeCases:
         # Mock _detect_rejection_zones to raise exception
         from unittest.mock import patch
 
-        from trading_bot.exceptions.strategy_exceptions import ZoneDetectionError
+        from trading_worker.exceptions.strategy_exceptions import ZoneDetectionError
 
         with patch.object(detector, "_detect_rejection_zones", side_effect=Exception("Test error")):
             with pytest.raises(ZoneDetectionError, match="Failed to detect zones"):

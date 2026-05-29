@@ -9,8 +9,7 @@ Solution: Dynamic ATR-based trailing with tiered approach
 from unittest.mock import patch
 
 import pytest
-
-from src.trading_bot.position.automation.trailing_stop_manager import (
+from trading_worker.position.automation.trailing_stop_manager import (
     TieredTrailingConfig,
     TrailingStopManager,
 )

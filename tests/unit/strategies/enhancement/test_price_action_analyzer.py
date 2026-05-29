@@ -1,6 +1,5 @@
 import pytest
-
-from src.trading_bot.strategies.enhancement.price_action_analyzer import PriceActionAnalyzer
+from trading_worker.strategies.enhancement.price_action_analyzer import PriceActionAnalyzer
 
 
 @pytest.fixture

@@ -19,8 +19,8 @@ except ImportError:
     MT5_AVAILABLE = False
     mt5 = None
 
-from trading_bot.connectors.data_manager import DataManager
-from trading_bot.exceptions import MT5ConnectionError, MT5DataError
+from trading_worker.connectors.data_manager import DataManager
+from trading_worker.exceptions import MT5ConnectionError, MT5DataError
 
 
 @pytest.fixture
@@ -42,8 +42,8 @@ def mock_symbol_manager():
 @pytest.fixture
 def data_manager(mock_mt5_connector, mock_symbol_manager):
     """Create DataManager instance."""
-    with patch("trading_bot.connectors.data_manager.MT5_AVAILABLE", True):
-        with patch("trading_bot.connectors.data_manager.mt5"):
+    with patch("trading_worker.connectors.data_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.data_manager.mt5"):
             return DataManager(mock_mt5_connector, mock_symbol_manager)
 
 
@@ -104,14 +104,14 @@ class TestDataManagerInitialization:
 
     def test_init_success(self, mock_mt5_connector, mock_symbol_manager):
         """Test successful initialization."""
-        with patch("trading_bot.connectors.data_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.data_manager.MT5_AVAILABLE", True):
             manager = DataManager(mock_mt5_connector, mock_symbol_manager)
             assert manager.connector == mock_mt5_connector
             assert manager.symbol_manager == mock_symbol_manager
 
     def test_init_mt5_not_available(self, mock_mt5_connector, mock_symbol_manager):
         """Test initialization fails when MT5 not available."""
-        with patch("trading_bot.connectors.data_manager.MT5_AVAILABLE", False):
+        with patch("trading_worker.connectors.data_manager.MT5_AVAILABLE", False):
             with pytest.raises(ImportError, match="MetaTrader5 package not available"):
                 DataManager(mock_mt5_connector, mock_symbol_manager)
 
@@ -121,7 +121,7 @@ class TestOHLCVDataRetrieval:
 
     def test_get_ohlcv_success(self, data_manager, mock_symbol_manager):
         """Test getting OHLCV data successfully."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(100)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 
@@ -144,7 +144,7 @@ class TestOHLCVDataRetrieval:
 
     def test_get_ohlcv_different_timeframes(self, data_manager):
         """Test getting OHLCV data for different timeframes."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(50)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 
@@ -168,7 +168,7 @@ class TestOHLCVDataRetrieval:
 
     def test_get_ohlcv_no_data(self, data_manager):
         """Test getting OHLCV when no data available."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_rates_from_pos.return_value = None
             mock_mt5.last_error.return_value = (10001, "No data")
 
@@ -177,7 +177,7 @@ class TestOHLCVDataRetrieval:
 
     def test_get_ohlcv_empty_data(self, data_manager):
         """Test getting OHLCV when empty data returned."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_rates_from_pos.return_value = np.array([], dtype=object)
             mock_mt5.last_error.return_value = (10001, "No data")
 
@@ -190,7 +190,7 @@ class TestHistoricalDataFetching:
 
     def test_get_ohlcv_range_success(self, data_manager):
         """Test getting OHLCV data for date range."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(50)
             mock_mt5.copy_rates_range.return_value = mock_rates
 
@@ -205,7 +205,7 @@ class TestHistoricalDataFetching:
 
     def test_get_ohlcv_range_no_data(self, data_manager):
         """Test getting OHLCV range when no data available."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_rates_range.return_value = None
 
             date_from = datetime.now() - timedelta(days=7)
@@ -238,7 +238,7 @@ class TestTickData:
 
     def test_get_last_tick_success(self, data_manager):
         """Test getting last tick successfully."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_tick = Mock()
             mock_tick._asdict.return_value = {
                 "time": int(datetime.now().timestamp()),
@@ -259,7 +259,7 @@ class TestTickData:
 
     def test_get_last_tick_none(self, data_manager):
         """Test getting last tick when None returned."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info_tick.return_value = None
 
             with pytest.raises(MT5DataError, match="No tick data available"):
@@ -267,7 +267,7 @@ class TestTickData:
 
     def test_get_ticks_success(self, data_manager):
         """Test getting tick data successfully."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_ticks = create_mock_ticks(100)
             mock_mt5.copy_ticks_from_pos.return_value = mock_ticks
 
@@ -286,7 +286,7 @@ class TestTickData:
 
     def test_get_ticks_no_data(self, data_manager):
         """Test getting ticks when no data available."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_ticks_from_pos.return_value = None
 
             with pytest.raises(MT5DataError, match="No tick data available"):
@@ -301,7 +301,7 @@ class TestTickData:
 
     def test_get_ticks_exception(self, data_manager):
         """Test exception handling in get_ticks (line 282-284)."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_ticks_from_pos.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5DataError):
@@ -322,7 +322,7 @@ class TestMultiTimeframeSupport:
 
     def test_get_ohlcv_multiple_timeframes(self, data_manager):
         """Test getting data for multiple timeframes."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(100)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 
@@ -338,7 +338,7 @@ class TestDataValidation:
 
     def test_get_ohlcv_validates_symbol(self, data_manager, mock_symbol_manager):
         """Test that get_ohlcv validates symbol."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(100)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 
@@ -348,7 +348,7 @@ class TestDataValidation:
 
     def test_get_ohlcv_range_validates_symbol(self, data_manager, mock_symbol_manager):
         """Test that get_ohlcv_range validates symbol."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(50)
             mock_mt5.copy_rates_range.return_value = mock_rates
 
@@ -365,7 +365,7 @@ class TestCurrentPrice:
 
     def test_get_current_price_success(self, data_manager):
         """Test getting current bid/ask prices."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_tick = Mock()
             mock_tick._asdict.return_value = {
                 "bid": 1.10000,
@@ -384,7 +384,7 @@ class TestErrorHandling:
 
     def test_get_ohlcv_exception(self, data_manager):
         """Test exception handling in get_ohlcv."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_rates_from_pos.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5DataError):
@@ -392,7 +392,7 @@ class TestErrorHandling:
 
     def test_get_ohlcv_range_exception(self, data_manager):
         """Test exception handling in get_ohlcv_range."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.copy_rates_range.side_effect = Exception("Unexpected error")
 
             date_from = datetime.now() - timedelta(days=7)
@@ -403,7 +403,7 @@ class TestErrorHandling:
 
     def test_get_last_tick_exception(self, data_manager):
         """Test exception handling in get_last_tick."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info_tick.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5DataError):
@@ -418,7 +418,7 @@ class TestErrorHandling:
 
     def test_get_ohlcv_enabled_symbols_check(self, data_manager):
         """Test enabled_symbols validation (line 93-95)."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(100)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 
@@ -435,7 +435,7 @@ class TestErrorHandling:
 
     def test_get_ohlcv_enabled_symbols_success(self, data_manager):
         """Test enabled_symbols validation - symbol in list."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(100)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 
@@ -454,7 +454,7 @@ class TestErrorHandling:
 
     def test_get_ohlcv_enabled_symbols_with_broker_suffix(self, data_manager):
         """Test enabled_symbols validation with broker symbol suffix."""
-        with patch("trading_bot.connectors.data_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.data_manager.mt5") as mock_mt5:
             mock_rates = create_mock_rates(100)
             mock_mt5.copy_rates_from_pos.return_value = mock_rates
 

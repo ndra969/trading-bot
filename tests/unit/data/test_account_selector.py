@@ -4,11 +4,9 @@ Unit tests for AccountSelector service.
 Tests account selection and switching logic for multi-account trading.
 """
 
-
 import pytest
-
-from trading_bot.data.repositories import AccountRepository
-from trading_bot.data.services.account_selector import AccountSelector
+from trading_core.data.repositories import AccountRepository
+from trading_core.data.services.account_selector import AccountSelector
 
 
 class TestAccountSelector:

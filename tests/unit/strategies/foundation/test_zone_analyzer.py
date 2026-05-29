@@ -7,9 +7,8 @@ Testing zone analysis and quality filtering with TDD methodology.
 from datetime import datetime
 
 import pytest
-
-from trading_bot.strategies.foundation.zone_analyzer import ZoneAnalyzer
-from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+from trading_worker.strategies.foundation.zone_analyzer import ZoneAnalyzer
+from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
 
 class TestZoneAnalyzerInitialization:

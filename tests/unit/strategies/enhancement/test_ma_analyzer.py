@@ -1,8 +1,7 @@
 from unittest.mock import patch
 
 import pytest
-
-from src.trading_bot.strategies.enhancement.ma_analyzer import MovingAverageAnalyzer
+from trading_worker.strategies.enhancement.ma_analyzer import MovingAverageAnalyzer
 
 
 @pytest.fixture
@@ -19,7 +18,7 @@ def analyzer(ma_config):
 async def test_strong_uptrend(analyzer):
     """Test Strong Uptrend (Price > EMA21 > EMA50 > SMA200)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Mock MA values
         # Scenario: Strong Uptrend
@@ -49,7 +48,7 @@ async def test_strong_uptrend(analyzer):
 async def test_strong_downtrend(analyzer):
     """Test Strong Downtrend (Price < EMA21 < EMA50 < SMA200)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Scenario: Strong Downtrend
         # SMA200: 150
@@ -78,7 +77,7 @@ async def test_strong_downtrend(analyzer):
 async def test_golden_cross(analyzer):
     """Test Golden Cross (EMA21 crosses above EMA50)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Prev: EMA21 (100) < EMA50 (105)
         # Curr: EMA21 (110) > EMA50 (105)
@@ -106,7 +105,7 @@ async def test_golden_cross(analyzer):
 async def test_death_cross(analyzer):
     """Test Death Cross (EMA21 crosses below EMA50)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Prev: EMA21 (110) > EMA50 (105)
         # Curr: EMA21 (100) < EMA50 (105)
@@ -134,7 +133,7 @@ async def test_death_cross(analyzer):
 async def test_insufficient_ma_data(analyzer):
     """Test MA analysis with insufficient data (line 62)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Missing EMA50 or EMA21
         mock_calc.return_value = {
@@ -157,7 +156,7 @@ async def test_insufficient_ma_data(analyzer):
 async def test_fallback_trend_without_sma200(analyzer):
     """Test fallback trend identification without SMA200 (line 86-89)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # No SMA200 data
         mock_calc.return_value = {
@@ -185,7 +184,7 @@ async def test_fallback_trend_without_sma200(analyzer):
 async def test_medium_uptrend(analyzer):
     """Test medium uptrend (line 98-102)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Price > EMA21 > EMA50 (but no SMA200 or not in strong alignment)
         mock_calc.return_value = {
@@ -208,7 +207,7 @@ async def test_medium_uptrend(analyzer):
 async def test_weak_uptrend(analyzer):
     """Test weak uptrend (line 103-105)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Price > EMA21 but not > EMA50
         mock_calc.return_value = {
@@ -230,7 +229,7 @@ async def test_weak_uptrend(analyzer):
 async def test_medium_downtrend(analyzer):
     """Test medium downtrend (line 113-117)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Price < EMA21 < EMA50
         mock_calc.return_value = {
@@ -253,7 +252,7 @@ async def test_medium_downtrend(analyzer):
 async def test_weak_downtrend(analyzer):
     """Test weak downtrend (line 118-120)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Price < EMA21 but not < EMA50
         mock_calc.return_value = {
@@ -275,7 +274,7 @@ async def test_weak_downtrend(analyzer):
 async def test_bullish_fast_cross(analyzer):
     """Test bullish fast cross (EMA9 crosses above EMA21) (line 149-153)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Prev: EMA9 (100) <= EMA21 (110)
         # Curr: EMA9 (120) > EMA21 (110)
@@ -302,7 +301,7 @@ async def test_bullish_fast_cross(analyzer):
 async def test_bearish_fast_cross(analyzer):
     """Test bearish fast cross (EMA9 crosses below EMA21) (line 157-161)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Prev: EMA9 (120) >= EMA21 (110)
         # Curr: EMA9 (100) < EMA21 (110)

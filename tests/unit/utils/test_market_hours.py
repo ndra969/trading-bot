@@ -2,10 +2,7 @@
 
 from datetime import UTC, datetime
 
-import pytest
-
-from trading_bot.utils.market_hours import is_market_open
-
+from trading_worker.utils.market_hours import is_market_open
 
 # ─────────────────────────────────────────────────────────────────
 # Weekend filter
@@ -63,43 +60,24 @@ class TestSessionFilter:
     def test_london_only_skips_asian_hours(self):
         wed_3utc = datetime(2026, 5, 27, 3, 0, tzinfo=UTC)
         # 3 UTC is in tokyo bucket — london-only symbol skips
-        assert (
-            is_market_open("forex_major", allowed_sessions=["london"], now=wed_3utc)
-            is False
-        )
+        assert is_market_open("forex_major", allowed_sessions=["london"], now=wed_3utc) is False
 
     def test_london_session_matches_london_bucket(self):
         wed_10utc = datetime(2026, 5, 27, 10, 0, tzinfo=UTC)
-        assert (
-            is_market_open("forex_major", allowed_sessions=["london"], now=wed_10utc)
-            is True
-        )
+        assert is_market_open("forex_major", allowed_sessions=["london"], now=wed_10utc) is True
 
     def test_overlap_matches_london_only_symbol(self):
         wed_15utc = datetime(2026, 5, 27, 15, 0, tzinfo=UTC)
         # london_ny_overlap bucket — admits london-only too
-        assert (
-            is_market_open("forex_major", allowed_sessions=["london"], now=wed_15utc)
-            is True
-        )
+        assert is_market_open("forex_major", allowed_sessions=["london"], now=wed_15utc) is True
 
     def test_overlap_matches_ny_only_symbol(self):
         wed_15utc = datetime(2026, 5, 27, 15, 0, tzinfo=UTC)
-        assert (
-            is_market_open(
-                "forex_major", allowed_sessions=["new_york"], now=wed_15utc
-            )
-            is True
-        )
+        assert is_market_open("forex_major", allowed_sessions=["new_york"], now=wed_15utc) is True
 
     def test_new_york_session_matches_ny_bucket(self):
         wed_19utc = datetime(2026, 5, 27, 19, 0, tzinfo=UTC)
-        assert (
-            is_market_open(
-                "forex_major", allowed_sessions=["new_york"], now=wed_19utc
-            )
-            is True
-        )
+        assert is_market_open("forex_major", allowed_sessions=["new_york"], now=wed_19utc) is True
 
     def test_off_hours_blocks_all_session_symbols(self):
         wed_2230utc = datetime(2026, 5, 27, 22, 30, tzinfo=UTC)
@@ -114,18 +92,12 @@ class TestSessionFilter:
 
     def test_tokyo_matches_tokyo_bucket(self):
         wed_5utc = datetime(2026, 5, 27, 5, 0, tzinfo=UTC)
-        assert (
-            is_market_open("forex_jpy", allowed_sessions=["tokyo"], now=wed_5utc)
-            is True
-        )
+        assert is_market_open("forex_jpy", allowed_sessions=["tokyo"], now=wed_5utc) is True
 
     def test_sydney_accepted_in_tokyo_bucket(self):
         """Sydney session shares the 00-08 UTC slot with Tokyo in our buckets."""
         wed_5utc = datetime(2026, 5, 27, 5, 0, tzinfo=UTC)
-        assert (
-            is_market_open("forex_major", allowed_sessions=["sydney"], now=wed_5utc)
-            is True
-        )
+        assert is_market_open("forex_major", allowed_sessions=["sydney"], now=wed_5utc) is True
 
 
 class TestCombinedFilters:
@@ -133,9 +105,4 @@ class TestCombinedFilters:
 
     def test_session_match_on_saturday_still_closed(self):
         sat_10utc = datetime(2026, 5, 30, 10, 0, tzinfo=UTC)
-        assert (
-            is_market_open(
-                "forex_major", allowed_sessions=["london"], now=sat_10utc
-            )
-            is False
-        )
+        assert is_market_open("forex_major", allowed_sessions=["london"], now=sat_10utc) is False

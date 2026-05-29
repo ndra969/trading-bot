@@ -4,9 +4,8 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-
-from trading_bot.strategies.models import SignalDirection, StrategyResult
-from trading_bot.strategies.strategy_manager import StrategyManager
+from trading_worker.strategies.models import SignalDirection, StrategyResult
+from trading_worker.strategies.strategy_manager import StrategyManager
 
 
 class MockStrategy:

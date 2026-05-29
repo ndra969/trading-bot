@@ -3,8 +3,7 @@
 from unittest.mock import patch
 
 import pytest
-
-from trading_bot.position.pip_calculator import PipCalculator
+from trading_worker.position.pip_calculator import PipCalculator
 
 
 class TestPipCalculatorInitialization:

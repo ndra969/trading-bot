@@ -8,8 +8,7 @@ This test file follows TDD methodology:
 """
 
 import pytest
-
-from trading_bot.executors.factory import TradingTypeFactory
+from trading_worker.executors.factory import TradingTypeFactory
 
 
 class TestTradingTypeFactoryCreateExecutor:
@@ -37,7 +36,7 @@ class TestTradingTypeFactoryCreateExecutor:
         )
 
         # Assert
-        from trading_bot.executors.intraday_executor import IntradayExecutor
+        from trading_worker.executors.intraday_executor import IntradayExecutor
 
         assert isinstance(executor, IntradayExecutor)
         assert executor.config == mock_config
@@ -225,6 +224,6 @@ class TestTradingTypeFactoryLogging:
         # Assert
         # Executor should be created successfully
         assert executor is not None
-        from trading_bot.executors.intraday_executor import IntradayExecutor
+        from trading_worker.executors.intraday_executor import IntradayExecutor
 
         assert isinstance(executor, IntradayExecutor)

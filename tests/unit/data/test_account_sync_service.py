@@ -7,9 +7,8 @@ Tests MT5 account synchronization and balance updates.
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from trading_bot.data.repositories import AccountRepository
-from trading_bot.data.services.account_sync_service import AccountSyncService
+from trading_core.data.repositories import AccountRepository
+from trading_worker.services.account_sync_service import AccountSyncService
 
 
 class TestAccountSyncService:
@@ -41,7 +40,7 @@ class TestAccountSyncService:
         created = await repo.create(account_data)
 
         # Mock MT5 connector - account_info is a property that returns dict
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info_dict  # Property returns dict
@@ -65,7 +64,7 @@ class TestAccountSyncService:
         """Test syncing non-existent account returns False."""
         sync_service = AccountSyncService()
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5.return_value = mock_mt5_instance
 
@@ -89,7 +88,7 @@ class TestAccountSyncService:
         created = await repo.create(account_data)
 
         # Mock MT5 connection failure
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.get_account_info.side_effect = Exception("MT5 connection failed")
             mock_mt5.return_value = mock_mt5_instance
@@ -125,7 +124,8 @@ class TestAccountSyncService:
         call_count = [0]  # Mutable to track calls
         account_ids = [20000000, 20000001, 20000002]
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
+
             def create_mock_instance():
                 mock_instance = MagicMock()
                 mock_instance.is_connected.return_value = True
@@ -171,7 +171,7 @@ class TestAccountSyncService:
         }
         created = await repo.create(account_data)
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5.return_value = mock_mt5_instance
 
@@ -187,7 +187,7 @@ class TestAccountSyncService:
     @pytest.mark.asyncio
     async def test_check_account_connection_status(self):
         """Test checking MT5 account connection status."""
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5.return_value = mock_mt5_instance
@@ -222,7 +222,7 @@ class TestAccountSyncService:
         mt5_account_info.server = "Exness-MT5Real"
         mt5_account_info.currency = "USD"
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.get_account_info.return_value = mt5_account_info
             mock_mt5.return_value = mock_mt5_instance
@@ -263,7 +263,8 @@ class TestAccountSyncService:
         call_count = [0]
         account_ids = [50000000, 50000001, 50000002]
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
+
             def create_mock_instance():
                 mock_instance = MagicMock()
                 account_id = account_ids[call_count[0]]
@@ -312,7 +313,7 @@ class TestAccountSyncService:
             "trade_mode": 2,  # LIVE account
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -354,7 +355,7 @@ class TestAccountSyncService:
             "currency": "USD",
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -377,7 +378,7 @@ class TestAccountSyncService:
     @pytest.mark.asyncio
     async def test_ensure_account_exists_not_connected(self):
         """Test ensure_account_exists returns None when MT5 not connected."""
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = False
             mock_mt5.return_value = mock_mt5_instance
@@ -390,7 +391,7 @@ class TestAccountSyncService:
     @pytest.mark.asyncio
     async def test_ensure_account_exists_no_account_info(self):
         """Test ensure_account_exists returns None when account_info is None."""
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = None
@@ -410,7 +411,7 @@ class TestAccountSyncService:
             # Missing "login" field
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -435,7 +436,7 @@ class TestAccountSyncService:
             "trade_mode": 0,  # DEMO
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -464,7 +465,7 @@ class TestAccountSyncService:
             "trade_mode": 0,
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -482,7 +483,7 @@ class TestAccountSyncService:
     @pytest.mark.asyncio
     async def test_ensure_account_exists_exception_handling(self):
         """Test ensure_account_exists handles exceptions gracefully."""
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.side_effect = Exception("Connection error")
             mock_mt5.return_value = mock_mt5_instance
@@ -516,7 +517,7 @@ class TestAccountSyncService:
             "currency": "USD",
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -547,7 +548,7 @@ class TestAccountSyncService:
         }
         created = await repo.create(account_data)
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = None  # None account_info
@@ -584,7 +585,7 @@ class TestAccountSyncService:
             "currency": "USD",
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info
@@ -612,7 +613,7 @@ class TestAccountSyncService:
         }
         created = await repo.create(account_data)
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.side_effect = Exception("Unexpected error")
             mock_mt5.return_value = mock_mt5_instance
@@ -634,7 +635,7 @@ class TestAccountSyncService:
     @pytest.mark.asyncio
     async def test_check_connection_status_exception(self):
         """Test check_connection_status handles exceptions gracefully."""
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5.side_effect = Exception("Connection check failed")
 
             sync_service = AccountSyncService()
@@ -693,7 +694,7 @@ class TestAccountSyncService:
             "currency": "USD",
         }
 
-        with patch("trading_bot.data.services.account_sync_service.MT5Connector") as mock_mt5:
+        with patch("trading_worker.services.account_sync_service.MT5Connector") as mock_mt5:
             mock_mt5_instance = MagicMock()
             mock_mt5_instance.is_connected.return_value = True
             mock_mt5_instance.account_info = mt5_account_info

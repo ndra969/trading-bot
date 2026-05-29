@@ -3,9 +3,8 @@
 from datetime import datetime
 
 import pytest
-
-from trading_bot.position.position_models import Position, PositionStatus, PositionType
-from trading_bot.position.position_tracker import PositionTracker
+from trading_worker.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.position.position_tracker import PositionTracker
 
 
 @pytest.fixture

@@ -9,8 +9,7 @@ from datetime import UTC
 import pandas as pd
 import pytest
 import pytest_asyncio
-
-from trading_bot.strategies.foundation.foundation_engine import FoundationEngine
+from trading_worker.strategies.foundation.foundation_engine import FoundationEngine
 
 
 class TestFoundationEngineInitialization:
@@ -453,7 +452,7 @@ class TestFoundationEngineEnhancementAnalyzers:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_config
 
@@ -555,7 +554,7 @@ class TestFoundationEngineEnhancementAnalyzers:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_config
 
@@ -676,7 +675,7 @@ class TestFoundationEngineIsPriceAtZone:
         """Create a sample zone for testing."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -744,7 +743,7 @@ class TestFoundationEngineIsDemandZone:
         """Create a rejection zone."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -762,7 +761,7 @@ class TestFoundationEngineIsDemandZone:
         """Create a breakout origin zone."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.BREAKOUT_ORIGIN,
@@ -804,7 +803,7 @@ class TestFoundationEngineIsDemandZone:
         """Test consolidation zone defaults to demand."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = FoundationEngine(use_database=False)
         zone = DetectedZone(
@@ -868,7 +867,7 @@ class TestFoundationEngineCreateSignalComprehensive:
         """Create a demand zone."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -886,7 +885,7 @@ class TestFoundationEngineCreateSignalComprehensive:
         """Create a supply zone."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -1104,7 +1103,7 @@ class TestFoundationEngineCreateSignalComprehensive:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_full_config
         current_price = 1.1005
@@ -1185,7 +1184,7 @@ class TestFoundationEngineCreateSignalComprehensive:
 
                                 from datetime import datetime
 
-                                from trading_bot.strategies.foundation.zone_detector import (
+                                from trading_worker.strategies.foundation.zone_detector import (
                                     DetectedZone,
                                     ZoneType,
                                 )
@@ -1274,7 +1273,7 @@ class TestFoundationEngineAssetClassSLBuffer:
         """Create a demand zone for forex."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -1292,7 +1291,7 @@ class TestFoundationEngineAssetClassSLBuffer:
         """Create a demand zone for JPY pair."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -1310,7 +1309,7 @@ class TestFoundationEngineAssetClassSLBuffer:
         """Create a demand zone for crypto."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -1328,7 +1327,7 @@ class TestFoundationEngineAssetClassSLBuffer:
         """Create a demand zone for commodity (Gold)."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         return DetectedZone(
             zone_type=ZoneType.REJECTION,
@@ -1723,7 +1722,7 @@ class TestFoundationEngineAssetClassSLBuffer:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_config
         # Create a very large zone (50 pips - should be capped at 30 pips)
@@ -1865,7 +1864,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
         """Create a zone that would generate high TP distance."""
         from datetime import datetime
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         # Large zone that would create 40 pips SL, resulting in 80 pips TP (exceeds 60 pips max)
         # Use REJECTION zone type, and ensure current_price > midpoint for demand zone
@@ -1997,7 +1996,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_max_tp_config
 
@@ -2116,7 +2115,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_max_tp_config
 
@@ -2230,7 +2229,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         # Engine without max_take_profit_distance config
         engine = FoundationEngine(
@@ -2376,7 +2375,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_max_tp_config
 
@@ -2531,7 +2530,7 @@ class TestFoundationEnginePriceActionRequirement:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_price_action_required
 
@@ -2623,7 +2622,7 @@ class TestFoundationEnginePriceActionRequirement:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_price_action_required
 
@@ -2726,7 +2725,7 @@ class TestFoundationEnginePriceActionRequirement:
         from datetime import datetime
         from unittest.mock import AsyncMock, patch
 
-        from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
         engine = engine_with_price_action_required
 

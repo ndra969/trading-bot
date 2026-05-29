@@ -4,8 +4,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 import pytest
-
-from src.trading_bot.strategies.enhancement.technical_analyzer import (
+from trading_worker.strategies.enhancement.technical_analyzer import (
     RobustIndicatorCalculator,
     TALibHighPerformance,
     TALibIndicatorCalculator,
@@ -195,10 +194,10 @@ class TestRobustIndicatorCalculator:
         # Mock primary and secondary to fail or be None
         with (
             patch(
-                "src.trading_bot.strategies.enhancement.technical_analyzer.TALibHighPerformance"
+                "trading_worker.strategies.enhancement.technical_analyzer.TALibHighPerformance"
             ) as mock_talib,
             patch(
-                "src.trading_bot.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator"
+                "trading_worker.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator"
             ) as mock_pandas_ta,
         ):
             # Make TALib unavailable
@@ -230,7 +229,7 @@ class TestRobustIndicatorCalculator:
         mock_talib_class.return_value = mock_instance
 
         with patch(
-            "src.trading_bot.strategies.enhancement.technical_analyzer.TALibHighPerformance",
+            "trading_worker.strategies.enhancement.technical_analyzer.TALibHighPerformance",
             mock_talib_class,
         ):
             calculator = RobustIndicatorCalculator()
@@ -240,7 +239,7 @@ class TestRobustIndicatorCalculator:
     def test_initialization_primary_exception(self):
         """Test initialization when primary raises exception."""
         with patch(
-            "src.trading_bot.strategies.enhancement.technical_analyzer.TALibHighPerformance",
+            "trading_worker.strategies.enhancement.technical_analyzer.TALibHighPerformance",
             side_effect=Exception("Primary failed"),
         ):
             calculator = RobustIndicatorCalculator()
@@ -251,11 +250,11 @@ class TestRobustIndicatorCalculator:
     def test_initialization_secondary_import_error(self):
         """Test initialization when secondary raises ImportError."""
         with patch(
-            "src.trading_bot.strategies.enhancement.technical_analyzer.TALibHighPerformance",
+            "trading_worker.strategies.enhancement.technical_analyzer.TALibHighPerformance",
             return_value=MagicMock(available=False),
         ):
             with patch(
-                "src.trading_bot.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator",
+                "trading_worker.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator",
                 side_effect=ImportError("Secondary failed"),
             ):
                 calculator = RobustIndicatorCalculator()
@@ -267,15 +266,15 @@ class TestRobustIndicatorCalculator:
     def test_initialization_fallback_import_error(self):
         """Test initialization when all calculators fail."""
         with patch(
-            "src.trading_bot.strategies.enhancement.technical_analyzer.TALibHighPerformance",
+            "trading_worker.strategies.enhancement.technical_analyzer.TALibHighPerformance",
             return_value=MagicMock(available=False),
         ):
             with patch(
-                "src.trading_bot.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator",
+                "trading_worker.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator",
                 side_effect=ImportError("Secondary failed"),
             ):
                 with patch(
-                    "src.trading_bot.strategies.enhancement.technical_analyzer.TALibIndicatorCalculator",
+                    "trading_worker.strategies.enhancement.technical_analyzer.TALibIndicatorCalculator",
                     side_effect=ImportError("Fallback failed"),
                 ):
                     calculator = RobustIndicatorCalculator()
@@ -351,15 +350,15 @@ class TestRobustIndicatorCalculator:
     def test_calculate_all_no_calculators_available(self, sample_data):
         """Test calculate_all when no calculators are available."""
         with patch(
-            "src.trading_bot.strategies.enhancement.technical_analyzer.TALibHighPerformance",
+            "trading_worker.strategies.enhancement.technical_analyzer.TALibHighPerformance",
             return_value=MagicMock(available=False),
         ):
             with patch(
-                "src.trading_bot.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator",
+                "trading_worker.strategies.enhancement.technical_analyzer.TechnicalIndicatorCalculator",
                 side_effect=ImportError("Secondary failed"),
             ):
                 with patch(
-                    "src.trading_bot.strategies.enhancement.technical_analyzer.TALibIndicatorCalculator",
+                    "trading_worker.strategies.enhancement.technical_analyzer.TALibIndicatorCalculator",
                     side_effect=ImportError("Fallback failed"),
                 ):
                     calculator = RobustIndicatorCalculator()

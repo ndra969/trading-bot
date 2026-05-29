@@ -2,11 +2,10 @@
 
 import pandas as pd
 import pytest
-
-from trading_bot.config import Configuration
-from trading_bot.strategies.foundation.foundation_engine import FoundationEngine
-from trading_bot.strategies.signal_aggregator import SignalAggregator
-from trading_bot.strategies.strategy_manager import StrategyManager
+from trading_core.config import Configuration
+from trading_worker.strategies.foundation.foundation_engine import FoundationEngine
+from trading_worker.strategies.signal_aggregator import SignalAggregator
+from trading_worker.strategies.strategy_manager import StrategyManager
 
 
 @pytest.fixture
@@ -79,7 +78,7 @@ class TestSignalAggregatorIntegration:
     @pytest.mark.asyncio
     async def test_signal_aggregator_with_foundation_results(self, config):
         """Test SignalAggregator with foundation strategy results."""
-        from trading_bot.strategies.models import SignalDirection, StrategyResult
+        from trading_worker.strategies.models import SignalDirection, StrategyResult
 
         # Create mock strategy results
         results = [
@@ -210,7 +209,7 @@ class TestEndToEndIntegration:
     @pytest.mark.asyncio
     async def test_signal_quality_filtering(self, config):
         """Test that signals are filtered by quality thresholds."""
-        from trading_bot.strategies.models import SignalDirection, StrategyResult
+        from trading_worker.strategies.models import SignalDirection, StrategyResult
 
         signal_aggregator = SignalAggregator(config._config)
 
@@ -244,7 +243,7 @@ class TestEndToEndIntegration:
     @pytest.mark.asyncio
     async def test_conflict_resolution_multiple_signals(self, config):
         """Test conflict resolution when multiple signals for same symbol."""
-        from trading_bot.strategies.models import SignalDirection, StrategyResult
+        from trading_worker.strategies.models import SignalDirection, StrategyResult
 
         signal_aggregator = SignalAggregator(config._config)
 
@@ -281,7 +280,7 @@ class TestTradingBotIntegration:
 
     def test_trading_bot_initialization_with_config(self, config):
         """Test that TradingBot can be initialized with config."""
-        from trading_bot.main import TradingBot
+        from trading_worker.main import TradingBot
 
         bot = TradingBot(config)
 
@@ -310,7 +309,7 @@ class TestTradingBotIntegration:
     @pytest.mark.asyncio
     async def test_trading_bot_strategy_system_initialization(self, config):
         """Test that TradingBot initializes strategy system."""
-        from trading_bot.main import TradingBot
+        from trading_worker.main import TradingBot
 
         bot = TradingBot(config)
 

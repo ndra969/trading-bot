@@ -1,12 +1,11 @@
 """Tests for PartialCloseManager."""
 
 import pytest
-
-from trading_bot.position.automation.partial_close_manager import (
+from trading_worker.position.automation.partial_close_manager import (
     PartialCloseLevel,
     PartialCloseManager,
 )
-from trading_bot.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.position.position_models import Position, PositionStatus, PositionType
 
 
 @pytest.fixture

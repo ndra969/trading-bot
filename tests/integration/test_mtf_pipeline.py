@@ -11,9 +11,8 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-
-from trading_bot.strategies.models import StrategyResult
-from trading_bot.strategies.mtf_analyzer import MTFAnalyzer
+from trading_worker.strategies.models import StrategyResult
+from trading_worker.strategies.mtf_analyzer import MTFAnalyzer
 
 # Define path to backtest data
 DATA_DIR = Path("d:/Workspaces/trading-bot/data/backtest")

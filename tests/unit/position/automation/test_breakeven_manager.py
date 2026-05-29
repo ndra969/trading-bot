@@ -1,9 +1,8 @@
 """Tests for BreakevenManager."""
 
 import pytest
-
-from trading_bot.position.automation.breakeven_manager import BreakevenManager
-from trading_bot.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.position.automation.breakeven_manager import BreakevenManager
+from trading_worker.position.position_models import Position, PositionStatus, PositionType
 
 
 @pytest.fixture
@@ -277,7 +276,7 @@ class TestPerSymbolBreakeven:
     """Per-symbol overrides take priority over asset-class defaults."""
 
     def test_per_symbol_override_used(self):
-        from trading_bot.position.automation.breakeven_manager import BreakevenManager
+        from trading_worker.position.automation.breakeven_manager import BreakevenManager
 
         cfg = {
             "position_management": {
@@ -292,7 +291,7 @@ class TestPerSymbolBreakeven:
         assert mgr.get_breakeven_buffer("XAUUSD") == 20
 
     def test_symbol_without_override_uses_asset_default(self):
-        from trading_bot.position.automation.breakeven_manager import BreakevenManager
+        from trading_worker.position.automation.breakeven_manager import BreakevenManager
 
         cfg = {
             "position_management": {

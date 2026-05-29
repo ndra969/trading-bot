@@ -3,8 +3,7 @@ Unit tests for MT5 exceptions.
 """
 
 import pytest
-
-from trading_bot.exceptions.mt5_exceptions import (
+from trading_worker.exceptions.mt5_exceptions import (
     MT5ConnectionError,
     MT5DataError,
     MT5OrderError,

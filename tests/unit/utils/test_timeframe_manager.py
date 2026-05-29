@@ -5,8 +5,7 @@ Following TDD approach - tests written first!
 """
 
 import pytest
-
-from trading_bot.utils.timeframe_manager import TimeframeManager
+from trading_worker.utils.timeframe_manager import TimeframeManager
 
 
 class TestTimeframeRanking:

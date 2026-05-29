@@ -693,9 +693,9 @@ def _display_claude_rules(format: str):
         except Exception:
             pass  # Ignore if reconfiguration fails
 
-    # Get project root directory
-    project_root = Path(__file__).parent.parent.parent
-    claude_md_path = project_root / "CLAUDE.md"
+    # CLAUDE.md lives at the repo root; resolve relative to the working
+    # directory (run from repo root), robust to monorepo package nesting.
+    claude_md_path = Path("CLAUDE.md")
 
     if not claude_md_path.exists():
         console.print("[bold red]Error:[/bold red] CLAUDE.md not found!")

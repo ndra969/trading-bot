@@ -8,14 +8,14 @@ data manager, order manager, and position manager.
 from unittest.mock import Mock, patch
 
 import pytest
+from trading_worker.connectors.account_manager import AccountManager
+from trading_worker.connectors.data_manager import DataManager
+from trading_worker.connectors.mt5_connector import MT5Connector
+from trading_worker.connectors.mt5_position_query import MT5PositionQuery
+from trading_worker.connectors.order_manager import OrderManager
+from trading_worker.connectors.symbol_manager import SymbolManager
 
 from tests.utils.mock_helpers import MockMT5
-from trading_bot.connectors.account_manager import AccountManager
-from trading_bot.connectors.data_manager import DataManager
-from trading_bot.connectors.mt5_connector import MT5Connector
-from trading_bot.connectors.order_manager import OrderManager
-from trading_bot.connectors.mt5_position_query import MT5PositionQuery
-from trading_bot.connectors.symbol_manager import SymbolManager
 
 
 @pytest.fixture
@@ -25,12 +25,12 @@ def mock_mt5_connector():
 
     # Patch all MT5 modules
     patches = [
-        patch("trading_bot.connectors.mt5_connector.mt5", new=mock_mt5),
-        patch("trading_bot.connectors.account_manager.mt5", new=mock_mt5),
-        patch("trading_bot.connectors.symbol_manager.mt5", new=mock_mt5),
-        patch("trading_bot.connectors.data_manager.mt5", new=mock_mt5),
-        patch("trading_bot.connectors.order_manager.mt5", new=mock_mt5),
-        patch("trading_bot.connectors.mt5_position_query.mt5", new=mock_mt5),
+        patch("trading_worker.connectors.mt5_connector.mt5", new=mock_mt5),
+        patch("trading_worker.connectors.account_manager.mt5", new=mock_mt5),
+        patch("trading_worker.connectors.symbol_manager.mt5", new=mock_mt5),
+        patch("trading_worker.connectors.data_manager.mt5", new=mock_mt5),
+        patch("trading_worker.connectors.order_manager.mt5", new=mock_mt5),
+        patch("trading_worker.connectors.mt5_position_query.mt5", new=mock_mt5),
     ]
 
     for p in patches:
@@ -126,7 +126,7 @@ class TestMT5ManagerIntegration:
         order_manager = OrderManager(mock_mt5_connector, symbol_manager)
 
         # Test market order execution
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             # Set TRADE_RETCODE_DONE constant
             mock_mt5.TRADE_RETCODE_DONE = 10009
             mock_mt5.ORDER_TYPE_BUY = 0
@@ -177,7 +177,7 @@ class TestMT5ManagerIntegration:
         position_manager = MT5PositionQuery(mock_mt5_connector, symbol_manager)
 
         # Test position retrieval
-        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_position = Mock()
             mock_position.ticket = 12345
             mock_position.symbol = "EURUSD"
@@ -227,7 +227,7 @@ class TestCompleteTradingWorkflow:
         symbol_manager.validate_symbol("EURUSD")
 
         # Step 3: Execute order
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             # Set MT5 constants
             mock_mt5.TRADE_RETCODE_DONE = 10009
             mock_mt5.ORDER_TYPE_BUY = 0
@@ -258,7 +258,7 @@ class TestCompleteTradingWorkflow:
             assert result is not None
 
         # Step 4: Check positions
-        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = []
             positions = position_manager.get_all_positions()
             assert isinstance(positions, list)
@@ -300,7 +300,7 @@ class TestCompleteTradingWorkflow:
         assert equity > 0
 
         # Step 2: Get all positions
-        with patch("trading_bot.connectors.mt5_position_query.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.mt5_position_query.mt5") as mock_mt5:
             mock_position = Mock()
             mock_position.ticket = 12345
             mock_position.symbol = "EURUSD"
@@ -340,13 +340,13 @@ class TestErrorHandlingIntegration:
 
     def test_connection_error_propagation(self):
         """Test error propagation when MT5 not connected."""
-        with patch("trading_bot.connectors.mt5_connector.mt5", new=MockMT5()):
+        with patch("trading_worker.connectors.mt5_connector.mt5", new=MockMT5()):
             connector = MT5Connector()
             # Don't initialize connector
 
             account_manager = AccountManager(connector)
 
-            from trading_bot.exceptions import MT5ConnectionError
+            from trading_worker.exceptions import MT5ConnectionError
 
             with pytest.raises(MT5ConnectionError):
                 account_manager.get_account_info()
@@ -356,10 +356,10 @@ class TestErrorHandlingIntegration:
         symbol_manager = SymbolManager(mock_mt5_connector)
 
         # Mock symbol_info to return None for invalid symbol
-        with patch("trading_bot.connectors.symbol_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.symbol_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.return_value = None
 
-            from trading_bot.exceptions import MT5SymbolError
+            from trading_worker.exceptions import MT5SymbolError
 
             with pytest.raises(MT5SymbolError):
                 symbol_manager.get_symbol_info("INVALID_SYMBOL")
@@ -369,7 +369,7 @@ class TestErrorHandlingIntegration:
         symbol_manager = SymbolManager(mock_mt5_connector)
         order_manager = OrderManager(mock_mt5_connector, symbol_manager)
 
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.symbol_info.return_value = Mock(
                 _asdict=lambda: {
                     "name": "EURUSD",
@@ -386,7 +386,7 @@ class TestErrorHandlingIntegration:
             mock_mt5.order_send.return_value = None
             mock_mt5.last_error.return_value = (10013, "Invalid volume")
 
-            from trading_bot.exceptions import MT5OrderError
+            from trading_worker.exceptions import MT5OrderError
 
             with pytest.raises(MT5OrderError):
                 order_manager.send_market_order(

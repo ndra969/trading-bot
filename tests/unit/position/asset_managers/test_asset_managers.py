@@ -1,8 +1,7 @@
 """Tests for asset-specific position managers."""
 
 import pytest
-
-from trading_bot.position.asset_managers import (
+from trading_worker.position.asset_managers import (
     AssetManagerFactory,
     CommodityPositionManager,
     CryptoPositionManager,

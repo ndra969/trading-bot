@@ -8,8 +8,7 @@ This test file follows TDD methodology:
 """
 
 import pytest
-
-from trading_bot.executors.base_executor import TradingTypeExecutor
+from trading_worker.executors.base_executor import TradingTypeExecutor
 
 
 class TestBaseExecutorAbstractClass:

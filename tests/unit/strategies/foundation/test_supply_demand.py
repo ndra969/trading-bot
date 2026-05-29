@@ -7,8 +7,7 @@ Testing supply & demand strategy with TDD methodology.
 import pandas as pd
 import pytest
 import pytest_asyncio
-
-from trading_bot.strategies.foundation.supply_demand import SupplyDemandStrategy
+from trading_worker.strategies.foundation.supply_demand import SupplyDemandStrategy
 
 
 class TestSupplyDemandStrategyInitialization:

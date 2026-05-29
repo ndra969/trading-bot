@@ -2,9 +2,8 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from trading_bot.config import Configuration
-from trading_bot.utils.notification_manager import (
+from trading_core.config import Configuration
+from trading_worker.utils.notification_manager import (
     NotificationLevel,
     NotificationManager,
     markdownish_to_html,

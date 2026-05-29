@@ -48,7 +48,7 @@ repos:
 
   # Type checking
   # Note: types-all has dependency issues, so we skip it in pre-commit
-  # Run mypy manually: uv run mypy src/trading_bot/
+  # Run mypy manually: uv run mypy packages/core/src/trading_core packages/worker/src/trading_worker
   # - repo: https://github.com/pre-commit/mirrors-mypy
   #   rev: v1.8.0
   #   hooks:
@@ -70,7 +70,7 @@ repos:
 
       - id: pytest-coverage-overall
         name: Check overall test coverage (minimum 85%)
-        entry: uv run pytest tests/unit/ --cov=src/trading_bot --cov-report=term-missing --cov-fail-under=85 -v
+        entry: uv run pytest tests/unit/ --cov=packages/core/src/trading_core --cov=packages/worker/src/trading_worker --cov-report=term-missing --cov-fail-under=85 -v
         language: system
         pass_filenames: false
         always_run: true
@@ -78,7 +78,7 @@ repos:
 
       - id: pytest-coverage-critical-risk
         name: Check risk management coverage (minimum 95%)
-        entry: uv run pytest tests/unit/risk/ --cov=src/trading_bot/risk --cov-report=term-missing --cov-fail-under=95 -v
+        entry: uv run pytest tests/unit/risk/ --cov=packages/worker/src/trading_worker/risk --cov-report=term-missing --cov-fail-under=95 -v
         language: system
         pass_filenames: false
         always_run: true
@@ -86,7 +86,7 @@ repos:
 
       - id: pytest-coverage-critical-position
         name: Check position management coverage (minimum 100%)
-        entry: uv run pytest tests/unit/position/ --cov=src/trading_bot/position --cov-report=term-missing --cov-fail-under=100 -v
+        entry: uv run pytest tests/unit/position/ --cov=packages/worker/src/trading_worker/position --cov-report=term-missing --cov-fail-under=100 -v
         language: system
         pass_filenames: false
         always_run: true

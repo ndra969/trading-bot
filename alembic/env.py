@@ -26,7 +26,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import our models for autogenerate support
-from trading_bot.data.database import Base
+from trading_core.data.database import Base
 
 # add your model's MetaData object here
 # for 'autogenerate' support

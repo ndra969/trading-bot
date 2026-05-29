@@ -10,10 +10,8 @@ Tests cover:
 - Timestamps
 """
 
-
 import pytest
-
-from trading_bot.data.models import TradingAccount
+from trading_core.data.models import TradingAccount
 
 
 class TestTradingAccountModel:

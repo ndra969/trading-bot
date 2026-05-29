@@ -2,10 +2,8 @@
 Unit tests for database models.
 """
 
-
 import pytest
-
-from trading_bot.data.models import Position, SupplyDemandZone
+from trading_core.data.models import Position, SupplyDemandZone
 
 
 class TestSupplyDemandZone:
@@ -143,4 +141,3 @@ class TestPosition:
         assert "EURUSD" in repr_str
         assert "BUY" in repr_str
         assert "OPEN" in repr_str
-

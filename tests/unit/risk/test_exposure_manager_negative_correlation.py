@@ -1,6 +1,6 @@
 """Additional tests for ExposureManager negative correlation feature."""
 
-from trading_bot.risk.exposure_manager import ExposureManager
+from trading_worker.risk.exposure_manager import ExposureManager
 
 
 class TestNegativeCorrelationGroups:

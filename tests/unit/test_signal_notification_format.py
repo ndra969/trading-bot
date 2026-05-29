@@ -10,8 +10,7 @@ Tests the notification message format when executing signals, ensuring:
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from trading_bot.strategies.models import SignalDirection, TradingSignal
+from trading_worker.strategies.models import SignalDirection, TradingSignal
 
 
 @pytest.fixture

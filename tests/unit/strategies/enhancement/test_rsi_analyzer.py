@@ -1,8 +1,7 @@
 from unittest.mock import patch
 
 import pytest
-
-from src.trading_bot.strategies.enhancement.rsi_analyzer import RSIAnalyzer
+from trading_worker.strategies.enhancement.rsi_analyzer import RSIAnalyzer
 
 
 @pytest.fixture
@@ -20,7 +19,7 @@ async def test_oversold_signal(analyzer):
     """Test RSI oversold condition (Buy signal)."""
     # Mock calculator to return RSI values ending below 30
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Create a series ending at 25 (Oversold)
         rsi_values = [50] * 10 + [40, 35, 25]
@@ -40,7 +39,7 @@ async def test_oversold_signal(analyzer):
 async def test_overbought_signal(analyzer):
     """Test RSI overbought condition (Sell signal)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Create a series ending at 75 (Overbought)
         rsi_values = [50] * 10 + [60, 65, 75]
@@ -60,7 +59,7 @@ async def test_overbought_signal(analyzer):
 async def test_bullish_divergence(analyzer):
     """Test Bullish Divergence (Price Lower Low, RSI Higher Low)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Construct Bullish Divergence scenario with sufficient length (>20)
         # We add padding at the start
@@ -91,7 +90,7 @@ async def test_bullish_divergence(analyzer):
 async def test_bearish_divergence(analyzer):
     """Test Bearish Divergence (Price Higher High, RSI Lower High)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # Construct Bearish Divergence scenario with sufficient length
         padding_len = 20
@@ -119,7 +118,7 @@ async def test_bearish_divergence(analyzer):
 async def test_neutral_signal(analyzer):
     """Test Neutral RSI."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         rsi_values = [50] * 20  # Flat RSI
         mock_calc.return_value = {"rsi": rsi_values}
@@ -136,7 +135,7 @@ async def test_neutral_signal(analyzer):
 async def test_no_rsi_data(analyzer):
     """Test when no RSI data is available (line 64)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         mock_calc.return_value = {"rsi": []}  # Empty RSI values
 
@@ -154,7 +153,7 @@ async def test_no_rsi_data(analyzer):
 async def test_rising_from_oversold(analyzer):
     """Test rising from oversold reversal (line 93-96)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI rising from oversold: 25 -> 35
         rsi_values = [50] * 10 + [25, 35]
@@ -174,7 +173,7 @@ async def test_rising_from_oversold(analyzer):
 async def test_falling_from_overbought(analyzer):
     """Test falling from overbought reversal (line 100-103)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI falling from overbought: 75 -> 65
         rsi_values = [50] * 10 + [75, 65]
@@ -194,7 +193,7 @@ async def test_falling_from_overbought(analyzer):
 async def test_bullish_momentum_trend(analyzer):
     """Test bullish momentum trend context (RSI 50-65 for DEMAND zone)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI between 50-65 for DEMAND zone (should support BUY)
         rsi_values = [50] * 10 + [60]
@@ -213,7 +212,7 @@ async def test_bullish_momentum_trend(analyzer):
 async def test_bearish_momentum_trend(analyzer):
     """Test bearish momentum trend context (RSI 35-50 for SUPPLY zone)."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI between 35-50 for SUPPLY zone (should support SELL)
         rsi_values = [50] * 10 + [40]
@@ -232,7 +231,7 @@ async def test_bearish_momentum_trend(analyzer):
 async def test_overbought_warning_blocks_buy(analyzer):
     """Test that RSI >= 65 blocks BUY signal for DEMAND zone."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI 69.75 (approaching overbought) - should block BUY
         rsi_values = [50] * 10 + [69.75]
@@ -254,7 +253,7 @@ async def test_overbought_warning_blocks_buy(analyzer):
 async def test_oversold_warning_blocks_sell(analyzer):
     """Test that RSI <= 35 blocks SELL signal for SUPPLY zone."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI 25 (approaching oversold) - should block SELL
         rsi_values = [50] * 10 + [25]
@@ -276,7 +275,7 @@ async def test_oversold_warning_blocks_sell(analyzer):
 async def test_rsi_65_boundary_demand_zone(analyzer):
     """Test RSI exactly at 65 boundary for DEMAND zone."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI exactly 65 - should trigger overbought warning
         rsi_values = [50] * 10 + [65.0]
@@ -295,7 +294,7 @@ async def test_rsi_65_boundary_demand_zone(analyzer):
 async def test_rsi_35_boundary_supply_zone(analyzer):
     """Test RSI exactly at 35 boundary for SUPPLY zone."""
     with patch(
-        "src.trading_bot.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
     ) as mock_calc:
         # RSI exactly 35 - should trigger oversold warning
         rsi_values = [50] * 10 + [35.0]

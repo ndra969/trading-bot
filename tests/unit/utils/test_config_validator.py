@@ -1,8 +1,7 @@
 """Tests for startup config validation."""
 
 import pytest
-
-from trading_bot.utils.config_validator import (
+from trading_worker.utils.config_validator import (
     ConfigValidationError,
     validate_position_management_config,
 )

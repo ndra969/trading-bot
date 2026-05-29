@@ -8,9 +8,8 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
-
-from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
-from trading_bot.strategies.foundation.zone_manager import ZoneManager
+from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
+from trading_worker.strategies.foundation.zone_manager import ZoneManager
 
 
 class TestZoneManagerInitialization:

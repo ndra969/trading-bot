@@ -1,6 +1,5 @@
 import pytest
-
-from src.trading_bot.strategies.enhancement.breakout_analyzer import BreakoutAnalyzer
+from trading_worker.strategies.enhancement.breakout_analyzer import BreakoutAnalyzer
 
 
 @pytest.fixture

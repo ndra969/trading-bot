@@ -122,17 +122,13 @@ Documentation = "https://trading-bot.readthedocs.io"
 Repository = "https://github.com/yourusername/trading-bot"
 "Bug Tracker" = "https://github.com/yourusername/trading-bot/issues"
 
-[project.scripts]
-# Live CLI stays on the old package until the Phase 5 cutover. The new
-# workspace packages are added additively (copy-first migration) so the
-# running bot and its restart path are never broken mid-migration.
-trading-bot = "trading_bot.cli:cli"
-# Temporary alias to exercise the NEW worker package before cutover. Removed
-# at Phase 5 when `trading-bot` flips to trading_worker.cli:cli.
-trading-bot-new = "trading_worker.cli:cli"
+# The `trading-bot` CLI script now lives in the trading-worker package
+# (packages/worker/pyproject.toml). The root is a virtual workspace root
+# (not itself an installable package) after the monorepo cutover.
+[tool.uv]
+package = false
 
-# uv workspace: the new monorepo packages live under packages/*. The root
-# project (old src/trading_bot) remains the live member until cutover.
+# uv workspace: the monorepo packages live under packages/*.
 [tool.uv.workspace]
 members = ["packages/*"]
 
@@ -231,7 +227,8 @@ minversion = "7.0"
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=src/trading_bot",
+    "--cov=packages/core/src/trading_core",
+    "--cov=packages/worker/src/trading_worker",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
@@ -250,7 +247,7 @@ markers = [
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["src/trading_bot"]
+source = ["packages/core/src/trading_core", "packages/worker/src/trading_worker"]
 omit = [
     "*/tests/*",
     "*/test_*",

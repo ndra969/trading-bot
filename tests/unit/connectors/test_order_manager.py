@@ -16,8 +16,8 @@ except ImportError:
     MT5_AVAILABLE = False
     mt5 = None
 
-from trading_bot.connectors.order_manager import OrderManager
-from trading_bot.exceptions import MT5ConnectionError, MT5OrderError
+from trading_worker.connectors.order_manager import OrderManager
+from trading_worker.exceptions import MT5ConnectionError, MT5OrderError
 
 
 @pytest.fixture
@@ -47,8 +47,8 @@ def mock_symbol_manager():
 @pytest.fixture
 def order_manager(mock_mt5_connector, mock_symbol_manager):
     """Create OrderManager instance."""
-    with patch("trading_bot.connectors.order_manager.MT5_AVAILABLE", True):
-        with patch("trading_bot.connectors.order_manager.mt5"):
+    with patch("trading_worker.connectors.order_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.order_manager.mt5"):
             return OrderManager(mock_mt5_connector, mock_symbol_manager)
 
 
@@ -57,14 +57,14 @@ class TestOrderManagerInitialization:
 
     def test_init_success(self, mock_mt5_connector, mock_symbol_manager):
         """Test successful initialization."""
-        with patch("trading_bot.connectors.order_manager.MT5_AVAILABLE", True):
+        with patch("trading_worker.connectors.order_manager.MT5_AVAILABLE", True):
             manager = OrderManager(mock_mt5_connector, mock_symbol_manager)
             assert manager.connector == mock_mt5_connector
             assert manager.symbol_manager == mock_symbol_manager
 
     def test_init_mt5_not_available(self, mock_mt5_connector, mock_symbol_manager):
         """Test initialization fails when MT5 not available."""
-        with patch("trading_bot.connectors.order_manager.MT5_AVAILABLE", False):
+        with patch("trading_worker.connectors.order_manager.MT5_AVAILABLE", False):
             with pytest.raises(ImportError, match="MetaTrader5 package not available"):
                 OrderManager(mock_mt5_connector, mock_symbol_manager)
 
@@ -76,7 +76,7 @@ class TestMarketOrders:
         self, order_manager, mock_mt5_connector, mock_symbol_manager
     ):
         """Test successful market buy order."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             # Set TRADE_RETCODE_DONE constant
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
@@ -113,7 +113,7 @@ class TestMarketOrders:
         self, order_manager, mock_mt5_connector, mock_symbol_manager
     ):
         """Test successful market sell order."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
             else:
@@ -196,7 +196,7 @@ class TestMarketOrders:
 
     def test_send_market_order_rejected(self, order_manager):
         """Test market order rejection."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_result = Mock()
             mock_result._asdict.return_value = {
                 "retcode": 10004,  # Rejected
@@ -213,7 +213,7 @@ class TestMarketOrders:
 
     def test_send_market_order_none_result(self, order_manager):
         """Test market order when MT5 returns None."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.order_send.return_value = None
             mock_mt5.last_error.return_value = (10001, "Connection error")
 
@@ -230,7 +230,7 @@ class TestPendingOrders:
 
     def test_send_buy_limit_order_success(self, order_manager):
         """Test successful buy limit order."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
             else:
@@ -262,7 +262,7 @@ class TestPendingOrders:
 
     def test_send_sell_stop_order_success(self, order_manager):
         """Test successful sell stop order."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
             else:
@@ -316,7 +316,7 @@ class TestOrderModification:
 
     def test_modify_position_success(self, order_manager):
         """Test successful position modification."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
             else:
@@ -349,7 +349,7 @@ class TestOrderModification:
 
     def test_modify_position_not_found(self, order_manager):
         """Test modification when position not found."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             with pytest.raises(MT5OrderError, match="Position.*not found"):
@@ -364,7 +364,7 @@ class TestOrderModification:
 
     def test_modify_position_none_result(self, order_manager):
         """Test modify position when MT5 returns None (line 291-292)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_position = Mock()
             mock_position.symbol = "EURUSD"
             mock_position.sl = 1.10000
@@ -379,7 +379,7 @@ class TestOrderModification:
 
     def test_modify_position_rejected(self, order_manager):
         """Test modify position rejection (line 297-299)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
             else:
@@ -403,7 +403,7 @@ class TestOrderModification:
 
     def test_modify_position_exception_handling(self, order_manager):
         """Test exception handling in modify_position (line 304-308)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_position = Mock()
             mock_position.symbol = "EURUSD"
             mock_position.sl = 1.10000
@@ -421,7 +421,7 @@ class TestPositionClosure:
 
     def test_close_position_full_success(self, order_manager, mock_symbol_manager):
         """Test successful full position closure."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
                 mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
@@ -458,7 +458,7 @@ class TestPositionClosure:
 
     def test_close_position_partial_success(self, order_manager, mock_symbol_manager):
         """Test successful partial position closure."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
                 mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
@@ -491,7 +491,7 @@ class TestPositionClosure:
 
     def test_close_position_sell_type(self, order_manager, mock_symbol_manager):
         """Test closing SELL position (line 347, 352)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
                 mock_mt5.POSITION_TYPE_SELL = mt5.POSITION_TYPE_SELL
@@ -532,7 +532,7 @@ class TestPositionClosure:
 
     def test_close_position_not_found(self, order_manager):
         """Test closure when position not found."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.positions_get.return_value = None
 
             with pytest.raises(MT5OrderError, match="Position.*not found"):
@@ -547,7 +547,7 @@ class TestPositionClosure:
 
     def test_close_position_none_result(self, order_manager, mock_symbol_manager):
         """Test close position when MT5 returns None (line 375-377)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
             else:
@@ -572,7 +572,7 @@ class TestPositionClosure:
 
     def test_close_position_rejected(self, order_manager, mock_symbol_manager):
         """Test close position rejection (line 381-384)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
                 mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
@@ -603,7 +603,7 @@ class TestPositionClosure:
 
     def test_close_position_exception_handling(self, order_manager, mock_symbol_manager):
         """Test exception handling in close_position (line 389-393)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.POSITION_TYPE_BUY = mt5.POSITION_TYPE_BUY
             else:
@@ -631,7 +631,7 @@ class TestOrderErrorHandling:
 
     def test_order_exception_handling(self, order_manager):
         """Test exception handling in order execution."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.order_send.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5OrderError):
@@ -643,7 +643,7 @@ class TestOrderErrorHandling:
 
     def test_pending_order_exception_handling(self, order_manager):
         """Test exception handling in pending order."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.order_send.side_effect = Exception("Unexpected error")
 
             with pytest.raises(MT5OrderError):
@@ -656,7 +656,7 @@ class TestOrderErrorHandling:
 
     def test_send_pending_order_none_result(self, order_manager):
         """Test pending order when MT5 returns None (line 228-229)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             mock_mt5.order_send.return_value = None
             mock_mt5.last_error.return_value = (10001, "Connection error")
 
@@ -670,7 +670,7 @@ class TestOrderErrorHandling:
 
     def test_send_pending_order_rejected(self, order_manager):
         """Test pending order rejection (line 234-236)."""
-        with patch("trading_bot.connectors.order_manager.mt5") as mock_mt5:
+        with patch("trading_worker.connectors.order_manager.mt5") as mock_mt5:
             if MT5_AVAILABLE:
                 mock_mt5.TRADE_RETCODE_DONE = mt5.TRADE_RETCODE_DONE
             else:

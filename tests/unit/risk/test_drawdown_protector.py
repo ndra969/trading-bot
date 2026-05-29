@@ -1,8 +1,7 @@
 """Tests for DrawdownProtector."""
 
 import pytest
-
-from trading_bot.risk.drawdown_protector import DrawdownProtector
+from trading_worker.risk.drawdown_protector import DrawdownProtector
 
 
 @pytest.fixture

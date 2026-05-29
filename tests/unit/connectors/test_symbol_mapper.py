@@ -6,8 +6,7 @@ Testing symbol mapping and conversion functionality.
 
 import pytest
 import yaml
-
-from trading_bot.connectors.symbol_mapper import SymbolMapper, SymbolMappingError
+from trading_worker.connectors.symbol_mapper import SymbolMapper, SymbolMappingError
 
 
 class TestSymbolMapperInitialization:

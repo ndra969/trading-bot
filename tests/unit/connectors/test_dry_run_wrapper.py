@@ -12,8 +12,7 @@ Verifies that:
 from unittest.mock import MagicMock
 
 import pytest
-
-from trading_bot.connectors.dry_run_wrapper import DryRunMT5Wrapper
+from trading_worker.connectors.dry_run_wrapper import DryRunMT5Wrapper
 
 
 @pytest.fixture
@@ -86,9 +85,7 @@ class TestLiveModePassthrough:
         mock_connector.place_order.return_value = expected
 
         wrapper = DryRunMT5Wrapper(mock_connector, dry_run=False)
-        result = wrapper.place_order(
-            symbol="EURUSD", order_type="BUY", volume=0.01, price=1.1
-        )
+        result = wrapper.place_order(symbol="EURUSD", order_type="BUY", volume=0.01, price=1.1)
 
         mock_connector.place_order.assert_called_once()
         assert result == expected

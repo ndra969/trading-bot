@@ -8,9 +8,8 @@ trading bot components.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from trading_bot.config import Configuration
-from trading_bot.data.database import DatabaseManager, get_session, init_database
+from trading_core.config import Configuration
+from trading_core.data.database import DatabaseManager, get_session, init_database
 
 
 class TestDatabaseInitialization:
@@ -119,7 +118,7 @@ class TestGlobalDatabaseFunctions:
         manager._session_maker = mock_session_maker
 
         # Set global manager
-        import trading_bot.data.database as db_module
+        import trading_core.data.database as db_module
 
         db_module._db_manager = manager
 
@@ -131,7 +130,7 @@ class TestGlobalDatabaseFunctions:
 
     def test_get_session_not_initialized(self):
         """Test get_session when database not initialized."""
-        import trading_bot.data.database as db_module
+        import trading_core.data.database as db_module
 
         original_manager = db_module._db_manager
         db_module._db_manager = None

@@ -6,8 +6,7 @@ Tests CRUD operations for TradingAccount model.
 
 import pytest
 from sqlalchemy.exc import IntegrityError
-
-from trading_bot.data.repositories import AccountRepository
+from trading_core.data.repositories import AccountRepository
 
 
 class TestAccountRepository:
@@ -269,7 +268,7 @@ class TestAccountRepository:
     async def test_update_balance_account_not_found(self):
         """Test updating balance for non-existent account raises error."""
         repo = AccountRepository()
-        
+
         with pytest.raises(ValueError, match="Account with ID .* not found"):
             await repo.update_balance(999999, 10000.0, 10100.0)
 
@@ -277,7 +276,7 @@ class TestAccountRepository:
     async def test_deactivate_account_not_found(self):
         """Test deactivating non-existent account raises error."""
         repo = AccountRepository()
-        
+
         with pytest.raises(ValueError, match="Account with ID .* not found"):
             await repo.deactivate(999999)
 
@@ -285,7 +284,7 @@ class TestAccountRepository:
     async def test_delete_account(self):
         """Test deleting an account."""
         repo = AccountRepository()
-        
+
         # Create account
         account_data = {
             "account_id": 88888888,
@@ -296,12 +295,12 @@ class TestAccountRepository:
             "leverage": 100,
         }
         created = await repo.create(account_data)
-        
+
         # Delete
         deleted = await repo.delete(created.id)
-        
+
         assert deleted is True
-        
+
         # Verify deleted
         account = await repo.get_by_id(created.id)
         assert account is None
@@ -310,7 +309,7 @@ class TestAccountRepository:
     async def test_delete_account_not_found(self):
         """Test deleting non-existent account returns False."""
         repo = AccountRepository()
-        
+
         deleted = await repo.delete(999999)
-        
+
         assert deleted is False

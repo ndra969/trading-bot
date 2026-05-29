@@ -9,9 +9,8 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from trading_bot.strategies.foundation.foundation_engine import FoundationEngine
-from trading_bot.strategies.foundation.zone_detector import DetectedZone, ZoneType
+from trading_worker.strategies.foundation.foundation_engine import FoundationEngine
+from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
 
 
 @pytest.fixture
@@ -97,7 +96,7 @@ class TestGetSLConfig:
         assert config["max_sl"] == 60
         assert config["default_sl"] == 30
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_asset_class_fallback_for_unknown_symbol(self, mock_pip_calc, engine):
         """Unknown symbols should fall back to asset class config."""
         # Mock PipCalculator to return 'commodities' asset class
@@ -111,7 +110,7 @@ class TestGetSLConfig:
         assert config["min_sl"] == 80.0  # From commodities config
         assert config["max_sl"] == 300.0
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_forex_asset_class_fallback(self, mock_pip_calc, engine):
         """Forex symbols without symbol config should use asset class."""
         mock_pip_calc_instance = MagicMock()
@@ -128,7 +127,7 @@ class TestGetSLConfig:
 class TestCalculateZoneBasedSL:
     """Test _calculate_zone_based_sl() method."""
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_small_zone_uses_minimum_sl(self, mock_pip_calc, engine):
         """Small zones should be clamped to minimum SL."""
         # Mock PipCalculator
@@ -148,7 +147,7 @@ class TestCalculateZoneBasedSL:
         # SL price should be entry - (80 pips × 0.1 pip size) = 2002.0 - 8.0
         assert sl_price == pytest.approx(1994.0, rel=0.01)
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_medium_zone_uses_calculated_sl(self, mock_pip_calc, engine):
         """Medium zones should use calculated SL (zone_size × buffer)."""
         mock_pip_calc_instance = MagicMock()
@@ -167,7 +166,7 @@ class TestCalculateZoneBasedSL:
         # SL price = 2007.5 - 18.0
         assert sl_price == pytest.approx(1989.5, rel=0.01)
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_large_zone_uses_maximum_sl(self, mock_pip_calc, engine):
         """Large zones should be clamped to maximum SL."""
         mock_pip_calc_instance = MagicMock()
@@ -186,7 +185,7 @@ class TestCalculateZoneBasedSL:
         # SL price = 2017.5 - 30.0
         assert sl_price == pytest.approx(1987.5, rel=0.01)
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_sell_direction_sl_above_entry(self, mock_pip_calc, engine):
         """SELL positions should have SL above entry price."""
         mock_pip_calc_instance = MagicMock()
@@ -205,7 +204,7 @@ class TestCalculateZoneBasedSL:
         assert sl_price == pytest.approx(2025.5, rel=0.01)
         assert sl_distance_pips == 180.0
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_fixed_sl_for_forex(self, mock_pip_calc, engine):
         """Forex with zone-based disabled should use fixed default SL."""
         mock_pip_calc_instance = MagicMock()
@@ -227,7 +226,7 @@ class TestCalculateZoneBasedSL:
         # SL price = 1.1010 - (30 × 0.0001) = 1.0980
         assert sl_price == pytest.approx(1.0980, rel=0.0001)
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_zone_buffer_multiplier_applied(self, mock_pip_calc, engine):
         """Verify zone buffer multiplier (1.2x) is applied correctly."""
         mock_pip_calc_instance = MagicMock()
@@ -249,7 +248,7 @@ class TestCalculateZoneBasedSL:
 class TestEdgeCases:
     """Test edge cases and error handling."""
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_zero_size_zone_uses_minimum(self, mock_pip_calc, engine):
         """Zero-size zones should use minimum SL."""
         mock_pip_calc_instance = MagicMock()
@@ -266,7 +265,7 @@ class TestEdgeCases:
         # Should use minimum
         assert sl_distance_pips == 80.0
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_exact_min_sl_boundary(self, mock_pip_calc, engine):
         """Zone that calculates exactly to min SL."""
         mock_pip_calc_instance = MagicMock()
@@ -284,7 +283,7 @@ class TestEdgeCases:
         # Should be exactly 80 pips (or very close)
         assert 79.9 <= sl_distance_pips <= 80.1
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_exact_max_sl_boundary(self, mock_pip_calc, engine):
         """Zone that calculates exactly to max SL."""
         mock_pip_calc_instance = MagicMock()
@@ -306,7 +305,7 @@ class TestEdgeCases:
 class TestIntegration:
     """Integration tests with realistic scenarios."""
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_realistic_gold_small_zone(self, mock_pip_calc, engine):
         """Realistic Gold scenario: 60 pip zone."""
         mock_pip_calc_instance = MagicMock()
@@ -324,7 +323,7 @@ class TestIntegration:
         assert sl_distance_pips == 80.0
         assert 2044.0 <= sl_price <= 2046.0  # Entry 2053 - 8.0
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_realistic_gold_large_zone(self, mock_pip_calc, engine):
         """Realistic Gold scenario: 200 pip zone."""
         mock_pip_calc_instance = MagicMock()
@@ -342,7 +341,7 @@ class TestIntegration:
         assert sl_distance_pips == 240.0
         assert sl_price == pytest.approx(2036.0, rel=0.1)
 
-    @patch("trading_bot.position.pip_calculator.PipCalculator")
+    @patch("trading_worker.position.pip_calculator.PipCalculator")
     def test_realistic_eurusd_scenario(self, mock_pip_calc, engine):
         """Realistic EURUSD scenario: fixed 30 pip SL."""
         mock_pip_calc_instance = MagicMock()

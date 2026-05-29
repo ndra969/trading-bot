@@ -4,10 +4,8 @@ Unit tests for enhanced SupplyDemandZone model.
 Tests session relationship and freshness score functionality.
 """
 
-import pytest
-from datetime import UTC, datetime
 
-from trading_bot.data.models import SupplyDemandZone
+from trading_core.data.models import SupplyDemandZone
 
 
 class TestSupplyDemandZoneEnhanced:
@@ -23,7 +21,7 @@ class TestSupplyDemandZoneEnhanced:
             low_price=1.0950,
             session_id="sess_test_001",
         )
-        
+
         assert zone.session_id == "sess_test_001"
         assert zone.symbol == "EURUSD"
 
@@ -37,7 +35,7 @@ class TestSupplyDemandZoneEnhanced:
             low_price=1.2950,
             freshness_score=0.0,  # Explicitly set for test
         )
-        
+
         assert zone.freshness_score == 0.0
 
     def test_freshness_score_setting(self):
@@ -50,7 +48,7 @@ class TestSupplyDemandZoneEnhanced:
             low_price=149.50,
             freshness_score=75.5,
         )
-        
+
         assert zone.freshness_score == 75.5
 
     def test_freshness_score_validation(self):
@@ -65,7 +63,7 @@ class TestSupplyDemandZoneEnhanced:
             low_price=1.0950,
             freshness_score=100.0,  # Max value
         )
-        
+
         assert zone.freshness_score == 100.0
 
     def test_zone_with_session_and_freshness(self):
@@ -79,7 +77,7 @@ class TestSupplyDemandZoneEnhanced:
             session_id="sess_test_002",
             freshness_score=85.0,
         )
-        
+
         assert zone.session_id == "sess_test_002"
         assert zone.freshness_score == 85.0
 
@@ -95,7 +93,7 @@ class TestSupplyDemandZoneEnhanced:
             freshness_score=0.0,  # Explicitly set
             touched_count=0,  # Explicitly set
         )
-        
+
         assert zone.session_id is None
         assert zone.freshness_score == 0.0
 
@@ -111,7 +109,7 @@ class TestSupplyDemandZoneEnhanced:
             confluence_score=70.0,
             freshness_score=90.0,
         )
-        
+
         # Zone has high quality metrics
         assert zone.strength == 80.0
         assert zone.confluence_score == 70.0
@@ -129,17 +127,16 @@ class TestSupplyDemandZoneEnhanced:
             freshness_score=50.0,
             touched_count=0,  # Explicitly set
         )
-        
+
         # Test zone methods still work
         assert zone.is_price_in_zone(1.0975) is True
         assert zone.is_price_in_zone(1.1100) is False
-        
+
         # Touch zone
         zone.touch_zone()
         assert zone.touched_count == 1
         assert zone.last_touched is not None
-        
+
         # Deactivate
         zone.deactivate_zone()
         assert zone.is_active is False
-

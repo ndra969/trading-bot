@@ -8,8 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from sqlalchemy.pool import NullPool
-
-from trading_bot.data.database import (
+from trading_core.data.database import (
     DatabaseManager,
     get_session,
     init_database,
@@ -74,8 +73,8 @@ class TestDatabaseManagerInitialization:
 class TestDatabaseEngineCreation:
     """Test database engine creation."""
 
-    @patch("trading_bot.data.database.create_async_engine")
-    @patch("trading_bot.data.database.async_sessionmaker")
+    @patch("trading_core.data.database.create_async_engine")
+    @patch("trading_core.data.database.async_sessionmaker")
     def test_create_engine_sqlite(self, mock_session_maker, mock_create_engine):
         """Test creating engine for SQLite."""
         db_url = "sqlite+aiosqlite:///test.db"
@@ -93,8 +92,8 @@ class TestDatabaseEngineCreation:
         assert call_kwargs["echo"] is False
         assert manager._engine == mock_engine
 
-    @patch("trading_bot.data.database.create_async_engine")
-    @patch("trading_bot.data.database.async_sessionmaker")
+    @patch("trading_core.data.database.create_async_engine")
+    @patch("trading_core.data.database.async_sessionmaker")
     def test_create_engine_postgresql(self, mock_session_maker, mock_create_engine):
         """Test creating engine for PostgreSQL."""
         db_url = "postgresql+asyncpg://user:pass@localhost:5432/testdb"
@@ -323,7 +322,7 @@ class TestDatabaseClose:
 class TestGlobalFunctions:
     """Test global database functions."""
 
-    @patch("trading_bot.data.database._db_manager", None)
+    @patch("trading_core.data.database._db_manager", None)
     def test_init_database(self):
         """Test initializing global database."""
         db_url = "sqlite+aiosqlite:///test.db"
@@ -336,7 +335,7 @@ class TestGlobalFunctions:
             assert manager.echo is True
             mock_create_engine.assert_called_once()
 
-    @patch("trading_bot.data.database._db_manager", None)
+    @patch("trading_core.data.database._db_manager", None)
     def test_get_session_not_initialized(self):
         """Test getting session when database not initialized."""
         with pytest.raises(RuntimeError, match="Database not initialized"):
@@ -358,7 +357,7 @@ class TestGlobalFunctions:
         manager._session_maker = mock_session_maker
 
         # Set global manager
-        import trading_bot.data.database as db_module
+        import trading_core.data.database as db_module
 
         db_module._db_manager = manager
 

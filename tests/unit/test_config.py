@@ -7,7 +7,7 @@ Tests configuration loading, validation, and environment variable overrides.
 import os
 from pathlib import Path
 
-from trading_bot.config import Configuration, DatabaseConfig, TelegramConfig, TradingConfig
+from trading_core.config import Configuration, DatabaseConfig, TelegramConfig, TradingConfig
 
 
 class TestConfiguration:

@@ -4,7 +4,7 @@ Unit tests for logging system.
 Tests logger setup and functionality.
 """
 
-from trading_bot.utils.logger import get_logger, setup_logger
+from trading_core.utils.logger import get_logger, setup_logger
 
 
 class TestLogger:
