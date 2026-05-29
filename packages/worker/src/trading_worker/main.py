@@ -19,6 +19,7 @@ from .position.position_manager import PositionManager
 from .risk.drawdown_protector import DrawdownProtector
 from .risk.exposure_manager import ExposureManager
 from .risk.portfolio_risk_manager import PortfolioRiskManager
+from .services.analysis_service import AnalysisService
 from .services.execution_service import ExecutionService
 from .services.position_orchestrator import PositionOrchestrator
 from .strategies.foundation.foundation_engine import FoundationEngine
@@ -68,6 +69,7 @@ class TradingBot:
         # Service layer
         self.execution_service: ExecutionService | None = None
         self.position_orchestrator: PositionOrchestrator | None = None
+        self.analysis_service: AnalysisService | None = None
 
         # Account Management components
         self.account_sync_service = None
@@ -611,6 +613,9 @@ class TradingBot:
             # Position reconciliation + automation (same deps as ExecutionService)
             self.position_orchestrator = PositionOrchestrator(self)
 
+            # Per-symbol analysis service (detects signals → execution_service)
+            self.analysis_service = AnalysisService(self)
+
             # Load active positions from database
             await self.position_manager.load_positions_from_db()
 
@@ -884,7 +889,9 @@ class TradingBot:
                 # - Faster overall analysis (limited by slowest symbol, not sum of all)
                 try:
                     # Create analysis tasks for all symbols
-                    analysis_tasks = [self._analyze_symbol(symbol) for symbol in self.symbols]
+                    analysis_tasks = [
+                        self.analysis_service.analyze_symbol(symbol) for symbol in self.symbols
+                    ]
 
                     # Run all tasks in parallel and capture exceptions
                     results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
@@ -970,46 +977,6 @@ class TradingBot:
 
         return generate_mock_ohlcv(symbol, timeframe, count)
 
-    async def _analyze_symbol(self, symbol: str):
-        """Analyze a symbol using the strategy system and execute resulting signals.
-
-        Args:
-            symbol: Trading symbol (internal/universal format)
-        """
-        # Pre-flight: skip if market closed
-        if not self._is_market_open(symbol):
-            logger.debug(f"Skipping {symbol}: Market closed (Weekend)")
-            return
-
-        try:
-            broker_symbol = self._convert_to_broker_symbol(symbol)
-            is_dry_run = self.config.get("trading", {}).get("dry_run", False)
-            is_mock_mode = self.mt5 is None
-
-            # Run strategy analysis (MTF or single TF)
-            strategy_results = await self._run_strategy_analysis(
-                symbol, broker_symbol, is_dry_run, is_mock_mode
-            )
-
-            if not strategy_results:
-                logger.debug(f"{symbol}: No strategy results generated")
-                return
-
-            logger.info(f"📊 {symbol}: Received {len(strategy_results)} results")
-
-            # Aggregate and execute signals
-            signals = await self.signal_aggregator.aggregate_signals(strategy_results)
-            if not signals:
-                logger.debug(f"{symbol}: No valid signals after aggregation")
-                return
-
-            logger.info(f"✅ {symbol}: Generated {len(signals)} trading signals")
-            for signal in signals:
-                await self.execution_service.execute_signal(signal)
-
-        except Exception as e:
-            logger.error(f"Error analyzing {symbol}: {e}", exc_info=True)
-
     def _convert_to_broker_symbol(self, symbol: str) -> str:
         """Convert internal symbol to broker-specific format (e.g., EURUSD → EURUSDc)."""
         if not self.symbol_mapper:
@@ -1022,92 +989,3 @@ class TradingBot:
         except Exception as e:
             logger.warning(f"Failed to convert symbol {symbol} to broker format: {e} - using as-is")
             return symbol
-
-    async def _run_strategy_analysis(
-        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
-    ) -> list:
-        """Dispatch to MTF or single-TF strategy analysis based on mode."""
-        if self.mtf_mode and self.mtf_analyzer:
-            return await self._run_mtf_analysis(symbol, broker_symbol, is_dry_run, is_mock_mode)
-        return await self._run_single_tf_analysis(symbol, broker_symbol, is_dry_run, is_mock_mode)
-
-    async def _run_mtf_analysis(
-        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
-    ) -> list:
-        """Fetch Zone TF + Entry TF data and run MTF analyzer."""
-        zone_data, entry_data = self._fetch_mtf_data(
-            symbol, broker_symbol, is_dry_run, is_mock_mode
-        )
-        if zone_data is None or zone_data.empty or entry_data is None or entry_data.empty:
-            logger.warning(f"Insufficient data for MTF analysis of {symbol}")
-            return []
-        return await self.mtf_analyzer.analyze(
-            symbol=symbol,
-            zone_tf_data=zone_data,
-            entry_tf_data=entry_data,
-            zone_tf=self.zone_timeframe,
-            entry_tf=self.entry_timeframe,
-        )
-
-    def _fetch_mtf_data(
-        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
-    ) -> tuple:
-        """Fetch (zone_data, entry_data) from MT5 or generate mock data."""
-        zone_data = None
-        entry_data = None
-
-        if self.data_manager and not is_dry_run and not is_mock_mode:
-            try:
-                zone_data = self.data_manager.get_ohlcv(
-                    symbol=broker_symbol,
-                    timeframe=self.zone_timeframe,
-                    count=200,
-                    enabled_symbols=self.symbols,
-                )
-                entry_data = self.data_manager.get_ohlcv(
-                    symbol=broker_symbol,
-                    timeframe=self.entry_timeframe,
-                    count=100,
-                    enabled_symbols=self.symbols,
-                )
-            except Exception as e:
-                logger.warning(f"Error fetching real data for {symbol}: {e}")
-                if not is_dry_run:
-                    return None, None
-
-        # Fallback to mock data for dry-run/mock modes
-        if (zone_data is None or entry_data is None) and (is_dry_run or is_mock_mode):
-            logger.debug(f"Generating MTF mock data for {symbol}")
-            zone_data = self._generate_mock_data(symbol, self.zone_timeframe, count=200)
-            entry_data = self._generate_mock_data(symbol, self.entry_timeframe, count=100)
-
-        return zone_data, entry_data
-
-    async def _run_single_tf_analysis(
-        self, symbol: str, broker_symbol: str, is_dry_run: bool, is_mock_mode: bool
-    ) -> list:
-        """Fetch single timeframe data and run legacy strategy_manager analysis."""
-        data = None
-
-        if self.data_manager and not is_dry_run and not is_mock_mode:
-            try:
-                data = self.data_manager.get_ohlcv(
-                    symbol=broker_symbol,
-                    timeframe=self.timeframe,
-                    count=100,
-                    enabled_symbols=self.symbols,
-                )
-            except Exception as e:
-                logger.warning(f"Error fetching real data for {symbol}: {e}")
-                if not is_dry_run:
-                    return []
-
-        if data is None and (is_dry_run or is_mock_mode):
-            logger.debug(f"Generating mock data for {symbol} ({self.timeframe})")
-            data = self._generate_mock_data(symbol, self.timeframe)
-
-        if data is None or data.empty:
-            logger.warning(f"No data available for {symbol}")
-            return []
-
-        return await self.strategy_manager.analyze_symbol(symbol, data, self.timeframe)

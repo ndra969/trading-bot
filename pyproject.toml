@@ -258,6 +258,7 @@ omit = [
     # dispatch). Same rationale as main.py: integration-tested (test_position_sync),
     # not unit-tested. Was inside the omitted main.py before the service split.
     "*/position_orchestrator.py",
+    "*/analysis_service.py",  # analysis loop extracted from main.py; integration-tested
 ]
 
 [tool.coverage.report]
