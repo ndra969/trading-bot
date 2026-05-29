@@ -35,8 +35,8 @@ Multi-asset trading bot (Forex/Commodities/Crypto) with MT5. Python 3.12+, UV, C
 ```bash
 uv run trading-bot start --dry-run                # Safe test
 uv run trading-bot start --config production      # Live
-uv run pytest tests/ --cov=src/trading_bot --cov-fail-under=85
-uv run black src/ tests/ && uv run ruff check src/ tests/ --fix && uv run mypy src/trading_bot/
+uv run pytest tests/ --cov=packages/core/src/trading_core --cov=packages/worker/src/trading_worker --cov-fail-under=85
+uv run black packages/ tests/ && uv run ruff check packages/ tests/ --fix && uv run mypy packages/core/src/trading_core packages/worker/src/trading_worker
 ```
 
 ## Critical Rules
@@ -113,16 +113,26 @@ For runtime issues, use these commands instead of running CLI manually:
 ## Structure
 
 ```
-src/trading_bot/
-  cli.py  config.py  main.py
-  connectors/  data/  executors/  position/
-  risk/  strategies/  utils/  exceptions/
-tests/    1534+ tests (unit, integration, utils)
-config/   YAML configs
+packages/
+  core/src/trading_core/    shared: config.py  data/ (models, db, repositories)
+                            enums/ (close_reason)  utils/ (logger, market_session,
+                            config_hasher)
+  worker/src/trading_worker/  bot engine: cli.py  main.py  connectors/  executors/
+                              position/  risk/  strategies/  services/  exceptions/
+                              utils/   (CLI entry: `trading-bot`)
+  api/src/trading_api/      read-only FastAPI BFF (dashboard backend)
+apps/dashboard/   Next.js dashboard (frontend)
+tests/    1550+ tests (unit, integration, utils)
+config/   YAML configs (loaded relative to repo root)
 docs/     User docs
 specs/    active/ (3-file specs: requirements+design+tasks) · archive/
 alembic/  DB migrations
 ```
+
+> Monorepo (uv workspace). Root `pyproject.toml` is a virtual workspace root
+> (`[tool.uv] package = false`); each package has its own `pyproject.toml`.
+> `trading_core` depends on nothing internal; `trading_worker`/`trading_api`
+> depend only on `trading_core`, never on each other.
 
 > New planned work → scaffold a spec with `/spec <name>` (creates
 > `specs/active/<name>/{requirements,design,tasks}.md`). Archive to
