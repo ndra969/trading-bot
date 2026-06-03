@@ -3048,3 +3048,38 @@ class TestPriceActionConfluenceContribution:
         )
         assert "price_action" not in raw
         assert layer_scores["price_action"] == 0.0
+
+
+class TestCommodityGatesConfig:
+    """Commodity gate thresholds extracted to config (#4).
+
+    Defaults MUST reproduce the prior hardcoded behaviour exactly, and config
+    must override per direction.
+    """
+
+    def test_defaults_match_legacy_hardcoded_values(self):
+        engine = FoundationEngine(config={}, use_database=False)
+        g = engine._commodity_gates()
+        assert g["rejection_wick"]["buy"] == {"min_ratio": 0.15, "trend_following_ratio": 0.08}
+        assert g["rejection_wick"]["sell"] == {"min_ratio": 0.30, "trend_following_ratio": 0.15}
+        assert g["color_match"]["buy_small_body_exception"] == 0.30
+        assert g["color_match"]["sell_small_body_exception"] == 0.0
+        assert g["volatility_trend_gate"]["buy"] == {"vol_mult": 2.0, "ema_buffer_pct": 0.3}
+        assert g["volatility_trend_gate"]["sell"] == {"vol_mult": 1.5, "ema_buffer_pct": 0.0}
+
+    def test_config_overrides_per_direction(self):
+        cfg = {
+            "signal_generation": {
+                "commodity_gates": {
+                    "rejection_wick": {"sell": {"min_ratio": 0.5}},
+                    "volatility_trend_gate": {"buy": {"vol_mult": 1.5}},
+                }
+            }
+        }
+        engine = FoundationEngine(config=cfg, use_database=False)
+        g = engine._commodity_gates()
+        assert g["rejection_wick"]["sell"]["min_ratio"] == 0.5
+        # untouched keys keep defaults
+        assert g["rejection_wick"]["sell"]["trend_following_ratio"] == 0.15
+        assert g["volatility_trend_gate"]["buy"]["vol_mult"] == 1.5
+        assert g["volatility_trend_gate"]["buy"]["ema_buffer_pct"] == 0.3

@@ -190,6 +190,39 @@ signal_generation:
     crypto:
       climax_multiplier: 2.5
 
+  # Commodities-only entry gates (gold/silver). Per-direction so the BUY vs
+  # SELL asymmetry is EXPLICIT and tunable instead of hidden in code.
+  # 2026-06-03: values extracted verbatim from the previously-hardcoded gates
+  # — behaviour is unchanged. The asymmetry (BUY was relaxed for backtest, SELL
+  # was not) is intentional-looking but unverified; tune here, don't re-hardcode.
+  commodity_gates:
+    # Lower-wick (BUY bounce) / upper-wick (SELL rejection) confirmation:
+    # reject if wick/range < min_ratio (trend_following_ratio when entry aligns
+    # with the EMA20 trend).
+    rejection_wick:
+      buy:
+        min_ratio: 0.15
+        trend_following_ratio: 0.08
+      sell:
+        min_ratio: 0.30
+        trend_following_ratio: 0.15
+    # Signal-candle colour: BUY wants green, SELL wants red. A counter-colour
+    # candle is allowed only if its body < *_small_body_exception of range
+    # (treated as doji/neutral). 0.0 = never allow (strict).
+    color_match:
+      buy_small_body_exception: 0.30
+      sell_small_body_exception: 0.0
+    # High-volatility counter-trend block: when current_range > vol_mult ×
+    # ATR(14)-avg, reject if price is on the wrong side of EMA20 by more than
+    # ema_buffer_pct (% of EMA). 0.0 buffer = block any wrong-side close.
+    volatility_trend_gate:
+      buy:
+        vol_mult: 2.0
+        ema_buffer_pct: 0.3
+      sell:
+        vol_mult: 1.5
+        ema_buffer_pct: 0.0
+
   # Risk/Reward Requirements
   risk_reward:
     min_risk_reward_ratio: 2.0   # Minimum R:R ratio (1:2)
