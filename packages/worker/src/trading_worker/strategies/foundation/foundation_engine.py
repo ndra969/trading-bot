@@ -419,6 +419,7 @@ class FoundationEngine:
         weighted_enhancement_score: float,
         layer_scores: dict,
         layer_details: dict,
+        raw_confidences: dict,
         current_price: float,
     ) -> StrategyResult:
         """Build the final StrategyResult after all filters have passed.
@@ -427,6 +428,17 @@ class FoundationEngine:
         confluence data into metadata for downstream consumers.
         """
         zone_id = f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
+
+        # Observability (ui-dashboard Goal 7): the foundation-vs-enhancement
+        # split + per-layer raw confidences only existed in transient logs.
+        # Persist them so the API / Tuning view can show WHY a trade scored
+        # what it did. Pure metadata — does not affect scoring or execution.
+        confluence_breakdown = {
+            "foundation_share": round(weighted_foundation_score, 2),
+            "enhancement_share": round(weighted_enhancement_score, 2),
+            "raw_confidences": {k: round(float(v), 2) for k, v in raw_confidences.items()},
+            "active_layers": sorted(raw_confidences.keys()),
+        }
 
         logger.info(
             f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
@@ -452,6 +464,7 @@ class FoundationEngine:
                 "enhancement_score": weighted_enhancement_score,
                 "layer_scores": layer_scores,
                 "layer_details": layer_details,
+                "confluence_breakdown": confluence_breakdown,
             },
         )
 
@@ -1619,6 +1632,7 @@ class FoundationEngine:
                 weighted_enhancement_score=weighted_enhancement_score,
                 layer_scores=layer_scores,
                 layer_details=layer_details,
+                raw_confidences=raw_confidences,
                 current_price=current_price,
             )
 

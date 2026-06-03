@@ -122,6 +122,25 @@ class TestCreatePositionFromSignal:
         assert position.metadata["signal_id"] == "sig_001"
         assert "confluence_score" in position.metadata
 
+    def test_create_position_persists_confluence_breakdown(self, position_manager, buy_signal):
+        """confluence_breakdown from the signal is copied to position.metadata (Goal 7)."""
+        breakdown = {
+            "foundation_share": 24.0,
+            "enhancement_share": 12.0,
+            "raw_confidences": {"price_action": 70.0, "ma": 50.0},
+            "active_layers": ["ma", "price_action"],
+        }
+        buy_signal.metadata = {"confluence_breakdown": breakdown}
+
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+
+        assert position.metadata["confluence_breakdown"] == breakdown
+
+    def test_create_position_without_breakdown_omits_key(self, position_manager, buy_signal):
+        """No breakdown in signal → key absent (old/partial signals don't crash)."""
+        position = position_manager.create_position_from_signal(buy_signal, volume=1.0)
+        assert "confluence_breakdown" not in position.metadata
+
 
 class TestOpenPosition:
     """Test opening positions."""
