@@ -135,6 +135,13 @@ async def test_sync_position_closed_in_mt5_with_ticket(trading_bot):
     # Verify exposure was unregistered
     trading_bot.exposure_manager.unregister_position.assert_called_once_with("EURUSD", "forex", 1.0)
 
+    # Verify outcome fields reflect the broker's AUTHORITATIVE MT5 deal P&L
+    # (profit + swap + commission = 50.0), not a pip-recomputed approximation.
+    # This is the MT5-server-side (SL) close path the bot only detects via sync.
+    assert position.realized_pnl_usd == 50.0
+    assert position.is_winner is True
+    assert position.exit_type == "WIN"
+
 
 @pytest.mark.asyncio
 async def test_sync_position_closed_in_mt5_no_ticket_no_symbol_match(trading_bot):

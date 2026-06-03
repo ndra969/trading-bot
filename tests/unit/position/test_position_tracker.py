@@ -173,6 +173,8 @@ class TestClosePosition:
         # realized_* frozen at close (immutable outcome for analytics)
         assert buy_position.realized_profit_pips == pytest.approx(50.0, abs=0.1)
         assert buy_position.realized_pnl_usd == pytest.approx(500.0, abs=1.0)
+        assert buy_position.is_winner is True
+        assert buy_position.exit_type == "WIN"
 
     def test_close_position_freezes_realized_against_later_updates(self, tracker, buy_position):
         """realized_* stays at the close value even if current_* mutates after."""
@@ -195,6 +197,19 @@ class TestClosePosition:
         assert buy_position.status == PositionStatus.CLOSED
         assert buy_position.current_profit_pips == pytest.approx(-30.0, abs=0.1)
         assert buy_position.current_pnl_usd == pytest.approx(-300.0, abs=1.0)
+        assert buy_position.is_winner is False
+        assert buy_position.exit_type == "LOSS"
+
+    def test_close_position_at_breakeven(self, tracker, buy_position):
+        """Closing flat at entry classifies as BREAKEVEN."""
+        tracker.open_position(buy_position)
+
+        # Close exactly at entry → zero P&L
+        tracker.close_position(buy_position, buy_position.entry_price)
+
+        assert buy_position.status == PositionStatus.CLOSED
+        assert buy_position.current_pnl_usd == pytest.approx(0.0, abs=0.01)
+        assert buy_position.exit_type == "BREAKEVEN"
 
     def test_close_pending_position(self, tracker, buy_position):
         """Test that closing pending position does nothing."""

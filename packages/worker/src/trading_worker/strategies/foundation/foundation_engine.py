@@ -616,6 +616,87 @@ class FoundationEngine:
         legacy_keys = ("require_foundation", "require_price_action")
         return {k: vr[k] for k in legacy_keys if k in vr and not isinstance(vr[k], dict)}
 
+    def _climax_multiplier(self, asset_class: str) -> float:
+        """Resolve the climax-candle range multiplier for an asset class.
+
+        Reads ``signal_generation.volatility_filter.<asset_class>.climax_multiplier``
+        with a fallback to ``volatility_filter.default`` and finally a hard 2.5.
+        """
+        vf = self.config.get("signal_generation", {}).get("volatility_filter", {})
+        per_asset = vf.get(asset_class) if isinstance(vf.get(asset_class), dict) else {}
+        default = vf.get("default") if isinstance(vf.get("default"), dict) else {}
+        return float(
+            per_asset.get(
+                "climax_multiplier",
+                default.get("climax_multiplier", 2.5),
+            )
+        )
+
+    def _commodity_gates(self) -> dict:
+        """Per-direction commodities entry-gate thresholds (config-driven).
+
+        Reads ``signal_generation.commodity_gates``; every default reproduces
+        the prior hardcoded value exactly, so a missing/partial config leaves
+        behaviour unchanged. BUY/SELL are separate so their asymmetry is
+        explicit and tunable.
+        """
+        cfg = self.config.get("signal_generation", {}).get("commodity_gates", {})
+
+        def g(path: tuple, default: float) -> float:
+            cur: object = cfg
+            for key in path:
+                if not isinstance(cur, dict) or key not in cur:
+                    return default
+                cur = cur[key]
+            return cur if isinstance(cur, int | float) else default
+
+        return {
+            "rejection_wick": {
+                "buy": {
+                    "min_ratio": g(("rejection_wick", "buy", "min_ratio"), 0.15),
+                    "trend_following_ratio": g(
+                        ("rejection_wick", "buy", "trend_following_ratio"), 0.08
+                    ),
+                },
+                "sell": {
+                    "min_ratio": g(("rejection_wick", "sell", "min_ratio"), 0.30),
+                    "trend_following_ratio": g(
+                        ("rejection_wick", "sell", "trend_following_ratio"), 0.15
+                    ),
+                },
+            },
+            "color_match": {
+                "buy_small_body_exception": g(("color_match", "buy_small_body_exception"), 0.30),
+                "sell_small_body_exception": g(("color_match", "sell_small_body_exception"), 0.0),
+            },
+            "volatility_trend_gate": {
+                "buy": {
+                    "vol_mult": g(("volatility_trend_gate", "buy", "vol_mult"), 2.0),
+                    "ema_buffer_pct": g(("volatility_trend_gate", "buy", "ema_buffer_pct"), 0.3),
+                },
+                "sell": {
+                    "vol_mult": g(("volatility_trend_gate", "sell", "vol_mult"), 1.5),
+                    "ema_buffer_pct": g(("volatility_trend_gate", "sell", "ema_buffer_pct"), 0.0),
+                },
+            },
+        }
+
+    def _is_climax_candle(self, asset_class: str, data: pd.DataFrame) -> bool:
+        """Detect an overextended / exhaustion candle (chasing a spent move).
+
+        True when the latest candle's high-low range exceeds
+        ``climax_multiplier × ATR(14)-equivalent average range``. Applies to
+        ALL asset classes. Needs at least 14 bars; returns False otherwise.
+        """
+        if len(data) < 14:
+            return False
+        ranges = data["high"] - data["low"]
+        avg_range = float(ranges.tail(14).mean())
+        if avg_range <= 0:
+            return False
+        current_range = float(data["high"].iloc[-1] - data["low"].iloc[-1])
+        return current_range > avg_range * self._climax_multiplier(asset_class)
+
     def _is_counter_trend(
         self,
         direction: SignalDirection,
@@ -645,32 +726,57 @@ class FoundationEngine:
     def _calculate_confluence_score(
         self, zone: DetectedZone, raw_confidences: dict
     ) -> tuple[float, float, float]:
-        """Calculate weighted confluence score from foundation + enhancement layers.
+        """Confluence as a weighted AVERAGE over the layers that participated.
 
         Uses weights from `confluence_weights` config section:
             foundation: 0.30 (S&D zone strength)
             trendline: 0.20, price_action: 0.15, fibonacci: 0.12,
             breakout: 0.12, structure: 0.08, rsi: 0.10, ma: 0.08
 
+        Foundation (zone strength) always participates. An enhancement layer
+        participates only when it agreed with the trade direction (i.e. it is
+        present in ``raw_confidences``). The score is normalised by the summed
+        weight of the *participating* layers, so it expresses the weighted % of
+        confidence among the signals that actually spoke — rather than an
+        absolute sum that can never approach 100 because trend/momentum layers
+        (rsi, structure, breakout) structurally stay silent at reversal zones.
+
         Returns:
-            (final_score, weighted_foundation_score, weighted_enhancement_score)
-            All capped at 100.0 max for final_score.
+            (final_score, foundation_share, enhancement_share). The two shares
+            sum to final_score; all three are 0-100.
         """
         weights = self.config.get("confluence_weights", {})
-
-        # Foundation score (zone strength * foundation weight, default 0.30)
         foundation_weight = weights.get("foundation", 0.30)
-        weighted_foundation_score = zone.strength * foundation_weight
 
-        # Enhancement score: sum of (raw_confidence * weight) per active layer
-        weighted_enhancement_score = sum(
+        # Foundation always participates; its raw confidence is the zone strength.
+        foundation_contrib = zone.strength * foundation_weight
+
+        enhancement_layers = (
+            "rsi",
+            "ma",
+            "trendline",
+            "price_action",
+            "fibonacci",
+            "structure",
+            "breakout",
+        )
+        enhancement_contrib = sum(
             raw_confidences.get(layer, 0.0) * weights.get(layer, 0.0)
-            for layer in ("rsi", "ma", "trendline", "price_action", "fibonacci", "structure")
+            for layer in enhancement_layers
         )
 
-        # Final score capped at 100
-        final_score = min(weighted_foundation_score + weighted_enhancement_score, 100.0)
-        return final_score, weighted_foundation_score, weighted_enhancement_score
+        # Denominator: weight of every layer that actually contributed.
+        participating_weight = foundation_weight + sum(
+            weights.get(layer, 0.0) for layer in enhancement_layers if layer in raw_confidences
+        )
+
+        if participating_weight <= 0:
+            return 0.0, 0.0, 0.0
+
+        foundation_share = min(foundation_contrib / participating_weight, 100.0)
+        enhancement_share = enhancement_contrib / participating_weight
+        final_score = min(foundation_share + enhancement_share, 100.0)
+        return final_score, foundation_share, enhancement_share
 
     async def _run_enhancement_analyzers(
         self,
@@ -753,9 +859,9 @@ class FoundationEngine:
         pa_res = await self.price_action_analyzer.analyze_pattern(
             symbol, opens, highs, lows, closes, zone_type_str
         )
-        self._score_price_action(symbol, pa_res, direction, layer_scores, layer_details)
-        if pa_res is not None:
-            raw_confidences["price_action"] = pa_res.confidence
+        self._score_price_action(
+            symbol, pa_res, direction, layer_scores, layer_details, raw_confidences
+        )
 
         # 5. Fibonacci (Weight: 0.12)
         fib_res = await self.fibonacci_analyzer.analyze_fibonacci(
@@ -788,8 +894,12 @@ class FoundationEngine:
 
         if struct_res and struct_res.direction == direction.name:
             layer_scores["structure"] = struct_res.confidence * 0.08
-            layer_scores["structure_type"] = struct_res.structure_type
-            layer_details["structure"] = struct_res.details
+            # structure_type is metadata (a string) — keep it out of layer_scores,
+            # which must stay a {layer: float} map (it drives logging/keys()).
+            layer_details["structure"] = {
+                **(struct_res.details or {}),
+                "structure_type": struct_res.structure_type,
+            }
             raw_confidences["structure"] = struct_res.confidence
 
         # 7. Breakout (Weight: 0.12) - skipped at zone entry, used for confirmation later
@@ -804,13 +914,19 @@ class FoundationEngine:
         direction: SignalDirection,
         layer_scores: dict,
         layer_details: dict,
+        raw_confidences: dict,
     ) -> None:
-        """Score price action layer; mutates layer_scores and layer_details.
+        """Score price action layer; mutates layer_scores/details/raw_confidences.
 
-        Handles three cases:
-        - Direction match → full weighted score (confidence * 0.15)
-        - NEUTRAL pattern (Inside Bar, Doji) → reduced score (50% of confidence * 0.15)
-        - Wrong direction or no pattern → score 0.0 with status logged
+        ``raw_confidences`` drives the normalised confluence score, so it MUST
+        carry the *directional* contribution — never a contradicting pattern's
+        raw confidence:
+
+        - Direction match  → full score (conf * 0.15);  raw = conf
+        - NEUTRAL pattern  → half score (0.5*conf*0.15); raw = 0.5*conf
+        - Wrong direction / no pattern → score 0.0 and price_action does NOT
+          participate (key omitted from raw_confidences). A bullish pinbar must
+          not inflate a SELL's confluence.
         """
         if not pa_res:
             layer_scores["price_action"] = 0.0
@@ -821,6 +937,7 @@ class FoundationEngine:
         # Direction matches - full score
         if pa_res.direction == direction.name:
             layer_scores["price_action"] = pa_res.confidence * 0.15
+            raw_confidences["price_action"] = pa_res.confidence
             layer_details["price_action"] = {
                 **pa_res.details,
                 "pattern_type": pa_res.pattern_type,
@@ -837,6 +954,7 @@ class FoundationEngine:
         # NEUTRAL patterns (Inside Bar, Doji) - reduced score (50%)
         if pa_res.direction == "NEUTRAL":
             layer_scores["price_action"] = (pa_res.confidence * 0.5) * 0.15
+            raw_confidences["price_action"] = pa_res.confidence * 0.5
             layer_details["price_action"] = {
                 **pa_res.details,
                 "pattern_type": pa_res.pattern_type,
@@ -851,7 +969,7 @@ class FoundationEngine:
             )
             return
 
-        # Wrong direction - no score
+        # Wrong direction - no score, and DO NOT let it participate in confluence
         layer_scores["price_action"] = 0.0
         layer_details["price_action"] = {
             "status": "wrong_direction",
@@ -861,7 +979,8 @@ class FoundationEngine:
         }
         logger.debug(
             f"{symbol}: Price action pattern detected but wrong direction: "
-            f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name}"
+            f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name} "
+            f"— excluded from confluence"
         )
 
     async def _create_signal_from_zone(
@@ -890,6 +1009,7 @@ class FoundationEngine:
             # Determine if zone is demand or supply (Fixed Phase 5.6)
             is_demand = self._is_demand_zone(zone, current_price)
             zone_type_str = "DEMAND" if is_demand else "SUPPLY"
+            gates = self._commodity_gates()  # per-direction commodities gate thresholds
 
             # Get R:R ratio from config (default 2.0 for 1:2)
             rr_ratio = (
@@ -998,48 +1118,43 @@ class FoundationEngine:
                             return None
 
                 # === FLASH CRASH / CLIMAX PROTECTION (Volatility Filter) ===
-                # APPLIES TO ALL ASSET CLASSES (Fixed 2026-02-11)
-                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms)
+                # APPLIES TO ALL ASSET CLASSES. Per-asset multipliers live in
+                # signal_generation.volatility_filter (see _is_climax_candle).
+                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms).
+                # current_range/avg_range are also reused downstream (counter-trend
+                # gate + final quality filters), so compute them unconditionally.
                 if len(data) >= 14:
-                    # Calculate ATR(14) equivalent (moving range)
                     ranges = data["high"] - data["low"]
-                    avg_range = ranges.tail(14).mean()
-                    current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
+                    avg_range = float(ranges.tail(14).mean())
+                    current_range = float(data["high"].iloc[-1] - data["low"].iloc[-1])
+                else:
+                    avg_range = 0.0
+                    current_range = 0.0
 
-                    # Thresholds by asset class
-                    vol_multiplier = 3.0  # Default (loose)
-                    if asset_class == "commodities":
-                        vol_multiplier = 2.0  # Strict for Gold/Silver (was 2.5 loose)
-                    elif asset_class == "crypto":
-                        vol_multiplier = 2.5
-                    elif asset_class == "forex_majors":
-                        vol_multiplier = 2.5
-
-                    # If current candle is > multiplier * avg range, it's likely exhaustion
-                    if current_range > avg_range * vol_multiplier:
-                        logger.warning(
-                            f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
-                            f"({current_range:.1f} > {avg_range*vol_multiplier:.1f}). "
-                            "Risk of reversal is high. Waiting for consolidation."
-                        )
-                        return None
+                if self._is_climax_candle(asset_class, data):
+                    logger.warning(
+                        f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
+                        f"({current_range:.5f} > "
+                        f"{avg_range * self._climax_multiplier(asset_class):.5f}, "
+                        f"asset_class={asset_class}). "
+                        "Risk of reversal is high. Waiting for consolidation."
+                    )
+                    return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
                 if asset_class == "commodities" and last_range > 0:
                     lower_wick = min(last_open, last_close) - last_low
                     wick_ratio = lower_wick / last_range
 
-                    # RELAXED: Lower wick threshold to allow more setups for XAUUSD backtest
-                    wick_threshold = 0.15  # Default: 0.15 (reduced from 0.2)
+                    wick_cfg = gates["rejection_wick"]["buy"]
+                    wick_threshold = wick_cfg["min_ratio"]
                     if len(data) > 100:
                         ema_20 = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
                         is_with_trend = (
                             direction == SignalDirection.BUY and current_price > ema_20
                         ) or (direction == SignalDirection.SELL and current_price < ema_20)
                         if is_with_trend:
-                            wick_threshold = (
-                                0.08  # More lenient for trend-following (reduced from 0.1)
-                            )
+                            wick_threshold = wick_cfg["trend_following_ratio"]
 
                     if wick_ratio < wick_threshold:
                         logger.warning(
@@ -1048,14 +1163,15 @@ class FoundationEngine:
                         return None
 
                 # === SIGNAL CANDLE COLOR MATCH (PHASE 5.12) ===
-                # FIX: Melonggarkan untuk trend-following - allow doji dan small bearish jika trend kuat
+                # Allow doji / small bearish body (< exception) as neutral; else require green.
                 if asset_class == "commodities" and last_close <= last_open:
-                    # Check if it's a small bearish candle (body < 30% of range) - bisa di-allow
+                    body_exception = gates["color_match"]["buy_small_body_exception"]
                     if last_range > 0:
                         body_ratio = abs(last_close - last_open) / last_range
-                        if body_ratio < 0.3:  # Small body = doji-like, bisa di-allow
+                        if body_ratio < body_exception:  # Small body = doji-like, allow
                             logger.debug(
-                                f"{symbol}: ALLOWED - Small bearish body ({body_ratio:.2f} < 0.30), treating as neutral"
+                                f"{symbol}: ALLOWED - Small bearish body "
+                                f"({body_ratio:.2f} < {body_exception}), treating as neutral"
                             )
                         else:
                             logger.warning(
@@ -1075,18 +1191,19 @@ class FoundationEngine:
                     avg_range = ranges.tail(14).mean()
                     current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
 
-                    # FIX: Melonggarkan threshold (dari 1.5x menjadi 2.0x) dan hanya block jika sangat counter-trend
-                    # If volatility is very high, trend alignment is MANDATORY
-                    if current_range > avg_range * 2.0:  # Lebih longgar dari 1.5x
+                    # In very high volatility, block counter-trend BUY (price below
+                    # EMA20 by more than ema_buffer_pct). Thresholds are config-driven.
+                    vt_cfg = gates["volatility_trend_gate"]["buy"]
+                    if current_range > avg_range * vt_cfg["vol_mult"]:
                         # Use Faster EMA (20) for reactive volatility gating
                         ema_20 = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-                        # Hanya block jika price jauh di bawah EMA (bukan hanya sedikit)
                         price_below_ema_pct = (ema_20 - current_price) / ema_20 * 100
                         if (
-                            current_price < ema_20 and price_below_ema_pct > 0.3
-                        ):  # Hanya block jika > 0.3% di bawah EMA
+                            current_price < ema_20
+                            and price_below_ema_pct > vt_cfg["ema_buffer_pct"]
+                        ):
                             logger.warning(
-                                f"{symbol}: REJECTED - Very high volatility ({current_range:.1f} > {avg_range*2.0:.1f}) and strong counter-trend (Price {price_below_ema_pct:.2f}% below EMA). NO counter-trend BUY allowed during crash."
+                                f"{symbol}: REJECTED - Very high volatility ({current_range:.1f} > {avg_range*vt_cfg['vol_mult']:.1f}) and strong counter-trend (Price {price_below_ema_pct:.2f}% below EMA). NO counter-trend BUY allowed during crash."
                             )
                             return None
 
@@ -1216,43 +1333,40 @@ class FoundationEngine:
                             return None
 
                 # === FLASH CRASH / CLIMAX PROTECTION (Volatility Filter) ===
-                # APPLIES TO ALL ASSET CLASSES (Fixed 2026-02-11)
-                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms)
+                # APPLIES TO ALL ASSET CLASSES. Per-asset multipliers live in
+                # signal_generation.volatility_filter (see _is_climax_candle).
+                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms).
+                # current_range/avg_range are also reused downstream (counter-trend
+                # gate + final quality filters), so compute them unconditionally.
                 if len(data) >= 14:
-                    # Calculate ATR(14) equivalent (moving range)
                     ranges = data["high"] - data["low"]
-                    avg_range = ranges.tail(14).mean()
-                    current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
+                    avg_range = float(ranges.tail(14).mean())
+                    current_range = float(data["high"].iloc[-1] - data["low"].iloc[-1])
+                else:
+                    avg_range = 0.0
+                    current_range = 0.0
 
-                    # Thresholds by asset class
-                    vol_multiplier = 3.0  # Default (loose)
-                    if asset_class == "commodities":
-                        vol_multiplier = 2.0  # Strict for Gold/Silver (was 2.5 loose)
-                    elif asset_class == "crypto":
-                        vol_multiplier = 2.5
-                    elif asset_class == "forex_majors":
-                        vol_multiplier = 2.5
-
-                    # If current candle is > multiplier * avg range, it's likely exhaustion
-                    if current_range > avg_range * vol_multiplier:
-                        logger.warning(
-                            f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
-                            f"({current_range:.1f} > {avg_range*vol_multiplier:.1f}). "
-                            "Risk of reversal is high. Waiting for consolidation."
-                        )
-                        return None
+                if self._is_climax_candle(asset_class, data):
+                    logger.warning(
+                        f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
+                        f"({current_range:.5f} > "
+                        f"{avg_range * self._climax_multiplier(asset_class):.5f}, "
+                        f"asset_class={asset_class}). "
+                        "Risk of reversal is high. Waiting for consolidation."
+                    )
+                    return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
                 if asset_class == "commodities" and last_range > 0:
                     upper_wick = last_high - max(last_open, last_close)
                     wick_ratio = upper_wick / last_range
 
-                    # Adaptive Wick (Phase 5.22): Relax for trend-following in high volatility
-                    wick_threshold = 0.3  # Default
+                    wick_cfg = gates["rejection_wick"]["sell"]
+                    wick_threshold = wick_cfg["min_ratio"]
                     if len(data) > 100:
                         ema_20 = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-                        if current_price < ema_20:  # Trend is DOWN
-                            wick_threshold = 0.15  # Easier entry for SELL in downtrend
+                        if current_price < ema_20:  # Trend is DOWN (with-trend for SELL)
+                            wick_threshold = wick_cfg["trend_following_ratio"]
 
                     if wick_ratio < wick_threshold:
                         logger.warning(
@@ -1261,11 +1375,22 @@ class FoundationEngine:
                         return None
 
                 # === SIGNAL CANDLE COLOR MATCH (PHASE 5.12) ===
+                # Allow doji / small bullish body (< exception) as neutral; else require red.
+                # Default exception 0.0 => reject any bullish candle (strict).
                 if asset_class == "commodities" and last_close >= last_open:
-                    logger.warning(
-                        f"{symbol}: REJECTED - No bearish confirmation (Candle is Bullish). Waiting for red candle."
-                    )
-                    return None
+                    body_exception = gates["color_match"]["sell_small_body_exception"]
+                    body_ratio = abs(last_close - last_open) / last_range if last_range > 0 else 1.0
+                    if body_ratio < body_exception:
+                        logger.debug(
+                            f"{symbol}: ALLOWED - Small bullish body "
+                            f"({body_ratio:.2f} < {body_exception}), treating as neutral"
+                        )
+                    else:
+                        logger.warning(
+                            f"{symbol}: REJECTED - No bearish confirmation (Candle is Bullish). "
+                            "Waiting for red candle."
+                        )
+                        return None
 
                 # === VOLATILITY-DEPENDENT TREND GATE (PHASE 5.13) ===
                 if asset_class == "commodities" and len(data) >= 100:
@@ -1274,13 +1399,21 @@ class FoundationEngine:
                     avg_range = ranges.tail(14).mean()
                     current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
 
-                    # If volatility is high, trend alignment is MANDATORY
-                    if current_range > avg_range * 1.5:
+                    # In very high volatility, block counter-trend SELL (price above
+                    # EMA20 by more than ema_buffer_pct). Thresholds are config-driven.
+                    vt_cfg = gates["volatility_trend_gate"]["sell"]
+                    if current_range > avg_range * vt_cfg["vol_mult"]:
                         # Use Faster EMA (20) for reactive volatility gating
                         ema_20 = data["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-                        if current_price > ema_20:
+                        price_above_ema_pct = (current_price - ema_20) / ema_20 * 100
+                        if (
+                            current_price > ema_20
+                            and price_above_ema_pct > vt_cfg["ema_buffer_pct"]
+                        ):
                             logger.warning(
-                                f"{symbol}: REJECTED - High volatility trend mismatch. NO counter-trend SELL allowed during spike."
+                                f"{symbol}: REJECTED - High volatility trend mismatch "
+                                f"({current_range:.1f} > {avg_range*vt_cfg['vol_mult']:.1f}). "
+                                "NO counter-trend SELL allowed during spike."
                             )
                             return None
 
