@@ -527,6 +527,12 @@ class PositionManager:
             "strategy_scores": signal.strategy_scores,
         }
 
+        # Persist the confluence breakdown for the dashboard Tuning view
+        # (foundation/enhancement split + per-layer raw confidences). Observability
+        # only — see foundation_engine._build_strategy_result.
+        if signal.metadata and signal.metadata.get("confluence_breakdown"):
+            position_metadata["confluence_breakdown"] = signal.metadata["confluence_breakdown"]
+
         # Add price action pattern info to position metadata for tracking
         if price_action_info:
             position_metadata["price_action"] = {
