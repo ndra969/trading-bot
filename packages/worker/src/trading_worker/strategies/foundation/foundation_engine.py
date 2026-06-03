@@ -810,9 +810,9 @@ class FoundationEngine:
         pa_res = await self.price_action_analyzer.analyze_pattern(
             symbol, opens, highs, lows, closes, zone_type_str
         )
-        self._score_price_action(symbol, pa_res, direction, layer_scores, layer_details)
-        if pa_res is not None:
-            raw_confidences["price_action"] = pa_res.confidence
+        self._score_price_action(
+            symbol, pa_res, direction, layer_scores, layer_details, raw_confidences
+        )
 
         # 5. Fibonacci (Weight: 0.12)
         fib_res = await self.fibonacci_analyzer.analyze_fibonacci(
@@ -861,13 +861,19 @@ class FoundationEngine:
         direction: SignalDirection,
         layer_scores: dict,
         layer_details: dict,
+        raw_confidences: dict,
     ) -> None:
-        """Score price action layer; mutates layer_scores and layer_details.
+        """Score price action layer; mutates layer_scores/details/raw_confidences.
 
-        Handles three cases:
-        - Direction match → full weighted score (confidence * 0.15)
-        - NEUTRAL pattern (Inside Bar, Doji) → reduced score (50% of confidence * 0.15)
-        - Wrong direction or no pattern → score 0.0 with status logged
+        ``raw_confidences`` drives the normalised confluence score, so it MUST
+        carry the *directional* contribution — never a contradicting pattern's
+        raw confidence:
+
+        - Direction match  → full score (conf * 0.15);  raw = conf
+        - NEUTRAL pattern  → half score (0.5*conf*0.15); raw = 0.5*conf
+        - Wrong direction / no pattern → score 0.0 and price_action does NOT
+          participate (key omitted from raw_confidences). A bullish pinbar must
+          not inflate a SELL's confluence.
         """
         if not pa_res:
             layer_scores["price_action"] = 0.0
@@ -878,6 +884,7 @@ class FoundationEngine:
         # Direction matches - full score
         if pa_res.direction == direction.name:
             layer_scores["price_action"] = pa_res.confidence * 0.15
+            raw_confidences["price_action"] = pa_res.confidence
             layer_details["price_action"] = {
                 **pa_res.details,
                 "pattern_type": pa_res.pattern_type,
@@ -894,6 +901,7 @@ class FoundationEngine:
         # NEUTRAL patterns (Inside Bar, Doji) - reduced score (50%)
         if pa_res.direction == "NEUTRAL":
             layer_scores["price_action"] = (pa_res.confidence * 0.5) * 0.15
+            raw_confidences["price_action"] = pa_res.confidence * 0.5
             layer_details["price_action"] = {
                 **pa_res.details,
                 "pattern_type": pa_res.pattern_type,
@@ -908,7 +916,7 @@ class FoundationEngine:
             )
             return
 
-        # Wrong direction - no score
+        # Wrong direction - no score, and DO NOT let it participate in confluence
         layer_scores["price_action"] = 0.0
         layer_details["price_action"] = {
             "status": "wrong_direction",
@@ -918,7 +926,8 @@ class FoundationEngine:
         }
         logger.debug(
             f"{symbol}: Price action pattern detected but wrong direction: "
-            f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name}"
+            f"{pa_res.pattern_type} ({pa_res.direction}) != required {direction.name} "
+            f"— excluded from confluence"
         )
 
     async def _create_signal_from_zone(

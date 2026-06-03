@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 from trading_worker.strategies.foundation.foundation_engine import FoundationEngine
+from trading_worker.strategies.models import SignalDirection
 
 
 class TestFoundationEngineInitialization:
@@ -2991,3 +2992,59 @@ class TestConfluenceScoreNormalization:
         final, found_share, enh_share = engine._calculate_confluence_score(self._zone(80.0), {})
         assert final == 0.0
         assert (found_share, enh_share) == (0.0, 0.0)
+
+
+class TestPriceActionConfluenceContribution:
+    """price_action must contribute to confluence only in its actual direction.
+
+    Regression (2026-06-03): a wrong-direction PINBAR still wrote its full
+    confidence into raw_confidences, inflating a SELL's confluence with a
+    bullish reversal signal (silver SELL into a bullish pinbar).
+    """
+
+    class _PA:
+        def __init__(self, direction, confidence=75.0, pattern_type="PINBAR"):
+            self.direction = direction
+            self.confidence = confidence
+            self.pattern_type = pattern_type
+            self.details = {}
+
+    def _engine(self):
+        return FoundationEngine(config={}, use_database=False)
+
+    def test_matching_direction_contributes_full(self):
+        engine = self._engine()
+        layer_scores, layer_details, raw = {}, {}, {}
+        engine._score_price_action(
+            "XAGUSD", self._PA("SELL"), SignalDirection.SELL, layer_scores, layer_details, raw
+        )
+        assert raw["price_action"] == 75.0
+        assert layer_scores["price_action"] == pytest.approx(75.0 * 0.15)
+
+    def test_wrong_direction_does_not_participate(self):
+        engine = self._engine()
+        layer_scores, layer_details, raw = {}, {}, {}
+        # Bullish pinbar on a SELL → must NOT appear in raw_confidences
+        engine._score_price_action(
+            "XAGUSD", self._PA("BUY"), SignalDirection.SELL, layer_scores, layer_details, raw
+        )
+        assert "price_action" not in raw
+        assert layer_scores["price_action"] == 0.0
+        assert layer_details["price_action"]["status"] == "wrong_direction"
+
+    def test_neutral_contributes_half(self):
+        engine = self._engine()
+        layer_scores, layer_details, raw = {}, {}, {}
+        engine._score_price_action(
+            "XAGUSD", self._PA("NEUTRAL"), SignalDirection.SELL, layer_scores, layer_details, raw
+        )
+        assert raw["price_action"] == pytest.approx(37.5)
+
+    def test_no_pattern_does_not_participate(self):
+        engine = self._engine()
+        layer_scores, layer_details, raw = {}, {}, {}
+        engine._score_price_action(
+            "XAGUSD", None, SignalDirection.SELL, layer_scores, layer_details, raw
+        )
+        assert "price_action" not in raw
+        assert layer_scores["price_action"] == 0.0
