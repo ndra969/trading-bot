@@ -52,7 +52,7 @@ class Position:
         close_time: When position was closed (if closed)
         close_price: Price at which position was closed
         close_reason: Reason for closing (SL, TP, Manual, etc.)
-        exit_type: Exit type (full, partial)
+        exit_type: Outcome class on close (WIN / LOSS / BREAKEVEN)
         current_price: Current market price
         current_profit_pips: Current profit in pips
         current_pnl_usd: Current P&L in USD
@@ -94,7 +94,7 @@ class Position:
     close_time: datetime | None = None
     close_price: float | None = None
     close_reason: str | None = None  # Reason for closing
-    exit_type: str | None = None  # Exit type (full, partial)
+    exit_type: str | None = None  # Outcome class on close: WIN / LOSS / BREAKEVEN
     current_price: float | None = None
     current_profit_pips: float = 0.0
     current_pnl_usd: float = 0.0

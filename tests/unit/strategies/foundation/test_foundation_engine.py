@@ -2821,3 +2821,173 @@ class TestFoundationEnginePriceActionRequirement:
                                     # Signal should be accepted with sufficient price action
                                     assert result is not None
                                     assert result.direction.value == "BUY"
+
+
+class TestClimaxCandleFilter:
+    """Climax / exhaustion candle filter (_is_climax_candle, _climax_multiplier).
+
+    Regression: forex previously bypassed this filter entirely because the
+    code branched on a non-existent `forex_majors` asset class (canonical is
+    `forex_major`) and forex_jpy had no branch, so both fell through to a
+    loose 3.0x default and chased tall candles.
+    """
+
+    @staticmethod
+    def _flat_df(n: int = 20, rng: float = 1.0, last_rng: float | None = None) -> pd.DataFrame:
+        """Build OHLC data with constant high-low range, optional taller last bar."""
+        highs = [10.0 + rng] * n
+        lows = [10.0] * n
+        if last_rng is not None:
+            highs[-1] = 10.0 + last_rng
+        return pd.DataFrame(
+            {
+                "open": [10.0] * n,
+                "high": highs,
+                "low": lows,
+                "close": [10.0 + rng / 2] * n,
+                "volume": [1000] * n,
+            }
+        )
+
+    def test_climax_multiplier_resolves_per_asset(self):
+        config = {
+            "signal_generation": {
+                "volatility_filter": {
+                    "default": {"climax_multiplier": 2.5},
+                    "forex_major": {"climax_multiplier": 2.0},
+                }
+            }
+        }
+        engine = FoundationEngine(config=config, use_database=False)
+        assert engine._climax_multiplier("forex_major") == 2.0
+        # forex_jpy not defined -> default
+        assert engine._climax_multiplier("forex_jpy") == 2.5
+
+    def test_climax_multiplier_falls_back_to_hard_default(self):
+        engine = FoundationEngine(config={}, use_database=False)
+        assert engine._climax_multiplier("forex_major") == 2.5
+
+    def test_forex_major_climax_blocks_tall_candle(self):
+        """A 2.5x-range candle must be blocked for forex_major at 2.0x (was bypassed)."""
+        config = {
+            "signal_generation": {"volatility_filter": {"forex_major": {"climax_multiplier": 2.0}}}
+        }
+        engine = FoundationEngine(config=config, use_database=False)
+        df = self._flat_df(rng=1.0, last_rng=2.5)  # last candle 2.5x avg
+        assert engine._is_climax_candle("forex_major", df) is True
+
+    def test_forex_jpy_climax_blocks_tall_candle(self):
+        config = {
+            "signal_generation": {"volatility_filter": {"forex_jpy": {"climax_multiplier": 2.0}}}
+        }
+        engine = FoundationEngine(config=config, use_database=False)
+        df = self._flat_df(rng=1.0, last_rng=2.5)
+        assert engine._is_climax_candle("forex_jpy", df) is True
+
+    def test_normal_candle_passes(self):
+        config = {
+            "signal_generation": {"volatility_filter": {"forex_major": {"climax_multiplier": 2.0}}}
+        }
+        engine = FoundationEngine(config=config, use_database=False)
+        df = self._flat_df(rng=1.0, last_rng=1.5)  # 1.5x < 2.0x threshold
+        assert engine._is_climax_candle("forex_major", df) is False
+
+    def test_insufficient_bars_returns_false(self):
+        engine = FoundationEngine(config={}, use_database=False)
+        df = self._flat_df(n=10, rng=1.0, last_rng=5.0)
+        assert engine._is_climax_candle("forex_major", df) is False
+
+    def test_zero_avg_range_returns_false(self):
+        engine = FoundationEngine(config={}, use_database=False)
+        df = pd.DataFrame(
+            {
+                "open": [10.0] * 20,
+                "high": [10.0] * 20,
+                "low": [10.0] * 20,
+                "close": [10.0] * 20,
+                "volume": [1000] * 20,
+            }
+        )
+        assert engine._is_climax_candle("forex_major", df) is False
+
+
+class TestConfluenceScoreNormalization:
+    """Confluence score is a weighted AVERAGE over participating layers.
+
+    Regression: the old additive sum could never approach 100 because
+    rsi/structure/breakout stay silent at reversal zones, so the documented
+    65% gate was impossible and thresholds were forced down to 38-48.
+    """
+
+    WEIGHTS = {
+        "confluence_weights": {
+            "foundation": 0.30,
+            "trendline": 0.20,
+            "price_action": 0.15,
+            "fibonacci": 0.12,
+            "breakout": 0.12,
+            "rsi": 0.10,
+            "ma": 0.08,
+            "structure": 0.08,
+        }
+    }
+
+    @staticmethod
+    def _zone(strength: float):
+        from datetime import datetime
+
+        from trading_worker.strategies.foundation.zone_detector import DetectedZone, ZoneType
+
+        return DetectedZone(
+            zone_type=ZoneType.REJECTION,
+            upper_bound=1.1010,
+            lower_bound=1.1000,
+            strength=strength,
+            touches=2,
+            volume_confirmed=True,
+            first_detected=datetime(2026, 6, 1),
+            last_tested=datetime(2026, 6, 2),
+        )
+
+    def _engine(self):
+        return FoundationEngine(config=self.WEIGHTS, use_database=False)
+
+    def test_foundation_only_scores_zone_strength(self):
+        """With no participating enhancement layers, score == zone strength."""
+        engine = self._engine()
+        final, found_share, enh_share = engine._calculate_confluence_score(self._zone(80.0), {})
+        assert final == pytest.approx(80.0)
+        assert found_share == pytest.approx(80.0)
+        assert enh_share == pytest.approx(0.0)
+
+    def test_weighted_average_over_participating_layers(self):
+        """foundation(88) + price_action(70) + fibonacci(60) → normalised 77.4%."""
+        engine = self._engine()
+        raw = {"price_action": 70.0, "fibonacci": 60.0}
+        final, found_share, enh_share = engine._calculate_confluence_score(self._zone(88.0), raw)
+        # (88*.30 + 70*.15 + 60*.12) / (.30+.15+.12) = 44.1 / .57
+        assert final == pytest.approx(77.368, abs=0.01)
+        # Shares sum to final
+        assert found_share + enh_share == pytest.approx(final, abs=1e-6)
+
+    def test_score_reaches_design_target_for_strong_setup(self):
+        """A strong, broadly-confirmed setup can now exceed the 65% gate."""
+        engine = self._engine()
+        raw = {"trendline": 80.0, "price_action": 80.0, "fibonacci": 80.0, "ma": 80.0}
+        final, _, _ = engine._calculate_confluence_score(self._zone(85.0), raw)
+        assert final >= 65.0
+
+    def test_score_capped_at_100(self):
+        engine = self._engine()
+        raw = {"trendline": 100.0, "price_action": 100.0, "fibonacci": 100.0}
+        final, _, _ = engine._calculate_confluence_score(self._zone(100.0), raw)
+        assert final <= 100.0
+
+    def test_zero_participating_weight_returns_zero(self):
+        """Degenerate config (no weights at all) → 0, no ZeroDivisionError."""
+        engine = FoundationEngine(
+            config={"confluence_weights": {"foundation": 0.0}}, use_database=False
+        )
+        final, found_share, enh_share = engine._calculate_confluence_score(self._zone(80.0), {})
+        assert final == 0.0
+        assert (found_share, enh_share) == (0.0, 0.0)

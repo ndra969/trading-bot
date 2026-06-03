@@ -14,6 +14,7 @@ from trading_core.utils.logger import get_logger
 
 from trading_worker.position.pip_calculator import PipCalculator
 from trading_worker.position.position_models import Position, PositionStatus, PositionType
+from trading_worker.position.position_tracker import classify_exit_type
 from trading_worker.utils.notification_manager import NotificationLevel
 
 if TYPE_CHECKING:
@@ -424,6 +425,7 @@ class PositionOrchestrator:
         reason: CloseReason,
         is_dry_run: bool,
         log_comment: str | None = None,
+        authoritative_pnl: bool = False,
     ) -> None:
         """Common cleanup after closing a position: save, update balance, unregister exposure.
 
@@ -437,13 +439,27 @@ class PositionOrchestrator:
             reason: Canonical CloseReason enum value (recorded to DB)
             is_dry_run: Skip DB saves when True
             log_comment: Optional extra context for logging (e.g., MT5 deal comment)
+            authoritative_pnl: True when ``pnl`` is the broker's actual realized
+                P&L (from MT5 deal history, incl. swap/commission). When set, it
+                overrides the pip-recomputed P&L from PositionTracker so the
+                persisted realized_pnl_usd / is_winner / exit_type reflect the
+                broker result rather than a price-based approximation.
         """
-        # Close in position_manager state
+        # Close in position_manager state (PositionTracker computes a pip-based
+        # P&L + exit_type from close_price).
         result = self.bot.position_manager.close_position(
             position.position_id, close_price, reason.value
         )
         if result:
             result["pnl_usd"] = pnl
+
+        # Prefer the broker's authoritative realized P&L for the persisted
+        # outcome. close_position mutates the same Position instance, so this
+        # override lands in the row saved below.
+        if authoritative_pnl:
+            position.realized_pnl_usd = pnl
+            position.is_winner = pnl > 0
+            position.exit_type = classify_exit_type(pnl)
 
         # Persist to DB
         await self.bot.position_manager.save_position(position, is_dry_run=is_dry_run)
@@ -581,6 +597,8 @@ class PositionOrchestrator:
                             reason=reason,
                             is_dry_run=is_dry_run,
                             log_comment=comment,
+                            # MT5 deal P&L is the broker's actual result.
+                            authoritative_pnl=mt5_reason is not None,
                         )
                         logger.info(f"  ✅ Synced Close: {position.position_id} | P&L: ${pnl:.2f}")
                         continue

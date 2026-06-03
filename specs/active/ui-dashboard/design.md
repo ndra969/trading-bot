@@ -39,14 +39,15 @@ trading-bot/
 │       ├── schemas.py              # Pydantic response models
 │       └── routers/
 │           ├── positions.py  account.py  sessions.py
-│           ├── signals.py     analytics.py
+│           ├── signals.py     analytics.py  config.py
 ├── apps/
 │   └── dashboard/                  # ← THIS SPEC fills it (Next.js)
 │       ├── app/                    # App Router pages
 │       │   ├── page.tsx            # overview
 │       │   ├── positions/page.tsx
 │       │   ├── history/page.tsx
-│       │   └── analytics/page.tsx
+│       │   ├── analytics/page.tsx
+│       │   └── tuning/page.tsx     # ← confluence distribution + thresholds
 │       ├── lib/api.ts              # typed fetch client + poll hook
 │       ├── components/
 │       └── package.json
@@ -83,14 +84,21 @@ Interactive Swagger docs auto-served at `/docs`, ReDoc at `/redoc`.
 | Endpoint | Returns |
 |----------|---------|
 | `GET /api/v1/positions/open` | Live open positions (symbol, type, entry, SL, TP, current price, P&L, pips, confluence) |
-| `GET /api/v1/positions/closed?limit=&symbol=&since=` | Closed-trade history with close_reason, P&L, holding time |
+| `GET /api/v1/positions/closed?limit=&symbol=&since=&exit_type=&close_reason=` | Closed-trade history with close_reason, exit_type, P&L, holding time |
+| `GET /api/v1/positions/{position_id}` | **Single-trade drill-down**: full quality metrics (MAE/MFE, slippage, entry→SL/TP pips, max_profit/drawdown, breakeven/trailing activated, holding time) + confluence breakdown (foundation_share, enhancement_share, per-layer raw confidences, active layers) |
 | `GET /api/v1/account/summary` | Balance, equity, currency unit, open count, total exposure |
 | `GET /api/v1/sessions?limit=` | Trading sessions with aggregations (trades, win_rate, P&L) |
 | `GET /api/v1/signals/recent?limit=` | Recent signals (if persisted) or last-N from positions |
 | `GET /api/v1/analytics/by-asset` | Per-asset-class WR, avg P&L, count |
 | `GET /api/v1/analytics/by-session` | Per-market-session WR (tokyo/london/ny) |
 | `GET /api/v1/analytics/by-close-reason` | Breakdown by CloseReason enum |
-| `GET /api/v1/analytics/equity-curve?since=` | Cumulative P&L series for chart |
+| `GET /api/v1/analytics/by-exit-type` | Counts + P&L by WIN / LOSS / BREAKEVEN (sanity-check classification & R-multiple) |
+| `GET /api/v1/analytics/equity-curve?since=` | Cumulative realized P&L series for chart |
+| **Tuning endpoints** | |
+| `GET /api/v1/analytics/confluence-distribution?asset_class=&bucket=` | Histogram of `confluence_score` per asset class (+ overall min/p50/max), for overlaying the threshold line |
+| `GET /api/v1/analytics/confluence-vs-outcome?asset_class=` | Win-rate + avg P&L per confluence bucket, and WIN-avg vs LOSS-avg confluence — answers "does confluence predict outcome?" (it didn't pre-fix) |
+| `GET /api/v1/analytics/layer-contribution?asset_class=` | Per enhancement layer: how often it participated + its avg contribution (exposes dead layers like rsi/structure/breakout) |
+| `GET /api/v1/config/thresholds` | Current `quality_thresholds` + `volatility_filter` + `confluence_weights` from the loaded YAML (read-only) so the UI can draw the active gate over the distribution |
 | `GET /api/v1/health` | API + DB reachability |
 
 ### Currency unit in responses
@@ -123,23 +131,54 @@ in phase 1, but the middleware hook is stubbed.
   required for phase 1 (can add later).
 - Charts: `lightweight-charts` (TradingView) for equity curve / price;
   `recharts` for bar/pie analytics. Pick one primary to limit deps.
+- Nav menu (left rail), ordered for a position-analysis workflow:
+  **Overview → Positions → History → Analytics → Tuning**.
 - Pages:
   - **Overview**: account summary cards, open positions table, equity
     curve, today's P&L.
-  - **Positions**: full open positions + closed history with filters.
-  - **History**: closed trades table, close_reason breakdown.
-  - **Analytics**: WR by asset / session / close_reason, confluence
-    distribution.
+  - **Positions**: live open positions with P&L + confluence; row click
+    opens the trade drill-down drawer.
+  - **History**: closed trades table with filters (symbol, `exit_type`,
+    `close_reason`, date); close_reason + exit_type breakdown charts; row
+    click → **trade drill-down** (`/positions/{id}`) showing every
+    quality metric + the confluence/per-layer breakdown for that trade.
+  - **Analytics**: WR + P&L by asset / session / close_reason /
+    exit_type; equity curve.
+  - **Tuning** (the strategy-tuning surface): asset-class selector, then
+    (1) confluence-score histogram with the **current threshold drawn as
+    a vertical line** (from `/config/thresholds`); (2) win-rate per
+    confluence bucket + WIN-avg vs LOSS-avg confluence (does it predict?);
+    (3) per-layer contribution bars (which layers actually fire). Purely
+    read-only — surfaces the evidence; the operator edits YAML by hand.
+- Trade drill-down is a shared component (drawer/modal) used by both
+  Positions and History, backed by `GET /positions/{id}`.
 - Env: `NEXT_PUBLIC_API_BASE` points at the FastAPI host
   (`http://localhost:8000`).
 
 ## Data source notes
 
 - Bot already persists positions, sessions, accounts to PostgreSQL.
-- `market_session`, `confluence_score`, `close_reason`, `slippage_pips`
-  are on positions → analytics endpoints can use them directly.
-- Equity curve = cumulative sum of closed `current_pnl_usd` ordered by
-  `close_time`.
+- `market_session`, `confluence_score`, `close_reason`, `exit_type`,
+  `is_winner`, `slippage_pips`, `mae_pips`, `mfe_pips`,
+  `holding_time_seconds`, `entry_to_sl_pips`, `entry_to_tp_pips`,
+  `breakeven_activated`, `trailing_activated` are all columns on
+  `positions` → analytics + drill-down endpoints use them directly.
+- Equity curve = cumulative sum of closed `realized_pnl_usd` ordered by
+  `close_time` (use the frozen realized value, not the mutable
+  `current_pnl_usd`).
+- **Confluence breakdown persistence (Goal 7, worker change).** The
+  per-layer split is NOT in the DB today — `meta_data.strategy_scores`
+  only echoes the total. The worker must, at signal creation (where
+  `_build_strategy_result` assembles `meta_data`), also store:
+  `meta_data["confluence_breakdown"] = {foundation_share,
+  enhancement_share, raw_confidences: {layer: conf}, active_layers: [...]}`.
+  `/positions/{id}` and `/analytics/layer-contribution` read this.
+  Backfill is impossible for old rows (data is gone) → those simply show
+  "breakdown unavailable"; new trades carry it. Snapshot-test the signal
+  path to prove scoring math is unchanged by the added write.
+- `/config/thresholds` reads the same loaded YAML the worker uses
+  (`config/strategy_parameters.yaml` → `signal_generation`), surfaced
+  read-only. Do NOT re-read files per request — load once at app start.
 
 ## Test impact
 
@@ -171,10 +210,15 @@ Dashboard is purely additive. To remove: delete `packages/api/`,
 
 ## What "done" looks like
 
-- `uv run uvicorn trading_bot.api.app:app --port 8000` serves all
-  endpoints with live data.
-- `cd frontend && npm run dev` renders the overview with real positions
-  and a working equity curve.
+- `uv run uvicorn trading_api.app:app --port 8000` serves all endpoints
+  with live data.
+- `cd apps/dashboard && npm run dev` renders the overview with real
+  positions and a working equity curve.
 - New positions/closes appear within one poll interval.
-- Backend tests pass; bot tests unchanged.
+- Tuning page shows the confluence histogram + current threshold line +
+  WR-by-bucket for a selected asset class.
+- A closed trade can be drilled to its full quality + confluence
+  breakdown.
+- Backend tests pass; bot tests unchanged (signal-path snapshot proves
+  the breakdown write didn't alter scoring).
 - README/docs note how to run the dashboard.

@@ -5,6 +5,7 @@ Tracks position status and calculates real-time P&L.
 """
 
 from datetime import datetime
+from typing import Any
 
 from trading_core.utils.logger import get_logger
 
@@ -12,6 +13,21 @@ from trading_worker.position.pip_calculator import PipCalculator
 from trading_worker.position.position_models import Position, PositionStatus
 
 logger = get_logger(__name__)
+
+
+def classify_exit_type(pnl_usd: float) -> str:
+    """Classify a closed position's outcome from its realized P&L.
+
+    Single source of truth for the DB ``exit_type`` column
+    (constraint: WIN / LOSS / BREAKEVEN). This is an *outcome* bucket and is
+    orthogonal to *how* the position closed (SL / TP / trailing / breakeven),
+    which is captured separately in ``close_reason``.
+    """
+    if pnl_usd > 0:
+        return "WIN"
+    if pnl_usd < 0:
+        return "LOSS"
+    return "BREAKEVEN"
 
 
 class PositionTracker:
@@ -25,7 +41,7 @@ class PositionTracker:
     - Update position status
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize position tracker."""
         self.pip_calculator = PipCalculator()
         logger.debug("PositionTracker initialized")
@@ -183,6 +199,7 @@ class PositionTracker:
         - close_price
         - Final P&L
         - is_winner (True if profit, False if loss)
+        - exit_type (WIN / LOSS / BREAKEVEN, from realized P&L)
         """
         if position.status != PositionStatus.OPEN:
             logger.warning(
@@ -211,8 +228,11 @@ class PositionTracker:
         position.realized_profit_pips = position.current_profit_pips
         position.realized_pnl_usd = position.current_pnl_usd
 
-        # Set is_winner based on final P&L
+        # Set is_winner + exit_type from the (pip-recomputed) realized P&L.
+        # Reconciled MT5 closes refine these from the broker's authoritative
+        # P&L (incl. swap/commission) in _finalize_closed_position.
         position.is_winner = position.current_pnl_usd > 0
+        position.exit_type = classify_exit_type(position.current_pnl_usd)
 
         # Calculate holding time in seconds
         if position.open_time:
@@ -264,7 +284,7 @@ class PositionTracker:
         else:  # SELL
             return position.current_price <= position.take_profit
 
-    def get_position_summary(self, position: Position) -> dict:
+    def get_position_summary(self, position: Position) -> dict[str, Any]:
         """
         Get position summary.
 

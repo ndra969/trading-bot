@@ -5,11 +5,25 @@ Each phase is independently shippable.
 
 ## Phase 0 — Prerequisite (blocking)
 
-- [ ] **[monorepo-restructure](../monorepo-restructure/tasks.md) must be
-      DONE first.** It creates `packages/api/` and `apps/dashboard/`
-      skeletons + the `trading_core` package this API imports. Do not
-      start Phase 1 until the monorepo restructure has landed and the
-      bot dry-run is verified green.
+- [x] **[monorepo-restructure](../../archive/2026-05/monorepo-restructure/)
+      DONE** (archived 2026-05). `packages/{core,worker,api}` +
+      `apps/dashboard` exist; `packages/api/src/trading_api/__init__.py`
+      is in place. Bot dry-run verified green.
+
+## Phase 1.5 — Worker observability (confluence breakdown) (~30 min)
+
+Prereq for the Tuning view + trade drill-down (requirements Goal 7).
+
+- [ ] In the worker signal path (`foundation_engine._build_strategy_result`,
+      where `meta_data` is assembled), persist
+      `meta_data["confluence_breakdown"] = {foundation_share,
+      enhancement_share, raw_confidences: {layer: conf}, active_layers}`.
+- [ ] Snapshot/regression test the signal path: assert the returned
+      signal `score` and direction are byte-identical before/after — the
+      write must not touch scoring.
+- [ ] Confirm a fresh dry-run / live trade writes the breakdown to a new
+      `positions` row (old rows legitimately lack it).
+- [ ] Commit: `feat(worker): persist confluence breakdown to meta_data`.
 
 ## Phase 1 — Dashboard scaffolding (~30 min)
 
@@ -34,12 +48,19 @@ Each phase is independently shippable.
       duplicate the small "cent in broker name" check).
 
 ### Routers
-- [ ] `routers/positions.py`: `/open`, `/closed`.
+- [ ] `routers/positions.py`: `/open`, `/closed` (filters: symbol,
+      `exit_type`, `close_reason`, since), `/{position_id}` drill-down
+      (quality metrics + confluence_breakdown).
 - [ ] `routers/account.py`: `/summary`.
 - [ ] `routers/sessions.py`: `/sessions`.
 - [ ] `routers/signals.py`: `/recent`.
 - [ ] `routers/analytics.py`: `/by-asset`, `/by-session`,
-      `/by-close-reason`, `/equity-curve`.
+      `/by-close-reason`, `/by-exit-type`, `/equity-curve`,
+      `/confluence-distribution`, `/confluence-vs-outcome`,
+      `/layer-contribution`.
+- [ ] `routers/config.py`: `/config/thresholds` — read the loaded
+      `signal_generation` config (quality_thresholds + volatility_filter
+      + confluence_weights), read-only, loaded once at startup.
 
 ### Tests (mandatory — API gates like the bot does)
 - [ ] Add `syrupy` to dev deps.
@@ -62,7 +83,8 @@ Each phase is independently shippable.
       (or with tailwind if preferred).
 - [ ] `lib/api.ts`: typed fetch client + `usePoll(endpoint, ms)` hook.
 - [ ] `.env.local`: `NEXT_PUBLIC_API_BASE=http://localhost:8000`.
-- [ ] Base layout + nav (Overview / Positions / History / Analytics).
+- [ ] Base layout + nav (Overview / Positions / History / Analytics /
+      Tuning).
 - [ ] Health-check banner (API reachable?).
 - [ ] Commit: `feat(frontend): Next.js scaffold + API client`.
 
@@ -71,12 +93,20 @@ Each phase is independently shippable.
 - [ ] **Overview**: account summary cards (balance/equity/open count
       with currency unit), open positions table, today P&L.
 - [ ] **Positions**: open + closed tables with symbol/reason filters.
-- [ ] **History**: closed trades + close_reason breakdown chart.
-- [ ] **Analytics**: WR by asset / session / close_reason; equity curve
-      (lightweight-charts); confluence distribution.
+- [ ] **History**: closed trades + close_reason/exit_type breakdown
+      charts; filters (symbol, exit_type, close_reason, date).
+- [ ] **Trade drill-down** (shared drawer, used by Positions + History):
+      full quality metrics + confluence/per-layer breakdown from
+      `/positions/{id}`. Show "breakdown unavailable" for old rows.
+- [ ] **Analytics**: WR + P&L by asset / session / close_reason /
+      exit_type; equity curve (lightweight-charts).
+- [ ] **Tuning**: asset-class selector → confluence histogram with the
+      current threshold line (`/config/thresholds`), WR-by-confluence-
+      bucket + WIN-avg vs LOSS-avg, per-layer contribution bars. Clearly
+      labelled read-only (edit YAML by hand).
 - [ ] Currency unit labels everywhere (USC/USD from API).
 - [ ] Loading / empty / error states per page.
-- [ ] Commit: `feat(frontend): dashboard pages`.
+- [ ] Commit: `feat(frontend): dashboard pages + tuning view`.
 
 ## Phase 5 — Polish & docs (~1 hr)
 
@@ -89,12 +119,14 @@ Each phase is independently shippable.
 ## Effort estimate
 
 - Phase 1: 0.5 hr
-- Phase 2 (API + tests): 2-3 hr
+- Phase 1.5 (worker breakdown persistence + test): 0.5 hr
+- Phase 2 (API + tuning endpoints + tests): 3-4 hr
 - Phase 3 (frontend scaffold): 1-2 hr
-- Phase 4 (pages): 3-4 hr
+- Phase 4 (pages incl. Tuning + drill-down): 4-5 hr
 - Phase 5 (polish): 1 hr
-- **Total: ~8-11 hr** across multiple sessions (backend can land
-  independently of frontend).
+- **Total: ~10-13 hr** across multiple sessions (backend can land
+  independently of frontend; Phase 1.5 should land early so live trades
+  start accumulating breakdown data for the Tuning view).
 
 ## Sequencing notes
 

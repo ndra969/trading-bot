@@ -96,43 +96,47 @@ signal_generation:
   # foundation_engine looks up `<asset_class>` first, falls back to `default`.
   # Asset classes recognised: forex_major, forex_jpy, commodities, crypto.
   quality_thresholds:
-    # Data-driven thresholds (2026-05-28). Calibrated against actual DB
-    # confluence distribution — earlier theoretical values (60-75%) would
-    # have blocked ALL signals since observed max confluence is only
-    # ~43-57% per asset. Set near each asset's p50 so we capture roughly
-    # half the historical signals for observation-phase data collection.
+    # Recalibrated 2026-06-02 for the NORMALISED confluence score.
+    # Confluence is now a weighted AVERAGE over participating layers
+    # (see foundation_engine._calculate_confluence_score), not an absolute
+    # weighted sum. Under the old sum, momentum/trend layers (rsi, structure,
+    # breakout) structurally stayed silent at reversal zones, so the score
+    # could never exceed ~57 and the documented 65% gate was impossible —
+    # which is why earlier thresholds were forced down to 38-48 (and the bot
+    # took low-quality signals → sustained losses).
     #
-    # Observed (closed positions): forex max 57.4 / p50 35.4; forex_jpy
-    # max 57.9 / p50 41.9; crypto max 42.8 / p50 34.3; commodities max
-    # 45.5 / p50 34.2. Confluence is currently a WEAK outcome predictor
-    # (win avg ≈ loss avg) — scoring likely under-tuned; revisit separately.
-    # 2026-05-29 bump: raised ~6-7 pts above p50 (toward ~p65) to trim the
-    # weakest half of signals after a losing run, while staying below each
-    # asset's observed max so signals still flow. Confluence is still a weak
-    # predictor; this is a stopgap until the scoring revisit.
+    # With normalisation the score spans a true 0-100 again (estimated avg
+    # ~43, strong setups ~65-75). Thresholds raised back toward the 65%
+    # design target to keep only above-average setups. MONITOR for a few days
+    # and tune: too few signals → lower ~3pts; still losing → raise ~3pts.
+    #
+    # CAVEAT: a weighted average rewards FEWER participating layers (smaller
+    # denominator). require_price_action stays ON so price action always
+    # participates; consider a "min participating enhancement layers" guard
+    # if lonely high-strength zones start passing on thin confirmation.
     default:
-      min_confluence_score: 42.0
+      min_confluence_score: 60.0
       min_foundation_score: 30.0
       min_price_action_score: 8.0
 
     forex_major:
-      min_confluence_score: 42.0       # was 35 (p50 35.4); max observed 57.4
+      min_confluence_score: 62.0       # normalised scale; toward 65% design target
       min_foundation_score: 30.0
       min_price_action_score: 8.0
 
     forex_jpy:
-      min_confluence_score: 48.0       # was 42 (p50 41.9); max observed 57.9
+      min_confluence_score: 62.0
       min_foundation_score: 35.0
       min_price_action_score: 8.0
 
     commodities:
-      min_confluence_score: 38.0           # was 32 (p50 34.2); max observed 45.5
-      min_confluence_score_counter: 42.0   # was 38 — stricter counter-trend
+      min_confluence_score: 58.0
+      min_confluence_score_counter: 64.0   # stricter counter-trend
       min_foundation_score: 25.0
       min_price_action_score: 8.0
 
     crypto:
-      min_confluence_score: 38.0       # was 32 (p50 34.3); max observed 42.8
+      min_confluence_score: 58.0
       min_foundation_score: 28.0
       min_price_action_score: 8.0
 
@@ -165,6 +169,26 @@ signal_generation:
     # Globals
     conflict_prevention: true       # Prevent conflicting signals (all assets)
     market_hours_validation: true   # Validate market hours (all assets)
+
+  # Climax / exhaustion candle filter — blocks entries on overextended candles.
+  # Rejects when the latest candle's range > climax_multiplier × ATR(14)-equiv
+  # average range (chasing a spent move). Lower = stricter.
+  # Resolves `<asset_class>` first, falls back to `default`.
+  # 2026-06-02: previously forex never hit this filter — the code branched on
+  # a non-existent `forex_majors` asset class (canonical is `forex_major`) and
+  # forex_jpy had no branch, so both fell through to a loose 3.0×. Forex
+  # entries were chasing tall H1 candles into immediate pullbacks.
+  volatility_filter:
+    default:
+      climax_multiplier: 2.5
+    forex_major:
+      climax_multiplier: 2.0
+    forex_jpy:
+      climax_multiplier: 2.0
+    commodities:
+      climax_multiplier: 2.0
+    crypto:
+      climax_multiplier: 2.5
 
   # Risk/Reward Requirements
   risk_reward:

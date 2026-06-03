@@ -616,6 +616,38 @@ class FoundationEngine:
         legacy_keys = ("require_foundation", "require_price_action")
         return {k: vr[k] for k in legacy_keys if k in vr and not isinstance(vr[k], dict)}
 
+    def _climax_multiplier(self, asset_class: str) -> float:
+        """Resolve the climax-candle range multiplier for an asset class.
+
+        Reads ``signal_generation.volatility_filter.<asset_class>.climax_multiplier``
+        with a fallback to ``volatility_filter.default`` and finally a hard 2.5.
+        """
+        vf = self.config.get("signal_generation", {}).get("volatility_filter", {})
+        per_asset = vf.get(asset_class) if isinstance(vf.get(asset_class), dict) else {}
+        default = vf.get("default") if isinstance(vf.get("default"), dict) else {}
+        return float(
+            per_asset.get(
+                "climax_multiplier",
+                default.get("climax_multiplier", 2.5),
+            )
+        )
+
+    def _is_climax_candle(self, asset_class: str, data: pd.DataFrame) -> bool:
+        """Detect an overextended / exhaustion candle (chasing a spent move).
+
+        True when the latest candle's high-low range exceeds
+        ``climax_multiplier × ATR(14)-equivalent average range``. Applies to
+        ALL asset classes. Needs at least 14 bars; returns False otherwise.
+        """
+        if len(data) < 14:
+            return False
+        ranges = data["high"] - data["low"]
+        avg_range = float(ranges.tail(14).mean())
+        if avg_range <= 0:
+            return False
+        current_range = float(data["high"].iloc[-1] - data["low"].iloc[-1])
+        return current_range > avg_range * self._climax_multiplier(asset_class)
+
     def _is_counter_trend(
         self,
         direction: SignalDirection,
@@ -645,32 +677,57 @@ class FoundationEngine:
     def _calculate_confluence_score(
         self, zone: DetectedZone, raw_confidences: dict
     ) -> tuple[float, float, float]:
-        """Calculate weighted confluence score from foundation + enhancement layers.
+        """Confluence as a weighted AVERAGE over the layers that participated.
 
         Uses weights from `confluence_weights` config section:
             foundation: 0.30 (S&D zone strength)
             trendline: 0.20, price_action: 0.15, fibonacci: 0.12,
             breakout: 0.12, structure: 0.08, rsi: 0.10, ma: 0.08
 
+        Foundation (zone strength) always participates. An enhancement layer
+        participates only when it agreed with the trade direction (i.e. it is
+        present in ``raw_confidences``). The score is normalised by the summed
+        weight of the *participating* layers, so it expresses the weighted % of
+        confidence among the signals that actually spoke — rather than an
+        absolute sum that can never approach 100 because trend/momentum layers
+        (rsi, structure, breakout) structurally stay silent at reversal zones.
+
         Returns:
-            (final_score, weighted_foundation_score, weighted_enhancement_score)
-            All capped at 100.0 max for final_score.
+            (final_score, foundation_share, enhancement_share). The two shares
+            sum to final_score; all three are 0-100.
         """
         weights = self.config.get("confluence_weights", {})
-
-        # Foundation score (zone strength * foundation weight, default 0.30)
         foundation_weight = weights.get("foundation", 0.30)
-        weighted_foundation_score = zone.strength * foundation_weight
 
-        # Enhancement score: sum of (raw_confidence * weight) per active layer
-        weighted_enhancement_score = sum(
+        # Foundation always participates; its raw confidence is the zone strength.
+        foundation_contrib = zone.strength * foundation_weight
+
+        enhancement_layers = (
+            "rsi",
+            "ma",
+            "trendline",
+            "price_action",
+            "fibonacci",
+            "structure",
+            "breakout",
+        )
+        enhancement_contrib = sum(
             raw_confidences.get(layer, 0.0) * weights.get(layer, 0.0)
-            for layer in ("rsi", "ma", "trendline", "price_action", "fibonacci", "structure")
+            for layer in enhancement_layers
         )
 
-        # Final score capped at 100
-        final_score = min(weighted_foundation_score + weighted_enhancement_score, 100.0)
-        return final_score, weighted_foundation_score, weighted_enhancement_score
+        # Denominator: weight of every layer that actually contributed.
+        participating_weight = foundation_weight + sum(
+            weights.get(layer, 0.0) for layer in enhancement_layers if layer in raw_confidences
+        )
+
+        if participating_weight <= 0:
+            return 0.0, 0.0, 0.0
+
+        foundation_share = min(foundation_contrib / participating_weight, 100.0)
+        enhancement_share = enhancement_contrib / participating_weight
+        final_score = min(foundation_share + enhancement_share, 100.0)
+        return final_score, foundation_share, enhancement_share
 
     async def _run_enhancement_analyzers(
         self,
@@ -998,31 +1055,28 @@ class FoundationEngine:
                             return None
 
                 # === FLASH CRASH / CLIMAX PROTECTION (Volatility Filter) ===
-                # APPLIES TO ALL ASSET CLASSES (Fixed 2026-02-11)
-                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms)
+                # APPLIES TO ALL ASSET CLASSES. Per-asset multipliers live in
+                # signal_generation.volatility_filter (see _is_climax_candle).
+                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms).
+                # current_range/avg_range are also reused downstream (counter-trend
+                # gate + final quality filters), so compute them unconditionally.
                 if len(data) >= 14:
-                    # Calculate ATR(14) equivalent (moving range)
                     ranges = data["high"] - data["low"]
-                    avg_range = ranges.tail(14).mean()
-                    current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
+                    avg_range = float(ranges.tail(14).mean())
+                    current_range = float(data["high"].iloc[-1] - data["low"].iloc[-1])
+                else:
+                    avg_range = 0.0
+                    current_range = 0.0
 
-                    # Thresholds by asset class
-                    vol_multiplier = 3.0  # Default (loose)
-                    if asset_class == "commodities":
-                        vol_multiplier = 2.0  # Strict for Gold/Silver (was 2.5 loose)
-                    elif asset_class == "crypto":
-                        vol_multiplier = 2.5
-                    elif asset_class == "forex_majors":
-                        vol_multiplier = 2.5
-
-                    # If current candle is > multiplier * avg range, it's likely exhaustion
-                    if current_range > avg_range * vol_multiplier:
-                        logger.warning(
-                            f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
-                            f"({current_range:.1f} > {avg_range*vol_multiplier:.1f}). "
-                            "Risk of reversal is high. Waiting for consolidation."
-                        )
-                        return None
+                if self._is_climax_candle(asset_class, data):
+                    logger.warning(
+                        f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
+                        f"({current_range:.5f} > "
+                        f"{avg_range * self._climax_multiplier(asset_class):.5f}, "
+                        f"asset_class={asset_class}). "
+                        "Risk of reversal is high. Waiting for consolidation."
+                    )
+                    return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
                 if asset_class == "commodities" and last_range > 0:
@@ -1216,31 +1270,28 @@ class FoundationEngine:
                             return None
 
                 # === FLASH CRASH / CLIMAX PROTECTION (Volatility Filter) ===
-                # APPLIES TO ALL ASSET CLASSES (Fixed 2026-02-11)
-                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms)
+                # APPLIES TO ALL ASSET CLASSES. Per-asset multipliers live in
+                # signal_generation.volatility_filter (see _is_climax_candle).
+                # Prevent entry on extreme exhaustion candles (chasing tops/bottoms).
+                # current_range/avg_range are also reused downstream (counter-trend
+                # gate + final quality filters), so compute them unconditionally.
                 if len(data) >= 14:
-                    # Calculate ATR(14) equivalent (moving range)
                     ranges = data["high"] - data["low"]
-                    avg_range = ranges.tail(14).mean()
-                    current_range = data["high"].iloc[-1] - data["low"].iloc[-1]
+                    avg_range = float(ranges.tail(14).mean())
+                    current_range = float(data["high"].iloc[-1] - data["low"].iloc[-1])
+                else:
+                    avg_range = 0.0
+                    current_range = 0.0
 
-                    # Thresholds by asset class
-                    vol_multiplier = 3.0  # Default (loose)
-                    if asset_class == "commodities":
-                        vol_multiplier = 2.0  # Strict for Gold/Silver (was 2.5 loose)
-                    elif asset_class == "crypto":
-                        vol_multiplier = 2.5
-                    elif asset_class == "forex_majors":
-                        vol_multiplier = 2.5
-
-                    # If current candle is > multiplier * avg range, it's likely exhaustion
-                    if current_range > avg_range * vol_multiplier:
-                        logger.warning(
-                            f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
-                            f"({current_range:.1f} > {avg_range*vol_multiplier:.1f}). "
-                            "Risk of reversal is high. Waiting for consolidation."
-                        )
-                        return None
+                if self._is_climax_candle(asset_class, data):
+                    logger.warning(
+                        f"{symbol}: REJECTED - Climax Candle / Extreme Volatility "
+                        f"({current_range:.5f} > "
+                        f"{avg_range * self._climax_multiplier(asset_class):.5f}, "
+                        f"asset_class={asset_class}). "
+                        "Risk of reversal is high. Waiting for consolidation."
+                    )
+                    return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
                 if asset_class == "commodities" and last_range > 0:
