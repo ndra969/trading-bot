@@ -30,7 +30,9 @@ that also houses a frontend, without disrupting the live bot.
    landed; `packages/{core,worker,api}` + `apps/dashboard` exist.)**
 2. Read-only REST API over the existing PostgreSQL data the bot writes.
 3. Dashboard pages: live positions, closed-trade history, account /
-   equity summary, recent signals, per-asset/per-session analytics.
+   equity summary, per-asset / per-session / **per-symbol** analytics,
+   and a rejection-telemetry view. (No separate "recent signals" page —
+   signals are not persisted as their own entity; see Non-goals.)
 4. Cent-account aware display (USC vs USD) consistent with the bot's
    `account_currency_unit` logic.
 5. **Deep position analysis**: every closed trade is drillable to its
@@ -55,16 +57,36 @@ that also houses a frontend, without disrupting the live bot.
    at signal creation so the API can serve them. This is the
    observability gap that forced the manual log-spelunking during the
    2026-06-02 loss investigation.
+8. **Per-symbol analytics.** Tuning rounds are driven by *per-symbol* P&L
+   (see [strategy-tuning](../strategy-tuning.md): "XAU/XAG dominated
+   losses"). The aggregate by-asset/by-session views are too coarse for
+   that. Add a per-symbol breakdown (WR, P&L, count, avg confluence) and a
+   symbol filter across analytics — the data is already there
+   (`positions.symbol`), it just isn't exposed.
+9. **Rejection telemetry (the other half of tuning).** Today the dashboard
+   can only see *taken* trades. The richest tuning signal is *why setups
+   were REJECTED* (climax candle, wrong-direction price action, anti-chase,
+   confluence-too-low, counter-trend gate, …) — currently only in transient
+   logs. The worker must record each rejection (timestamp, symbol,
+   asset_class, direction, stage/reason, confluence at rejection, light
+   context) to a capped telemetry store so the API can answer "which gate
+   blocks the most setups on XAGUSD this week, and would loosening it help?"
+   This is observability only (no change to *whether* a setup is rejected).
 
 ## Non-goals
 
 - No control/mutation endpoints (close, modify, start, stop). Read-only.
 - No WebSocket / live tick streaming (polling only).
 - No multi-user accounts / RBAC (single-operator dashboard).
-- No change to bot trading **logic** — the only worker change allowed is
-  *observability* (Goal 7: persist the confluence breakdown to
-  `meta_data`). Signal generation, scoring math, and execution behaviour
-  stay byte-for-byte identical.
+- No change to bot trading **logic** — the only worker changes allowed are
+  *observability*: Goal 7 (persist the confluence breakdown to `meta_data`)
+  and Goal 9 (record rejection telemetry). Signal generation, scoring math,
+  thresholds, and *whether* a setup is taken/rejected stay byte-for-byte
+  identical; we only write down what already happened.
+- No persisted `TradingSignal` entity / "recent signals" feed in this
+  phase. Signals are not stored as their own table (only the resulting
+  Position is). "What the bot is doing now" = open positions + the
+  rejection telemetry feed; do not invent a signals table here.
 - No editing config / thresholds from the UI in this phase. The Tuning
   view is **read-only**: it shows distributions + the current YAML
   threshold so the operator decides the value, then edits the YAML by
@@ -84,6 +106,16 @@ that also houses a frontend, without disrupting the live bot.
   without touching logs or the DB directly.
 - **Trade drill-down**: clicking a closed trade shows its full quality
   metrics + confluence/per-layer breakdown.
+- **Per-symbol view**: WR / P&L / count / avg-confluence per symbol, and
+  a symbol filter usable across history + analytics.
+- **Rejection feed**: the operator can see, per symbol + time window,
+  which gate rejected the most setups and the confluence those setups
+  carried — closing the "why didn't it trade / why did it" loop.
+- **Time-windowed**: every analytics + tuning + rejection endpoint accepts
+  a `since`/`until` range so a tuning change can be evaluated before vs
+  after (e.g. "since the 2026-06-02 threshold bump").
+- **Paginated history**: closed-trades + sessions endpoints return a
+  bounded page + total count; the History page can walk all rows.
 - Backend has unit tests (≥85% coverage on `trading_api`), gating like
   the bot's tests — FastAPI TestClient, mocked data layer, and syrupy
   snapshot assertions on response shapes. The API is NOT exempt from
@@ -113,6 +145,8 @@ that also houses a frontend, without disrupting the live bot.
 |------|------------|
 | Dashboard DB reads contend with bot writes | Use a separate read-only connection pool; short-lived queries; never hold transactions |
 | Worker observability write (Goal 7) regresses signal logic | Persist breakdown only where `meta_data` is already assembled at signal creation; no change to scoring/branching. Snapshot-test the signal path before/after |
+| Rejection telemetry (Goal 9) floods the DB / slows the loop | Every symbol can reject every cycle. Mitigate: one cheap INSERT per rejection wrapped so a telemetry failure NEVER blocks/raises into the trade loop; a capped retention (rolling N days / max rows, pruned) ; off-thread/batched flush if measured cost > a few ms. Behind a config flag (`telemetry.rejections_enabled`, default on) so it can be killed instantly |
+| Rejection write changes whether a setup is rejected | Telemetry is recorded at the existing `return None` sites only; it never alters control flow. Regression-test that signal output is identical with telemetry on vs off |
 | Frontend secrets (DB creds) leak to client | BFF pattern — frontend only talks to FastAPI, never DB directly. DB creds stay server-side |
 | Currency unit shown wrong (USC vs USD) | API returns both raw value + unit; reuse bot's cent-detection logic |
 | Scope creep into control features | Hard non-goal; revisit control in a separate spec after read-only ships |
