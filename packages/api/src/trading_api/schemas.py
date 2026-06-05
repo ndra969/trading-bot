@@ -94,3 +94,85 @@ class ThresholdsOut(BaseModel):
     confluence_weights: dict
     volatility_filter: dict
     commodity_gates: dict
+
+
+# --- Analytics -------------------------------------------------------------
+
+
+class StatRow(BaseModel):
+    """A grouped performance row (by asset / symbol / session / reason / exit)."""
+
+    key: str
+    count: int
+    wins: int
+    win_rate: float
+    total_pnl: float
+    avg_pnl: float
+    avg_confluence: float
+    currency_unit: str
+
+
+class EquityPoint(BaseModel):
+    close_time: datetime
+    cumulative_pnl: float
+
+
+class ConfluenceBucket(BaseModel):
+    bucket: str
+    lower: float
+    upper: float
+    count: int
+    wins: int
+    win_rate: float
+    avg_pnl: float
+
+
+class ConfluenceDistribution(BaseModel):
+    asset_class: str | None
+    buckets: list[ConfluenceBucket]
+    min: float | None
+    p50: float | None
+    max: float | None
+
+
+class ConfluenceVsOutcome(BaseModel):
+    buckets: list[ConfluenceBucket]
+    win_avg_confluence: float | None
+    loss_avg_confluence: float | None
+
+
+class LayerContribRow(BaseModel):
+    layer: str
+    participation_rate: float  # fraction of sampled trades the layer fired in
+    avg_contribution: float  # avg raw confidence when it fired
+
+
+class LayerContribution(BaseModel):
+    rows: list[LayerContribRow]
+    coverage: float  # fraction of closed trades carrying a breakdown
+    sample: int  # trades with a breakdown
+
+
+# --- Rejections ------------------------------------------------------------
+
+
+class RejectionReasonRow(BaseModel):
+    stage: str
+    count: int
+    avg_confluence: float | None
+
+
+class RejectionSymbolRow(BaseModel):
+    symbol: str
+    stage: str
+    count: int
+
+
+class RejectionRecent(BaseModel):
+    created_at: datetime
+    symbol: str
+    asset_class: str | None
+    direction: str | None
+    stage: str
+    confluence_score: float | None
+    details: dict
