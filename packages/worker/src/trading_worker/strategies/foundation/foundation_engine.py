@@ -1211,6 +1211,12 @@ class FoundationEngine:
                         logger.debug(
                             f"{symbol}: REJECTED - No volume burst (Vol: {current_volume} < {avg_volume:.0f} * {vol_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.VOLUME_BURST,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                        )
                         return None
 
                 # === CANDLE SENTIMENT GATE (Commodities) ===
@@ -1229,6 +1235,13 @@ class FoundationEngine:
                         if body_ratio > 0.7:  # Relaxed from 0.6 to 0.7
                             logger.warning(
                                 f"{symbol}: REJECTED - Falling knife detected (Bearish Body Ratio: {body_ratio:.2f})"
+                            )
+                            self._record_rejection(
+                                RejectionStage.FALLING_KNIFE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                body_ratio=round(body_ratio, 2),
                             )
                             return None
 
@@ -1283,6 +1296,14 @@ class FoundationEngine:
                         logger.warning(
                             f"{symbol}: REJECTED - No bounce confirmation (Lower Wick: {wick_ratio:.2f} < {wick_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.REJECTION_WICK,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            wick_ratio=round(wick_ratio, 2),
+                            threshold=wick_threshold,
+                        )
                         return None
 
                 # === SIGNAL CANDLE COLOR MATCH (PHASE 5.12) ===
@@ -1300,10 +1321,23 @@ class FoundationEngine:
                             logger.warning(
                                 f"{symbol}: REJECTED - No bullish confirmation (Candle is Bearish with body {body_ratio:.2f}). Waiting for green candle."
                             )
+                            self._record_rejection(
+                                RejectionStage.COLOR_MATCH,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                body_ratio=round(body_ratio, 2),
+                            )
                             return None
                     else:
                         logger.warning(
                             f"{symbol}: REJECTED - No bullish confirmation (Candle is Bearish). Waiting for green candle."
+                        )
+                        self._record_rejection(
+                            RejectionStage.COLOR_MATCH,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
                         )
                         return None
 
@@ -1327,6 +1361,13 @@ class FoundationEngine:
                         ):
                             logger.warning(
                                 f"{symbol}: REJECTED - Very high volatility ({current_range:.1f} > {avg_range*vt_cfg['vol_mult']:.1f}) and strong counter-trend (Price {price_below_ema_pct:.2f}% below EMA). NO counter-trend BUY allowed during crash."
+                            )
+                            self._record_rejection(
+                                RejectionStage.VOLATILITY_TREND_GATE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                price_below_ema_pct=round(price_below_ema_pct, 2),
                             )
                             return None
 
@@ -1352,6 +1393,14 @@ class FoundationEngine:
                             f"above zone BOTTOM {zone.lower_bound:.5f}. Max allowed: {max_entry_dev_pips}. "
                             f"Zone range: {zone.lower_bound:.5f} - {zone.upper_bound:.5f}"
                         )
+                        self._record_rejection(
+                            RejectionStage.ANTI_CHASE,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            dev_pips=round(entry_dist_from_zone_bottom / pip_size, 1),
+                            max_pips=max_entry_dev_pips,
+                        )
                         return None
 
                     # Additional validation: Entry should not be above zone upper bound
@@ -1363,6 +1412,15 @@ class FoundationEngine:
                             f"{zone.upper_bound:.5f} by {entry_dist_from_zone_top/pip_size:.1f} pips. "
                             f"This is chasing price, not trading at support. "
                             f"Zone range: {zone.lower_bound:.5f} - {zone.upper_bound:.5f}"
+                        )
+                        self._record_rejection(
+                            RejectionStage.ANTI_CHASE,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            dev_pips=round(entry_dist_from_zone_top / pip_size, 1),
+                            max_pips=max_entry_dev_pips,
+                            above_upper_bound=True,
                         )
                         return None
 
@@ -1400,6 +1458,14 @@ class FoundationEngine:
                         f"{symbol}: REJECTED - Net Risk too high. "
                         f"Risk: {current_risk/pip_size:.1f} pips > Max {max_risk_pips} pips."
                     )
+                    self._record_rejection(
+                        RejectionStage.MAX_STOP_LOSS,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        risk_pips=round(current_risk / pip_size, 1),
+                        max_pips=max_risk_pips,
+                    )
                     return None
 
                 # Recalculate TP based on ACTUAL entry and FIXED SL to maintain RR
@@ -1434,6 +1500,12 @@ class FoundationEngine:
                         logger.debug(
                             f"{symbol}: REJECTED - No volume burst (Vol: {current_volume} < {avg_volume:.0f} * {vol_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.VOLUME_BURST,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                        )
                         return None
 
                 # === CANDLE SENTIMENT GATE (Commodities) ===
@@ -1452,6 +1524,13 @@ class FoundationEngine:
                         if body_ratio > 0.7:  # Relaxed from 0.6 to 0.7
                             logger.warning(
                                 f"{symbol}: REJECTED - Momentum spike detected (Bullish Body Ratio: {body_ratio:.2f})"
+                            )
+                            self._record_rejection(
+                                RejectionStage.MOMENTUM_SPIKE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                body_ratio=round(body_ratio, 2),
                             )
                             return None
 
@@ -1503,6 +1582,14 @@ class FoundationEngine:
                         logger.warning(
                             f"{symbol}: REJECTED - No bounce confirmation (Upper Wick: {wick_ratio:.2f} < {wick_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.REJECTION_WICK,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            wick_ratio=round(wick_ratio, 2),
+                            threshold=wick_threshold,
+                        )
                         return None
 
                 # === SIGNAL CANDLE COLOR MATCH (PHASE 5.12) ===
@@ -1520,6 +1607,13 @@ class FoundationEngine:
                         logger.warning(
                             f"{symbol}: REJECTED - No bearish confirmation (Candle is Bullish). "
                             "Waiting for red candle."
+                        )
+                        self._record_rejection(
+                            RejectionStage.COLOR_MATCH,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            body_ratio=round(body_ratio, 2),
                         )
                         return None
 
@@ -1546,6 +1640,13 @@ class FoundationEngine:
                                 f"({current_range:.1f} > {avg_range*vt_cfg['vol_mult']:.1f}). "
                                 "NO counter-trend SELL allowed during spike."
                             )
+                            self._record_rejection(
+                                RejectionStage.VOLATILITY_TREND_GATE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                price_above_ema_pct=round(price_above_ema_pct, 2),
+                            )
                             return None
 
                 # ═══════════════════════════════════════════════════════
@@ -1564,6 +1665,14 @@ class FoundationEngine:
                             f"{symbol}: REJECTED - Chasing price too far from zone. "
                             f"Price {entry_price:.5f} is {entry_dist_from_zone/pip_size:.1f} pips "
                             f"below zone bottom {zone.lower_bound:.5f}. Max allowed: {max_entry_dev_pips}"
+                        )
+                        self._record_rejection(
+                            RejectionStage.ANTI_CHASE,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            dev_pips=round(entry_dist_from_zone / pip_size, 1),
+                            max_pips=max_entry_dev_pips,
                         )
                         return None
 
@@ -1592,6 +1701,14 @@ class FoundationEngine:
                     logger.debug(
                         f"{symbol}: REJECTED - Net Risk too high. "
                         f"Risk: {current_risk/pip_size:.1f} pips > Max {max_risk_pips} pips."
+                    )
+                    self._record_rejection(
+                        RejectionStage.MAX_STOP_LOSS,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        risk_pips=round(current_risk / pip_size, 1),
+                        max_pips=max_risk_pips,
                     )
                     return None
 
