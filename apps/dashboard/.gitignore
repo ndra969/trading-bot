@@ -1,0 +1,15 @@
+/node_modules
+/.next
+/out
+/build
+next-env.d.ts
+.env.local
+*.tsbuildinfo
+
+# The repo-root .gitignore has broad `*.json` and `lib/` rules (for the Python
+# project); re-include the dashboard files they would otherwise swallow.
+!package.json
+!package-lock.json
+!tsconfig.json
+!/src/lib/
+!/src/lib/**
