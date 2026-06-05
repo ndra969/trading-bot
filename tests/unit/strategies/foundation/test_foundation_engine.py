@@ -9,6 +9,7 @@ from datetime import UTC
 import pandas as pd
 import pytest
 import pytest_asyncio
+from trading_core.enums.rejection_stage import RejectionStage
 from trading_worker.strategies.foundation.foundation_engine import FoundationEngine
 from trading_worker.strategies.models import SignalDirection
 
@@ -3083,3 +3084,66 @@ class TestCommodityGatesConfig:
         assert g["rejection_wick"]["sell"]["trend_following_ratio"] == 0.15
         assert g["volatility_trend_gate"]["buy"]["vol_mult"] == 1.5
         assert g["volatility_trend_gate"]["buy"]["ema_buffer_pct"] == 0.3
+
+
+class TestRejectionTelemetry:
+    """FoundationEngine records rejections when a recorder is wired (Goal 9)."""
+
+    def test_record_rejection_noop_without_recorder(self):
+        engine = FoundationEngine(config={}, use_database=False)
+        # Must not raise when no recorder is configured.
+        engine._record_rejection(
+            RejectionStage.CLIMAX,
+            "XAGUSD",
+            direction=SignalDirection.SELL,
+            asset_class="commodities",
+        )
+
+    def test_record_rejection_forwards_to_recorder(self):
+        from unittest.mock import MagicMock
+
+        rec = MagicMock()
+        engine = FoundationEngine(config={}, use_database=False, rejection_recorder=rec)
+        engine._record_rejection(
+            RejectionStage.CLIMAX,
+            "XAGUSD",
+            direction=SignalDirection.SELL,
+            asset_class="commodities",
+            confluence_score=61.7,
+            current_range=1.2,
+        )
+        rec.record.assert_called_once()
+        kw = rec.record.call_args.kwargs
+        assert kw["stage"] == RejectionStage.CLIMAX
+        assert kw["symbol"] == "XAGUSD"
+        assert kw["direction"] == "SELL"
+        assert kw["asset_class"] == "commodities"
+        assert kw["confluence_score"] == 61.7
+        assert kw["details"] == {"current_range": 1.2}
+
+    def test_confluence_too_low_records_rejection(self):
+        from unittest.mock import MagicMock
+
+        import pandas as pd
+
+        rec = MagicMock()
+        engine = FoundationEngine(config={}, use_database=False, rejection_recorder=rec)
+        df = pd.DataFrame({"high": [1.1], "low": [1.0], "close": [1.05], "open": [1.0]})
+
+        passed = engine._passes_final_quality_filters(
+            symbol="EURUSD",
+            direction=SignalDirection.BUY,
+            asset_class="forex_major",
+            final_score=10.0,  # below any threshold
+            weighted_foundation_score=10.0,
+            weighted_enhancement_score=0.0,
+            layer_scores={},
+            h1_trend_bias=None,
+            data=df,
+            current_price=1.05,
+            current_range=0.1,
+            avg_range=0.1,
+        )
+
+        assert passed is False
+        assert rec.record.call_args.kwargs["stage"] == RejectionStage.CONFLUENCE_TOO_LOW

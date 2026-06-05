@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 import pandas as pd
+from trading_core.enums.rejection_stage import RejectionStage
 from trading_core.utils.logger import get_logger
 
 from trading_worker.strategies.enhancement.breakout_analyzer import BreakoutAnalyzer
@@ -28,7 +29,11 @@ class FoundationEngine:
     """
 
     def __init__(
-        self, config: dict[str, Any] = None, use_database: bool = True, symbol_mapper=None
+        self,
+        config: dict[str, Any] = None,
+        use_database: bool = True,
+        symbol_mapper=None,
+        rejection_recorder=None,
     ):
         """
         Initialize foundation engine.
@@ -37,9 +42,12 @@ class FoundationEngine:
             config: Engine configuration
             use_database: Whether to persist zones to database
             symbol_mapper: Optional SymbolMapper for symbol normalization (EURUSDc -> EURUSD)
+            rejection_recorder: Optional RejectionRecorder for tuning telemetry.
+                When None (tests/backtests), rejection recording is a no-op.
         """
         self.config = config or {}
         self.symbol_mapper = symbol_mapper  # Store for symbol normalization
+        self.rejection_recorder = rejection_recorder
 
         # Initialize S&D strategy
         self.strategy = SupplyDemandStrategy(
@@ -56,6 +64,37 @@ class FoundationEngine:
         self.breakout_analyzer = BreakoutAnalyzer(self.config)
 
         logger.info(f"FoundationEngine initialized (database: {use_database})")
+
+    def _record_rejection(
+        self,
+        stage: RejectionStage,
+        symbol: str,
+        *,
+        direction: SignalDirection | None = None,
+        asset_class: str | None = None,
+        confluence_score: float | None = None,
+        **details: Any,
+    ) -> None:
+        """Record a rejected setup for tuning telemetry (no-op without recorder).
+
+        Fire-and-forget: never raises into the signal path. Call this right
+        before the matching ``return None`` / ``return False`` — it does not
+        change control flow.
+        """
+        recorder = self.rejection_recorder
+        if recorder is None:
+            return
+        try:
+            recorder.record(
+                stage=stage,
+                symbol=symbol,
+                asset_class=asset_class,
+                direction=direction.name if direction is not None else None,
+                confluence_score=confluence_score,
+                details=details or None,
+            )
+        except Exception:  # pragma: no cover - telemetry must never break trading
+            pass
 
     async def analyze_symbol(
         self,
@@ -532,6 +571,14 @@ class FoundationEngine:
                 f"Foundation: {weighted_foundation_score:.1f}%, "
                 f"Enhancement: {weighted_enhancement_score:.1f}%"
             )
+            self._record_rejection(
+                RejectionStage.CONFLUENCE_TOO_LOW,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                min_confluence=min_confluence,
+            )
             return False
 
         # 2. Price Action Confirmation Requirement
@@ -547,6 +594,14 @@ class FoundationEngine:
                     f"(score: {pa_raw:.1f}% < min: {min_pa_score}%). "
                     f"No clear rejection pattern detected."
                 )
+                self._record_rejection(
+                    RejectionStage.PRICE_ACTION_REQUIRED,
+                    symbol,
+                    direction=direction,
+                    asset_class=asset_class,
+                    confluence_score=final_score,
+                    pa_raw=round(pa_raw, 1),
+                )
                 return False
             logger.debug(
                 f"{symbol}: ✅ Price action confirmed (score: {pa_raw:.1f}% ≥ {min_pa_score}%)"
@@ -558,11 +613,27 @@ class FoundationEngine:
                 f"{symbol}: REJECTED - H1 Trend is BEARISH. "
                 f"Counter-trend BUY blocked by SNIPER Gate (Universal)."
             )
+            self._record_rejection(
+                RejectionStage.COUNTER_TREND_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                h1_trend_bias=h1_trend_bias,
+            )
             return False
         if h1_trend_bias == "BULLISH" and direction == SignalDirection.SELL:
             logger.warning(
                 f"{symbol}: REJECTED - H1 Trend is BULLISH. "
                 f"Counter-trend SELL blocked by SNIPER Gate (Universal)."
+            )
+            self._record_rejection(
+                RejectionStage.COUNTER_TREND_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                h1_trend_bias=h1_trend_bias,
             )
             return False
 
@@ -571,6 +642,13 @@ class FoundationEngine:
             logger.warning(
                 f"{symbol}: REJECTED - No technical confirmation. "
                 f"Gold trades require at least one enhancement layer."
+            )
+            self._record_rejection(
+                RejectionStage.NO_ENHANCEMENT_LAYER,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
             )
             return False
 
@@ -839,11 +917,27 @@ class FoundationEngine:
                 f"{symbol}: REJECTING SELL signal - RSI is oversold ({rsi_res.rsi_value:.1f}). "
                 f"Cannot short when market is already oversold."
             )
+            self._record_rejection(
+                RejectionStage.RSI_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                condition="OVERSOLD",
+                rsi=round(float(rsi_res.rsi_value), 1),
+            )
             return None
         elif direction == SignalDirection.BUY and rsi_res.details.get("condition") == "OVERBOUGHT":
             logger.warning(
                 f"{symbol}: REJECTING BUY signal - RSI is overbought ({rsi_res.rsi_value:.1f}). "
                 f"Cannot buy when market is already overbought."
+            )
+            self._record_rejection(
+                RejectionStage.RSI_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                condition="OVERBOUGHT",
+                rsi=round(float(rsi_res.rsi_value), 1),
             )
             return None
 
@@ -896,6 +990,14 @@ class FoundationEngine:
                 logger.warning(
                     f"{symbol}: REJECTED - Extremely strong market structure misalignment "
                     f"({struct_res.direction} {struct_res.confidence:.1f}% vs {direction.name})"
+                )
+                self._record_rejection(
+                    RejectionStage.STRUCTURE_GATE,
+                    symbol,
+                    direction=direction,
+                    asset_class=asset_class,
+                    structure_direction=struct_res.direction,
+                    structure_confidence=round(float(struct_res.confidence), 1),
                 )
                 return None
             elif struct_res.direction != direction.name:
@@ -1152,6 +1254,14 @@ class FoundationEngine:
                         f"asset_class={asset_class}). "
                         "Risk of reversal is high. Waiting for consolidation."
                     )
+                    self._record_rejection(
+                        RejectionStage.CLIMAX,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        current_range=round(current_range, 5),
+                        avg_range=round(avg_range, 5),
+                    )
                     return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
@@ -1366,6 +1476,14 @@ class FoundationEngine:
                         f"{avg_range * self._climax_multiplier(asset_class):.5f}, "
                         f"asset_class={asset_class}). "
                         "Risk of reversal is high. Waiting for consolidation."
+                    )
+                    self._record_rejection(
+                        RejectionStage.CLIMAX,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        current_range=round(current_range, 5),
+                        avg_range=round(avg_range, 5),
                     )
                     return None
 

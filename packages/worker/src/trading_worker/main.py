@@ -52,6 +52,7 @@ class TradingBot:
         self.mt5 = None
         self.data_manager = None
         self.foundation_engine = None
+        self.rejection_recorder = None
         self.symbol_mapper = None
         self.strategy_manager = None
         self.signal_aggregator = None
@@ -334,13 +335,31 @@ class TradingBot:
             logger.warning("Database not available - zones will be stored in memory only")
             use_database = False
 
-        self.foundation_engine = FoundationEngine(strategy_config, use_database=use_database)
+        # Rejection telemetry recorder (ui-dashboard Goal 9) — observability only,
+        # fire-and-forget. Disabled when there's no DB to write to.
+        from .services.rejection_recorder import RejectionRecorder
+
+        telemetry_cfg = self.config.get("telemetry", {}) if isinstance(self.config, dict) else {}
+        self.rejection_recorder = RejectionRecorder(
+            enabled=use_database and bool(telemetry_cfg.get("rejections_enabled", True)),
+            retention_days=int(telemetry_cfg.get("rejection_retention_days", 30)),
+        )
+
+        self.foundation_engine = FoundationEngine(
+            strategy_config,
+            use_database=use_database,
+            rejection_recorder=self.rejection_recorder,
+        )
 
         # Initialize MTFAnalyzer if in MTF mode
         if self.mtf_mode:
             from .strategies.mtf_analyzer import MTFAnalyzer
 
-            self.mtf_analyzer = MTFAnalyzer(config=strategy_config, use_database=use_database)
+            self.mtf_analyzer = MTFAnalyzer(
+                config=strategy_config,
+                use_database=use_database,
+                rejection_recorder=self.rejection_recorder,
+            )
             logger.info(
                 f"MTFAnalyzer initialized (Zone: {self.zone_timeframe}, Entry: {self.entry_timeframe})"
             )
@@ -903,6 +922,11 @@ class TradingBot:
 
                 except Exception as e:
                     logger.error(f"Error in parallel analysis: {e}")
+
+                # Flush rejection telemetry collected during this cycle (Goal 9).
+                # Fire-and-forget: flush() never raises.
+                if self.rejection_recorder is not None:
+                    await self.rejection_recorder.flush()
 
                 # Update and manage positions
                 await self.position_orchestrator.manage_positions()
