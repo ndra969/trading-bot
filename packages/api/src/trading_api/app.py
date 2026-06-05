@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from trading_api.deps import _engine
-from trading_api.routers import analytics, config, positions, rejections
+from trading_api.routers import account, analytics, config, positions, rejections, sessions
 from trading_api.schemas import Health
 
 
@@ -32,6 +32,8 @@ def create_app() -> FastAPI:
     app.include_router(positions.router)
     app.include_router(analytics.router)
     app.include_router(rejections.router)
+    app.include_router(account.router)
+    app.include_router(sessions.router)
     app.include_router(config.router)
 
     @app.get("/api/v1/health", response_model=Health, tags=["health"])

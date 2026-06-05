@@ -176,3 +176,33 @@ class RejectionRecent(BaseModel):
     stage: str
     confluence_score: float | None
     details: dict
+
+
+# --- Account / Sessions ----------------------------------------------------
+
+
+class AccountSummary(BaseModel):
+    broker_name: str | None
+    balance: float
+    equity: float
+    leverage: int | None
+    open_count: int
+    # Capital at risk if every open SL hits (Σ open risk_amount_usd).
+    total_exposure: float
+    currency_unit: str
+
+
+class SessionOut(BaseModel):
+    session_id: str
+    status: str | None
+    trading_type: str | None
+    start_time: datetime | None
+    end_time: datetime | None
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    win_rate: float
+    total_pnl_usd: float
+    profit_factor: float
+    max_drawdown: float
+    currency_unit: str
