@@ -3,6 +3,14 @@
 Backend first (data contract), then frontend against real endpoints.
 Each phase is independently shippable.
 
+> **Progress (2026-06-05).** Phases 0, 1.5, 1.6, and 2 are **DONE & merged**:
+> monorepo skeleton, confluence-breakdown persistence, rejection telemetry
+> (table + recorder + 26 instrumented sites + per-cycle flush), and the full
+> read-only API (positions / analytics / rejections / account / sessions /
+> config + health, 24 tests, live-DB smoke). Next up: **Phase 3-4 frontend**,
+> following `reference/polyforge` conventions (see design.md → Tech stack +
+> Frontend → API transport).
+
 ## Phase 0 — Prerequisite (blocking)
 
 - [x] **[monorepo-restructure](../../archive/2026-05/monorepo-restructure/)
@@ -122,20 +130,30 @@ setups are rejected.
       endpoint + open `/docs` (Swagger) + `/redoc`, confirm live shape.
 - [ ] Commit: `feat(api): read-only dashboard endpoints + tests`.
 
-## Phase 3 — Frontend scaffold (~1-2 hr)
+## Phase 3 — Frontend scaffold (~2 hr)
 
-- [ ] `npx create-next-app@latest frontend --ts --app --no-tailwind`
-      (or with tailwind if preferred).
-- [ ] `lib/api.ts`: typed fetch client + `usePoll(endpoint, ms)` hook
-      (tiered intervals: live 3 s, history 15 s, analytics/tuning/
+Mirror `reference/polyforge/frontend/nextjs` conventions (cloned locally,
+gitignored). Port its patterns; skip its auth/Firebase/i18n.
+
+- [ ] `create-next-app` into `apps/dashboard` (`--ts --app --tailwind`,
+      `src/` dir, import alias `@/*`). Tailwind v4.
+- [ ] shadcn/ui init; add the primitives we use (button, card, table,
+      dialog/drawer, select, badge, skeleton, toast). `lib/utils.ts` → `cn()`.
+- [ ] **Proxy route** `src/app/api/proxy/[...path]/route.ts` forwarding
+      `/api/proxy/*` → `${API_URL}/*` (server-side). `.env.local`:
+      `API_URL=http://localhost:8000` (NOT `NEXT_PUBLIC_*`).
+- [ ] `lib/api.ts`: `apiFetch<T>()` + `ApiError` (same-origin `/api/proxy`),
+      and `lib/usePoll.ts` (tiered: live 3 s, history 15 s, analytics/tuning/
       rejections 60 s + manual refresh).
-- [ ] Shared **time-range picker** component (presets 24h/7d/30d/since/
-      all) that threads `since`/`until` into page fetches.
-- [ ] `.env.local`: `NEXT_PUBLIC_API_BASE=http://localhost:8000`.
-- [ ] Base layout + nav (Overview / Positions / History / Analytics /
-      Tuning / Rejections).
-- [ ] Health-check banner (API reachable?).
-- [ ] Commit: `feat(frontend): Next.js scaffold + API client`.
+- [ ] `types/api.ts`: TS types mirroring the Pydantic schemas
+      (OpenPosition, ClosedPosition, PositionDetail, Page<T>, StatRow,
+      Confluence*, Rejection*, AccountSummary, SessionOut, ThresholdsOut).
+- [ ] Port `features/theme` + `features/toast`; `(dashboard)/layout.tsx`
+      with `Sidebar` (Overview/Positions/History/Analytics/Tuning/Rejections)
+      + `Topbar`; shared `TimeRangePicker` (24h/7d/30d/since/all → since/until),
+      `Pagination`, `StatusDot`, skeletons.
+- [ ] Health banner (poll `/api/v1/health` via proxy).
+- [ ] `npm run build` green. Commit: `feat(frontend): Next.js scaffold + API client (polyforge conventions)`.
 
 ## Phase 4 — Dashboard pages (~3-4 hr)
 
