@@ -24,20 +24,28 @@ class MTFAnalyzer:
     This matches the proven backtest approach that achieved +40R across 3 pairs.
     """
 
-    def __init__(self, config: dict | None = None, use_database: bool = False):
+    def __init__(
+        self,
+        config: dict | None = None,
+        use_database: bool = False,
+        rejection_recorder=None,
+    ):
         """
         Initialize MTF Analyzer.
 
         Args:
             config: Strategy configuration
             use_database: Whether to use database for persistence
+            rejection_recorder: Optional RejectionRecorder for tuning telemetry.
         """
         self.config = config or {}
         self.use_database = use_database
 
         # Initialize FoundationEngine for zone detection and signal generation
         self.foundation_engine = FoundationEngine(
-            config=self.config, use_database=self.use_database
+            config=self.config,
+            use_database=self.use_database,
+            rejection_recorder=rejection_recorder,
         )
 
         # Initialize TimeframeManager for validation
