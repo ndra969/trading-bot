@@ -114,3 +114,6 @@ Thumbs.db
 # Documentation build
 docs/_build/
 site/
+
+# UI reference clone (indra-an/polyforge) — local only, never pushed
+/reference/
