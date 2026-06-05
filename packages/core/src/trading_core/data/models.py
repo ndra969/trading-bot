@@ -676,3 +676,48 @@ class ConfigSnapshot(Base):
             f"<ConfigSnapshot(hash={self.config_hash[:12]}..., "
             f"env={self.environment}, created={self.created_at.strftime('%Y-%m-%d')})>"
         )
+
+
+class SignalRejection(Base):
+    """
+    Signal Rejection Telemetry.
+
+    One row per setup the signal pipeline rejected before it became a trade.
+    Observability for strategy tuning (the dashboard Rejections view): answers
+    "which gate blocks the most setups on which symbol, and at what
+    confluence?". Written fire-and-forget by the worker; never affects trading.
+    """
+
+    __tablename__ = "signal_rejections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        index=True,
+    )
+
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    asset_class: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    direction: Mapped[str | None] = mapped_column(String(10), nullable=True)  # BUY/SELL
+    stage: Mapped[str] = mapped_column(
+        String(40), nullable=False, index=True
+    )  # RejectionStage value (e.g. "climax")
+
+    # Confluence at the moment of rejection (nullable — some gates fire before
+    # scoring completes).
+    confluence_score: Mapped[float | None] = mapped_column(Float(precision=2), nullable=True)
+
+    # Small free-form context (e.g. {current_range, avg_range, threshold}).
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("idx_rejection_created", "created_at"),
+        Index("idx_rejection_symbol_stage", "symbol", "stage"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<SignalRejection(symbol={self.symbol}, stage={self.stage}, "
+            f"conf={self.confluence_score}, at={self.created_at})>"
+        )

@@ -262,14 +262,17 @@ class SignalAggregator:
         # Collect strategy scores
         strategy_scores = {r.strategy_name: r.score for r in results}
 
-        # Extract price action info from foundation strategy result (if available)
+        # Extract price action info + confluence breakdown from the foundation
+        # strategy result (if available)
         price_action_info = None
+        confluence_breakdown = None
         for result in results:
             if result.strategy_name == "foundation" and result.metadata:
                 layer_details = result.metadata.get("layer_details", {})
                 if "price_action" in layer_details:
                     price_action_info = layer_details["price_action"]
-                    break
+                confluence_breakdown = result.metadata.get("confluence_breakdown")
+                break
 
         # Create signal metadata with price action info
         signal_metadata = {
@@ -277,6 +280,8 @@ class SignalAggregator:
         }
         if price_action_info:
             signal_metadata["price_action"] = price_action_info
+        if confluence_breakdown:
+            signal_metadata["confluence_breakdown"] = confluence_breakdown
 
         # Create signal
         try:

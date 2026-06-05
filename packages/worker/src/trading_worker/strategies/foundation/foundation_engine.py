@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 import pandas as pd
+from trading_core.enums.rejection_stage import RejectionStage
 from trading_core.utils.logger import get_logger
 
 from trading_worker.strategies.enhancement.breakout_analyzer import BreakoutAnalyzer
@@ -28,7 +29,11 @@ class FoundationEngine:
     """
 
     def __init__(
-        self, config: dict[str, Any] = None, use_database: bool = True, symbol_mapper=None
+        self,
+        config: dict[str, Any] = None,
+        use_database: bool = True,
+        symbol_mapper=None,
+        rejection_recorder=None,
     ):
         """
         Initialize foundation engine.
@@ -37,9 +42,12 @@ class FoundationEngine:
             config: Engine configuration
             use_database: Whether to persist zones to database
             symbol_mapper: Optional SymbolMapper for symbol normalization (EURUSDc -> EURUSD)
+            rejection_recorder: Optional RejectionRecorder for tuning telemetry.
+                When None (tests/backtests), rejection recording is a no-op.
         """
         self.config = config or {}
         self.symbol_mapper = symbol_mapper  # Store for symbol normalization
+        self.rejection_recorder = rejection_recorder
 
         # Initialize S&D strategy
         self.strategy = SupplyDemandStrategy(
@@ -56,6 +64,37 @@ class FoundationEngine:
         self.breakout_analyzer = BreakoutAnalyzer(self.config)
 
         logger.info(f"FoundationEngine initialized (database: {use_database})")
+
+    def _record_rejection(
+        self,
+        stage: RejectionStage,
+        symbol: str,
+        *,
+        direction: SignalDirection | None = None,
+        asset_class: str | None = None,
+        confluence_score: float | None = None,
+        **details: Any,
+    ) -> None:
+        """Record a rejected setup for tuning telemetry (no-op without recorder).
+
+        Fire-and-forget: never raises into the signal path. Call this right
+        before the matching ``return None`` / ``return False`` — it does not
+        change control flow.
+        """
+        recorder = self.rejection_recorder
+        if recorder is None:
+            return
+        try:
+            recorder.record(
+                stage=stage,
+                symbol=symbol,
+                asset_class=asset_class,
+                direction=direction.name if direction is not None else None,
+                confluence_score=confluence_score,
+                details=details or None,
+            )
+        except Exception:  # pragma: no cover - telemetry must never break trading
+            pass
 
     async def analyze_symbol(
         self,
@@ -419,6 +458,7 @@ class FoundationEngine:
         weighted_enhancement_score: float,
         layer_scores: dict,
         layer_details: dict,
+        raw_confidences: dict,
         current_price: float,
     ) -> StrategyResult:
         """Build the final StrategyResult after all filters have passed.
@@ -427,6 +467,17 @@ class FoundationEngine:
         confluence data into metadata for downstream consumers.
         """
         zone_id = f"{symbol}_{zone.zone_type.value}_{zone.lower_bound:.5f}_{zone.upper_bound:.5f}"
+
+        # Observability (ui-dashboard Goal 7): the foundation-vs-enhancement
+        # split + per-layer raw confidences only existed in transient logs.
+        # Persist them so the API / Tuning view can show WHY a trade scored
+        # what it did. Pure metadata — does not affect scoring or execution.
+        confluence_breakdown = {
+            "foundation_share": round(weighted_foundation_score, 2),
+            "enhancement_share": round(weighted_enhancement_score, 2),
+            "raw_confidences": {k: round(float(v), 2) for k, v in raw_confidences.items()},
+            "active_layers": sorted(raw_confidences.keys()),
+        }
 
         logger.info(
             f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
@@ -452,6 +503,7 @@ class FoundationEngine:
                 "enhancement_score": weighted_enhancement_score,
                 "layer_scores": layer_scores,
                 "layer_details": layer_details,
+                "confluence_breakdown": confluence_breakdown,
             },
         )
 
@@ -519,6 +571,14 @@ class FoundationEngine:
                 f"Foundation: {weighted_foundation_score:.1f}%, "
                 f"Enhancement: {weighted_enhancement_score:.1f}%"
             )
+            self._record_rejection(
+                RejectionStage.CONFLUENCE_TOO_LOW,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                min_confluence=min_confluence,
+            )
             return False
 
         # 2. Price Action Confirmation Requirement
@@ -534,6 +594,14 @@ class FoundationEngine:
                     f"(score: {pa_raw:.1f}% < min: {min_pa_score}%). "
                     f"No clear rejection pattern detected."
                 )
+                self._record_rejection(
+                    RejectionStage.PRICE_ACTION_REQUIRED,
+                    symbol,
+                    direction=direction,
+                    asset_class=asset_class,
+                    confluence_score=final_score,
+                    pa_raw=round(pa_raw, 1),
+                )
                 return False
             logger.debug(
                 f"{symbol}: ✅ Price action confirmed (score: {pa_raw:.1f}% ≥ {min_pa_score}%)"
@@ -545,11 +613,27 @@ class FoundationEngine:
                 f"{symbol}: REJECTED - H1 Trend is BEARISH. "
                 f"Counter-trend BUY blocked by SNIPER Gate (Universal)."
             )
+            self._record_rejection(
+                RejectionStage.COUNTER_TREND_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                h1_trend_bias=h1_trend_bias,
+            )
             return False
         if h1_trend_bias == "BULLISH" and direction == SignalDirection.SELL:
             logger.warning(
                 f"{symbol}: REJECTED - H1 Trend is BULLISH. "
                 f"Counter-trend SELL blocked by SNIPER Gate (Universal)."
+            )
+            self._record_rejection(
+                RejectionStage.COUNTER_TREND_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                h1_trend_bias=h1_trend_bias,
             )
             return False
 
@@ -558,6 +642,13 @@ class FoundationEngine:
             logger.warning(
                 f"{symbol}: REJECTED - No technical confirmation. "
                 f"Gold trades require at least one enhancement layer."
+            )
+            self._record_rejection(
+                RejectionStage.NO_ENHANCEMENT_LAYER,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
             )
             return False
 
@@ -826,11 +917,27 @@ class FoundationEngine:
                 f"{symbol}: REJECTING SELL signal - RSI is oversold ({rsi_res.rsi_value:.1f}). "
                 f"Cannot short when market is already oversold."
             )
+            self._record_rejection(
+                RejectionStage.RSI_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                condition="OVERSOLD",
+                rsi=round(float(rsi_res.rsi_value), 1),
+            )
             return None
         elif direction == SignalDirection.BUY and rsi_res.details.get("condition") == "OVERBOUGHT":
             logger.warning(
                 f"{symbol}: REJECTING BUY signal - RSI is overbought ({rsi_res.rsi_value:.1f}). "
                 f"Cannot buy when market is already overbought."
+            )
+            self._record_rejection(
+                RejectionStage.RSI_GATE,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                condition="OVERBOUGHT",
+                rsi=round(float(rsi_res.rsi_value), 1),
             )
             return None
 
@@ -883,6 +990,14 @@ class FoundationEngine:
                 logger.warning(
                     f"{symbol}: REJECTED - Extremely strong market structure misalignment "
                     f"({struct_res.direction} {struct_res.confidence:.1f}% vs {direction.name})"
+                )
+                self._record_rejection(
+                    RejectionStage.STRUCTURE_GATE,
+                    symbol,
+                    direction=direction,
+                    asset_class=asset_class,
+                    structure_direction=struct_res.direction,
+                    structure_confidence=round(float(struct_res.confidence), 1),
                 )
                 return None
             elif struct_res.direction != direction.name:
@@ -1096,6 +1211,12 @@ class FoundationEngine:
                         logger.debug(
                             f"{symbol}: REJECTED - No volume burst (Vol: {current_volume} < {avg_volume:.0f} * {vol_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.VOLUME_BURST,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                        )
                         return None
 
                 # === CANDLE SENTIMENT GATE (Commodities) ===
@@ -1114,6 +1235,13 @@ class FoundationEngine:
                         if body_ratio > 0.7:  # Relaxed from 0.6 to 0.7
                             logger.warning(
                                 f"{symbol}: REJECTED - Falling knife detected (Bearish Body Ratio: {body_ratio:.2f})"
+                            )
+                            self._record_rejection(
+                                RejectionStage.FALLING_KNIFE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                body_ratio=round(body_ratio, 2),
                             )
                             return None
 
@@ -1139,6 +1267,14 @@ class FoundationEngine:
                         f"asset_class={asset_class}). "
                         "Risk of reversal is high. Waiting for consolidation."
                     )
+                    self._record_rejection(
+                        RejectionStage.CLIMAX,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        current_range=round(current_range, 5),
+                        avg_range=round(avg_range, 5),
+                    )
                     return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
@@ -1160,6 +1296,14 @@ class FoundationEngine:
                         logger.warning(
                             f"{symbol}: REJECTED - No bounce confirmation (Lower Wick: {wick_ratio:.2f} < {wick_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.REJECTION_WICK,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            wick_ratio=round(wick_ratio, 2),
+                            threshold=wick_threshold,
+                        )
                         return None
 
                 # === SIGNAL CANDLE COLOR MATCH (PHASE 5.12) ===
@@ -1177,10 +1321,23 @@ class FoundationEngine:
                             logger.warning(
                                 f"{symbol}: REJECTED - No bullish confirmation (Candle is Bearish with body {body_ratio:.2f}). Waiting for green candle."
                             )
+                            self._record_rejection(
+                                RejectionStage.COLOR_MATCH,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                body_ratio=round(body_ratio, 2),
+                            )
                             return None
                     else:
                         logger.warning(
                             f"{symbol}: REJECTED - No bullish confirmation (Candle is Bearish). Waiting for green candle."
+                        )
+                        self._record_rejection(
+                            RejectionStage.COLOR_MATCH,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
                         )
                         return None
 
@@ -1204,6 +1361,13 @@ class FoundationEngine:
                         ):
                             logger.warning(
                                 f"{symbol}: REJECTED - Very high volatility ({current_range:.1f} > {avg_range*vt_cfg['vol_mult']:.1f}) and strong counter-trend (Price {price_below_ema_pct:.2f}% below EMA). NO counter-trend BUY allowed during crash."
+                            )
+                            self._record_rejection(
+                                RejectionStage.VOLATILITY_TREND_GATE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                price_below_ema_pct=round(price_below_ema_pct, 2),
                             )
                             return None
 
@@ -1229,6 +1393,14 @@ class FoundationEngine:
                             f"above zone BOTTOM {zone.lower_bound:.5f}. Max allowed: {max_entry_dev_pips}. "
                             f"Zone range: {zone.lower_bound:.5f} - {zone.upper_bound:.5f}"
                         )
+                        self._record_rejection(
+                            RejectionStage.ANTI_CHASE,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            dev_pips=round(entry_dist_from_zone_bottom / pip_size, 1),
+                            max_pips=max_entry_dev_pips,
+                        )
                         return None
 
                     # Additional validation: Entry should not be above zone upper bound
@@ -1240,6 +1412,15 @@ class FoundationEngine:
                             f"{zone.upper_bound:.5f} by {entry_dist_from_zone_top/pip_size:.1f} pips. "
                             f"This is chasing price, not trading at support. "
                             f"Zone range: {zone.lower_bound:.5f} - {zone.upper_bound:.5f}"
+                        )
+                        self._record_rejection(
+                            RejectionStage.ANTI_CHASE,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            dev_pips=round(entry_dist_from_zone_top / pip_size, 1),
+                            max_pips=max_entry_dev_pips,
+                            above_upper_bound=True,
                         )
                         return None
 
@@ -1277,6 +1458,14 @@ class FoundationEngine:
                         f"{symbol}: REJECTED - Net Risk too high. "
                         f"Risk: {current_risk/pip_size:.1f} pips > Max {max_risk_pips} pips."
                     )
+                    self._record_rejection(
+                        RejectionStage.MAX_STOP_LOSS,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        risk_pips=round(current_risk / pip_size, 1),
+                        max_pips=max_risk_pips,
+                    )
                     return None
 
                 # Recalculate TP based on ACTUAL entry and FIXED SL to maintain RR
@@ -1311,6 +1500,12 @@ class FoundationEngine:
                         logger.debug(
                             f"{symbol}: REJECTED - No volume burst (Vol: {current_volume} < {avg_volume:.0f} * {vol_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.VOLUME_BURST,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                        )
                         return None
 
                 # === CANDLE SENTIMENT GATE (Commodities) ===
@@ -1329,6 +1524,13 @@ class FoundationEngine:
                         if body_ratio > 0.7:  # Relaxed from 0.6 to 0.7
                             logger.warning(
                                 f"{symbol}: REJECTED - Momentum spike detected (Bullish Body Ratio: {body_ratio:.2f})"
+                            )
+                            self._record_rejection(
+                                RejectionStage.MOMENTUM_SPIKE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                body_ratio=round(body_ratio, 2),
                             )
                             return None
 
@@ -1354,6 +1556,14 @@ class FoundationEngine:
                         f"asset_class={asset_class}). "
                         "Risk of reversal is high. Waiting for consolidation."
                     )
+                    self._record_rejection(
+                        RejectionStage.CLIMAX,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        current_range=round(current_range, 5),
+                        avg_range=round(avg_range, 5),
+                    )
                     return None
 
                 # === REJECTION WICK CONFIRMATION (PHASE 5.11) ===
@@ -1372,6 +1582,14 @@ class FoundationEngine:
                         logger.warning(
                             f"{symbol}: REJECTED - No bounce confirmation (Upper Wick: {wick_ratio:.2f} < {wick_threshold})"
                         )
+                        self._record_rejection(
+                            RejectionStage.REJECTION_WICK,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            wick_ratio=round(wick_ratio, 2),
+                            threshold=wick_threshold,
+                        )
                         return None
 
                 # === SIGNAL CANDLE COLOR MATCH (PHASE 5.12) ===
@@ -1389,6 +1607,13 @@ class FoundationEngine:
                         logger.warning(
                             f"{symbol}: REJECTED - No bearish confirmation (Candle is Bullish). "
                             "Waiting for red candle."
+                        )
+                        self._record_rejection(
+                            RejectionStage.COLOR_MATCH,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            body_ratio=round(body_ratio, 2),
                         )
                         return None
 
@@ -1415,6 +1640,13 @@ class FoundationEngine:
                                 f"({current_range:.1f} > {avg_range*vt_cfg['vol_mult']:.1f}). "
                                 "NO counter-trend SELL allowed during spike."
                             )
+                            self._record_rejection(
+                                RejectionStage.VOLATILITY_TREND_GATE,
+                                symbol,
+                                direction=direction,
+                                asset_class=asset_class,
+                                price_above_ema_pct=round(price_above_ema_pct, 2),
+                            )
                             return None
 
                 # ═══════════════════════════════════════════════════════
@@ -1433,6 +1665,14 @@ class FoundationEngine:
                             f"{symbol}: REJECTED - Chasing price too far from zone. "
                             f"Price {entry_price:.5f} is {entry_dist_from_zone/pip_size:.1f} pips "
                             f"below zone bottom {zone.lower_bound:.5f}. Max allowed: {max_entry_dev_pips}"
+                        )
+                        self._record_rejection(
+                            RejectionStage.ANTI_CHASE,
+                            symbol,
+                            direction=direction,
+                            asset_class=asset_class,
+                            dev_pips=round(entry_dist_from_zone / pip_size, 1),
+                            max_pips=max_entry_dev_pips,
                         )
                         return None
 
@@ -1461,6 +1701,14 @@ class FoundationEngine:
                     logger.debug(
                         f"{symbol}: REJECTED - Net Risk too high. "
                         f"Risk: {current_risk/pip_size:.1f} pips > Max {max_risk_pips} pips."
+                    )
+                    self._record_rejection(
+                        RejectionStage.MAX_STOP_LOSS,
+                        symbol,
+                        direction=direction,
+                        asset_class=asset_class,
+                        risk_pips=round(current_risk / pip_size, 1),
+                        max_pips=max_risk_pips,
                     )
                     return None
 
@@ -1619,6 +1867,7 @@ class FoundationEngine:
                 weighted_enhancement_score=weighted_enhancement_score,
                 layer_scores=layer_scores,
                 layer_details=layer_details,
+                raw_confidences=raw_confidences,
                 current_price=current_price,
             )
 
