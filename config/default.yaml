@@ -47,6 +47,14 @@ database:
   pool_timeout: 30
   pool_recycle: 3600
 
+# Observability telemetry for the dashboard (does NOT affect trading).
+telemetry:
+  # Record WHY setups were rejected (climax, confluence-too-low, counter-trend,
+  # rsi/structure gate, ...) to the signal_rejections table for the dashboard
+  # Rejections / tuning views. Fire-and-forget; auto-disabled without a DB.
+  rejections_enabled: true
+  rejection_retention_days: 30   # prune older rows hourly
+
 telegram:
   bot_token: null
   chat_id: null
