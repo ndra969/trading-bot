@@ -57,7 +57,10 @@ repos:
   #       args: ['--ignore-missing-imports', '--no-strict-optional']
   #       exclude: ^(tests/|alembic/)
 
-  # Run all unit tests
+  # Bot (worker/core) test + coverage gates.
+  # Scoped via `files:` so they only run when bot code/tests/config/migrations
+  # change. API-only commits (packages/api/, tests/api/) skip these — see the
+  # dedicated pytest-api hook below.
   - repo: local
     hooks:
       - id: pytest-all
@@ -65,37 +68,52 @@ repos:
         entry: uv run pytest tests/unit/ -v --tb=short
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [commit]
+        always_run: false
+        files: ^(packages/core/|packages/worker/|tests/unit/|config/|alembic/)
+        stages: [pre-commit]
 
       - id: pytest-coverage-overall
         name: Check overall test coverage (minimum 85%)
         entry: uv run pytest tests/unit/ --cov=packages/core/src/trading_core --cov=packages/worker/src/trading_worker --cov-report=term-missing --cov-fail-under=85 -v
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [commit]
+        always_run: false
+        files: ^(packages/core/|packages/worker/|tests/unit/|config/|alembic/)
+        stages: [pre-commit]
 
       - id: pytest-coverage-critical-risk
         name: Check risk management coverage (minimum 95%)
         entry: uv run pytest tests/unit/risk/ --cov=packages/worker/src/trading_worker/risk --cov-report=term-missing --cov-fail-under=95 -v
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [commit]
+        always_run: false
+        files: ^(packages/core/|packages/worker/|tests/unit/|config/|alembic/)
+        stages: [pre-commit]
 
       - id: pytest-coverage-critical-position
         name: Check position management coverage (minimum 100%)
         entry: uv run pytest tests/unit/position/ --cov=packages/worker/src/trading_worker/position --cov-report=term-missing --cov-fail-under=100 -v
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [commit]
+        always_run: false
+        files: ^(packages/core/|packages/worker/|tests/unit/|config/|alembic/)
+        stages: [pre-commit]
 
       - id: pytest-foundation-engine
         name: Check foundation engine tests (Phase 5)
         entry: uv run pytest tests/unit/strategies/foundation/test_foundation_engine.py -v
         language: system
         pass_filenames: false
-        always_run: true
-        stages: [commit]
+        always_run: false
+        files: ^(packages/core/|packages/worker/|tests/unit/strategies/|config/)
+        stages: [pre-commit]
+
+      # API (trading_api) tests — only run when the API or its tests change.
+      - id: pytest-api
+        name: Run API tests
+        entry: uv run pytest tests/api/ -v --tb=short
+        language: system
+        pass_filenames: false
+        always_run: false
+        files: ^(packages/api/|tests/api/)
+        stages: [pre-commit]

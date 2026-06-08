@@ -42,23 +42,35 @@ trading-bot/
 │           ├── analytics.py   rejections.py  config.py
 ├── apps/
 │   └── dashboard/                  # ← THIS SPEC fills it (Next.js)
-│       ├── app/                    # App Router pages
-│       │   ├── page.tsx            # overview
-│       │   ├── positions/page.tsx
-│       │   ├── history/page.tsx
-│       │   ├── analytics/page.tsx  # by asset / symbol / session / reason
-│       │   ├── tuning/page.tsx      # ← confluence distribution + thresholds
-│       │   └── rejections/page.tsx  # ← why setups were blocked (Goal 9)
-│       ├── lib/api.ts              # typed fetch client + poll hook
-│       ├── components/
-│       └── package.json
-└── packages/api/tests/             # backend tests (or tests/api/)
+│       └── src/                    # layout follows reference/polyforge
+│           ├── app/
+│           │   ├── (dashboard)/    # route group w/ shared sidebar layout
+│           │   │   ├── layout.tsx        # Sidebar + Topbar shell
+│           │   │   ├── page.tsx          # overview
+│           │   │   ├── positions/page.tsx
+│           │   │   ├── history/page.tsx
+│           │   │   ├── analytics/page.tsx   # by asset/symbol/session/reason
+│           │   │   ├── tuning/page.tsx      # confluence dist + thresholds
+│           │   │   └── rejections/page.tsx  # why setups were blocked (Goal 9)
+│           │   ├── api/proxy/[...path]/route.ts  # server→FastAPI proxy
+│           │   ├── globals.css     # Tailwind v4
+│           │   └── layout.tsx      # root (theme + toast providers)
+│           ├── components/         # Sidebar, Topbar, Pagination, StatusDot,
+│           │   │                   # TimeRangePicker, TradeDrawer, charts, …
+│           │   └── ui/             # shadcn/ui primitives (Radix)
+│           ├── features/           # theme, toast (ported from polyforge)
+│           ├── lib/
+│           │   ├── api.ts          # apiFetch<T>() + ApiError (via proxy)
+│           │   ├── usePoll.ts      # tiered polling hook
+│           │   └── utils.ts        # cn() = clsx + tailwind-merge
+│           └── types/api.ts        # TS mirrors of the Pydantic schemas
+└── tests/api/                      # backend tests (FastAPI TestClient)
 ```
 
-**Decision**: `trading_api` imports `trading_core.data.repositories` and
-`trading_core.data.models` — both api and worker depend only on core,
-never on each other (clean dependency tree). DB creds stay server-side
-(BFF); the frontend only ever talks to the API.
+**Decision**: `trading_api` imports `trading_core.data.models` /
+repositories — both api and worker depend only on core, never on each
+other. DB creds stay server-side; the browser only ever talks to Next.js
+(see proxy below), never to FastAPI directly.
 
 ## Tech stack (latest, mainstream)
 
@@ -70,10 +82,21 @@ abandoned libs.
   `/redoc`). Pydantic v2 response models drive the schema. No extra docs
   tooling needed.
 - **DB access**: existing SQLAlchemy 2.0 async + asyncpg (reused from core).
-- **Frontend**: Next.js (latest stable, App Router) + TypeScript +
-  React 18+. Charts: `lightweight-charts` (TradingView) for equity/price;
-  `recharts` for bar/pie analytics. Data fetching: native fetch + a small
-  poll hook (add TanStack Query only if polling grows complex).
+- **Frontend**: Next.js (App Router) + TypeScript + React, **following the
+  conventions in `reference/polyforge/frontend/nextjs`** (cloned locally,
+  gitignored) so the two stay consistent:
+  - **Tailwind CSS v4** + **shadcn/ui** (Radix primitives + `cva` +
+    `clsx` + `tailwind-merge` `cn()`), **lucide-react** icons.
+  - `react-hook-form` + `zod` only where forms appear (filters); not core
+    to a read-only dashboard.
+  - Charts: `recharts` for bar/histogram/pie analytics; `lightweight-charts`
+    (TradingView) for the equity curve.
+  - Data fetching: native `fetch` via `lib/api.ts` (`apiFetch<T>()` +
+    `ApiError`) + a small `usePoll` hook. No TanStack Query in phase 1.
+  - **Port** polyforge's `theme` + `toast` features and the `Sidebar`/
+    `Topbar`/`Pagination`/`StatusDot`/`Skeleton` component patterns.
+    **Skip** its auth/Firebase, i18n, and middleware redirect — this is a
+    single-operator localhost dashboard with no login in phase 1.
 - Pin to latest stable at implementation time; prefer the most-downloaded
   option when choosing between equivalents.
 
@@ -151,9 +174,22 @@ single-token header check (`X-Dashboard-Token`) as the gate that MUST be
 added before binding to `0.0.0.0` / exposing remotely. Not implemented
 in phase 1, but the middleware hook is stubbed.
 
+### Frontend → API transport (Next.js proxy, from polyforge)
+
+The browser never calls FastAPI directly. Following
+`reference/polyforge`, a Next.js route handler
+`src/app/api/proxy/[...path]/route.ts` forwards `/api/proxy/api/v1/*` →
+`${API_URL}/api/v1/*` server-to-server. This keeps `API_URL` server-side,
+removes the need for browser CORS, and means `lib/api.ts` only ever hits
+same-origin `/api/proxy/...`. (polyforge also forwards a Firebase token
+here; we drop that — no auth in phase 1.) FastAPI keeps permissive CORS
+only for `/docs` convenience; the dashboard path doesn't rely on it.
+
 ## Frontend design
 
-- **Next.js App Router** + TypeScript.
+- **Next.js App Router** + TypeScript, shadcn/ui + Tailwind v4 (see Tech
+  stack). Layout under a `(dashboard)` route group with a shared
+  `Sidebar`+`Topbar` shell (ported from polyforge).
 - Data fetching: a small `usePoll(endpoint, intervalMs)` hook wrapping
   `fetch` with `setInterval` + cleanup. **Tiered intervals** — live data
   polls fast, slow-moving analytics poll lazily (or on demand) to avoid
@@ -196,9 +232,10 @@ in phase 1, but the middleware hook is stubbed.
   - Read-only banner on Tuning/Rejections: "values are edited in
     `config/strategy_parameters.yaml`; this view is read-only".
 - Trade drill-down is a shared component (drawer/modal) used by both
-  Positions and History, backed by `GET /positions/{id}`.
-- Env: `NEXT_PUBLIC_API_BASE` points at the FastAPI host
-  (`http://localhost:8000`).
+  Positions and History, backed by `GET /positions/{id}` (via the proxy).
+- Env: `API_URL` (server-side only, used by the proxy route) points at the
+  FastAPI host (`http://localhost:8000`). No `NEXT_PUBLIC_*` API URL — the
+  browser only sees same-origin `/api/proxy/...`.
 
 ## Data source notes
 
