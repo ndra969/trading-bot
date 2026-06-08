@@ -155,8 +155,23 @@ Priority: ENV → env YAML → specific YAML → default YAML → code defaults
 - [Database ERD](docs/architecture/database-erd.md)
 - [Coding Standards](docs/guides/coding-standards.md) ⚠️ READ FIRST
 - [Troubleshooting](docs/guides/troubleshooting-guide.md)
+- [Dashboard](docs/guides/dashboard-guide.md) - read-only monitoring + tuning UI
 
 Or use `/docs [topic]` command.
+
+## Dashboard
+
+Read-only web UI (independent of the bot; shares only the DB).
+
+```bash
+uv run uvicorn trading_api.app:app --port 8000           # API (BFF) → :8000/docs
+cd apps/dashboard && npm install && npm run dev           # frontend → :3000
+```
+
+- `packages/api` (FastAPI, read-only) + `apps/dashboard` (Next.js + Tailwind).
+- Browser → Next proxy (`/api/proxy/*`) → FastAPI → Postgres (no CORS).
+- Tests: `uv run pytest tests/api/` (API commits skip the bot suite via
+  scoped pre-commit hooks). Full guide: `docs/guides/dashboard-guide.md`.
 
 ## Requirements
 

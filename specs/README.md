@@ -21,10 +21,13 @@ specs/
 | Spec | Status | Priority |
 |------|--------|----------|
 | [strategy-tuning.md](active/strategy-tuning.md) | 🟢 Round 1 applied, observation phase | 🟠 Medium |
-| [monorepo-restructure/](active/monorepo-restructure/) | 📋 Planned — split into packages/core+worker+api (Opsi 3); prerequisite for dashboard | 🟠 Medium |
-| [ui-dashboard/](active/ui-dashboard/) | 📋 Planned — read-only dashboard (FastAPI + Next.js); depends on monorepo-restructure | 🟠 Medium |
 | [confluence-scoring-investigation/](active/confluence-scoring-investigation/) | 📋 Planned — investigate weak confluence predictor (wait 1wk sample) | 🟠 Medium |
-| [refactor-main-services/](active/refactor-main-services/) | 📋 Planned — extract PositionOrchestrator + AnalysisService (folds into worker pkg after monorepo) | 🟢 Low |
+
+## Recently Archived (2026-06)
+
+- [ui-dashboard/](archive/2026-06/ui-dashboard/) — read-only dashboard:
+  worker observability + FastAPI read-only API + Next.js frontend
+  (✅ Shipped 2026-06, Phases 1.5–4)
 
 ## Recently Archived (2026-05)
 

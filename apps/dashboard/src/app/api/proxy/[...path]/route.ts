@@ -17,11 +17,13 @@ export async function GET(
 ) {
   const { path } = await params
   const upstream = `${API_URL}/${path.join("/")}${req.nextUrl.search}`
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  // Forward the dashboard token (server-side env) when the API requires it.
+  if (process.env.DASHBOARD_API_TOKEN) {
+    headers["X-Dashboard-Token"] = process.env.DASHBOARD_API_TOKEN
+  }
   try {
-    const res = await fetch(upstream, {
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    })
+    const res = await fetch(upstream, { headers, cache: "no-store" })
     const body = await res.text()
     return new NextResponse(body, {
       status: res.status,

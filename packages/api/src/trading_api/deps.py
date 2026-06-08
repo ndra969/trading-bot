@@ -62,6 +62,21 @@ def currency_unit() -> str:
     return "USC" if "cent" in broker else "USD"
 
 
+@lru_cache
+def dashboard_token() -> str | None:
+    """Optional shared secret for the API.
+
+    Returns the configured token (env ``DASHBOARD_API_TOKEN`` or
+    ``dashboard.api_token`` in YAML), or None. When None (the localhost
+    default) the API is open; when set, every request except health/docs
+    must send a matching ``X-Dashboard-Token`` header — the gate to enable
+    before exposing the API beyond localhost.
+    """
+    import os
+
+    return os.getenv("DASHBOARD_API_TOKEN") or get_config().get("dashboard.api_token")
+
+
 # ---------------------------------------------------------------------------
 # Shared query params
 # ---------------------------------------------------------------------------

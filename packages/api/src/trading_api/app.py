@@ -6,13 +6,17 @@ the documented gate to add before any non-local exposure.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from trading_api.deps import _engine
+from trading_api.deps import _engine, dashboard_token
 from trading_api.routers import account, analytics, config, positions, rejections, sessions
 from trading_api.schemas import Health
+
+# Paths reachable without a token even when one is configured (liveness + docs).
+_AUTH_EXEMPT = ("/api/v1/health", "/docs", "/redoc", "/openapi.json")
 
 
 def create_app() -> FastAPI:
@@ -28,6 +32,21 @@ def create_app() -> FastAPI:
         allow_methods=["GET"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def require_token(request: Request, call_next):
+        """Enforce X-Dashboard-Token only when a token is configured.
+
+        No token (localhost default) → open. Set DASHBOARD_API_TOKEN before
+        exposing the API beyond localhost.
+        """
+        token = dashboard_token()
+        if token and not request.url.path.startswith(_AUTH_EXEMPT):
+            if request.headers.get("X-Dashboard-Token") != token:
+                return JSONResponse(
+                    {"detail": "invalid or missing X-Dashboard-Token"}, status_code=401
+                )
+        return await call_next(request)
 
     app.include_router(positions.router)
     app.include_router(analytics.router)
