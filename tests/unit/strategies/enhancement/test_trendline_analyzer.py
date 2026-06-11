@@ -224,3 +224,107 @@ async def test_invalid_line_breakout(analyzer):
             # This line should have been invalidated
             # The test passes if this line is not found or has low touches
             pass
+
+
+def _ascending_support_prices() -> list[float]:
+    """Swing lows at idx 10/30/50 on a line with slope 0.2 (projects ~117.8 at idx 99)."""
+    prices = [110.0] * 100
+    prices[10] = 100.0
+    prices[9] = 105.0
+    prices[11] = 105.0
+    prices[30] = 104.0
+    prices[29] = 109.0
+    prices[31] = 109.0
+    prices[50] = 108.0
+    prices[49] = 113.0
+    prices[51] = 113.0
+    prices[99] = 117.85
+    return prices
+
+
+class TestZoneConfluence:
+    """Zone-based trendline confluence (enhancement-layer-rework Phase 1)."""
+
+    @pytest.mark.asyncio
+    async def test_support_line_reinforces_demand_zone(self, analyzer):
+        """A support line projecting into the zone band -> BOUNCE_SUPPORT."""
+        prices = _ascending_support_prices()
+        # Line projects to ~117.8 at the current bar; demand zone around it
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=117.5, zone_upper=118.5, is_demand=True
+        )
+
+        assert signal.signal_type == "BOUNCE_SUPPORT"
+        assert signal.confidence > 0
+        assert signal.nearest_trendline is not None
+        assert signal.nearest_trendline.line_type == "SUPPORT"
+
+    @pytest.mark.asyncio
+    async def test_direction_filter_support_does_not_reinforce_supply(self, analyzer):
+        """The same support line must NOT count for a SUPPLY zone (SELL)."""
+        prices = _ascending_support_prices()
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=117.5, zone_upper=118.5, is_demand=False
+        )
+
+        assert signal.signal_type == "NEUTRAL"
+        assert signal.confidence == 0
+
+    @pytest.mark.asyncio
+    async def test_line_outside_zone_band_is_neutral(self, analyzer):
+        """A zone far above the projected line -> no confluence."""
+        prices = _ascending_support_prices()
+        # Zone at 125-126 (height 1.0, tolerance 0.5 -> band 124.5-126.5);
+        # the line projects to ~117.8, well outside.
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=125.0, zone_upper=126.0, is_demand=True
+        )
+
+        assert signal.signal_type == "NEUTRAL"
+
+    @pytest.mark.asyncio
+    async def test_tolerance_scales_with_zone_height(self, analyzer):
+        """A taller zone widens the band proportionally (no fixed pip window)."""
+        prices = _ascending_support_prices()
+        # Line projects to ~117.8. Narrow zone above it misses...
+        narrow = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=119.0, zone_upper=119.4, is_demand=True
+        )
+        # ...but a taller zone with the same lower bound catches it via the
+        # height-proportional tolerance band.
+        tall = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=119.0, zone_upper=122.0, is_demand=True
+        )
+
+        assert narrow.signal_type == "NEUTRAL"
+        assert tall.signal_type == "BOUNCE_SUPPORT"
+
+    @pytest.mark.asyncio
+    async def test_centred_line_scores_higher_than_edge_line(self, analyzer):
+        """Confidence rewards a line through the zone middle over one at the edge."""
+        prices = _ascending_support_prices()
+        centred = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=117.3, zone_upper=118.3, is_demand=True
+        )
+        edge = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=118.2, zone_upper=119.2, is_demand=True
+        )
+
+        assert centred.signal_type == "BOUNCE_SUPPORT"
+        assert edge.signal_type == "BOUNCE_SUPPORT"
+        assert centred.confidence > edge.confidence
+
+    @pytest.mark.asyncio
+    async def test_insufficient_data(self, analyzer):
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", [100.0] * 10, "H1", zone_lower=99.0, zone_upper=101.0, is_demand=True
+        )
+        assert signal.signal_type == "NEUTRAL"
+
+    @pytest.mark.asyncio
+    async def test_degenerate_zone(self, analyzer):
+        prices = _ascending_support_prices()
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=118.0, zone_upper=118.0, is_demand=True
+        )
+        assert signal.signal_type == "NEUTRAL"

@@ -41,6 +41,18 @@ class RSIAnalyzer:
         self.overbought = config.get("rsi", {}).get("overbought", 70)
         self.oversold = config.get("rsi", {}).get("oversold", 30)
 
+        # Recovery-from-extreme scoring (spec enhancement-layer-rework):
+        # "RSI rising from an extreme toward the trade direction" fits the
+        # mean-reversion zone entry far better than an extreme AT the entry
+        # candle (which fires ~1%). OFF by default — enable via config after
+        # backtest validation; the hard gate behaviour is unaffected.
+        recovery_cfg = config.get("rsi", {}).get("recovery_scoring", {})
+        self.recovery_enabled = recovery_cfg.get("enabled", False)
+        self.recovery_floor = recovery_cfg.get("floor", 35.0)
+        self.recovery_ceiling = recovery_cfg.get("ceiling", 65.0)
+        self.recovery_lookback = recovery_cfg.get("lookback", 5)
+        self.recovery_score = recovery_cfg.get("score", 25.0)
+
     async def analyze_rsi_signal(
         self, symbol: str, prices: list[float], timeframe: str, zone_type: str = None
     ) -> RSISignal:
@@ -101,6 +113,35 @@ class RSIAnalyzer:
                     signal_type = "SELL"
                     confidence += 15
                     details["reversal"] = "Bearish Reversal"
+
+        # 2b. Recovery-from-extreme scoring (config-gated)
+        # BUY at demand: RSI dipped below the floor recently and is now
+        # rising; SELL at supply: RSI spiked above the ceiling and is now
+        # falling. Step 4's overbought/oversold neutralisation still applies
+        # afterwards, so a recovery that has already run too far gets blocked.
+        if self.recovery_enabled and len(rsi_values) >= 2:
+            prev_rsi = rsi_values[-2]
+            window = rsi_values[-self.recovery_lookback :]
+            if zone_type == "DEMAND":
+                recent_min = min(window)
+                if (
+                    recent_min <= self.recovery_floor
+                    and current_rsi > prev_rsi
+                    and current_rsi < self.recovery_ceiling
+                ):
+                    signal_type = "BUY"
+                    confidence += self.recovery_score
+                    details["recovery"] = "Bullish RSI Recovery"
+            elif zone_type == "SUPPLY":
+                recent_max = max(window)
+                if (
+                    recent_max >= self.recovery_ceiling
+                    and current_rsi < prev_rsi
+                    and current_rsi > self.recovery_floor
+                ):
+                    signal_type = "SELL"
+                    confidence += self.recovery_score
+                    details["recovery"] = "Bearish RSI Recovery"
 
         # 3. Analyze Divergence
         divergence_score, divergence_type = self._check_divergences(prices, rsi_values, zone_type)

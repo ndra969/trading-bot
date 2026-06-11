@@ -896,6 +896,8 @@ class FoundationEngine:
         closes: list,
         current_price: float,
         pip_size: float,
+        zone_lower: float,
+        zone_upper: float,
     ) -> tuple[dict, dict, dict] | None:
         """Run all enhancement layer analyzers with hard-rejection gates.
 
@@ -967,14 +969,19 @@ class FoundationEngine:
             layer_details["ma"] = ma_res.details
             raw_confidences["ma"] = ma_res.confidence
 
-        # 3. Trendline (Weight: 0.20)
-        # pip_value must match the symbol's real pip size — the 0.0001 default
-        # makes the 20-pip bounce window 100-10000x too small for JPY/gold/crypto.
-        tl_res = await self.trendline_analyzer.analyze_trendline_signal(
-            symbol, closes, timeframe, pip_value=pip_size
+        # 3. Trendline (Weight: 0.20) — zone-quality signal: does a trendline
+        # reinforce this S&D level? Entry-bar bounce proximity almost never
+        # coincides with a zone entry (the old model fired 0% even with the
+        # correct pip size), so confluence is evaluated against the zone band.
+        tl_res = await self.trendline_analyzer.analyze_zone_confluence(
+            symbol,
+            closes,
+            timeframe,
+            zone_lower=zone_lower,
+            zone_upper=zone_upper,
+            is_demand=is_demand,
         )
-        # Bounce types only: "SUPPORT" in signal_type would also match
-        # BREAK_SUPPORT (a breakdown), which argues AGAINST a demand entry.
+        # Bounce types only: BREAK_SUPPORT/BREAK_RESISTANCE argue AGAINST the entry.
         if (is_demand and tl_res.signal_type == "BOUNCE_SUPPORT") or (
             not is_demand and tl_res.signal_type == "BOUNCE_RESISTANCE"
         ):
@@ -1848,6 +1855,8 @@ class FoundationEngine:
                 closes=closes,
                 current_price=current_price,
                 pip_size=pip_size,
+                zone_lower=zone.lower_bound,
+                zone_upper=zone.upper_bound,
             )
             if enhancement_result is None:
                 return None  # Hard rejection by RSI block or structure block

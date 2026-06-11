@@ -5,30 +5,38 @@ weight re-derivation — each gated by backtest before touching live config.
 
 ## Phase 0 — Definite bug fixes (small, surgical)
 
-- [ ] **Structure vocab fix**: mapping helper (BULLISH→BUY / BEARISH→SELL);
+- [x] **Structure vocab fix**: mapping helper (BULLISH→BUY / BEARISH→SELL);
       use it in the scoring branch AND the commodities >90-confidence gate.
       Unit tests: aligned BULLISH+BUY scores (not rejected); opposed
-      BEARISH+BUY at conf>90 still rejected.
-- [ ] **Trendline pip_value fix**: cache `PipCalculator` on the engine; pass
+      BEARISH+BUY at conf>90 still rejected. *(2026-06-11, `_structure_aligns`)*
+- [x] **Trendline pip_value fix**: cache `PipCalculator` on the engine; pass
       `get_pip_size(symbol)` into `analyze_trendline_signal`. Unit test per
       asset class (JPY/gold/crypto distances now scale correctly).
-- [ ] Tighten the trendline substring match (`"SUPPORT" in signal_type` also
-      matches `BREAK_SUPPORT`) to explicit bounce types.
-- [ ] Run full suite + dry-run; commit as `fix(strategy): dead-layer bug fixes`.
+      *(2026-06-11; superseded in Phase 1 by the zone-based model, the legacy
+      entry-bar API keeps the pip_value parameter)*
+- [x] Tighten the trendline substring match (`"SUPPORT" in signal_type` also
+      matches `BREAK_SUPPORT`) to explicit bounce types. *(2026-06-11)*
+- [x] Run full suite + dry-run; commit as `fix(strategy): dead-layer bug fixes`.
+      *(commit b31a494, 1686 tests green, dry-run loop clean)*
 - [ ] **Measure-only week**: deploy, watch `/analytics/layer-contribution` +
       `/confluence-vs-outcome` — do trendline/structure now fire, and with
       what edge? No weight/threshold changes yet.
 
 ## Phase 1 — Analyzer reworks
 
-- [ ] **Trendline**: evaluate confluence against the zone band (projected
+- [x] **Trendline**: evaluate confluence against the zone band (projected
       line passes through/near `[lower, upper]`, tolerance ∝ zone height);
       direction filter SUPPORT↔DEMAND / RESISTANCE↔SUPPLY; confidence from
       touches + centring. Unit tests with synthetic trendlines/zones.
-- [ ] **Fibonacci**: swing selection from the most recent structural leg
+      *(2026-06-11, `TrendlineAnalyzer.analyze_zone_confluence`,
+      `trendline.zone_tolerance: 0.5` in config)*
+- [x] **Fibonacci**: swing selection from the most recent structural leg
       (pivot-based, not global 50-bar extreme). Keep level scores in config.
-- [ ] **RSI**: implement option (a) "recovering from extreme" scoring rule
+      *(2026-06-11, `_find_recent_leg` / `fibonacci.swing_window: 5`)*
+- [x] **RSI**: implement option (a) "recovering from extreme" scoring rule
       behind config; keep existing gate behaviour unchanged.
+      *(2026-06-11, `rsi.recovery_scoring` — `enabled: false` until the
+      Phase 2 backtest proves edge)*
 
 ## Phase 2 — Backtest validation (the gate)
 

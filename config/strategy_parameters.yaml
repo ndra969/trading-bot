@@ -25,6 +25,14 @@ rsi:
   period: 14
   overbought: 70
   oversold: 30
+  # Recovery-from-extreme scoring (enhancement-layer-rework). OFF until the
+  # Phase 2 backtest proves edge; the hard rsi_gate is unaffected either way.
+  recovery_scoring:
+    enabled: false
+    floor: 35.0       # BUY: RSI must have dipped below this recently
+    ceiling: 65.0     # SELL: RSI must have spiked above this recently
+    lookback: 5       # Bars of RSI history scanned for the extreme
+    score: 25.0       # Confidence added when a recovery is detected
 
 ma:
   fast_period: 9
@@ -36,6 +44,7 @@ ma:
 trendline:
   min_touches: 3
   tolerance: 0.0005
+  zone_tolerance: 0.5         # Zone-confluence band: fraction of zone height a projected line may sit beyond the zone and still reinforce it
 
 price_action:
   enabled_patterns: ["PINBAR", "ENGULFING", "INSIDE_BAR", "DOJI", "HARAMI", "OUTSIDE_BAR", "MORNING_STAR", "EVENING_STAR", "PULLBACK", "ORDER_BLOCK", "LIQUIDITY_SWEEP", "DOUBLE_TOP", "DOUBLE_BOTTOM"]
@@ -44,6 +53,7 @@ price_action:
 fibonacci:
   levels: {0.382: 10, 0.5: 20, 0.618: 15}
   tolerance: 0.0005
+  swing_window: 5             # Pivot window for structural swing-leg detection (enhancement-layer-rework)
 
 structure:
   lookback: 50                # Bars to look back for swing detection

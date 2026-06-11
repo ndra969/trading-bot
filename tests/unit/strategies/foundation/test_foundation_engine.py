@@ -517,7 +517,7 @@ class TestFoundationEngineEnhancementAnalyzers:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -611,7 +611,7 @@ class TestFoundationEngineEnhancementAnalyzers:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -944,7 +944,7 @@ class TestFoundationEngineCreateSignalComprehensive:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1048,7 +1048,7 @@ class TestFoundationEngineCreateSignalComprehensive:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -1158,7 +1158,7 @@ class TestFoundationEngineCreateSignalComprehensive:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1386,7 +1386,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1470,7 +1470,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1586,7 +1586,7 @@ class TestFoundationEngineAssetClassSLBuffer:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -1679,7 +1679,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1777,7 +1777,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1929,7 +1929,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2059,7 +2059,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2184,7 +2184,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2336,7 +2336,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2453,7 +2453,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2612,7 +2612,7 @@ class TestFoundationEnginePriceActionRequirement:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2709,7 +2709,7 @@ class TestFoundationEnginePriceActionRequirement:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2817,7 +2817,7 @@ class TestFoundationEnginePriceActionRequirement:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(

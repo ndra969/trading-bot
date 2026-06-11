@@ -49,6 +49,8 @@ async def run_enhancement(
     price_action=None,
     fibonacci=None,
     structure=None,
+    zone_lower=1.099,
+    zone_upper=1.101,
 ):
     """Run _run_enhancement_analyzers with every analyzer mocked."""
     with (
@@ -60,7 +62,7 @@ async def run_enhancement(
         ),
         patch.object(
             engine.trendline_analyzer,
-            "analyze_trendline_signal",
+            "analyze_zone_confluence",
             new_callable=AsyncMock,
             return_value=trendline,
         ) as mock_trendline,
@@ -96,6 +98,8 @@ async def run_enhancement(
             closes=[1.1] * 100,
             current_price=1.1,
             pip_size=pip_size,
+            zone_lower=zone_lower,
+            zone_upper=zone_upper,
         )
     return result, mock_trendline
 
@@ -197,10 +201,17 @@ class TestTrendlinePipValueFix:
         assert engine.pip_calculator is engine.pip_calculator
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("pip_size", [0.0001, 0.01, 0.1, 1.0])
-    async def test_pip_size_forwarded_to_trendline_analyzer(self, engine, pip_size):
-        _, mock_trendline = await run_enhancement(engine, pip_size=pip_size)
-        assert mock_trendline.call_args.kwargs["pip_value"] == pip_size
+    async def test_zone_bounds_forwarded_to_trendline_analyzer(self, engine):
+        """Phase 1 supersedes pip forwarding: the engine now evaluates
+        trendline confluence against the zone band (asset-scale independent
+        by construction), so it must forward the zone bounds + side."""
+        _, mock_trendline = await run_enhancement(
+            engine, is_demand=True, zone_lower=1.0950, zone_upper=1.0980
+        )
+        kwargs = mock_trendline.call_args.kwargs
+        assert kwargs["zone_lower"] == 1.0950
+        assert kwargs["zone_upper"] == 1.0980
+        assert kwargs["is_demand"] is True
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

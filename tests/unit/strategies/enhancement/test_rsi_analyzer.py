@@ -307,3 +307,98 @@ async def test_rsi_35_boundary_supply_zone(analyzer):
         # At boundary, should block SELL
         assert signal.signal_type == "NEUTRAL"
         assert "Oversold Warning" in signal.details.get("trend", "")
+
+
+class TestRecoveryScoring:
+    """Recovery-from-extreme scoring (enhancement-layer-rework, config-gated)."""
+
+    @pytest.fixture
+    def recovery_analyzer(self):
+        return RSIAnalyzer(
+            {
+                "rsi": {
+                    "period": 14,
+                    "overbought": 70,
+                    "oversold": 30,
+                    "recovery_scoring": {
+                        "enabled": True,
+                        "floor": 35.0,
+                        "ceiling": 65.0,
+                        "lookback": 5,
+                        "score": 25.0,
+                    },
+                }
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_bullish_recovery_at_demand(self, recovery_analyzer):
+        """RSI dipped below the floor recently and is rising -> BUY at demand."""
+        with patch(
+            "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        ) as mock_calc:
+            # Dipped to 28 three bars ago, now recovering at 42 (rising, < ceiling)
+            mock_calc.return_value = {"rsi": [50] * 10 + [32, 28, 33, 38, 42]}
+            prices = [100.0] * 15
+
+            signal = await recovery_analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+            assert signal.signal_type == "BUY"
+            assert signal.details["recovery"] == "Bullish RSI Recovery"
+            assert signal.confidence >= 25
+
+    @pytest.mark.asyncio
+    async def test_bearish_recovery_at_supply(self, recovery_analyzer):
+        """RSI spiked above the ceiling recently and is falling -> SELL at supply."""
+        with patch(
+            "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        ) as mock_calc:
+            mock_calc.return_value = {"rsi": [50] * 10 + [68, 72, 67, 62, 58]}
+            prices = [100.0] * 15
+
+            signal = await recovery_analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "SUPPLY")
+
+            assert signal.signal_type == "SELL"
+            assert signal.details["recovery"] == "Bearish RSI Recovery"
+            assert signal.confidence >= 25
+
+    @pytest.mark.asyncio
+    async def test_no_recovery_when_rsi_still_falling(self, recovery_analyzer):
+        """A dip without a turn-up must not score as recovery."""
+        with patch(
+            "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        ) as mock_calc:
+            mock_calc.return_value = {"rsi": [50] * 10 + [40, 38, 36, 34, 33]}
+            prices = [100.0] * 15
+
+            signal = await recovery_analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+            assert "recovery" not in signal.details
+
+    @pytest.mark.asyncio
+    async def test_recovery_disabled_by_default(self, analyzer):
+        """Default config: recovery scoring is OFF, behaviour unchanged."""
+        assert analyzer.recovery_enabled is False
+        with patch(
+            "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        ) as mock_calc:
+            mock_calc.return_value = {"rsi": [50] * 10 + [32, 28, 33, 38, 42]}
+            prices = [100.0] * 15
+
+            signal = await analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+            assert "recovery" not in signal.details
+
+    @pytest.mark.asyncio
+    async def test_recovery_does_not_override_overbought_guard(self, recovery_analyzer):
+        """A 'recovery' that already ran above the ceiling must not signal BUY."""
+        with patch(
+            "trading_worker.strategies.enhancement.technical_analyzer.RobustIndicatorCalculator.calculate_all"
+        ) as mock_calc:
+            # Recent min below floor but current RSI already at 67 (>= ceiling)
+            mock_calc.return_value = {"rsi": [50] * 10 + [30, 45, 55, 62, 67]}
+            prices = [100.0] * 15
+
+            signal = await recovery_analyzer.analyze_rsi_signal("EURUSD", prices, "H1", "DEMAND")
+
+            assert signal.signal_type != "BUY"
