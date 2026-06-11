@@ -7,6 +7,7 @@ import pandas as pd
 from trading_core.enums.rejection_stage import RejectionStage
 from trading_core.utils.logger import get_logger
 
+from trading_worker.position.pip_calculator import PipCalculator
 from trading_worker.strategies.enhancement.breakout_analyzer import BreakoutAnalyzer
 from trading_worker.strategies.enhancement.fibonacci_analyzer import FibonacciAnalyzer
 from trading_worker.strategies.enhancement.ma_analyzer import MovingAverageAnalyzer
@@ -48,6 +49,7 @@ class FoundationEngine:
         self.config = config or {}
         self.symbol_mapper = symbol_mapper  # Store for symbol normalization
         self.rejection_recorder = rejection_recorder
+        self.pip_calculator = PipCalculator()
 
         # Initialize S&D strategy
         self.strategy = SupplyDemandStrategy(
@@ -814,6 +816,17 @@ class FoundationEngine:
             return True
         return False
 
+    # StructureSignal speaks BULLISH/BEARISH while SignalDirection speaks
+    # BUY/SELL; comparing them raw is never true (dead-layer bug, spec
+    # enhancement-layer-rework). Both the scoring branch and the commodities
+    # gate must translate through this map.
+    _STRUCTURE_DIRECTION_MAP = {"BULLISH": "BUY", "BEARISH": "SELL"}
+
+    @classmethod
+    def _structure_aligns(cls, structure_direction: str, direction: SignalDirection) -> bool:
+        """True when a structure direction (BULLISH/BEARISH) matches the trade direction."""
+        return cls._STRUCTURE_DIRECTION_MAP.get(structure_direction) == direction.name
+
     def _calculate_confluence_score(
         self, zone: DetectedZone, raw_confidences: dict
     ) -> tuple[float, float, float]:
@@ -882,6 +895,7 @@ class FoundationEngine:
         lows: list,
         closes: list,
         current_price: float,
+        pip_size: float,
     ) -> tuple[dict, dict, dict] | None:
         """Run all enhancement layer analyzers with hard-rejection gates.
 
@@ -954,9 +968,15 @@ class FoundationEngine:
             raw_confidences["ma"] = ma_res.confidence
 
         # 3. Trendline (Weight: 0.20)
-        tl_res = await self.trendline_analyzer.analyze_trendline_signal(symbol, closes, timeframe)
-        if (is_demand and "SUPPORT" in tl_res.signal_type) or (
-            not is_demand and "RESISTANCE" in tl_res.signal_type
+        # pip_value must match the symbol's real pip size — the 0.0001 default
+        # makes the 20-pip bounce window 100-10000x too small for JPY/gold/crypto.
+        tl_res = await self.trendline_analyzer.analyze_trendline_signal(
+            symbol, closes, timeframe, pip_value=pip_size
+        )
+        # Bounce types only: "SUPPORT" in signal_type would also match
+        # BREAK_SUPPORT (a breakdown), which argues AGAINST a demand entry.
+        if (is_demand and tl_res.signal_type == "BOUNCE_SUPPORT") or (
+            not is_demand and tl_res.signal_type == "BOUNCE_RESISTANCE"
         ):
             layer_scores["trendline"] = tl_res.confidence * 0.20
             layer_details["trendline"] = tl_res.details
@@ -986,7 +1006,9 @@ class FoundationEngine:
         # PHASE 5.22: Adjusted alignment for Commodities
         if asset_class == "commodities" and struct_res:
             # Only reject if structure is OVERWHELMINGLY opposite (confidence > 90%)
-            if struct_res.direction != direction.name and struct_res.confidence > 90.0:
+            if not self._structure_aligns(struct_res.direction, direction) and (
+                struct_res.confidence > 90.0
+            ):
                 logger.warning(
                     f"{symbol}: REJECTED - Extremely strong market structure misalignment "
                     f"({struct_res.direction} {struct_res.confidence:.1f}% vs {direction.name})"
@@ -1000,14 +1022,14 @@ class FoundationEngine:
                     structure_confidence=round(float(struct_res.confidence), 1),
                 )
                 return None
-            elif struct_res.direction != direction.name:
+            elif not self._structure_aligns(struct_res.direction, direction):
                 logger.debug(
                     f"{symbol}: Weak/Moderate market structure misalignment "
                     f"({struct_res.direction} {struct_res.confidence:.1f}%). "
                     f"Proceeding due to High-Vol Trend alignment."
                 )
 
-        if struct_res and struct_res.direction == direction.name:
+        if struct_res and self._structure_aligns(struct_res.direction, direction):
             layer_scores["structure"] = struct_res.confidence * 0.08
             # structure_type is metadata (a string) — keep it out of layer_scores,
             # which must stay a {layer: float} map (it drives logging/keys()).
@@ -1825,6 +1847,7 @@ class FoundationEngine:
                 lows=lows,
                 closes=closes,
                 current_price=current_price,
+                pip_size=pip_size,
             )
             if enhancement_result is None:
                 return None  # Hard rejection by RSI block or structure block

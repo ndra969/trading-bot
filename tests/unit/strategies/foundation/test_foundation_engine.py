@@ -576,7 +576,12 @@ class TestFoundationEngineEnhancementAnalyzers:
         mock_struct_signal = type(
             "StructureSignal",
             (),
-            {"direction": "BULLISH", "confidence": 85.0, "details": {"structure_type": "BOS"}},
+            {
+                "direction": "BULLISH",
+                "confidence": 85.0,
+                "structure_type": "BOS",
+                "details": {"structure_type": "BOS"},
+            },
         )()
 
         # Create sample data
@@ -988,6 +993,7 @@ class TestFoundationEngineCreateSignalComprehensive:
                                     {
                                         "direction": "BULLISH",
                                         "confidence": 80.0,
+                                        "structure_type": "BOS",
                                         "details": {"structure_type": "BOS"},
                                     },
                                 )()
@@ -1083,7 +1089,12 @@ class TestFoundationEngineCreateSignalComprehensive:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BEARISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BEARISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -1958,7 +1969,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2083,7 +2099,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2204,7 +2225,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BEARISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BEARISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2350,7 +2376,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2462,7 +2493,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2606,7 +2642,12 @@ class TestFoundationEnginePriceActionRequirement:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2709,7 +2750,12 @@ class TestFoundationEnginePriceActionRequirement:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2813,7 +2859,12 @@ class TestFoundationEnginePriceActionRequirement:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
