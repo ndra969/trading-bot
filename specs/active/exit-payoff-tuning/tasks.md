@@ -18,10 +18,19 @@
 
 ## Phase 2 — Partial close size-guard (small code change)
 
-- [ ] `PartialCloseManager`: add `partial_close.min_position_volume` guard
+- [x] `PartialCloseManager`: add `partial_close.min_position_volume` guard
       (skip cleanly when `volume × close% < 0.01`); unit tests for 0.01 /
-      0.03 / 0.04 lot cases.
-- [ ] First-partial level moved to a reachable tier (config) per design L3.
+      0.03 / 0.04 lot cases. *(2026-06-12: position-level gate, logged once;
+      `min_volume` also made config-driven, default 0.01)*
+- [x] First-partial level moved to a reachable tier (config) per design L3.
+      *(2026-06-12: `partial_close.level_ratios` — flat list or per-asset
+      dict with `default`; values still come from the Phase 1 sweep, this is
+      the knob)*
+
+> Note (out of scope, for Phase 3 wiring): `position_orchestrator
+> ._handle_partial_close_automation` reads `result["closed_volume"]` but
+> `execute_partial_close` returns `close_volume` — the MT5 sync block is
+> skipped on the key-mismatch. Fix when enabling partial close live.
 
 ## Phase 3 — Ship + monitor
 

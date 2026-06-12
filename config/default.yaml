@@ -171,13 +171,29 @@ position_management:
 # MT5's 0.01 minimum so partial close cannot actually fire. Set enabled: true
 # when positions are large enough (e.g., dynamic lot >= 0.04 so 25% = 0.01).
 #
-# Level structure (when enabled, hardcoded in partial_close_manager.py):
+# Level structure (defaults; override via level_ratios below):
 #   Level 1: at 50% of TP distance, close 25% of remaining volume
 #   Level 2: at 80% of TP distance, close 50% of remaining
 # Each level fires once per position. Trailing stop runs independently
 # (no conflict — trailing moves SL, partial reduces volume).
 partial_close:
   enabled: false
+  # MT5 lot-size floor: a single partial-close order must be >= this volume.
+  min_volume: 0.01
+  # Skip partial close entirely for positions below this volume — a 25% first
+  # partial of anything smaller can't clear min_volume, so it would otherwise
+  # log "should fire but skipped" every loop. Computed default when unset:
+  # min_volume / first-level close% (0.01 / 0.25 = 0.04). Set explicitly here
+  # so the size gate is visible/tunable for the cent account.
+  min_position_volume: 0.04
+  # Partial-close ladder: proportion of TP distance + close % of remaining
+  # volume. The first level should sit at a REACHABLE tier (live data: ~19%
+  # of trades reach ~1R, almost none reach 2R). Tune via the Phase 1 backtest
+  # sweep before enabling. Flat list applies to all assets; a dict keyed by
+  # asset class (with a `default`) allows per-asset ladders.
+  # level_ratios:
+  #   - [0.5, 0.25]   # level 1: 50% of TP distance, close 25%
+  #   - [0.8, 0.50]   # level 2: 80% of TP distance, close 50% of remaining
 
 # Risk Management Configuration
 risk_management:
