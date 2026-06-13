@@ -29,6 +29,24 @@ def _open_pos(pid, risk):
     )
 
 
+def _closed_pos(pid, session_id, pnl, is_winner):
+    return Position(
+        position_id=pid,
+        session_id=session_id,
+        symbol="EURUSD",
+        position_type="BUY",
+        status="CLOSED",
+        entry_price=1.0,
+        stop_loss=0.99,
+        take_profit=1.02,
+        volume=0.1,
+        pip_size=0.0001,
+        pip_value_per_lot=10.0,
+        realized_pnl_usd=pnl,
+        is_winner=is_winner,
+    )
+
+
 @pytest_asyncio.fixture
 async def client(monkeypatch):
     engine = create_async_engine(
@@ -53,6 +71,11 @@ async def client(monkeypatch):
                 ),
                 _open_pos("o1", 10.0),
                 _open_pos("o2", 12.5),
+                # Stored counters are stale (10/40%); real derived stats come
+                # from the 3 linked closed positions below: 2 wins / 1 loss.
+                _closed_pos("c1", "sess1", 20.0, True),
+                _closed_pos("c2", "sess1", 10.0, True),
+                _closed_pos("c3", "sess1", -15.0, False),
                 TradingSession(
                     session_id="sess1",
                     account_id="acc1",
@@ -100,5 +123,18 @@ async def test_account_summary(client):
 async def test_sessions_paginated(client):
     body = (await client.get("/api/v1/sessions")).json()
     assert body["total"] == 1
-    assert body["items"][0]["session_id"] == "sess1"
-    assert body["items"][0]["win_rate"] == 40.0
+    row = body["items"][0]
+    assert row["session_id"] == "sess1"
+    # Derived from the 3 linked closed positions, NOT the stale stored counters.
+    assert row["total_trades"] == 3
+    assert row["winning_trades"] == 2
+    assert row["win_rate"] == 66.7
+    assert row["total_pnl_usd"] == 15.0
+    assert row["profit_factor"] == 2.0  # gross_profit 30 / gross_loss 15
+
+
+@pytest.mark.asyncio
+async def test_current_session_none_when_no_active(client):
+    # All seeded sessions are CLOSED → no active session.
+    body = (await client.get("/api/v1/sessions/current")).json()
+    assert body is None

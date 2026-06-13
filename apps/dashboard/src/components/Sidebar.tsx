@@ -9,6 +9,7 @@ import {
   BarChart3,
   SlidersHorizontal,
   ShieldX,
+  Activity,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -17,6 +18,7 @@ const NAV = [
   { label: "Overview", href: "/", icon: LayoutDashboard },
   { label: "Positions", href: "/positions", icon: ListChecks },
   { label: "History", href: "/history", icon: History },
+  { label: "Sessions", href: "/sessions", icon: Activity },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Tuning", href: "/tuning", icon: SlidersHorizontal },
   { label: "Rejections", href: "/rejections", icon: ShieldX },

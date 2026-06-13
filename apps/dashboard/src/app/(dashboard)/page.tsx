@@ -1,10 +1,11 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePoll } from "@/lib/usePoll"
-import { cn, money } from "@/lib/utils"
-import type { AccountSummary, OpenPosition } from "@/types/api"
+import { cn, money, pct } from "@/lib/utils"
+import type { AccountSummary, OpenPosition, SessionOut } from "@/types/api"
 
 function Stat({ title, value }: { title: string; value: string }) {
   return (
@@ -20,14 +21,54 @@ function Stat({ title, value }: { title: string; value: string }) {
 export default function OverviewPage() {
   const account = usePoll<AccountSummary>("/api/v1/account/summary", 3000)
   const open = usePoll<OpenPosition[]>("/api/v1/positions/open", 3000)
+  const session = usePoll<SessionOut | null>("/api/v1/sessions/current", 5000)
   const a = account.data
   const unit = a?.currency_unit ?? "USD"
   const positions = open.data ?? []
   const openPnl = positions.reduce((s, p) => s + p.current_pnl_usd, 0)
+  const cs = session.data
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Overview</h1>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>Current session</CardTitle>
+          <Badge variant={cs ? "success" : "muted"}>{cs ? cs.status ?? "ACTIVE" : "IDLE"}</Badge>
+        </CardHeader>
+        <CardContent className="text-sm">
+          {cs ? (
+            <div className="flex flex-wrap gap-x-8 gap-y-1">
+              <span className="text-muted-foreground">
+                Started{" "}
+                <span className="text-foreground">
+                  {cs.start_time?.slice(0, 16).replace("T", " ") ?? "—"}
+                </span>
+              </span>
+              <span className="text-muted-foreground">
+                Type <span className="text-foreground">{cs.trading_type ?? "—"}</span>
+              </span>
+              <span className="text-muted-foreground">
+                Trades <span className="text-foreground">{cs.total_trades}</span>
+              </span>
+              <span className="text-muted-foreground">
+                Win% <span className="text-foreground">{cs.total_trades > 0 ? pct(cs.win_rate) : "—"}</span>
+              </span>
+              <span className="text-muted-foreground">
+                P&L{" "}
+                <span className={cn(cs.total_pnl_usd < 0 ? "text-destructive" : "text-[hsl(var(--success))]")}>
+                  {money(cs.total_pnl_usd, cs.currency_unit)}
+                </span>
+              </span>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">
+              No active session — the bot isn&apos;t running live (dry-run sessions aren&apos;t persisted).
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {a ? (
