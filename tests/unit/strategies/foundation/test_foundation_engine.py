@@ -517,7 +517,7 @@ class TestFoundationEngineEnhancementAnalyzers:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -576,7 +576,12 @@ class TestFoundationEngineEnhancementAnalyzers:
         mock_struct_signal = type(
             "StructureSignal",
             (),
-            {"direction": "BULLISH", "confidence": 85.0, "details": {"structure_type": "BOS"}},
+            {
+                "direction": "BULLISH",
+                "confidence": 85.0,
+                "structure_type": "BOS",
+                "details": {"structure_type": "BOS"},
+            },
         )()
 
         # Create sample data
@@ -606,7 +611,7 @@ class TestFoundationEngineEnhancementAnalyzers:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -939,7 +944,7 @@ class TestFoundationEngineCreateSignalComprehensive:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -988,6 +993,7 @@ class TestFoundationEngineCreateSignalComprehensive:
                                     {
                                         "direction": "BULLISH",
                                         "confidence": 80.0,
+                                        "structure_type": "BOS",
                                         "details": {"structure_type": "BOS"},
                                     },
                                 )()
@@ -1042,7 +1048,7 @@ class TestFoundationEngineCreateSignalComprehensive:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -1083,7 +1089,12 @@ class TestFoundationEngineCreateSignalComprehensive:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BEARISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BEARISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -1147,7 +1158,7 @@ class TestFoundationEngineCreateSignalComprehensive:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1375,7 +1386,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1459,7 +1470,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1575,7 +1586,7 @@ class TestFoundationEngineAssetClassSLBuffer:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -1668,7 +1679,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1766,7 +1777,7 @@ class TestFoundationEngineAssetClassSLBuffer:
                 )()
 
                 with patch.object(
-                    engine.trendline_analyzer, "analyze_trendline_signal", new_callable=AsyncMock
+                    engine.trendline_analyzer, "analyze_zone_confluence", new_callable=AsyncMock
                 ) as mock_tl:
                     mock_tl.return_value = type(
                         "TrendlineSignal",
@@ -1918,7 +1929,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -1958,7 +1969,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2043,7 +2059,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2083,7 +2099,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2163,7 +2184,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2204,7 +2225,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BEARISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BEARISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2310,7 +2336,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2350,7 +2376,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2422,7 +2453,7 @@ class TestFoundationEngineMaxTakeProfitDistance:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2462,7 +2493,12 @@ class TestFoundationEngineMaxTakeProfitDistance:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2576,7 +2612,7 @@ class TestFoundationEnginePriceActionRequirement:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2606,7 +2642,12 @@ class TestFoundationEnginePriceActionRequirement:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2668,7 +2709,7 @@ class TestFoundationEnginePriceActionRequirement:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2709,7 +2750,12 @@ class TestFoundationEnginePriceActionRequirement:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(
@@ -2771,7 +2817,7 @@ class TestFoundationEnginePriceActionRequirement:
 
                     with patch.object(
                         engine.trendline_analyzer,
-                        "analyze_trendline_signal",
+                        "analyze_zone_confluence",
                         new_callable=AsyncMock,
                     ) as mock_tl:
                         mock_tl.return_value = type(
@@ -2813,7 +2859,12 @@ class TestFoundationEnginePriceActionRequirement:
                                     mock_struct.return_value = type(
                                         "StructureSignal",
                                         (),
-                                        {"direction": "BULLISH", "confidence": 80.0, "details": {}},
+                                        {
+                                            "direction": "BULLISH",
+                                            "confidence": 80.0,
+                                            "structure_type": "BOS",
+                                            "details": {},
+                                        },
                                     )()
 
                                     result = await engine._create_signal_from_zone(

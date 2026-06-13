@@ -474,3 +474,153 @@ class TestUtilityMethods:
         assert len(levels) == 2
         assert levels[0].distance_pips == pytest.approx(75.0, abs=0.1)  # 50% of 150
         assert levels[1].distance_pips == pytest.approx(120.0, abs=0.1)  # 80% of 150
+
+
+def _make_position(volume: float, position_id: str = "pos_size") -> Position:
+    """A forex BUY position at +75 pips (level-1 hit) with the given volume."""
+    pos = Position(
+        position_id=position_id,
+        symbol="EURUSD",
+        position_type=PositionType.BUY,
+        entry_price=1.1000,
+        stop_loss=1.0950,
+        take_profit=1.1150,  # TP distance 150 pips -> level 1 at 75 pips
+        volume=volume,
+        pip_size=0.0001,
+        pip_value_per_lot=10.0,
+        status=PositionStatus.OPEN,
+    )
+    pos.current_price = 1.1075
+    pos.current_profit_pips = 75.0
+    return pos
+
+
+class TestSizeGate:
+    """Position-level size gate (exit-payoff-tuning Phase 2)."""
+
+    def test_default_min_position_volume_computed_from_floor(self):
+        """Unset -> min_volume / first-level close% (0.01 / 0.25 = 0.04)."""
+        manager = PartialCloseManager(config={"partial_close": {"enabled": True}})
+        assert manager.min_volume == 0.01
+        assert manager.min_position_volume == pytest.approx(0.04)
+
+    def test_min_position_volume_explicit_override(self):
+        manager = PartialCloseManager(
+            config={"partial_close": {"enabled": True, "min_position_volume": 0.1}}
+        )
+        assert manager.min_position_volume == 0.1
+
+    def test_position_at_floor_001_is_size_gated(self):
+        """0.01 lot: 25% close = 0.0025 < floor -> skipped cleanly."""
+        manager = PartialCloseManager(config={"partial_close": {"enabled": True}})
+        pos = _make_position(0.01)
+        assert manager.should_close_partial(pos) is False
+
+    def test_position_003_still_size_gated(self):
+        """0.03 lot < 0.04 gate (25% = 0.0075 < floor) -> skipped."""
+        manager = PartialCloseManager(config={"partial_close": {"enabled": True}})
+        pos = _make_position(0.03)
+        assert manager.should_close_partial(pos) is False
+
+    def test_position_004_clears_the_gate(self):
+        """0.04 lot: 25% close = 0.01 = floor -> partial allowed."""
+        manager = PartialCloseManager(config={"partial_close": {"enabled": True}})
+        pos = _make_position(0.04)
+        assert manager.should_close_partial(pos) is True
+
+    def test_close_volume_below_floor_skips_when_position_gate_disabled(self):
+        """With the position gate off, a per-level close below the floor still
+        skips (the secondary close_volume < min_volume guard)."""
+        manager = PartialCloseManager(
+            config={"partial_close": {"enabled": True, "min_position_volume": 0.0}}
+        )
+        pos = _make_position(0.02)  # passes gate (0.0); 25% close = 0.005 < 0.01
+        assert manager.should_close_partial(pos) is False
+
+    def test_size_gate_logged_once(self):
+        """The size-gated skip is announced once, not every update loop."""
+        manager = PartialCloseManager(config={"partial_close": {"enabled": True}})
+        pos = _make_position(0.01)
+        manager.should_close_partial(pos)
+        assert pos.position_id in manager._size_gated_logged
+        # Subsequent calls still skip but don't re-add / re-log
+        manager.should_close_partial(pos)
+        assert manager.should_close_partial(pos) is False
+
+    def test_reset_clears_size_gate_log(self):
+        manager = PartialCloseManager(config={"partial_close": {"enabled": True}})
+        pos = _make_position(0.01)
+        manager.should_close_partial(pos)
+        manager.reset_position(pos.position_id)
+        assert pos.position_id not in manager._size_gated_logged
+
+
+class TestConfigurableMinVolume:
+    """The MT5 lot floor is config-driven, not hardcoded."""
+
+    def test_custom_min_volume_blocks_execute(self):
+        """A higher floor rejects a close that would otherwise clear 0.01."""
+        manager = PartialCloseManager(
+            config={
+                "partial_close": {
+                    "enabled": True,
+                    "min_volume": 0.1,
+                    "min_position_volume": 0.0,  # disable the position gate for this test
+                }
+            }
+        )
+        pos = _make_position(0.05)  # 25% = 0.0125 < 0.1 floor
+        with pytest.raises(ValueError, match="minimum 0.100"):
+            manager.execute_partial_close(pos, close_price=1.1075)
+
+
+class TestConfigurableLevelRatios:
+    """First-partial tier is config-driven (design L3)."""
+
+    def test_flat_level_ratios_override(self):
+        """A flat list applies to every asset class."""
+        manager = PartialCloseManager(
+            config={
+                "partial_close": {
+                    "enabled": True,
+                    "level_ratios": [[0.4, 0.25], [0.7, 0.50]],
+                }
+            }
+        )
+        pos = _make_position(1.0)
+        level = manager.get_next_level(pos)
+        # TP distance 150 pips, level 1 now at 40% = 60 pips
+        assert level.distance_pips == pytest.approx(60.0, abs=0.1)
+        assert level.close_percentage == 0.25
+
+    def test_per_asset_level_ratios_with_default(self):
+        manager = PartialCloseManager(
+            config={
+                "partial_close": {
+                    "enabled": True,
+                    "level_ratios": {
+                        "commodities": [[0.6, 0.30]],
+                        "default": [[0.45, 0.25], [0.75, 0.50]],
+                    },
+                }
+            }
+        )
+        # forex_major falls through to `default`
+        forex_ratios = manager._get_level_ratios("forex_major")
+        assert forex_ratios[0] == (0.45, 0.25)
+        # commodities uses its own ladder
+        gold_ratios = manager._get_level_ratios("commodities")
+        assert gold_ratios == [(0.6, 0.30)]
+
+    def test_first_close_percentage_drives_gate(self):
+        """A larger first-level close% lowers the min-position gate."""
+        manager = PartialCloseManager(
+            config={
+                "partial_close": {
+                    "enabled": True,
+                    "level_ratios": [[0.5, 0.50]],  # first close 50%
+                }
+            }
+        )
+        # min_position_volume = 0.01 / 0.50 = 0.02
+        assert manager.min_position_volume == pytest.approx(0.02)

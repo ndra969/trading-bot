@@ -74,13 +74,45 @@ class PartialCloseManager:
         # Track remaining volume: position_id -> remaining volume
         self.remaining_volume: dict[str, float] = {}
 
+        pc_cfg = self.config.get("partial_close", {})
+
         # Disabled by default — for small/cent accounts, 25% of 0.01 lot is
         # below MT5's 0.01 minimum so partial close silently never fires
         # anyway. Explicit flag prevents the misleading "should-fire-but-
         # skipped" log noise and documents the intent.
-        self.enabled = bool(self.config.get("partial_close", {}).get("enabled", False))
+        self.enabled = bool(pc_cfg.get("enabled", False))
 
-        logger.info(f"PartialCloseManager initialized (enabled={self.enabled})")
+        # MT5 lot-size floor: a single partial-close order must be >= this.
+        self.min_volume = float(pc_cfg.get("min_volume", 0.01))
+
+        # Optional per-asset / flat level-ratio overrides (proportion of TP
+        # distance + close % of remaining). Read once; resolved per asset.
+        self._level_ratios_cfg = pc_cfg.get("level_ratios")
+
+        # Position-level size gate: below this volume the FIRST partial can
+        # never clear the lot floor, so partial close is skipped cleanly for
+        # the whole position (no per-loop "should-fire-but-skipped" noise,
+        # visible in the dashboard as a non-firing automation). When unset,
+        # computed from the floor and the largest first-level close % — the
+        # smallest position that CAN partial-close (e.g. 0.01 / 0.25 = 0.04).
+        configured_min_pos = pc_cfg.get("min_position_volume")
+        if configured_min_pos is not None:
+            self.min_position_volume = float(configured_min_pos)
+        else:
+            first_close_pct = self._first_close_percentage()
+            self.min_position_volume = (
+                self.min_volume / first_close_pct if first_close_pct > 0 else self.min_volume
+            )
+
+        # Positions already announced as size-gated (log the skip once, not
+        # every update loop).
+        self._size_gated_logged: set[str] = set()
+
+        logger.info(
+            f"PartialCloseManager initialized (enabled={self.enabled}, "
+            f"min_volume={self.min_volume:.3f}, "
+            f"min_position_volume={self.min_position_volume:.3f})"
+        )
 
     def initialize_position(self, position: Position) -> None:
         """
@@ -149,6 +181,12 @@ class PartialCloseManager:
 
         Returns:
             List of (tp_ratio, close_percentage) tuples
+
+        Config (``partial_close.level_ratios``) overrides the defaults so the
+        first partial can be moved to a REACHABLE tier (live data: ~19% of
+        trades reach ~1R, almost none reach 2R). Accepts either a flat list of
+        ``[tp_ratio, close_pct]`` pairs applied to every asset, or a dict
+        keyed by asset class with a ``default`` fallback.
         """
         # Default ratios: Level 1 at 50% of TP (25% close), Level 2 at 80% of TP (50% close)
         # This ensures levels trigger before TP regardless of RR ratio
@@ -157,9 +195,21 @@ class PartialCloseManager:
             (0.8, 0.50),  # Level 2: 80% of TP, close 50% of remaining
         ]
 
-        # Asset-specific overrides can be added here if needed
-        # For now, all asset classes use the same proportional approach
+        cfg = self._level_ratios_cfg
+        raw = None
+        if isinstance(cfg, dict):
+            raw = cfg.get(asset_class) or cfg.get("default")
+        elif isinstance(cfg, list) and cfg:
+            raw = cfg
+
+        if raw:
+            return [(float(tp_ratio), float(close_pct)) for tp_ratio, close_pct in raw]
         return default_ratios
+
+    def _first_close_percentage(self) -> float:
+        """Close % of the first partial level (drives the min-position gate)."""
+        ratios = self._get_level_ratios("forex_major")
+        return ratios[0][1] if ratios else 0.25
 
     def should_close_partial(self, position: Position) -> bool:
         """
@@ -179,6 +229,19 @@ class PartialCloseManager:
         if not position.is_open:
             return False
 
+        # Position-level size gate: when the whole position is too small for
+        # any partial to clear the lot floor, skip cleanly for its lifetime
+        # (announce once at debug, not every update loop).
+        if position.volume < self.min_position_volume:
+            if position.position_id not in self._size_gated_logged:
+                self._size_gated_logged.add(position.position_id)
+                logger.debug(
+                    f"Partial close size-gated for {position.position_id}: "
+                    f"volume {position.volume:.3f} < min_position_volume "
+                    f"{self.min_position_volume:.3f} lots — partial disabled for this position"
+                )
+            return False
+
         # Get next level
         next_level = self.get_next_level(position)
         if not next_level:
@@ -188,19 +251,14 @@ class PartialCloseManager:
         if position.current_profit_pips < next_level.distance_pips:
             return False
 
-        # Check if volume is sufficient for partial close
-        # Minimum volume for partial close is typically 0.01 lot (or volume step)
+        # Check if the calculated close volume clears the MT5 lot floor.
         remaining = self.remaining_volume.get(position.position_id, position.volume)
         close_volume = remaining * next_level.close_percentage
 
-        # Determine minimum volume based on asset class
-        min_volume = 0.01  # Default minimum
-
-        # Skip partial close if calculated volume is too small
-        if close_volume < min_volume:
+        if close_volume < self.min_volume:
             logger.debug(
                 f"Skipping partial close for {position.position_id}: "
-                f"Close volume {close_volume:.3f} < minimum {min_volume:.3f} "
+                f"Close volume {close_volume:.3f} < minimum {self.min_volume:.3f} "
                 f"(Position: {position.volume:.3f} lots, Close %: {next_level.close_percentage * 100:.0f}%)"
             )
             return False
@@ -262,12 +320,10 @@ class PartialCloseManager:
             )
             close_volume = remaining
 
-        # Validate minimum volume (0.01 for all asset classes)
-        min_volume = 0.01
-
-        if close_volume < min_volume:
+        # Validate the close clears the configured MT5 lot floor.
+        if close_volume < self.min_volume:
             raise ValueError(
-                f"Cannot partial close: volume {close_volume:.3f} < minimum {min_volume:.3f} "
+                f"Cannot partial close: volume {close_volume:.3f} < minimum {self.min_volume:.3f} "
                 f"(position volume: {position.volume:.3f})"
             )
 
@@ -376,6 +432,7 @@ class PartialCloseManager:
             del self.partial_closes[position_id]
         if position_id in self.remaining_volume:
             del self.remaining_volume[position_id]
+        self._size_gated_logged.discard(position_id)
         logger.debug(f"Reset partial close tracking for {position_id}")
 
     def get_tracked_positions_count(self) -> int:

@@ -21,10 +21,15 @@ specs/
 | Spec | Status | Priority |
 |------|--------|----------|
 | [strategy-tuning.md](active/strategy-tuning.md) | 🟢 Round 1 applied, observation phase | 🟠 Medium |
-| [monorepo-restructure/](active/monorepo-restructure/) | 📋 Planned — split into packages/core+worker+api (Opsi 3); prerequisite for dashboard | 🟠 Medium |
-| [ui-dashboard/](active/ui-dashboard/) | 📋 Planned — read-only dashboard (FastAPI + Next.js); depends on monorepo-restructure | 🟠 Medium |
-| [confluence-scoring-investigation/](active/confluence-scoring-investigation/) | 📋 Planned — investigate weak confluence predictor (wait 1wk sample) | 🟠 Medium |
-| [refactor-main-services/](active/refactor-main-services/) | 📋 Planned — extract PositionOrchestrator + AnalysisService (folds into worker pkg after monorepo) | 🟢 Low |
+| [enhancement-layer-rework/](active/enhancement-layer-rework/) | 📋 Planned — revive dead confluence layers (trendline 0%, structure vocab bug, fibonacci counter-predictive, rsi role); supersedes the confluence investigation | 🟠 Medium |
+| [exit-payoff-tuning/](active/exit-payoff-tuning/) | 📋 Planned — payoff 0.47 fix: BE-gap leak, honest TP, size-gated partial close | 🟠 Medium-High |
+| [confluence-scoring-investigation/](active/confluence-scoring-investigation/) | 🟢 Findings folded into enhancement-layer-rework (2026-06-11 analysis) | 🟠 Medium |
+
+## Recently Archived (2026-06)
+
+- [ui-dashboard/](archive/2026-06/ui-dashboard/) — read-only dashboard:
+  worker observability + FastAPI read-only API + Next.js frontend
+  (✅ Shipped 2026-06, Phases 1.5–4)
 
 ## Recently Archived (2026-05)
 

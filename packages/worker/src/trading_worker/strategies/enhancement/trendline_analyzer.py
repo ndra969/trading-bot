@@ -52,6 +52,102 @@ class TrendlineAnalyzer:
         self.config = config
         self.min_touches = config.get("trendline", {}).get("min_touches", 3)
         self.tolerance = config.get("trendline", {}).get("tolerance", 0.0005)  # Price tolerance
+        # Zone-confluence tolerance as a fraction of zone height: how far
+        # beyond the zone band a projected line may sit and still count as
+        # reinforcing the zone (asset-scale independent by construction).
+        self.zone_tolerance = config.get("trendline", {}).get("zone_tolerance", 0.5)
+
+    async def analyze_zone_confluence(
+        self,
+        symbol: str,
+        prices: list[float],
+        timeframe: str,
+        zone_lower: float,
+        zone_upper: float,
+        is_demand: bool,
+    ) -> TrendlineSignal:
+        """
+        Evaluate whether a trendline reinforces an S&D zone.
+
+        Unlike analyze_trendline_signal (price within N pips of a line on the
+        entry candle — which almost never coincides with a zone entry), this
+        projects each top trendline to the current bar and asks whether the
+        line passes through or adjacent to the zone band. Tolerance scales
+        with zone height, so no pip conversion is needed. Direction filter:
+        only SUPPORT lines reinforce a DEMAND zone (BUY) and only RESISTANCE
+        lines reinforce a SUPPLY zone (SELL); break types never count.
+        """
+        if len(prices) < 50 or zone_upper <= zone_lower:
+            return TrendlineSignal(
+                symbol, timeframe, [], None, 0, "NEUTRAL", 0, {"error": "Insufficient data"}
+            )
+
+        swing_highs = self._find_swing_highs(prices)
+        swing_lows = self._find_swing_lows(prices)
+        resistance_lines = self._generate_trendlines(swing_highs, prices, "RESISTANCE")
+        support_lines = self._generate_trendlines(swing_lows, prices, "SUPPORT")
+
+        all_lines = resistance_lines + support_lines
+        all_lines.sort(key=lambda x: x.score, reverse=True)
+        top_lines = all_lines[:5]
+
+        current_idx = len(prices) - 1
+        zone_height = zone_upper - zone_lower
+        tolerance = zone_height * self.zone_tolerance
+        band_lower = zone_lower - tolerance
+        band_upper = zone_upper + tolerance
+        zone_mid = (zone_upper + zone_lower) / 2
+        half_span = zone_height / 2 + tolerance
+
+        wanted_type = "SUPPORT" if is_demand else "RESISTANCE"
+
+        best_line: Trendline | None = None
+        best_confidence = 0.0
+        best_line_price = 0.0
+        for line in top_lines:
+            if line.line_type != wanted_type:
+                continue
+            line_price = line.slope * current_idx + line.intercept
+            if not (band_lower <= line_price <= band_upper):
+                continue
+            # Confidence: touches (line strength) + how centred the line is
+            # within the zone band (a line through the zone middle reinforces
+            # the level more than one grazing the tolerance edge).
+            centring = 1.0 - abs(line_price - zone_mid) / half_span
+            confidence = 20.0 + line.touches * 5.0 + centring * 20.0
+            if confidence > best_confidence:
+                best_confidence = confidence
+                best_line = line
+                best_line_price = line_price
+
+        if best_line is None:
+            return TrendlineSignal(
+                symbol=symbol,
+                timeframe=timeframe,
+                trendlines=top_lines,
+                nearest_trendline=None,
+                distance_to_trendline=0,
+                signal_type="NEUTRAL",
+                confidence=0.0,
+                details={"zone": [zone_lower, zone_upper]},
+            )
+
+        signal_type = "BOUNCE_SUPPORT" if is_demand else "BOUNCE_RESISTANCE"
+        return TrendlineSignal(
+            symbol=symbol,
+            timeframe=timeframe,
+            trendlines=top_lines,
+            nearest_trendline=best_line,
+            distance_to_trendline=abs(best_line_price - zone_mid),
+            signal_type=signal_type,
+            confidence=min(best_confidence, 100),
+            details={
+                "action": f"{wanted_type} trendline reinforces zone",
+                "line_price": best_line_price,
+                "zone": [zone_lower, zone_upper],
+                "touches": best_line.touches,
+            },
+        )
 
     async def analyze_trendline_signal(
         self, symbol: str, prices: list[float], timeframe: str, pip_value: float = 0.0001

@@ -51,6 +51,10 @@ class FibonacciAnalyzer:
         else:
             self.levels = {0.382: 10, 0.500: 15, 0.618: 20, 0.786: 10}
 
+        # Pivot window for swing-leg detection (bars on each side that must
+        # be lower/higher for a bar to count as a pivot high/low).
+        self.swing_window = fib_cfg.get("swing_window", 5)
+
     async def analyze_fibonacci(
         self, symbol: str, highs: list[float], lows: list[float], zone_price: float, zone_type: str
     ) -> FibonacciSignal | None:
@@ -64,44 +68,15 @@ class FibonacciAnalyzer:
         recent_highs = highs[-self.lookback :]
         recent_lows = lows[-self.lookback :]
 
-        # Identify Major Swing High and Low
-        # Strategy:
-        # For Demand Zone (Buying), we expect price to retrace DOWN.
-        # So we draw Fibo from Swing Low to Swing High.
-        # For Supply Zone (Selling), we expect price to retrace UP.
-        # So we draw Fibo from Swing High to Swing Low.
-
-        max_high = max(recent_highs)
-        min_low = min(recent_lows)
-
-        # Find indices (relative to the slice)
-        high_idx = recent_highs.index(max_high)
-        low_idx = recent_lows.index(min_low)
-
-        # Determine Fibo Direction based on Zone Type
-        direction = "UNKNOWN"
-
-        if zone_type == "DEMAND":
-            # Looking for retracement of an UP move (Low -> High)
-            # Valid if Low happened BEFORE High
-            if low_idx < high_idx:
-                direction = "UP"
-            else:
-                # If High happened before Low, we are in a downtrend.
-                # Maybe use the previous High-Low?
-                # For simplicity, if structure isn't clear, skip.
-                return None
-
-        elif zone_type == "SUPPLY":
-            # Looking for retracement of a DOWN move (High -> Low)
-            # Valid if High happened BEFORE Low
-            if high_idx < low_idx:
-                direction = "DOWN"
-            else:
-                return None
-
-        else:
+        # Swing selection (spec enhancement-layer-rework): measure the
+        # retracement off the most recent *structural* leg (pivot high/low),
+        # not the global lookback extremes — the global max/min can be stale
+        # and ignore intermediate structure, which made deep retracements of
+        # old moves score highest (and dominate losers).
+        leg = self._find_recent_leg(recent_highs, recent_lows, zone_type)
+        if leg is None:
             return None
+        min_low, max_high, direction = leg
 
         # Calculate Levels
         # diff = swing_end - swing_start  # Not used in calculation
@@ -152,7 +127,69 @@ class FibonacciAnalyzer:
                     "level": best_level.name,
                     "price": best_level.price,
                     "swing_range": range_val,
+                    "swing_high": max_high,
+                    "swing_low": min_low,
                 },
             )
 
         return None
+
+    def _find_recent_leg(
+        self, highs: list[float], lows: list[float], zone_type: str
+    ) -> tuple[float, float, str] | None:
+        """Find the most recent structural swing leg for the zone type.
+
+        DEMAND (expects a retracement DOWN of an UP move): the latest pivot
+        high, paired with the latest pivot low that precedes it.
+        SUPPLY (retracement UP of a DOWN move): the latest pivot low, paired
+        with the latest pivot high that precedes it.
+
+        Returns:
+            (leg_low, leg_high, direction) where direction is "UP"/"DOWN",
+            or None when the recent structure does not form a valid leg.
+        """
+        pivot_highs = self._find_pivots(highs, is_high=True)
+        pivot_lows = self._find_pivots(lows, is_high=False)
+        if not pivot_highs or not pivot_lows:
+            return None
+
+        if zone_type == "DEMAND":
+            high_idx, high_val = pivot_highs[-1]
+            lows_before = [(i, v) for i, v in pivot_lows if i < high_idx]
+            if not lows_before:
+                return None
+            _, low_val = lows_before[-1]
+            if low_val >= high_val:
+                return None
+            return low_val, high_val, "UP"
+
+        if zone_type == "SUPPLY":
+            low_idx, low_val = pivot_lows[-1]
+            highs_before = [(i, v) for i, v in pivot_highs if i < low_idx]
+            if not highs_before:
+                return None
+            _, high_val = highs_before[-1]
+            if high_val <= low_val:
+                return None
+            return low_val, high_val, "DOWN"
+
+        return None
+
+    def _find_pivots(self, data: list[float], is_high: bool) -> list[tuple[int, float]]:
+        """Find pivot points (local extremes) with the configured window."""
+        window = self.swing_window
+        pivots = []
+        for i in range(window, len(data) - window):
+            is_pivot = True
+            for j in range(1, window + 1):
+                if is_high:
+                    if data[i] <= data[i - j] or data[i] <= data[i + j]:
+                        is_pivot = False
+                        break
+                else:
+                    if data[i] >= data[i - j] or data[i] >= data[i + j]:
+                        is_pivot = False
+                        break
+            if is_pivot:
+                pivots.append((i, data[i]))
+        return pivots
