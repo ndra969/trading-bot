@@ -5,10 +5,8 @@ engine against the same database the bot writes to — short-lived sessions,
 no writes, never holding transactions that could block the bot.
 """
 
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from fastapi import Query
@@ -82,6 +80,19 @@ def dashboard_token() -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _to_naive_utc(dt: datetime | None) -> datetime | None:
+    """Normalize an incoming bound to naive UTC.
+
+    Position/rejection timestamps are stored as ``TIMESTAMP WITHOUT TIME ZONE``
+    (naive UTC). A tz-aware bound (e.g. an ISO string ending in ``Z``) can't be
+    compared against those columns on Postgres, so convert to UTC and drop the
+    tzinfo. Naive inputs pass through unchanged.
+    """
+    if dt is None or dt.tzinfo is None:
+        return dt
+    return dt.astimezone(UTC).replace(tzinfo=None)
+
+
 class TimeRange:
     """Optional since/until window (ISO-8601), applied by each endpoint."""
 
@@ -90,8 +101,8 @@ class TimeRange:
         since: datetime | None = Query(None, description="ISO-8601 lower bound (inclusive)"),
         until: datetime | None = Query(None, description="ISO-8601 upper bound (exclusive)"),
     ) -> None:
-        self.since = since
-        self.until = until
+        self.since = _to_naive_utc(since)
+        self.until = _to_naive_utc(until)
 
 
 class Pagination:

@@ -28,6 +28,19 @@ router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
 _CLOSED = "CLOSED"
 
+# The worker stores the coarse asset_class "forex"; the Tuning view splits forex
+# into the pip-taxonomy sub-classes (forex_jpy = JPY-quoted pairs, forex_major =
+# the rest). Derive that split from the symbol here so the finer tabs resolve.
+_FOREX_SUBCLASSES = {"forex_major", "forex_jpy"}
+
+
+def _asset_class_filters(asset_class: str) -> list:
+    """SQL filters for an asset_class, resolving the forex_major/forex_jpy split."""
+    if asset_class in _FOREX_SUBCLASSES:
+        jpy = Position.symbol.contains("JPY")
+        return [Position.asset_class == "forex", jpy if asset_class == "forex_jpy" else ~jpy]
+    return [Position.asset_class == asset_class]
+
 
 async def _load_closed(
     session: AsyncSession,
@@ -35,12 +48,17 @@ async def _load_closed(
     symbol: str | None = None,
     asset_class: str | None = None,
 ) -> list[dict]:
-    """Load CLOSED positions in the window as lightweight trade dicts."""
-    filters = [Position.status == _CLOSED]
+    """Load CLOSED positions in the window as lightweight trade dicts.
+
+    Only positions with a recorded outcome (``is_winner`` set) are analyzable;
+    legacy early-dev rows with NULL outcome / asset_class carry pnl 0 and would
+    otherwise be silently counted as losses and dilute every win-rate.
+    """
+    filters = [Position.status == _CLOSED, Position.is_winner.isnot(None)]
     if symbol:
         filters.append(Position.symbol == symbol)
     if asset_class:
-        filters.append(Position.asset_class == asset_class)
+        filters.extend(_asset_class_filters(asset_class))
     if window.since:
         filters.append(Position.close_time >= window.since)
     if window.until:
