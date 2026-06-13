@@ -140,8 +140,15 @@ signal_generation:
       min_price_action_score: 8.0
 
     commodities:
-      min_confluence_score: 58.0
-      min_confluence_score_counter: 64.0   # stricter counter-trend
+      # 2026-06-13: raised 58 → 70 from the Tuning "Avg P&L" view. Every
+      # confluence bucket below 70 was net-NEGATIVE (50-60 avg -5.73,
+      # 60-70 avg -9.95); only the 70-80 bucket was profitable (+21.83).
+      # 58 admitted the bleeding 58-70 zone. Win-rate alone hid this (60-70
+      # showed ~58% WR yet lost money — small wins, big losses). MONITOR:
+      # too few commodity signals → ease toward 66; still losing ≥70 → it's
+      # an exit/payoff problem, not threshold (see exit-payoff-tuning).
+      min_confluence_score: 70.0
+      min_confluence_score_counter: 74.0   # stricter counter-trend (was 64)
       min_foundation_score: 25.0
       min_price_action_score: 8.0
 

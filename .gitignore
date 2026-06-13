@@ -117,3 +117,4 @@ site/
 
 # UI reference clone (indra-an/polyforge) — local only, never pushed
 /reference/
+.ui-shots/
