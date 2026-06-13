@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -22,7 +22,11 @@ export function sinceFor(key: RangeKey): string | undefined {
 /** Time-range selector. Returns the selected key; callers derive `since`. */
 export function useTimeRange(initial: RangeKey = "30d") {
   const [range, setRange] = useState<RangeKey>(initial)
-  return { range, setRange, since: sinceFor(range) }
+  // Recompute `since` only when `range` changes — otherwise every render
+  // produces a fresh timestamp, which would re-trigger every poll's useEffect
+  // and cause an infinite refetch loop.
+  const since = useMemo(() => sinceFor(range), [range])
+  return { range, setRange, since }
 }
 
 export function TimeRangePicker({

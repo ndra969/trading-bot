@@ -25,6 +25,7 @@ export default function AnalyticsPage() {
   const q = qs({ since })
 
   const bySymbol = usePoll<StatRow[]>(`/api/v1/analytics/by-symbol${q}`, POLL)
+  const bySession = usePoll<StatRow[]>(`/api/v1/analytics/by-session${q}`, POLL)
   const byExit = usePoll<StatRow[]>(`/api/v1/analytics/by-exit-type${q}`, POLL)
   const equity = usePoll<EquityPoint[]>(`/api/v1/analytics/equity-curve${q}`, POLL)
 
@@ -76,6 +77,19 @@ export default function AnalyticsPage() {
         <CardContent className="p-0">
           {bySymbol.data ? (
             <StatTable rows={bySymbol.data} keyLabel="Symbol" />
+          ) : (
+            <Skeleton className="m-4 h-32" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>By market session</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {bySession.data ? (
+            <StatTable rows={bySession.data} keyLabel="Market session" />
           ) : (
             <Skeleton className="m-4 h-32" />
           )}
