@@ -21,7 +21,9 @@ specs/
 | Spec | Status | Priority |
 |------|--------|----------|
 | [strategy-tuning.md](active/strategy-tuning.md) | 🟢 Round 1 applied, observation phase | 🟠 Medium |
-| [confluence-scoring-investigation/](active/confluence-scoring-investigation/) | 📋 Planned — investigate weak confluence predictor (wait 1wk sample) | 🟠 Medium |
+| [enhancement-layer-rework/](active/enhancement-layer-rework/) | 📋 Planned — revive dead confluence layers (trendline 0%, structure vocab bug, fibonacci counter-predictive, rsi role); supersedes the confluence investigation | 🟠 Medium |
+| [exit-payoff-tuning/](active/exit-payoff-tuning/) | 📋 Planned — payoff 0.47 fix: BE-gap leak, honest TP, size-gated partial close | 🟠 Medium-High |
+| [confluence-scoring-investigation/](active/confluence-scoring-investigation/) | 🟢 Findings folded into enhancement-layer-rework (2026-06-11 analysis) | 🟠 Medium |
 
 ## Recently Archived (2026-06)
 
