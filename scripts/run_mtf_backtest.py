@@ -1,483 +1,199 @@
-"""
-Multi-Timeframe Backtest Script.
+"""Multi-Timeframe Backtest — rewired 2026-06-13 for exit-payoff-tuning Phase 1.
 
-Strategy:
-- Zone Detection: H1 (strong, tested zones)
-- Entry Confirmation: M30 (precise price action)
+Zone detection on the higher TF (e.g. H1), entry confirmation on the lower TF
+(e.g. M30) — the live MTF approach. Subclasses BacktestEngine so exits and
+automation run through the SAME real managers (breakeven / trailing / partial)
++ PositionTracker; only zone detection and the entry scan are MTF-specific.
 
-This follows the intraday trading approach where higher TF provides
-context/zones and lower TF provides entry timing.
+    uv run python scripts/run_mtf_backtest.py --symbol EURUSDc --zone-tf H1 --entry-tf M30
+    uv run python scripts/run_mtf_backtest.py --symbol XAUUSDc --zone-tf H1 --entry-tf M30 \
+        --trailing-activation-r 0.5 --tp-ratio 1.5 --partial on --volume 0.10
+
+Sweep knobs and limitations match run_backtest.py.
 """
+
+from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
 from pathlib import Path
 
 import pandas as pd
-
-# Add project root to Python path
-project_root = str(Path(__file__).parent.parent / "src")
-sys.path.append(project_root)
-
-from run_backtest import BacktestEngine, MockTrade
-
-from trading_bot.strategies.foundation.foundation_engine import FoundationEngine
-from trading_bot.strategies.models import SignalDirection
-from trading_bot.utils.logger import get_logger
+from run_backtest import BacktestEngine, _build_overrides
+from trading_core.utils.logger import get_logger
 
 logger = get_logger("mtf_backtest")
 
 
 class MTFBacktestEngine(BacktestEngine):
-    """Multi-Timeframe Backtest Engine."""
+    """Multi-timeframe backtest: H1 zones, M30 entries, real automation managers."""
 
     def __init__(
-        self, symbol: str, zone_tf: str, entry_tf: str, zone_data_path: str, entry_data_path: str
+        self,
+        symbol: str,
+        zone_tf: str,
+        entry_tf: str,
+        zone_data_path: str,
+        entry_data_path: str,
+        *,
+        open_volume: float = 0.10,
+        overrides: dict | None = None,
     ):
-        """
-        Initialize MTF backtest.
-
-        Args:
-            symbol: Trading symbol
-            zone_tf: Higher timeframe for zone detection (e.g. 'H1')
-            entry_tf: Lower timeframe for entry signals (e.g. 'M30')
-            zone_data_path: Path to zone TF data CSV
-            entry_data_path: Path to entry TF data CSV
-        """
         self.symbol = symbol
         self.zone_tf = zone_tf
         self.entry_tf = entry_tf
+        self.timeframe = entry_tf  # for the inherited report header
+        self.open_volume = open_volume
 
-        # Load configuration
-        self.config = self._load_config()
+        self.config = self._load_config(overrides or {})
+        self.zone_data = self._load_data_from(zone_data_path)
+        self.entry_data = self._load_data_from(entry_data_path)
+        self._build_runtime()
 
-        # Override zone expiration for backtest (allow zones up to 100000 hours old)
-        # This prevents zones from being filtered out in historical backtests
-        # Historical data may have zones that are very old relative to current time
-        # SupplyDemandStrategy passes config.get("supply_demand", {}) to ZoneDetector
-        # ZoneDetector reads from config.get("zone_detection", {})
-        if "supply_demand" not in self.config:
-            self.config["supply_demand"] = {}
-        if "zone_detection" not in self.config["supply_demand"]:
-            self.config["supply_demand"]["zone_detection"] = {}
-        self.config["supply_demand"]["zone_detection"][
-            "max_zone_age_hours"
-        ] = 100000  # ~11 years - effectively disable expiration for backtest
         logger.info(
-            f"Backtest mode: max_zone_age_hours set to {self.config['supply_demand']['zone_detection']['max_zone_age_hours']} (effectively disabled)"
+            f"MTF {symbol}: {len(self.zone_data)} {zone_tf} (zones) / "
+            f"{len(self.entry_data)} {entry_tf} (entries)"
         )
 
-        # Load both timeframe data
-        self.zone_data = self._load_data_from_path(zone_data_path)
-        self.entry_data = self._load_data_from_path(entry_data_path)
-
-        from trading_bot.position.pip_calculator import PipCalculator
-
-        self.pip_calculator = PipCalculator()
-
-        logger.info(f"Loaded {len(self.zone_data)} {zone_tf} candles for zone detection")
-        logger.info(f"Loaded {len(self.entry_data)} {entry_tf} candles for entry signals")
-
-        # Initialize strategy
-        self.engine = FoundationEngine(config=self.config, use_database=False)
-
-        # State
-        self.trades: list[MockTrade] = []
-        self.active_trade: MockTrade | None = None
-        self.spread = 0.0001
-
-    def _load_config(self) -> dict:
-        """Load strategy parameters."""
-        import yaml
-
-        config_path = Path(__file__).parent.parent / "config" / "strategy_parameters.yaml"
-        try:
-            with open(config_path) as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Failed to load config: {e}")
-            return {}
-
-    def _load_data_from_path(self, path: str) -> pd.DataFrame:
-        """Load CSV data from path."""
+    @staticmethod
+    def _load_data_from(path: str) -> pd.DataFrame:
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"Data file not found: {p}")
-
         df = pd.read_csv(p)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df.set_index("timestamp", inplace=True)
         return df.sort_index()
 
-    async def run(self):
-        """Run MTF backtest simulation."""
-        logger.info(
-            f"Starting MTF Backtest: {self.symbol} (Zone: {self.zone_tf}, Entry: {self.entry_tf})"
-        )
+    async def run(self) -> None:
+        logger.info(f"MTF backtest {self.symbol} (zones {self.zone_tf}, entries {self.entry_tf})")
 
-        # Step 1: Detect zones on higher TF using ALL data
-        logger.info(f"Detecting zones on {self.zone_tf}...")
-        # FIX: Pass reference time to prevent zones from being filtered as expired
-        # Use last timestamp from zone data as reference (zones detected relative to this time)
-        last_zone_timestamp = self.zone_data.index[-1].to_pydatetime()
+        # Detect zones once on the higher TF, referenced to its last bar so age
+        # filters don't drop them as "expired" relative to wall-clock.
+        last_zone_ts = self.zone_data.index[-1].to_pydatetime()
         zones = await self.engine.analyze_symbol(
-            self.symbol, self.zone_data, self.zone_tf, reference_time=last_zone_timestamp
+            self.symbol, self.zone_data, self.zone_tf, reference_time=last_zone_ts
         )
         logger.info(f"Detected {len(zones)} zones on {self.zone_tf}")
-
         if not zones:
-            logger.warning("No zones detected. Backtest complete.")
-            self._print_report()
+            print("\nNo zones detected.")
+            self._report()
             return
 
-        # Step 2: Walk through entry TF candles to find entry signals
-        logger.info(f"Scanning {self.entry_tf} candles for entry signals...")
-
-        total_candles = len(self.entry_data)
-        lookback = 200  # Need history for indicators
-
-        for i in range(lookback, total_candles):
+        total = len(self.entry_data)
+        lookback = 200
+        for i in range(lookback, total):
             current_time = self.entry_data.index[i]
-            current_candle = self.entry_data.iloc[i]
-            current_price = float(current_candle["close"])
+            candle = self.entry_data.iloc[i]
+            price = float(candle["close"])
 
-            # Get historical context
-            historical_data = self.entry_data.iloc[: i + 1].copy()
+            # Exits + automation through the inherited real-manager machinery.
+            if self._active is not None:
+                self._check_exit(candle, current_time)
+            if self._active is not None:
+                self._update_and_automate(candle, current_time)
 
-            # Progress indicator
-            if i % 100 == 0:
-                print(f"\rProcessed {i}/{total_candles} candles...", end="", flush=True)
-
-            # Check and update active trade (if any)
-            if self.active_trade:
-                self._update_trade(current_candle, current_time)
-                if not self.active_trade:  # Trade closed
-                    continue
-
-            # Only open new trade if no active trade
-            if not self.active_trade:
-                # FIX: Update reference time for zone age calculation to current entry time
-                # This ensures zone age is calculated relative to when we're checking, not datetime.now()
+            # Flat: look for a zone the price is sitting in, then run the real
+            # signal path (with H1 trend bias for commodities) at that zone.
+            if self._active is None:
                 for zone in zones:
                     zone._reference_time = current_time
+                    if not self._price_at_zone(price, zone):
+                        continue
+                    bias = self._h1_trend_bias(candle, price)
+                    signal = await self.engine._create_signal_from_zone(
+                        self.symbol,
+                        zone,
+                        price,
+                        self.entry_tf,
+                        self.entry_data.iloc[: i + 1],
+                        h1_trend_bias=bias,
+                    )
+                    if signal:
+                        self._open(signal, current_time)
+                        break
 
-                # Get zones that are relevant at this time
-                active_zones = [z for z in zones if self._is_zone_active(z, current_time)]
+            if i % 100 == 0:
+                print(f"  {i}/{total} bars...", end="\r")
 
-                if not active_zones:
-                    continue
+        if self._active is not None:
+            last = self.entry_data.iloc[-1]
+            self._finalise_exit(float(last["close"]), self.entry_data.index[-1], "STOP_LOSS")
 
-                # Check if price is at any zone
-                for zone in active_zones:
-                    if self._is_price_at_zone(current_price, zone):
-                        # --- PHASE 5.24: SNIPER H1 TREND GATE ---
-                        h1_trend_bias = None
-                        asset_class = self.pip_calculator.symbol_mapper.get_asset_class(self.symbol)
-                        if asset_class == "commodities":
-                            # Get accurate H1 data available AT this timestamp
-                            # We use all H1 data up to current_time to avoid leakage
-                            h1_mask = self.zone_data.index <= current_candle.name
-                            h1_hist = self.zone_data[h1_mask]
+        print("\nMTF backtest complete.")
+        self._report()
 
-                            if len(h1_hist) >= 50:
-                                # Multi-Stage Trend Verification
-                                h1_ema_50 = h1_hist["close"].ewm(span=50, adjust=False).mean()
-                                h1_ema_20 = h1_hist["close"].ewm(span=20, adjust=False).mean()
-
-                                ema_50_curr = h1_ema_50.iloc[-1]
-                                ema_50_prev = h1_ema_50.iloc[-2]
-                                ema_20_curr = h1_ema_20.iloc[-1]
-
-                                # Slope: Is the major trend actually moving?
-                                slope_up = ema_50_curr > ema_50_prev
-                                slope_down = ema_50_curr < ema_50_prev
-
-                                # Double-Confirmation: Price must be on the right side of BOTH EMAs
-                                # AND the EMA 50 must have the correct slope
-                                is_bullish = (
-                                    current_price > ema_50_curr
-                                    and current_price > ema_20_curr
-                                    and slope_up
-                                )
-                                is_bearish = (
-                                    current_price < ema_50_curr
-                                    and current_price < ema_20_curr
-                                    and slope_down
-                                )
-
-                                if is_bullish:
-                                    h1_trend_bias = "BULLISH"
-                                elif is_bearish:
-                                    h1_trend_bias = "BEARISH"
-                                else:
-                                    h1_trend_bias = "NEUTRAL"
-
-                                # --- MOMENTUM PROTECTION (PHASE 5.24.1) ---
-                                # Even if Price > EMA, if H1 is crashing, don't BUY
-                                if len(h1_hist) >= 3:
-                                    c_curr = h1_hist["close"].iloc[-1]
-                                    c_p1 = h1_hist["close"].iloc[-2]
-                                    c_p2 = h1_hist["close"].iloc[-3]
-
-                                    # If two consecutive red candles, block BUY
-                                    if h1_trend_bias == "BULLISH" and c_curr < c_p1 and c_p1 < c_p2:
-                                        logger.warning(
-                                            "SNIPER: Blocking BULLISH bias due to H1 Bearish Momentum (Crash protection)"
-                                        )
-                                        h1_trend_bias = "NEUTRAL"
-                                    # If two consecutive green candles, block SELL
-                                    if h1_trend_bias == "BEARISH" and c_curr > c_p1 and c_p1 > c_p2:
-                                        logger.warning(
-                                            "SNIPER: Blocking BEARISH bias due to H1 Bullish Momentum"
-                                        )
-                                        h1_trend_bias = "NEUTRAL"
-
-                                logger.info(
-                                    f"SNIPER BIAS: {current_candle.name} | Price: {current_price:.2f} | H1 EMA50: {ema_50_curr:.2f} | Bias: {h1_trend_bias}"
-                                )
-
-                        # Generate signal using ENTRY TF data + H1 Bias
-                        result = await self.engine._create_signal_from_zone(
-                            self.symbol,
-                            zone,
-                            current_price,
-                            self.entry_tf,
-                            historical_data,
-                            h1_trend_bias=h1_trend_bias,
-                        )
-
-                        if result:
-                            self._open_trade(result, current_time)
-                            break  # Only one trade at a time
-
-        print("\nBacktest Complete.\n")
-        self._print_report()
-
-    def _is_zone_active(self, zone, current_time):
-        """Check if zone is still valid at current time."""
-        # Simple heuristic: zones expire after 30 days
-        zone_age_hours = (current_time - zone.first_detected).total_seconds() / 3600
-        return zone_age_hours < 720  # 30 days
-
-    def _is_price_at_zone(self, price, zone):
-        """Check if price is at zone."""
-        zone_size = zone.upper_bound - zone.lower_bound
-        tolerance = zone_size * 0.2
+    @staticmethod
+    def _price_at_zone(price: float, zone) -> bool:
+        tolerance = (zone.upper_bound - zone.lower_bound) * 0.2
         return zone.lower_bound - tolerance <= price <= zone.upper_bound + tolerance
 
-    def _update_trade(self, current_candle, current_time):
-        """Update active trade with current candle (check SL/TP, BE, TS)."""
-        if not self.active_trade:
-            return
+    def _h1_trend_bias(self, entry_candle: pd.Series, price: float) -> str | None:
+        """H1 sniper trend bias for commodities (None for other assets).
 
-        high = float(current_candle["high"])
-        low = float(current_candle["low"])
+        Mirrors the live Phase 5.24 gate: price on the right side of both EMA20
+        and EMA50 with EMA50 sloping that way, plus a two-candle momentum guard.
+        """
+        asset_class = self.pip_calculator.symbol_mapper.get_asset_class(self.symbol)
+        if asset_class != "commodities":
+            return None
 
-        # Determine pip size using PipCalculator for accuracy
-        from trading_bot.position.pip_calculator import PipCalculator
+        h1_hist = self.zone_data[self.zone_data.index <= entry_candle.name]
+        if len(h1_hist) < 50:
+            return None
 
-        pip_calc = PipCalculator()
-        pip_size = pip_calc.get_pip_size(self.symbol)
+        ema_50 = h1_hist["close"].ewm(span=50, adjust=False).mean()
+        ema_20 = h1_hist["close"].ewm(span=20, adjust=False).mean()
+        ema50_curr, ema50_prev = ema_50.iloc[-1], ema_50.iloc[-2]
+        ema20_curr = ema_20.iloc[-1]
 
-        # Get trade management config
-        tm_config = self.config.get("trade_management", {})
-        asset_class = pip_calc._determine_asset_class(self.symbol)
+        if price > ema50_curr and price > ema20_curr and ema50_curr > ema50_prev:
+            bias = "BULLISH"
+        elif price < ema50_curr and price < ema20_curr and ema50_curr < ema50_prev:
+            bias = "BEARISH"
+        else:
+            return "NEUTRAL"
 
-        defaults = tm_config.get("defaults", {})
-        overrides = tm_config.get("overrides", {}).get(asset_class, {})
-
-        be_settings = defaults.get("breakeven", {}).copy()
-        be_settings.update(overrides.get("breakeven", {}))
-
-        ts_settings = defaults.get("trailing_stop", {}).copy()
-        ts_settings.update(overrides.get("trailing_stop", {}))
-
-        be_enabled = be_settings.get("enabled", True)
-        be_trigger = be_settings.get("trigger_pips", 20.0)
-        be_offset = be_settings.get("offset_pips", 2.0)
-
-        ts_enabled = ts_settings.get("enabled", True)
-        ts_activation = ts_settings.get("activation_pips", 30.0)
-        ts_limit = ts_settings.get("limit_pips", 10.0)
-
-        # Check SL/TP
-        if self.active_trade.direction == SignalDirection.BUY:
-            if low <= self.active_trade.stop_loss:
-                self._close_trade(self.active_trade.stop_loss, current_time, "SL")
-                return
-            if high >= self.active_trade.take_profit:
-                self._close_trade(self.active_trade.take_profit, current_time, "TP")
-                return
-
-            # Breakeven & Trailing
-            current_profit_pips = (high - self.active_trade.entry_price) / pip_size
-
-            if be_enabled:
-                # SNIPER BREAKEVEN (Phase 5.24): Trigger at 0.7R (70% of SL Distance)
-                initial_sl_dist = abs(self.active_trade.entry_price - self.active_trade.stop_loss)
-                sniper_trigger_pips = (initial_sl_dist * 0.7) / pip_size
-
-                be_price = self.active_trade.entry_price + (be_offset * pip_size)
-                if (
-                    current_profit_pips >= sniper_trigger_pips
-                    and self.active_trade.stop_loss < be_price
-                ):
-                    old_sl = self.active_trade.stop_loss
-                    self.active_trade.stop_loss = be_price
-                    logger.debug(
-                        f"📍 Breakeven: SL {old_sl:.5f} → {be_price:.5f} (+{current_profit_pips:.1f} pips)"
-                    )
-
-            if ts_enabled and current_profit_pips >= ts_activation:
-                potential_sl = high - (ts_limit * pip_size)
-                if potential_sl > self.active_trade.stop_loss:
-                    old_sl = self.active_trade.stop_loss
-                    self.active_trade.stop_loss = potential_sl
-                    logger.debug(
-                        f"🔄 Trailing: SL {old_sl:.5f} → {potential_sl:.5f} (+{current_profit_pips:.1f} pips)"
-                    )
-        else:  # SELL
-            if high >= self.active_trade.stop_loss:
-                self._close_trade(self.active_trade.stop_loss, current_time, "SL")
-                return
-            if low <= self.active_trade.take_profit:
-                self._close_trade(self.active_trade.take_profit, current_time, "TP")
-                return
-
-            # Breakeven & Trailing
-            current_profit_pips = (self.active_trade.entry_price - low) / pip_size
-
-            if be_enabled:
-                # SNIPER BREAKEVEN (Phase 5.24): Trigger at 0.7R (70% of SL Distance)
-                initial_sl_dist = abs(self.active_trade.entry_price - self.active_trade.stop_loss)
-                sniper_trigger_pips = (initial_sl_dist * 0.7) / pip_size
-
-                be_price = self.active_trade.entry_price - (be_offset * pip_size)
-                if (
-                    current_profit_pips >= sniper_trigger_pips
-                    and self.active_trade.stop_loss > be_price
-                ):
-                    old_sl = self.active_trade.stop_loss
-                    self.active_trade.stop_loss = be_price
-                    logger.debug(
-                        f"📍 Breakeven: SL {old_sl:.5f} → {be_price:.5f} (+{current_profit_pips:.1f} pips)"
-                    )
-
-            if ts_enabled and current_profit_pips >= ts_activation:
-                potential_sl = low + (ts_limit * pip_size)
-                if potential_sl < self.active_trade.stop_loss:
-                    old_sl = self.active_trade.stop_loss
-                    self.active_trade.stop_loss = potential_sl
-                    logger.debug(
-                        f"🔄 Trailing: SL {old_sl:.5f} → {potential_sl:.5f} (+{current_profit_pips:.1f} pips)"
-                    )
-
-    def _open_trade(self, signal, time):
-        """Open new trade from signal."""
-        trade = MockTrade(
-            symbol=self.symbol,
-            direction=signal.direction,
-            entry_price=signal.entry_price,
-            stop_loss=signal.stop_loss,
-            take_profit=signal.take_profit,
-            entry_time=time,
-        )
-        self.active_trade = trade
-        self.trades.append(trade)
-        logger.info(
-            f"OPEN {signal.direction.value} @ {signal.entry_price:.5f} [SL: {signal.stop_loss:.5f}, TP: {signal.take_profit:.5f}] at {time}"
-        )
-
-    def _close_trade(self, price, time, reason):
-        """Close active trade."""
-        if not self.active_trade:
-            return
-
-        self.active_trade.is_open = False
-        self.active_trade.exit_price = price
-        self.active_trade.exit_time = time
-        self.active_trade.exit_reason = reason
-
-        logger.info(
-            f"CLOSE {self.active_trade.direction.value} ({reason}) @ {price:.5f} | R: {self.active_trade.r_multiple:.2f}"
-        )
-        self.active_trade = None
-
-    def _print_report(self):
-        """Print backtest report."""
-        if not self.trades:
-            print("\nNo trades generated.")
-            return
-
-        completed = [t for t in self.trades if not t.is_open]
-        if not completed:
-            print("\nNo completed trades.")
-            return
-
-        wins = [t for t in completed if t.r_multiple > 0]
-        losses = [t for t in completed if t.r_multiple <= 0]
-
-        win_rate = len(wins) / len(completed) * 100
-        total_r = sum(t.r_multiple for t in completed)
-        total_pips = sum(t.pips for t in completed)
-        best = max((t.r_multiple for t in completed), default=0)
-        worst = min((t.r_multiple for t in completed), default=0)
-
-        print("\n" + "=" * 40)
-        print(f"MTF BACKTEST REPORT: {self.symbol}")
-        print(f"Zone TF: {self.zone_tf} | Entry TF: {self.entry_tf}")
-        print("=" * 40)
-        print(f"Total Trades:     {len(completed)}")
-        print(f"Wins:             {len(wins)}")
-        print(f"Losses:           {len(losses)}")
-        print(f"Win Rate:         {win_rate:.2f}%")
-        print("-" * 20)
-        print(f"Total Return (R): {total_r:.2f}R")
-        print(f"Total Pips:       {total_pips:.1f} pips")
-        print(f"Best Trade:       {best:.2f}R")
-        print(f"Worst Trade:      {worst:.2f}R")
-        print("=" * 40)
-
-        print("\nTRADE HISTORY:")
-        print(
-            f"{'ID':<4} | {'Type':<4} | {'Entry':<10} | {'SL':<10} | {'TP':<10} | {'Pips':<6} | {'Result':<6}"
-        )
-        print("-" * 70)
-
-        for i, t in enumerate(completed, 1):
-            print(
-                f"{i:<4} | {t.direction.value:<4} | {t.entry_price:<10.5f} | "
-                + f"{t.stop_loss:<10.5f} | {t.take_profit:<10.5f} | {t.pips:<6.1f} | {t.r_multiple:+.2f}R"
+        # Momentum guard: don't fight two consecutive opposing H1 closes.
+        if len(h1_hist) >= 3:
+            c0, c1, c2 = (
+                h1_hist["close"].iloc[-1],
+                h1_hist["close"].iloc[-2],
+                h1_hist["close"].iloc[-3],
             )
-        print("-" * 70)
+            if bias == "BULLISH" and c0 < c1 < c2:
+                return "NEUTRAL"
+            if bias == "BEARISH" and c0 > c1 > c2:
+                return "NEUTRAL"
+        return bias
 
 
-async def main():
-    """Main entry point."""
-    parser = argparse.ArgumentParser(description="Multi-Timeframe Backtest")
-    parser.add_argument("--symbol", required=True, help="Trading symbol")
-    parser.add_argument("--zone-tf", default="H1", help="Zone detection timeframe")
-    parser.add_argument("--entry-tf", default="M30", help="Entry signal timeframe")
-    parser.add_argument("--zone-data", help="Path to zone TF data CSV")
-    parser.add_argument("--entry-data", help="Path to entry TF data CSV")
-
+async def main() -> None:
+    parser = argparse.ArgumentParser(description="Multi-timeframe backtest (real automation)")
+    parser.add_argument("--symbol", required=True)
+    parser.add_argument("--zone-tf", default="H1")
+    parser.add_argument("--entry-tf", default="M30")
+    parser.add_argument("--zone-data")
+    parser.add_argument("--entry-data")
+    parser.add_argument("--volume", type=float, default=0.10)
+    parser.add_argument("--trailing-activation-r", type=float, default=None)
+    parser.add_argument("--tp-ratio", type=float, default=None)
+    parser.add_argument("--partial", choices=["off", "on"], default=None)
     args = parser.parse_args()
 
-    # Auto-detect data paths if not provided
-    base_path = Path(__file__).parent.parent / "data" / "backtest"
-    zone_data = args.zone_data or str(base_path / f"{args.symbol}_{args.zone_tf}.csv")
-    entry_data = args.entry_data or str(base_path / f"{args.symbol}_{args.entry_tf}.csv")
+    base = Path("data/backtest")
+    zone_data = args.zone_data or str(base / f"{args.symbol}_{args.zone_tf}.csv")
+    entry_data = args.entry_data or str(base / f"{args.symbol}_{args.entry_tf}.csv")
 
-    # Run backtest
     engine = MTFBacktestEngine(
         symbol=args.symbol,
         zone_tf=args.zone_tf,
         entry_tf=args.entry_tf,
         zone_data_path=zone_data,
         entry_data_path=entry_data,
+        open_volume=args.volume,
+        overrides=_build_overrides(args),
     )
-
     await engine.run()
 
 

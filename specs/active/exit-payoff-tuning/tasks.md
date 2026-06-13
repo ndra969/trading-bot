@@ -8,11 +8,29 @@
 
 ## Phase 1 — Backtest sweep
 
-- [ ] Confirm the backtester reproduces the automation ladder (BE/trailing/
-      partial) — if it only simulates SL/TP, extend it first (blocking).
+- [x] Confirm the backtester reproduces the automation ladder (BE/trailing/
+      partial) — extended it (was blocking). *(2026-06-13: `scripts/run_backtest.py`
+      + `run_mtf_backtest.py` rewired to drive the REAL BreakevenManager /
+      TrailingStopManager / PartialCloseManager + PositionTracker off the merged
+      live config, instead of a divergent reimplementation. Sweep knobs added:
+      `--trailing-activation-r`, `--tp-ratio`, `--partial`, `--volume`. Report
+      shows per-exit-reason `reached(MFE)` vs `kept(R)`, payoff ratio, expectancy.)*
+  - **Validation:** on EURUSDc H1+M30 (Dec 2025, n=33) the rewired harness
+    independently reproduces the live payoff pathology — payoff **0.43** (live
+    0.47), BREAKEVEN_STOP reached **0.75R** kept **0.33R** (live 0.51→0.14),
+    TAKE_PROFIT never hit at 2R (live 1/129). Confirms the harness is faithful.
+  - **Lever L1 smoke:** `--trailing-activation-r 0.5 --tp-ratio 1.5` shifted
+    BE-bucket→TRAILING (13→6 / 7→14), payoff 0.43→0.46, expectancy −0.127→−0.110R
+    — the L1 mechanism behaves as hypothesised.
 - [ ] Grid: trailing activation {current, 0.5R, 0.6R} × TP {1.2R, 1.5R, 2R}
       × partial {off, size-gated on} over EURUSD/USDJPY/XAUUSD/BTCUSD on the
       live-streak window.
+      > **Blocked on data**, not tooling. `data/backtest/` is Dec 2025 (~480 H1
+      > bars/symbol), has **no BTCUSD**, and does NOT overlap the current live
+      > winning streak the acceptance criterion requires. Pull fresh data first
+      > (`scripts/download_data.py` — still stale, needs porting + MT5 login)
+      > before running the scoring grid. The runs above are harness-validation,
+      > not the gate.
 - [ ] Score by expectancy + payoff (tie-break drawdown); record the table in
       this spec.
 
