@@ -821,7 +821,7 @@ class TradingBot:
         # Close the position on MT5 too (we initiated this, MT5 won't otherwise)
         if not is_dry_run and self.mt5 and self.mt5.is_connected():
             broker_symbol = self._convert_to_broker_symbol_safe(position.symbol)
-            ticket = self._resolve_mt5_ticket(position, broker_symbol)
+            ticket = self.position_orchestrator._resolve_mt5_ticket(position, broker_symbol)
             if ticket:
                 try:
                     self.mt5.close_position(
@@ -843,7 +843,9 @@ class TradingBot:
 
         # Persist + session aggregation
         await self.position_manager.save_position(position, is_dry_run=is_dry_run)
-        await self._update_session_on_position_close(position, {"pnl_usd": pnl_usd, "pips": pips})
+        await self.position_orchestrator._update_session_on_position_close(
+            position, {"pnl_usd": pnl_usd, "pips": pips}
+        )
 
         logger.info(
             f"  ⏰ POSITION CLOSED (MAX DURATION): {position.position_id} | "

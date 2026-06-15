@@ -180,3 +180,40 @@ async def test_automation_not_run_on_position_already_closed(trading_bot):
 
     # Verify automation was NOT called (position is closed)
     trading_bot.position_orchestrator._check_position_automation.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_finalize_max_duration_close_resolves_ticket_via_orchestrator(trading_bot):
+    """Regression: max-duration close must resolve the MT5 ticket through the
+    orchestrator, not via a (now-removed) TradingBot._resolve_mt5_ticket method.
+
+    Previously this raised: 'TradingBot' object has no attribute '_resolve_mt5_ticket'.
+    """
+    position = Position(
+        position_id="pos_maxdur_001",
+        symbol="EURUSD",
+        position_type=PositionType.BUY,
+        entry_price=1.1000,
+        stop_loss=1.0950,
+        take_profit=1.1150,
+        volume=1.0,
+        pip_size=0.0001,
+        pip_value_per_lot=10.0,
+        status=PositionStatus.OPEN,
+        current_price=1.1050,
+    )
+    position.ticket = 99999
+    position.current_pnl_usd = 34.88
+    position.current_profit_pips = 43.6
+
+    trading_bot.symbol_mapper.convert_to_broker_symbol.return_value = "EURUSDm"
+    trading_bot.position_manager.save_position = AsyncMock()
+    trading_bot.position_orchestrator._update_session_on_position_close = AsyncMock()
+    trading_bot.notification_manager.send_message = AsyncMock()
+
+    # Must not raise AttributeError on _resolve_mt5_ticket.
+    await trading_bot._finalize_max_duration_close(position, is_dry_run=False)
+
+    # Ticket resolved via fast path and forwarded to the MT5 close call.
+    trading_bot.mt5.close_position.assert_called_once()
+    assert trading_bot.mt5.close_position.call_args.kwargs["ticket"] == 99999
