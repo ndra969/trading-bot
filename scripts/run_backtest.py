@@ -423,10 +423,36 @@ def main() -> None:
         help="Override trailing activation as a fraction of risk (all asset classes)",
     )
     parser.add_argument(
+        "--breakeven-trigger-r",
+        type=float,
+        default=None,
+        help="Override breakeven arm point as a fraction of risk (all asset classes). "
+        "Higher = let winners run before locking BE (default 0.4).",
+    )
+    parser.add_argument(
         "--tp-ratio", type=float, default=None, help="Override default_take_profit_ratio"
     )
     parser.add_argument("--partial", choices=["off", "on"], default=None)
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="WARNING",
+        help="Loguru level for the run (default WARNING). Per-bar DEBUG logging "
+        "dominates runtime, so backtests/sweeps run quiet by default; pass "
+        "--log-level INFO/DEBUG to trace automation decisions.",
+    )
     args = parser.parse_args()
+
+    # Backtests never call setup_logger, so loguru's default DEBUG stderr sink
+    # fires on every bar — that per-bar logging is the runtime bottleneck (M30
+    # and BTC H1 sweeps time out under it). Reconfigure to a quiet level so runs
+    # complete; the final report uses print() and is unaffected.
+    import sys
+
+    from loguru import logger as _loguru_logger
+
+    _loguru_logger.remove()
+    _loguru_logger.add(sys.stderr, level=args.log_level.upper())
 
     data_path = Path(args.data)
     if not data_path.suffix:
@@ -459,6 +485,10 @@ def _build_overrides(args) -> dict:
         pm = overrides.setdefault("position_management", {})
         for asset in ("forex_major", "forex_jpy", "commodities", "crypto"):
             pm.setdefault(asset, {})["trailing_activation_r"] = args.trailing_activation_r
+    if args.breakeven_trigger_r is not None:
+        pm = overrides.setdefault("position_management", {})
+        for asset in ("forex_major", "forex_jpy", "commodities", "crypto"):
+            pm.setdefault(asset, {})["breakeven_trigger_r"] = args.breakeven_trigger_r
     return overrides
 
 
