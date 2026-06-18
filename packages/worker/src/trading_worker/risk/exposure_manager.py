@@ -72,18 +72,32 @@ class ExposureManager:
             .get("enabled", True)
         )
 
+        # Currency-exposure cap: limits how many open positions may be exposed
+        # the SAME way (long or short) to any single currency. Without it the
+        # correlation rules happily allow e.g. EURUSD BUY + GBPUSD BUY +
+        # USDCHF SELL + USDJPY SELL — economically all "short USD", i.e. one
+        # leveraged bet that stops out together.
+        currency_cap_cfg = self.config.get("risk_management", {}).get("currency_exposure_cap", {})
+        self.currency_cap_enabled = currency_cap_cfg.get("enabled", True)
+        self.max_same_direction_per_currency = currency_cap_cfg.get("max_same_direction", 3)
+
         # Tracking
         self.positions_by_symbol: dict[str, int] = defaultdict(int)
         self.positions_by_asset_class: dict[str, int] = defaultdict(int)
         self.currency_exposure: dict[str, float] = defaultdict(float)
         # Track position directions for correlation checking
         self.position_directions: dict[str, str] = {}  # symbol -> "BUY" or "SELL"
+        # Count of open positions exposed long/short to each currency, keyed by
+        # (currency, "long"|"short") — drives the currency-exposure cap.
+        self.currency_direction_count: dict[tuple[str, str], int] = defaultdict(int)
 
         logger.info(
             f"ExposureManager initialized: "
             f"Max positions/symbol: {self.max_positions_per_symbol}, "
             f"Asset class limits: {self.max_positions_per_asset_class}, "
-            f"Correlation checking: {self.correlation_enabled}"
+            f"Correlation checking: {self.correlation_enabled}, "
+            f"Currency cap: {self.currency_cap_enabled} "
+            f"(max {self.max_same_direction_per_currency}/direction)"
         )
 
     def can_open_position(
@@ -131,6 +145,13 @@ class ExposureManager:
                 )
                 return False, conflict_reason
 
+        # Check currency-exposure cap (if direction provided)
+        if direction and self.currency_cap_enabled:
+            cap_reason = self._check_currency_exposure_cap(symbol, direction)
+            if cap_reason:
+                logger.warning(f"Currency-exposure cap hit for {symbol} {direction}: {cap_reason}")
+                return False, cap_reason
+
         # Check asset class exposure (if we have portfolio balance)
         # This would need portfolio balance to calculate percentage
         # For now, we just track counts
@@ -162,13 +183,24 @@ class ExposureManager:
         if direction:
             self.position_directions[symbol] = direction.upper()
 
-        # Track currency exposure if provided
+        # Track currency exposure if provided (direction-aware: a SELL is the
+        # opposite exposure of a BUY). Direction defaults to BUY when omitted to
+        # preserve historical behaviour for callers that don't pass it.
         if currency_pair:
             currencies = currency_pair.split("/")
             if len(currencies) == 2:
                 base, quote = currencies
-                self.currency_exposure[base] += volume
-                self.currency_exposure[quote] -= volume
+                if (direction or "BUY").upper() == "SELL":
+                    self.currency_exposure[base] -= volume
+                    self.currency_exposure[quote] += volume
+                else:
+                    self.currency_exposure[base] += volume
+                    self.currency_exposure[quote] -= volume
+
+        # Maintain per-currency directional counts for the exposure cap
+        if direction:
+            for currency, side in self._currency_exposures(symbol, direction):
+                self.currency_direction_count[(currency, side)] += 1
 
         logger.debug(
             f"Position registered: {symbol} ({asset_class}), "
@@ -194,17 +226,32 @@ class ExposureManager:
         if self.positions_by_asset_class[asset_class] > 0:
             self.positions_by_asset_class[asset_class] -= 1
 
+        # Capture the registered direction before we drop it — needed to reverse
+        # the direction-aware currency bookkeeping correctly.
+        direction = self.position_directions.get(symbol)
+
         # Remove direction tracking
         if symbol in self.position_directions:
             del self.position_directions[symbol]
 
-        # Update currency exposure
+        # Update currency exposure (reverse of register, direction-aware)
         if currency_pair:
             currencies = currency_pair.split("/")
             if len(currencies) == 2:
                 base, quote = currencies
-                self.currency_exposure[base] -= volume
-                self.currency_exposure[quote] += volume
+                if (direction or "BUY").upper() == "SELL":
+                    self.currency_exposure[base] += volume
+                    self.currency_exposure[quote] -= volume
+                else:
+                    self.currency_exposure[base] -= volume
+                    self.currency_exposure[quote] += volume
+
+        # Decrement per-currency directional counts (floor at 0)
+        if direction:
+            for currency, side in self._currency_exposures(symbol, direction):
+                key = (currency, side)
+                if self.currency_direction_count.get(key, 0) > 0:
+                    self.currency_direction_count[key] -= 1
 
         logger.debug(f"Position unregistered: {symbol} ({asset_class})")
 
@@ -442,12 +489,56 @@ class ExposureManager:
 
         return None
 
+    @staticmethod
+    def _parse_base_quote(symbol: str) -> tuple[str, str] | None:
+        """Parse base/quote currency codes from a symbol.
+
+        Handles 'EURUSD', broker-suffixed 'EURUSDc'/'BTCUSDm', and 'EUR/USD'.
+        The 6-char base+quote always leads, with any broker suffix trailing, so
+        the first six alpha chars are taken. Returns None if too short.
+        """
+        s = symbol.upper().strip().replace("/", "")
+        if len(s) < 6:
+            return None
+        return s[:3], s[3:6]
+
+    def _currency_exposures(self, symbol: str, direction: str) -> list[tuple[str, str]]:
+        """Currencies this position is exposed to, as (currency, 'long'|'short').
+
+        A BUY of BASE/QUOTE is long BASE, short QUOTE; a SELL is the reverse.
+        """
+        bq = self._parse_base_quote(symbol)
+        if not bq:
+            return []
+        base, quote = bq
+        if direction.upper() == "SELL":
+            return [(base, "short"), (quote, "long")]
+        return [(base, "long"), (quote, "short")]
+
+    def _check_currency_exposure_cap(self, symbol: str, direction: str) -> str | None:
+        """Block opening if it would over-concentrate one currency in one direction.
+
+        Returns an error message if any currency this position is exposed to
+        already has `max_same_direction_per_currency` open positions on the same
+        side, else None.
+        """
+        for currency, side in self._currency_exposures(symbol, direction):
+            current = self.currency_direction_count.get((currency, side), 0)
+            if current + 1 > self.max_same_direction_per_currency:
+                return (
+                    f"Currency exposure cap: already {current} open position(s) "
+                    f"{side} {currency} "
+                    f"(max {self.max_same_direction_per_currency} per direction)"
+                )
+        return None
+
     def reset_tracking(self) -> None:
         """Reset exposure tracking (for testing or new session)."""
         self.positions_by_symbol.clear()
         self.positions_by_asset_class.clear()
         self.currency_exposure.clear()
         self.position_directions.clear()
+        self.currency_direction_count.clear()
         logger.info("Exposure tracking reset")
 
     def __str__(self) -> str:

@@ -115,6 +115,7 @@ class Position:
     slippage_pips: float = 0.0  # Entry slippage
     closing_slippage_pips: float = 0.0  # Exit slippage
     metadata: dict = field(default_factory=dict)
+    entry_tags: dict = field(default_factory=dict)  # Entry context (layers, conf) for attribution
 
     def __post_init__(self):
         """Validate position after initialization."""

@@ -203,6 +203,23 @@ risk_management:
   max_leverage: 10.0
   max_asset_class_exposure_percent: 40.0
 
+  # Daily realized-loss circuit breaker (config toggle).
+  # Disabled by default so the bot keeps trading while we gather history; flip
+  # `enabled: true` to arm it — no code change needed. When armed, it halts new
+  # entries once the day's realized loss reaches `percent` of the daily starting
+  # balance (and blocks trades whose risk would push past it).
+  daily_loss_limit:
+    enabled: false
+    percent: 1.0          # 1% of the day's starting balance
+
+  # Currency-exposure cap: limits how many open positions may be exposed the
+  # SAME way (long or short) to any single currency. Stops the bot from stacking
+  # e.g. EURUSD BUY + GBPUSD BUY + USDCHF SELL + USDJPY SELL — all economically
+  # "short USD", one leveraged bet that stops out together.
+  currency_exposure_cap:
+    enabled: true
+    max_same_direction: 3   # max open positions long (or short) any one currency
+
   # Correlation Management
   # Prevents conflicting positions on correlated pairs
   correlation_management:

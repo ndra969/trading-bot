@@ -219,6 +219,63 @@ class TestCanTakeTrade:
         assert "not initialized" in reason
 
 
+class TestDailyLossLimitToggle:
+    """Daily loss limit is a config toggle (off by default, armable via config)."""
+
+    @staticmethod
+    def _enabled_mgr(percent=1.0):
+        return PortfolioRiskManager(
+            {
+                "risk_management": {
+                    "max_risk_per_trade_percent": 2.0,
+                    "daily_loss_limit": {"enabled": True, "percent": percent},
+                    "emergency_stop_percent": 15.0,
+                }
+            }
+        )
+
+    def test_disabled_by_default(self, risk_manager):
+        assert risk_manager.daily_loss_limit_enabled is False
+
+    def test_threshold_read_from_nested_config(self):
+        mgr = self._enabled_mgr(percent=0.5)
+        assert mgr.daily_loss_limit_enabled is True
+        assert mgr.daily_loss_limit_pct == 0.5
+
+    def test_enabled_blocks_when_limit_reached(self):
+        mgr = self._enabled_mgr(percent=1.0)
+        mgr.initialize_balance(10000.0)
+        mgr.update_balance(9900.0)  # daily loss = $100 = 1%
+
+        can_trade, reason = mgr.can_take_trade(risk_amount=50.0)
+
+        assert can_trade is False
+        assert "Daily loss limit reached" in reason
+        assert mgr.is_daily_limit_reached() is True
+
+    def test_enabled_blocks_when_risk_would_exceed_limit(self):
+        mgr = self._enabled_mgr(percent=1.0)
+        mgr.initialize_balance(10000.0)
+        mgr.update_balance(9950.0)  # daily loss = $50
+
+        # Adding $60 risk would push daily loss to $110 > $100 limit
+        can_trade, reason = mgr.can_take_trade(risk_amount=60.0)
+
+        assert can_trade is False
+        assert "exceed daily loss limit" in reason
+
+    def test_enabled_allows_trade_within_limit(self):
+        mgr = self._enabled_mgr(percent=1.0)
+        mgr.initialize_balance(10000.0)
+        mgr.update_balance(9970.0)  # daily loss = $30
+
+        can_trade, reason = mgr.can_take_trade(risk_amount=50.0)  # 30 + 50 = 80 < 100
+
+        assert can_trade is True
+        assert reason == "OK"
+        assert mgr.is_daily_limit_reached() is False
+
+
 class TestDrawdownCalculation:
     """Test drawdown calculations."""
 

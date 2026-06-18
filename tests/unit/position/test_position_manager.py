@@ -47,6 +47,36 @@ def sell_signal():
     )
 
 
+class TestEntryTagsPopulation:
+    """Entry-context telemetry: entry_tags must be populated (was always {})."""
+
+    def test_entry_tags_populated_from_signal(self, position_manager):
+        """Position carries confluence + contributing layers in entry_tags."""
+        signal = TradingSignal(
+            signal_id="sig_tags",
+            symbol="EURUSD",
+            direction=SignalDirection.BUY,
+            entry_price=1.1000,
+            stop_loss=1.0950,
+            take_profit=1.1150,
+            confluence_score=72.5,
+            risk_reward_ratio=3.0,
+            strategy_scores={"foundation": 30.0, "trendline": 18.0, "rsi": 0.0},
+            timeframe="H1",
+        )
+
+        position = position_manager.create_position_from_signal(signal, volume=1.0)
+
+        assert position.entry_tags  # not the historical empty {}
+        assert position.entry_tags["confluence_score"] == 72.5
+        assert position.entry_tags["direction"] == "BUY"
+        assert position.entry_tags["timeframe"] == "H1"
+        # Only layers that actually contributed (score > 0) are recorded
+        layers = position.entry_tags["contributing_layers"]
+        assert layers == {"foundation": 30.0, "trendline": 18.0}
+        assert "rsi" not in layers
+
+
 class TestPositionManagerInitialization:
     """Test PositionManager initialization."""
 

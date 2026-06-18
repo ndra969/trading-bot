@@ -244,6 +244,7 @@ class PositionManager:
             slippage_pips=db_pos.slippage_pips,
             closing_slippage_pips=db_pos.closing_slippage_pips,
             metadata=metadata,
+            entry_tags=db_pos.entry_tags or {},
         )
 
     def _load_position_ticket(self, position, db_pos, metadata) -> None:
@@ -432,6 +433,7 @@ class PositionManager:
                     db_pos.slippage_pips = position.slippage_pips
                     db_pos.closing_slippage_pips = position.closing_slippage_pips
                     db_pos.meta_data = position.metadata  # Keep metadata for backward compatibility
+                    db_pos.entry_tags = position.entry_tags  # Entry-context attribution
                 else:
                     # Create new
                     db_pos = DBPosition(
@@ -475,6 +477,7 @@ class PositionManager:
                         closing_slippage_pips=position.closing_slippage_pips,
                         open_time=position.open_time,
                         meta_data=position.metadata,
+                        entry_tags=position.entry_tags,
                     )
                     session.add(db_pos)
 
@@ -544,6 +547,18 @@ class PositionManager:
                 f"Position {signal.symbol}: Price action pattern saved: {price_action_info.get('desc', 'UNKNOWN')}"
             )
 
+        # Entry-context tags for per-trade attribution (which layers actually
+        # contributed at entry). Previously left empty, so the `entry_tags`
+        # column was always {} and entry quality couldn't be diagnosed.
+        entry_tags = {
+            "confluence_score": round(signal.confluence_score, 2),
+            "direction": signal.direction.value,
+            "timeframe": signal.timeframe,
+            "contributing_layers": {
+                name: round(score, 2) for name, score in signal.strategy_scores.items() if score > 0
+            },
+        }
+
         # Create position
         position = Position(
             position_id=self._generate_position_id(),
@@ -561,6 +576,7 @@ class PositionManager:
             strategy_id="foundation",  # TODO: Get from signal
             status=PositionStatus.PENDING,
             metadata=position_metadata,
+            entry_tags=entry_tags,
         )
 
         # Store position

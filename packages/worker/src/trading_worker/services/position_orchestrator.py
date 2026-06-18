@@ -887,10 +887,10 @@ class PositionOrchestrator:
             logger.error(f"  ❌ Error executing partial close for {position.position_id}: {e}")
             return
 
-        if not (result and result.get("closed_volume", 0) > 0):
+        if not (result and result.get("close_volume", 0) > 0):
             return
 
-        closed_volume = result["closed_volume"]
+        closed_volume = result["close_volume"]
 
         # Sync partial close with MT5 (live only)
         if not is_dry_run and self.bot.mt5 and self.bot.mt5.is_connected():

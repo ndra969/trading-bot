@@ -285,3 +285,93 @@ class TestCorrelationGroups:
 
         assert can_open is True
         assert reason == "OK"
+
+
+class TestCurrencyExposureDirection:
+    """Bug fix: currency_exposure must respect BUY/SELL direction."""
+
+    def test_buy_exposure_sign(self):
+        mgr = ExposureManager()
+        mgr.register_position(
+            "EURUSD", "forex_major", 1.0, currency_pair="EUR/USD", direction="BUY"
+        )
+        assert mgr.get_currency_exposure("EUR") == 1.0
+        assert mgr.get_currency_exposure("USD") == -1.0
+
+    def test_sell_flips_exposure_sign(self):
+        """A SELL is the opposite currency exposure of a BUY (was recorded as BUY)."""
+        mgr = ExposureManager()
+        mgr.register_position(
+            "EURUSD", "forex_major", 1.0, currency_pair="EUR/USD", direction="SELL"
+        )
+        assert mgr.get_currency_exposure("EUR") == -1.0
+        assert mgr.get_currency_exposure("USD") == 1.0
+
+    def test_sell_register_unregister_nets_to_zero(self):
+        mgr = ExposureManager()
+        mgr.register_position(
+            "EURUSD", "forex_major", 1.0, currency_pair="EUR/USD", direction="SELL"
+        )
+        mgr.unregister_position("EURUSD", "forex_major", 1.0, currency_pair="EUR/USD")
+        assert mgr.get_currency_exposure("EUR") == 0.0
+        assert mgr.get_currency_exposure("USD") == 0.0
+
+
+class TestCurrencyExposureCap:
+    """Currency-exposure cap: prevents stacking same-direction bets on one currency."""
+
+    @staticmethod
+    def _mgr(enabled=True, max_same=3):
+        return ExposureManager(
+            {
+                "risk_management": {
+                    # isolate the cap from correlation rules
+                    "correlation_management": {"enabled": False},
+                    "currency_exposure_cap": {
+                        "enabled": enabled,
+                        "max_same_direction": max_same,
+                    },
+                }
+            }
+        )
+
+    def test_blocks_fourth_short_usd_position(self):
+        """3 short-USD allowed, 4th blocked — including SELL of a USD-base pair."""
+        mgr = self._mgr(max_same=3)
+        # BUY of XXXUSD = short USD
+        mgr.register_position("EURUSD", "forex_major", 1.0, direction="BUY")
+        mgr.register_position("GBPUSD", "forex_major", 1.0, direction="BUY")
+        mgr.register_position("AUDUSD", "forex_major", 1.0, direction="BUY")
+        # SELL of USDCHF is also short USD -> 4th short-USD, must be blocked
+        can_open, reason = mgr.can_open_position("USDCHF", "forex_major", 200.0, direction="SELL")
+        assert can_open is False
+        assert "Currency exposure cap" in reason
+        assert "USD" in reason
+
+    def test_opposite_direction_not_blocked(self):
+        """A long-USD position is unaffected by short-USD concentration."""
+        mgr = self._mgr(max_same=3)
+        mgr.register_position("EURUSD", "forex_major", 1.0, direction="BUY")
+        mgr.register_position("GBPUSD", "forex_major", 1.0, direction="BUY")
+        mgr.register_position("AUDUSD", "forex_major", 1.0, direction="BUY")
+        # USDJPY BUY = long USD -> different direction bucket, allowed
+        can_open, reason = mgr.can_open_position("USDJPY", "forex_jpy", 200.0, direction="BUY")
+        assert can_open is True
+
+    def test_disabled_allows_stacking(self):
+        mgr = self._mgr(enabled=False)
+        mgr.register_position("EURUSD", "forex_major", 1.0, direction="BUY")
+        mgr.register_position("GBPUSD", "forex_major", 1.0, direction="BUY")
+        mgr.register_position("AUDUSD", "forex_major", 1.0, direction="BUY")
+        can_open, _ = mgr.can_open_position("USDCHF", "forex_major", 200.0, direction="SELL")
+        assert can_open is True
+
+    def test_unregister_frees_capacity(self):
+        mgr = self._mgr(max_same=3)
+        for sym in ("EURUSD", "GBPUSD", "AUDUSD"):
+            mgr.register_position(sym, "forex_major", 1.0, direction="BUY")
+        # at cap
+        assert mgr.can_open_position("USDCHF", "forex_major", 200.0, direction="SELL")[0] is False
+        # closing one short-USD frees a slot
+        mgr.unregister_position("EURUSD", "forex_major", 1.0)
+        assert mgr.can_open_position("USDCHF", "forex_major", 200.0, direction="SELL")[0] is True

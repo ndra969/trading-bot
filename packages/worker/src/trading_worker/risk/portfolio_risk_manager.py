@@ -70,12 +70,17 @@ class PortfolioRiskManager:
             )
 
         # Other parameters (use risk_management section as fallback)
-        self.daily_loss_limit_pct = self.config.get("risk_management", {}).get(
-            "daily_loss_limit_percent", 1.0
+        risk_cfg = self.config.get("risk_management", {})
+        # Daily loss limit: nested `daily_loss_limit: {enabled, percent}` is the
+        # preferred form (a config toggle so it can be armed without code
+        # changes); fall back to the flat `daily_loss_limit_percent` for the
+        # threshold. Enforcement is OFF unless explicitly enabled.
+        daily_cfg = risk_cfg.get("daily_loss_limit", {})
+        self.daily_loss_limit_enabled = daily_cfg.get("enabled", False)
+        self.daily_loss_limit_pct = daily_cfg.get(
+            "percent", risk_cfg.get("daily_loss_limit_percent", 1.0)
         )
-        self.emergency_stop_pct = self.config.get("risk_management", {}).get(
-            "emergency_stop_percent", 15.0
-        )
+        self.emergency_stop_pct = risk_cfg.get("emergency_stop_percent", 15.0)
 
         # Portfolio tracking
         self.starting_balance: float = 0.0
@@ -90,7 +95,8 @@ class PortfolioRiskManager:
         logger.info(
             f"PortfolioRiskManager initialized: "
             f"Max risk/trade: {self.max_risk_per_trade_pct}%, "
-            f"Daily limit: {self.daily_loss_limit_pct}%, "
+            f"Daily limit: {self.daily_loss_limit_pct}% "
+            f"({'ENABLED' if self.daily_loss_limit_enabled else 'disabled'}), "
             f"Emergency stop: {self.emergency_stop_pct}%"
         )
 
@@ -202,21 +208,22 @@ class PortfolioRiskManager:
         if drawdown_pct >= self.emergency_stop_pct:
             return False, f"Emergency stop triggered: {drawdown_pct:.1f}% drawdown"
 
-        # Check daily loss limit - DISABLED
-        # daily_loss_limit = self.daily_start_balance * (self.daily_loss_limit_pct / 100.0)
-        # if abs(self.daily_pnl) >= daily_loss_limit and self.daily_pnl < 0:
-        #     return False, f"Daily loss limit reached: ${abs(self.daily_pnl):,.2f}"
+        # Check daily loss limit (config toggle — off by default)
+        daily_loss_limit = self.daily_start_balance * (self.daily_loss_limit_pct / 100.0)
+        if self.daily_loss_limit_enabled:
+            if abs(self.daily_pnl) >= daily_loss_limit and self.daily_pnl < 0:
+                return False, f"Daily loss limit reached: ${abs(self.daily_pnl):,.2f}"
 
         # Check risk per trade
         max_risk = self.calculate_max_risk_amount(self.current_balance)
         if risk_amount > max_risk:
             return False, f"Risk exceeds limit: ${risk_amount:.2f} > ${max_risk:.2f}"
 
-        # Check if adding this risk would violate daily limit (only if currently in loss) - DISABLED
-        # if self.daily_pnl < 0:
-        #     potential_daily_loss = abs(self.daily_pnl) + risk_amount
-        #     if potential_daily_loss > daily_loss_limit:
-        #         return False, "Would exceed daily loss limit"
+        # Check if adding this risk would push the day past the loss limit
+        if self.daily_loss_limit_enabled and self.daily_pnl < 0:
+            potential_daily_loss = abs(self.daily_pnl) + risk_amount
+            if potential_daily_loss > daily_loss_limit:
+                return False, "Would exceed daily loss limit"
 
         return True, "OK"
 
@@ -261,8 +268,12 @@ class PortfolioRiskManager:
         Returns:
             True if daily limit reached
         """
-        # Daily loss limit validation is currently disabled
-        return False
+        if not self.daily_loss_limit_enabled:
+            return False
+        if self.daily_start_balance <= 0:
+            return False
+        daily_loss_limit = self.daily_start_balance * (self.daily_loss_limit_pct / 100.0)
+        return self.daily_pnl < 0 and abs(self.daily_pnl) >= daily_loss_limit
 
     def get_portfolio_summary(self) -> dict:
         """

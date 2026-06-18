@@ -217,3 +217,44 @@ async def test_finalize_max_duration_close_resolves_ticket_via_orchestrator(trad
     # Ticket resolved via fast path and forwarded to the MT5 close call.
     trading_bot.mt5.close_position.assert_called_once()
     assert trading_bot.mt5.close_position.call_args.kwargs["ticket"] == 99999
+
+
+@pytest.mark.asyncio
+async def test_partial_close_reads_manager_result_key(trading_bot):
+    """Regression: orchestrator must read 'close_volume' (the key the manager
+    returns), not 'closed_volume'. The mismatch made the result look empty and
+    silently skipped the MT5 sync + save + notify on every partial close.
+    """
+    position = Position(
+        position_id="pos_partial_001",
+        symbol="EURUSD",
+        position_type=PositionType.BUY,
+        entry_price=1.1000,
+        stop_loss=1.0950,
+        take_profit=1.1150,
+        volume=1.0,
+        pip_size=0.0001,
+        pip_value_per_lot=10.0,
+        status=PositionStatus.OPEN,
+        current_price=1.1050,
+    )
+
+    # Manager returns the real key set ("close_volume", "profit_usd", ...).
+    trading_bot.partial_manager = MagicMock()
+    trading_bot.partial_manager.execute_partial_close.return_value = {
+        "level": 1,
+        "close_volume": 0.5,
+        "remaining_volume": 0.5,
+        "close_price": 1.1050,
+        "profit_pips": 50.0,
+        "profit_usd": 25.0,
+    }
+    trading_bot.position_manager.save_position = AsyncMock()
+
+    # Dry-run skips MT5; if the result key matched, save_position runs.
+    await trading_bot.position_orchestrator._handle_partial_close_automation(
+        position, is_dry_run=True
+    )
+
+    # Pre-fix this early-returned (result.get("closed_volume", 0) == 0) and never saved.
+    trading_bot.position_manager.save_position.assert_awaited_once()
