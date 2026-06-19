@@ -42,6 +42,44 @@ class TestMTFAnalyzerUtils:
         return analyzer
 
 
+class TestH1TrendBias:
+    """H1 trend bias for the counter-trend (sniper) gate."""
+
+    @staticmethod
+    def _df(closes):
+        return pd.DataFrame({"close": closes})
+
+    def test_insufficient_data_is_neutral(self):
+        analyzer = MTFAnalyzer()
+        assert analyzer._calculate_h1_trend_bias(self._df([100.0] * 10)) == "NEUTRAL"
+
+    def test_price_above_ema_is_bullish(self):
+        analyzer = MTFAnalyzer()
+        closes = [100.0 + i for i in range(60)]  # steady uptrend, price >> EMA50
+        assert analyzer._calculate_h1_trend_bias(self._df(closes)) == "BULLISH"
+
+    def test_price_below_ema_is_bearish(self):
+        analyzer = MTFAnalyzer()
+        closes = [200.0 - i for i in range(60)]  # steady downtrend
+        assert analyzer._calculate_h1_trend_bias(self._df(closes)) == "BEARISH"
+
+    def test_uptrend_pullback_stays_bullish(self):
+        """Regression: a 2-candle pullback (back to an S&D zone) must NOT flip a
+        valid BULLISH bias to NEUTRAL — the old momentum clause did, which
+        disabled the counter-trend block and let SELLs into uptrend pullbacks."""
+        analyzer = MTFAnalyzer()
+        # Strong uptrend, then last two candles tick DOWN but stay well above EMA50.
+        closes = [100.0 + i for i in range(57)] + [156.0, 155.0, 154.0]
+        # last 3: 156 > 155 > 154 → two consecutive red candles (the old trap)
+        assert analyzer._calculate_h1_trend_bias(self._df(closes)) == "BULLISH"
+
+    def test_downtrend_pullback_stays_bearish(self):
+        analyzer = MTFAnalyzer()
+        closes = [200.0 - i for i in range(57)] + [144.0, 145.0, 146.0]
+        # last 3: 144 < 145 < 146 → two consecutive green candles
+        assert analyzer._calculate_h1_trend_bias(self._df(closes)) == "BEARISH"
+
+
 class TestMTFAnalyzerZoneDetection:
     """Test zone detection logic (delegation to FoundationEngine)."""
 

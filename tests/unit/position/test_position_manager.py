@@ -63,6 +63,7 @@ class TestEntryTagsPopulation:
             risk_reward_ratio=3.0,
             strategy_scores={"foundation": 30.0, "trendline": 18.0, "rsi": 0.0},
             timeframe="H1",
+            metadata={"h1_trend_bias": "BULLISH"},
         )
 
         position = position_manager.create_position_from_signal(signal, volume=1.0)
@@ -71,6 +72,8 @@ class TestEntryTagsPopulation:
         assert position.entry_tags["confluence_score"] == 72.5
         assert position.entry_tags["direction"] == "BUY"
         assert position.entry_tags["timeframe"] == "H1"
+        # H1 trend bias threaded through for counter-trend attribution
+        assert position.entry_tags["h1_trend_bias"] == "BULLISH"
         # Only layers that actually contributed (score > 0) are recorded
         layers = position.entry_tags["contributing_layers"]
         assert layers == {"foundation": 30.0, "trendline": 18.0}

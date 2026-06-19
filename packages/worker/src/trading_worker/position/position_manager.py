@@ -557,6 +557,9 @@ class PositionManager:
             "contributing_layers": {
                 name: round(score, 2) for name, score in signal.strategy_scores.items() if score > 0
             },
+            # H1 trend bias the counter-trend gate saw — lets us confirm
+            # post-hoc whether a losing trade was with- or counter-trend.
+            "h1_trend_bias": (signal.metadata or {}).get("h1_trend_bias"),
         }
 
         # Create position

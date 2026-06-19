@@ -209,23 +209,12 @@ class IntradayExecutor(TradingTypeExecutor):
         else:
             h1_trend_bias = "NEUTRAL"
 
-        # Momentum Protection
-        # Even if Price > EMA, if H1 is crashing, don't BUY
-        if len(h1_hist) >= 3:
-            c_curr = h1_hist["close"].iloc[-1]
-            c_p1 = h1_hist["close"].iloc[-2]
-            c_p2 = h1_hist["close"].iloc[-3]
-
-            # If two consecutive red candles, block BUY
-            if h1_trend_bias == "BULLISH" and c_curr < c_p1 and c_p1 < c_p2:
-                logger.warning(
-                    "SNIPER: Blocking BULLISH bias due to H1 Bearish Momentum (Crash protection)"
-                )
-                h1_trend_bias = "NEUTRAL"
-            # If two consecutive green candles, block SELL
-            if h1_trend_bias == "BEARISH" and c_curr > c_p1 and c_p1 > c_p2:
-                logger.warning("SNIPER: Blocking BEARISH bias due to H1 Bullish Momentum")
-                h1_trend_bias = "NEUTRAL"
+        # NOTE: a former "momentum protection" clause flipped the bias to NEUTRAL
+        # on 2 counter-trend candles. Because S&D entries are pullbacks (counter
+        # candles back into the zone), it neutralised the bias at the exact entry
+        # moment and *disabled* the counter-trend block — letting the bot short
+        # uptrend pullbacks into the stop. Removed; the strict price-vs-EMA50
+        # bias only ever adds counter-trend blocks. See mtf_analyzer for detail.
 
         logger.info(
             f"SNIPER BIAS: {current_time} | Price: {current_price:.2f} | H1 EMA50: {ema_50_curr:.2f} | Bias: {h1_trend_bias}"

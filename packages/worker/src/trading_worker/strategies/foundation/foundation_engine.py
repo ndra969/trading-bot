@@ -462,6 +462,7 @@ class FoundationEngine:
         layer_details: dict,
         raw_confidences: dict,
         current_price: float,
+        h1_trend_bias: str | None = None,
     ) -> StrategyResult:
         """Build the final StrategyResult after all filters have passed.
 
@@ -506,6 +507,7 @@ class FoundationEngine:
                 "layer_scores": layer_scores,
                 "layer_details": layer_details,
                 "confluence_breakdown": confluence_breakdown,
+                "h1_trend_bias": h1_trend_bias,
             },
         )
 
@@ -1930,6 +1932,7 @@ class FoundationEngine:
                 layer_details=layer_details,
                 raw_confidences=raw_confidences,
                 current_price=current_price,
+                h1_trend_bias=h1_trend_bias,
             )
 
         except Exception as e:

@@ -266,12 +266,14 @@ class SignalAggregator:
         # strategy result (if available)
         price_action_info = None
         confluence_breakdown = None
+        h1_trend_bias = None
         for result in results:
             if result.strategy_name == "foundation" and result.metadata:
                 layer_details = result.metadata.get("layer_details", {})
                 if "price_action" in layer_details:
                     price_action_info = layer_details["price_action"]
                 confluence_breakdown = result.metadata.get("confluence_breakdown")
+                h1_trend_bias = result.metadata.get("h1_trend_bias")
                 break
 
         # Create signal metadata with price action info
@@ -282,6 +284,8 @@ class SignalAggregator:
             signal_metadata["price_action"] = price_action_info
         if confluence_breakdown:
             signal_metadata["confluence_breakdown"] = confluence_breakdown
+        if h1_trend_bias is not None:
+            signal_metadata["h1_trend_bias"] = h1_trend_bias
 
         # Create signal
         try:

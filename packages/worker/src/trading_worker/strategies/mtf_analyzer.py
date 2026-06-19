@@ -194,10 +194,18 @@ class MTFAnalyzer:
         """
         Calculate H1 trend bias using EMA 50 (Strict Sniper Gate).
 
-        Matches the logic in IntradayExecutor/Backtest:
         - Price > EMA 50: BULLISH
         - Price < EMA 50: BEARISH
-        - Momentum Protection: consecutive candles must align.
+
+        The downstream counter-trend gate blocks SELL when BULLISH and BUY when
+        BEARISH; NEUTRAL is permissive. A previous "momentum protection" clause
+        flipped the bias to NEUTRAL whenever the last 2 candles ran against it —
+        but S&D entries ARE pullbacks (2 counter candles back to the zone), so
+        it routinely neutralised a valid trend bias at the exact moment of
+        entry, which *disabled* the counter-trend block and let the bot short
+        uptrend pullbacks (and buy downtrend pullbacks) straight into the stop.
+        Removing it only ever ADDS counter-trend blocks; with-trend trades are
+        unaffected (BULLISH/NEUTRAL both allow BUY, etc.).
 
         Args:
             h1_data: H1 OHLCV data
@@ -215,28 +223,10 @@ class MTFAnalyzer:
 
         # Strict Price vs EMA 50
         if curr_price > curr_ema:
-            bias = "BULLISH"
+            return "BULLISH"
         elif curr_price < curr_ema:
-            bias = "BEARISH"
-        else:
-            bias = "NEUTRAL"
-
-        # Momentum Protection (2 consecutive candles)
-        if len(h1_data) >= 3:
-            c_curr = h1_data["close"].iloc[-1]
-            c_p1 = h1_data["close"].iloc[-2]
-            c_p2 = h1_data["close"].iloc[-3]
-
-            # If two consecutive red candles, block BUY
-            if bias == "BULLISH" and c_curr < c_p1 and c_p1 < c_p2:
-                logger.info("SNIPER: Blocking BULLISH bias due to Bearish Momentum")
-                bias = "NEUTRAL"
-            # If two consecutive green candles, block SELL
-            if bias == "BEARISH" and c_curr > c_p1 and c_p1 > c_p2:
-                logger.info("SNIPER: Blocking BEARISH bias due to Bullish Momentum")
-                bias = "NEUTRAL"
-
-        return bias
+            return "BEARISH"
+        return "NEUTRAL"
 
 
 class ZoneCache:
