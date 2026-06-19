@@ -102,8 +102,12 @@ position_management:
     trailing_distance_multiplier: 1.0    # Trail by 1.0x ATR
 
     # Ratio-based (preferred): scales with each position's actual stop distance.
-    breakeven_trigger_r: 0.4
-    trailing_activation_r: 0.7
+    # 2026-06-19: BE 0.4→0.5, trailing 0.7→1.0. The old tight pair was the
+    # WORST in the USDJPY H1 sweep (-5.49R, payoff 0.43 — BE scratched winners
+    # at 0.33R after they reached 0.85R). 0.5/1.0 lets winners run: -3.06R,
+    # payoff 0.62. forex_major (EUR) left tight on purpose (it prefers tight).
+    breakeven_trigger_r: 0.5
+    trailing_activation_r: 1.0
     trailing_distance_r: 0.4
 
     # Fallback to fixed pips if ATR not available
