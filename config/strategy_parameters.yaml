@@ -25,10 +25,11 @@ rsi:
   period: 14
   overbought: 70
   oversold: 30
-  # Recovery-from-extreme scoring (enhancement-layer-rework). OFF until the
-  # Phase 2 backtest proves edge; the hard rsi_gate is unaffected either way.
+  # Recovery-from-extreme scoring (enhancement-layer-rework). Enabled 2026-06-19
+  # so RSI actually participates at bounce entries (standard oversold-AT-entry
+  # fired only ~5%); the hard rsi_gate is unaffected either way. Backtest-validate.
   recovery_scoring:
-    enabled: false
+    enabled: true
     floor: 35.0       # BUY: RSI must have dipped below this recently
     ceiling: 65.0     # SELL: RSI must have spiked above this recently
     lookback: 5       # Bars of RSI history scanned for the extreme
