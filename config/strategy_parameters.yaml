@@ -42,7 +42,8 @@ ma:
   ema: true
 
 trendline:
-  min_touches: 3
+  min_touches: 2              # 2026-06-19: 3→2 so trendlines fire more often
+                              # (was active in only 14% of trades). Backtest impact.
   tolerance: 0.0005
   zone_tolerance: 0.5         # Zone-confluence band: fraction of zone height a projected line may sit beyond the zone and still reinforce it
 
@@ -128,6 +129,10 @@ signal_generation:
       min_confluence_score: 60.0
       min_foundation_score: 30.0
       min_price_action_score: 8.0
+      # Min trendline raw confidence to satisfy require_trendline. Trendline
+      # confidence = 20 + touches*5 + centring*20, so ~20 means "present and
+      # bounce-aligned"; raise to demand more touches / better centring.
+      min_trendline_score: 20.0
 
     forex_major:
       min_confluence_score: 62.0       # normalised scale; toward 65% design target
@@ -162,26 +167,34 @@ signal_generation:
     signal_refresh_interval: 300
 
   # Signal Validation Rules — per asset class with `default` fallback
+  # require_trendline: entry must coincide with an aligned trendline bounce
+  # (3+-touch line at the S&D zone). Set true in `default` so it applies to all
+  # asset classes; commodities opts out (gold moves on macro, like price_action).
   validation_rules:
     default:
       require_foundation: true
       require_price_action: true
+      require_trendline: true
 
     forex_major:
       require_foundation: true
       require_price_action: true
+      require_trendline: true
 
     forex_jpy:
       require_foundation: true
       require_price_action: true
+      require_trendline: true
 
     commodities:
       require_foundation: true
       require_price_action: false   # Gold often moves on macro without clean PA
+      require_trendline: false      # same rationale — gold rarely respects TLs cleanly
 
     crypto:
       require_foundation: true
       require_price_action: true    # Crypto needs PA confirmation due to volatility
+      require_trendline: true
 
     # Globals
     conflict_prevention: true       # Prevent conflicting signals (all assets)

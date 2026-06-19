@@ -609,6 +609,35 @@ class FoundationEngine:
                 f"{symbol}: ✅ Price action confirmed (score: {pa_raw:.1f}% ≥ {min_pa_score}%)"
             )
 
+        # 2b. Trendline Confirmation Requirement (mirrors price action). Trendline
+        # only enters layer_scores when a 3+-touch line bounces in alignment with
+        # the S&D zone (foundation_engine._run_enhancement_analyzers), so this gate
+        # enforces "entry must coincide with a trendline bounce".
+        if rules.get("require_trendline", False):
+            min_tl_score = thresholds.get("min_trendline_score", 20.0)
+            # trendline layer_score = raw_confidence * 0.20, so raw = score / 0.20
+            tl_weighted = layer_scores.get("trendline", 0.0)
+            tl_raw = (tl_weighted / 0.20) if tl_weighted > 0 else 0.0
+
+            if tl_raw < min_tl_score:
+                logger.warning(
+                    f"{symbol}: REJECTED - Trendline confirmation required but insufficient "
+                    f"(score: {tl_raw:.1f}% < min: {min_tl_score}%). "
+                    f"No aligned trendline bounce at this zone."
+                )
+                self._record_rejection(
+                    RejectionStage.TRENDLINE_REQUIRED,
+                    symbol,
+                    direction=direction,
+                    asset_class=asset_class,
+                    confluence_score=final_score,
+                    tl_raw=round(tl_raw, 1),
+                )
+                return False
+            logger.debug(
+                f"{symbol}: ✅ Trendline confirmed (score: {tl_raw:.1f}% ≥ {min_tl_score}%)"
+            )
+
         # 3. UNIVERSAL H1 Sniper Gate - blocks counter-trend trades on ALL asset classes
         if h1_trend_bias == "BEARISH" and direction == SignalDirection.BUY:
             logger.warning(

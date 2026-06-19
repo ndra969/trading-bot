@@ -3198,3 +3198,80 @@ class TestRejectionTelemetry:
 
         assert passed is False
         assert rec.record.call_args.kwargs["stage"] == RejectionStage.CONFLUENCE_TOO_LOW
+
+    @staticmethod
+    def _trendline_gate_config():
+        return {
+            "signal_generation": {
+                "quality_thresholds": {
+                    "forex_major": {"min_confluence_score": 60.0, "min_trendline_score": 20.0}
+                },
+                "validation_rules": {
+                    "forex_major": {
+                        "require_foundation": True,
+                        "require_price_action": False,
+                        "require_trendline": True,
+                    }
+                },
+            }
+        }
+
+    def test_require_trendline_rejects_without_trendline(self):
+        from unittest.mock import MagicMock
+
+        import pandas as pd
+
+        rec = MagicMock()
+        engine = FoundationEngine(
+            config=self._trendline_gate_config(), use_database=False, rejection_recorder=rec
+        )
+        df = pd.DataFrame({"high": [1.1], "low": [1.0], "close": [1.05], "open": [1.0]})
+
+        passed = engine._passes_final_quality_filters(
+            symbol="EURUSD",
+            direction=SignalDirection.BUY,
+            asset_class="forex_major",
+            final_score=80.0,  # clears the confluence gate
+            weighted_foundation_score=40.0,
+            weighted_enhancement_score=40.0,
+            layer_scores={},  # no trendline contribution
+            h1_trend_bias=None,
+            data=df,
+            current_price=1.05,
+            current_range=0.1,
+            avg_range=0.1,
+        )
+
+        assert passed is False
+        assert rec.record.call_args.kwargs["stage"] == RejectionStage.TRENDLINE_REQUIRED
+
+    def test_require_trendline_passes_gate_with_trendline(self):
+        from unittest.mock import MagicMock
+
+        import pandas as pd
+
+        rec = MagicMock()
+        engine = FoundationEngine(
+            config=self._trendline_gate_config(), use_database=False, rejection_recorder=rec
+        )
+        df = pd.DataFrame({"high": [1.1], "low": [1.0], "close": [1.05], "open": [1.0]})
+
+        # trendline raw 30 (= 6.0 / 0.20) >= min 20 -> the trendline gate is satisfied
+        engine._passes_final_quality_filters(
+            symbol="EURUSD",
+            direction=SignalDirection.BUY,
+            asset_class="forex_major",
+            final_score=80.0,
+            weighted_foundation_score=40.0,
+            weighted_enhancement_score=40.0,
+            layer_scores={"trendline": 6.0},
+            h1_trend_bias=None,
+            data=df,
+            current_price=1.05,
+            current_range=0.1,
+            avg_range=0.1,
+        )
+
+        # Whatever happens downstream, it must NOT be a trendline rejection.
+        stages = [c.kwargs.get("stage") for c in rec.record.call_args_list]
+        assert RejectionStage.TRENDLINE_REQUIRED not in stages

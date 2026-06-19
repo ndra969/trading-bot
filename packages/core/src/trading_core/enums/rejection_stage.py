@@ -18,6 +18,7 @@ class RejectionStage(str, Enum):
     CONFLUENCE_TOO_LOW = "confluence_too_low"
     PRICE_ACTION_REQUIRED = "price_action_required"  # require_price_action + insufficient PA
     PA_WRONG_DIRECTION = "pa_wrong_direction"
+    TRENDLINE_REQUIRED = "trendline_required"  # require_trendline + no trendline confluence
 
     # Trend / structure gates
     COUNTER_TREND_GATE = "counter_trend_gate"  # universal H1 sniper gate
