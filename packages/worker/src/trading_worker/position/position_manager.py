@@ -550,13 +550,27 @@ class PositionManager:
         # Entry-context tags for per-trade attribution (which layers actually
         # contributed at entry). Previously left empty, so the `entry_tags`
         # column was always {} and entry quality couldn't be diagnosed.
+        #
+        # Layers come from confluence_breakdown.raw_confidences (the real per-
+        # enhancement-layer confidences), NOT signal.strategy_scores — the
+        # latter only carries {"foundation": final_score}, so reading it made
+        # contributing_layers always show just foundation even when trendline/
+        # price_action/etc actually fired. Foundation always participates.
+        breakdown = (signal.metadata or {}).get("confluence_breakdown") or {}
+        contributing_layers = {
+            name: round(float(conf), 2)
+            for name, conf in (breakdown.get("raw_confidences") or {}).items()
+        }
+        contributing_layers["foundation"] = round(
+            float(breakdown.get("foundation_share", signal.strategy_scores.get("foundation", 0.0))),
+            2,
+        )
+
         entry_tags = {
             "confluence_score": round(signal.confluence_score, 2),
             "direction": signal.direction.value,
             "timeframe": signal.timeframe,
-            "contributing_layers": {
-                name: round(score, 2) for name, score in signal.strategy_scores.items() if score > 0
-            },
+            "contributing_layers": contributing_layers,
             # H1 trend bias the counter-trend gate saw — lets us confirm
             # post-hoc whether a losing trade was with- or counter-trend.
             "h1_trend_bias": (signal.metadata or {}).get("h1_trend_bias"),

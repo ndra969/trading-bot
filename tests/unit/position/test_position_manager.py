@@ -61,9 +61,18 @@ class TestEntryTagsPopulation:
             take_profit=1.1150,
             confluence_score=72.5,
             risk_reward_ratio=3.0,
-            strategy_scores={"foundation": 30.0, "trendline": 18.0, "rsi": 0.0},
+            strategy_scores={"foundation": 72.5},  # reality: only foundation here
             timeframe="H1",
-            metadata={"h1_trend_bias": "BULLISH"},
+            metadata={
+                "h1_trend_bias": "BULLISH",
+                # real per-layer participation lives in confluence_breakdown
+                "confluence_breakdown": {
+                    "foundation_share": 39.34,
+                    "enhancement_share": 33.16,
+                    "raw_confidences": {"trendline": 25.0, "price_action": 30.0},
+                    "active_layers": ["price_action", "trendline"],
+                },
+            },
         )
 
         position = position_manager.create_position_from_signal(signal, volume=1.0)
@@ -74,10 +83,11 @@ class TestEntryTagsPopulation:
         assert position.entry_tags["timeframe"] == "H1"
         # H1 trend bias threaded through for counter-trend attribution
         assert position.entry_tags["h1_trend_bias"] == "BULLISH"
-        # Only layers that actually contributed (score > 0) are recorded
+        # contributing_layers reflects the REAL enhancement layers (from the
+        # confluence breakdown) + foundation — not the foundation-only
+        # strategy_scores that made this always show just {"foundation"}.
         layers = position.entry_tags["contributing_layers"]
-        assert layers == {"foundation": 30.0, "trendline": 18.0}
-        assert "rsi" not in layers
+        assert layers == {"trendline": 25.0, "price_action": 30.0, "foundation": 39.34}
 
 
 class TestPositionManagerInitialization:
