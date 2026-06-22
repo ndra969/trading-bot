@@ -1082,12 +1082,35 @@ class PositionOrchestrator:
                         else:
                             close_reason = CloseReason.STOP_LOSS
 
-                        # Close position
+                        # Close position (PositionTracker computes a pip-based P&L)
                         result = self.bot.position_manager.close_position(
                             position.position_id, current_price, close_reason.value
                         )
 
                         if result:
+                            # Prefer the broker's authoritative realized P&L
+                            # (incl. swap + commission) over the pip recompute.
+                            # The pip-only value over-reports held positions:
+                            # it omits swap and inherits pip-value/spread drift
+                            # (e.g. 2026-06-22 multi-day holds read ~+7 vs MT5).
+                            if not is_dry_run and self.bot.mt5 and self.bot.mt5.is_connected():
+                                broker_symbol = self.bot._convert_to_broker_symbol_safe(
+                                    position.symbol
+                                )
+                                ticket = self._resolve_mt5_ticket(position, broker_symbol)
+                                if ticket:
+                                    (
+                                        _close_price,
+                                        deal_pnl,
+                                        _comment,
+                                        mt5_reason,
+                                    ) = self._resolve_mt5_deal_details(ticket, current_price)
+                                    if mt5_reason is not None:  # deal found → authoritative
+                                        result["pnl_usd"] = deal_pnl
+                                        position.realized_pnl_usd = deal_pnl
+                                        position.is_winner = deal_pnl > 0
+                                        position.exit_type = classify_exit_type(deal_pnl)
+
                             # Unregister from exposure manager
                             asset_class = self.bot._get_asset_class(position.symbol)
                             self.bot.exposure_manager.unregister_position(

@@ -258,3 +258,53 @@ async def test_partial_close_reads_manager_result_key(trading_bot):
 
     # Pre-fix this early-returned (result.get("closed_volume", 0) == 0) and never saved.
     trading_bot.position_manager.save_position.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_sl_close_uses_authoritative_mt5_pnl(trading_bot):
+    """Regression: a price-based SL/TP close must record MT5's actual deal P&L
+    (profit + swap + commission), not the pip recompute. The pip-only value
+    over-reports held positions (omits swap, inherits pip-value/spread drift) —
+    e.g. 2026-06-22 multi-day holds read ~+7 vs the broker's true figure.
+    """
+    position = Position(
+        position_id="pos_auth_pnl_001",
+        symbol="EURUSD",
+        position_type=PositionType.BUY,
+        entry_price=1.1000,
+        stop_loss=1.0950,
+        take_profit=1.1150,
+        volume=1.0,
+        pip_size=0.0001,
+        pip_value_per_lot=10.0,
+        status=PositionStatus.OPEN,
+        current_price=1.0950,
+    )
+    position.ticket = 555
+
+    trading_bot.data_manager = MagicMock()  # _check_position_closure early-returns without it
+    trading_bot.position_manager.get_open_positions.return_value = [position]
+    trading_bot.position_manager.update_position = MagicMock()
+    trading_bot.position_manager._check_max_duration = MagicMock(return_value=False)
+    # PositionTracker's pip recompute — optimistic, omits swap.
+    trading_bot.position_manager.close_position.return_value = {"pnl_usd": 11.39, "pips": 17.9}
+    trading_bot.position_manager.save_position = AsyncMock()
+    trading_bot.notification_manager.send_message = AsyncMock()
+    trading_bot.position_orchestrator._update_session_on_position_close = AsyncMock()
+    trading_bot._get_current_price = AsyncMock(return_value=1.0950)  # at SL → should_close
+
+    # Broker's authoritative deal: profit 9.00 + swap -1.24 = 7.76 net.
+    trading_bot.mt5.get_history_deal.return_value = {
+        "price": 1.0950,
+        "profit": 9.00,
+        "swap": -1.24,
+        "commission": 0.0,
+        "reason": 4,  # DEAL_REASON_SL (not None → authoritative)
+    }
+
+    await trading_bot.position_orchestrator._check_position_closure()
+
+    # Realized P&L reflects the broker (7.76), NOT the pip recompute (11.39).
+    assert position.realized_pnl_usd == pytest.approx(7.76)
+    # And the balance update used the authoritative figure, not the pip value.
+    trading_bot.portfolio_risk.update_balance.assert_called_once_with(10000.0 + 7.76)
