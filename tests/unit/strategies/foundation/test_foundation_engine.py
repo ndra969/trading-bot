@@ -3275,3 +3275,30 @@ class TestRejectionTelemetry:
         # Whatever happens downstream, it must NOT be a trendline rejection.
         stages = [c.kwargs.get("stage") for c in rec.record.call_args_list]
         assert RejectionStage.TRENDLINE_REQUIRED not in stages
+
+    def test_per_asset_take_profit_ratio(self):
+        """TP ratio resolves per asset, falling back to the global default."""
+        config = {
+            "signal_generation": {
+                "risk_reward": {
+                    "default_take_profit_ratio": 2.0,
+                    "take_profit_ratio_by_asset": {
+                        "forex_major": 2.0,
+                        "crypto": 2.0,
+                        "forex_jpy": 1.5,
+                        "commodities": 1.5,
+                    },
+                }
+            }
+        }
+        engine = FoundationEngine(config=config, use_database=False)
+        assert engine._resolve_take_profit_ratio("forex_jpy") == 1.5
+        assert engine._resolve_take_profit_ratio("commodities") == 1.5
+        assert engine._resolve_take_profit_ratio("forex_major") == 2.0
+        assert engine._resolve_take_profit_ratio("crypto") == 2.0
+        # Unlisted asset → global default
+        assert engine._resolve_take_profit_ratio("exotics") == 2.0
+
+    def test_take_profit_ratio_defaults_to_2_without_config(self):
+        engine = FoundationEngine(config={}, use_database=False)
+        assert engine._resolve_take_profit_ratio("forex_jpy") == 2.0

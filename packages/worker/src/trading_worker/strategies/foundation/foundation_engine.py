@@ -721,6 +721,18 @@ class FoundationEngine:
         )
         return {k: qt[k] for k in legacy_keys if k in qt and not isinstance(qt[k], dict)}
 
+    def _resolve_take_profit_ratio(self, asset_class: str) -> float:
+        """Resolve the TP (R:R) ratio for an asset class.
+
+        Per-asset ``signal_generation.risk_reward.take_profit_ratio_by_asset``
+        wins; otherwise the global ``default_take_profit_ratio`` (default 2.0).
+        Runners (forex_major, crypto) reach 2R; choppier pairs (forex_jpy,
+        commodities) rarely do, so they take profit closer in.
+        """
+        rr_cfg = self.config.get("signal_generation", {}).get("risk_reward", {})
+        by_asset = rr_cfg.get("take_profit_ratio_by_asset", {})
+        return by_asset.get(asset_class, rr_cfg.get("default_take_profit_ratio", 2.0))
+
     def _resolve_validation_rules(self, asset_class: str) -> dict:
         """Resolve per-asset validation rules with fallback to default."""
         vr = self.config.get("signal_generation", {}).get("validation_rules", {})
@@ -1186,19 +1198,14 @@ class FoundationEngine:
             zone_type_str = "DEMAND" if is_demand else "SUPPLY"
             gates = self._commodity_gates()  # per-direction commodities gate thresholds
 
-            # Get R:R ratio from config (default 2.0 for 1:2)
-            rr_ratio = (
-                self.config.get("signal_generation", {})
-                .get("risk_reward", {})
-                .get("default_take_profit_ratio", 2.0)
-            )
-
-            # Determine asset class for SL buffer adjustment
+            # Determine asset class (needed for per-asset TP + SL buffer)
             from trading_worker.position.pip_calculator import PipCalculator
 
             pip_calc = PipCalculator()
             asset_class = pip_calc._determine_asset_class(symbol)
             pip_size = pip_calc.get_pip_size(symbol)
+
+            rr_ratio = self._resolve_take_profit_ratio(asset_class)
 
             # Convert symbol to universal format for config lookup (e.g., EURUSDc -> EURUSD)
             symbol_for_config = symbol

@@ -256,9 +256,21 @@ signal_generation:
 
   # Risk/Reward Requirements
   risk_reward:
-    min_risk_reward_ratio: 2.0   # Minimum R:R ratio (1:2)
+    # Floor for an acceptable setup. Lowered 2.0 → 1.5 so the per-asset 1.5R
+    # targets below aren't rejected by this gate (1.5 = day-trading minimum;
+    # 1:1 would be scalping). forex_major/crypto still produce 2.0R signals.
+    min_risk_reward_ratio: 1.5
     max_stop_loss_pips: 50       # Maximum stop loss in pips
-    default_take_profit_ratio: 2.0 # Default TP ratio (1:2)
+    default_take_profit_ratio: 2.0 # Fallback TP ratio when asset not listed below
+
+    # Per-asset TP ratio. Runners reach 2R (EUR, BTC); choppier pairs rarely
+    # do — backtest: USDJPY TP 2.0→1.5 took it from -3.06R to -1.59R (TP hits
+    # 1→6); XAU slightly better; EUR/BTC prefer the wider 2.0.
+    take_profit_ratio_by_asset:
+      forex_major: 2.0
+      crypto: 2.0
+      forex_jpy: 1.5
+      commodities: 1.5
 
     # Zone-Based Stop Loss (NEW)
     # When enabled, SL is calculated from zone size instead of fixed pips
