@@ -69,5 +69,8 @@ contaminating the existing strategy when the feature is off.
   the nearest-event context for trades that pass.
 - Calendar fetch runs on schedule, persists events, survives source downtime
   (degrades to "no news data → no blackout", logged).
+- Fetch failure triggers bounded retry (tenacity, max 5 + backoff); only after
+  all retries fail does the operator get **one** Telegram ERROR ("protection
+  OFF"), never per-retry spam. Successful fetches do not notify.
 - Full test coverage on the gate + parser; backtestable (calendar replayable
   over historical windows).

@@ -17,6 +17,11 @@ identical when the flag is off (golden test).
 - [ ] Daily calendar fetch job (reuse project scheduling); store upcoming week.
 - [ ] Intraday refresh near high-impact events → fill `actual` + trigger a fresh
       market-data pull (download_data path).
+- [ ] Bounded retry via **tenacity** (new dep): `stop_after_attempt(5)` +
+      exponential backoff (~5/15/30/60 min); retry transient only, not 4xx/ToS.
+- [ ] Telegram alerting via `NotificationManager`: ERROR once after retries
+      exhausted; NO per-fetch / per-retry spam; `news_data_stale` flag surfaced
+      in the daily report.
 
 ## Phase 2 — NewsService + symbol mapping
 - [ ] Symbol→currencies map (EURUSD→EUR,USD; XAUUSD→USD; BTCUSD→USD…).

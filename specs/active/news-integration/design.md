@@ -86,6 +86,14 @@ news:
   source: investing            # investing | forexfactory
   fetch_cron: "0 6 * * *"      # daily calendar pull
   refresh_around_events: true  # intraday re-scrape near high-impact events
+  fetch:
+    retry:
+      max_attempts: 5
+      backoff_min: [5, 15, 30, 60]   # tenacity wait between attempts (minutes)
+  notify:
+    on_fetch_failure: true       # one ERROR after all retries exhausted
+    on_fetch_success: false      # success → log / daily-report line only
+    on_protection_disabled: true # alert when blackout is OFF due to stale data
   blackout:
     high:   {window_min: 30}
     medium: {window_min: 10}
@@ -94,6 +102,27 @@ news:
     surprise_boost:   1.15     # aligned with a printed surprise
     surprise_dampen:  0.80     # against a printed surprise
 ```
+
+## Operability (fetch resilience + alerting)
+
+The feature is *silent by design* (degrade → no blackout), so the operator must
+be told when protection is OFF — otherwise the bot trades through news for days
+unnoticed.
+
+- **Bounded retry on fetch (tenacity)**: the daily fetch retries on failure with
+  backoff — `@retry(stop=stop_after_attempt(5), wait=wait_exponential(...))`,
+  capped (e.g. ~5/15/30/60 min), retrying only transient errors (network / 5xx /
+  parse-empty), not hard 4xx/ToS blocks. NB: tenacity is a **new dependency**
+  (replaces the hand-rolled `range(3)` loop pattern in `NotificationManager`);
+  the intraday refresh uses the same decorator with a shorter cap.
+- **Telegram notifications** (reuse `NotificationManager`):
+  - Fetch **success** → no Telegram spam; log only, optionally one line in the
+    existing `send_daily_report` ("News: N events fetched").
+  - Fetch **failure after all retries** → one `ERROR` notification ("News fetch
+    failed today — blackout protection OFF"). Not one-per-retry.
+  - Mark state `news_data_stale` so the daily report shows protection status.
+- Never block the trading loop on a failed fetch; stale/missing calendar simply
+  means no blackout (as today), just now visibly.
 
 ## Telemetry
 
