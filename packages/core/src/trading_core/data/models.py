@@ -721,3 +721,57 @@ class SignalRejection(Base):
             f"<SignalRejection(symbol={self.symbol}, stage={self.stage}, "
             f"conf={self.confluence_score}, at={self.created_at})>"
         )
+
+
+class NewsEventRecord(Base):
+    """Persisted economic-calendar event (news-integration feature).
+
+    The DB twin of the ``trading_worker.news.NewsEvent`` value object. Named
+    ``*Record`` to avoid clashing with that domain dataclass; the
+    ``NewsRepository`` maps between the two. ``event_time_utc`` is stored NAIVE
+    (UTC wall-clock), matching every other timestamp in this schema.
+
+    ``actual`` is null until the release prints (filled by the intraday
+    refresh). Upserts key on ``source_id`` (Investing ``occurrenceId``) so a
+    re-fetch updates the same row instead of duplicating it.
+    """
+
+    __tablename__ = "news_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # Stable per-release key from the source (Investing occurrenceId). Unique so
+    # re-fetches upsert; nullable for sources that don't expose one.
+    source_id: Mapped[str | None] = mapped_column(
+        String(40), unique=True, nullable=True, index=True
+    )
+
+    event_time_utc: Mapped[datetime] = mapped_column(nullable=False, index=True)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    impact: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # low/medium/high
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    forecast: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    previous: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    actual: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    fetched_at: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
+
+    __table_args__ = (
+        # Primary query: high-impact events for a currency near a time T.
+        Index("idx_news_currency_time", "currency", "event_time_utc"),
+        Index("idx_news_impact_time", "impact", "event_time_utc"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<NewsEventRecord({self.currency} {self.impact} {self.name!r} "
+            f"at={self.event_time_utc})>"
+        )

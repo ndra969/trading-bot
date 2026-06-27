@@ -31,13 +31,25 @@ identical when the flag is off (golden test).
 >   `occurrenceId`). `timeZone=0` ⇒ times are GMT, stored as UTC.
 > Requires realistic browser headers (Referer + Sec-Fetch-*) or it 403s.
 
-## Phase 1 (partial) — weekly fetch ✅ live-verified 2026-06-27
+## Phase 1 — persistence + fetch ✅ (scheduler wiring still pending)
 - [x] `InvestingScraper.fetch()` pulls the upcoming 7 days day-by-day (stays
       under the endpoint's ~200-row cap, no pagination), dedups by `source_id`,
       returns sorted events. Live run: 498 events / 7 days, 17 high-impact.
-- [ ] STILL TODO: `news_events` table + Alembic migration; `NewsRepository`
-      upsert/query; scheduler (daily job) + intraday refresh; tenacity bounded
-      retry + Telegram failure alert (per Operability section in design.md).
+- [x] `news_events` table (`NewsEventRecord` in core models) + Alembic migration
+      `f3c8a1e6b9d2`. Naive-UTC storage (schema convention); unique `source_id`.
+- [x] `NewsRepository` (worker side — maps domain↔ORM): idempotent
+      `upsert_events` (key=source_id, fills `actual` on re-fetch),
+      `get_in_window` (currencies × ±window × min_impact), `get_between`
+      (backtest replay). 10 DB tests.
+- [x] `NewsFetchService`: tenacity bounded retry (transient only: network/5xx/429,
+      NOT hard 4xx), one Telegram ERROR after retries exhausted (no per-retry
+      spam), success quiet; `from_config` builder; `is_stale` surfaced. 9 tests.
+- [x] Config `news` block in default.yaml (enabled:false), loads cleanly.
+- [ ] STILL TODO: wire the daily fetch job into the worker (reuse `schedule`) +
+      intraday refresh near high-impact events (fill `actual` + force a fresh
+      market-data pull). This is the only live-loop change left in Phase 1.
+- Total news suite: 42 unit tests; ruff/black clean; mypy clean except the
+  pre-existing `get_session` context-manager annotation shared with all repos.
 
 ## Phase 1 — Persistence + fetch
 - [ ] `news_events` table + Alembic migration; `NewsRepository` upsert/query.

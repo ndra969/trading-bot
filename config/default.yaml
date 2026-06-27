@@ -60,6 +60,24 @@ telegram:
   chat_id: null
   enabled: false
 
+# News / economic-calendar integration (Phase 1: fetch + persist).
+# Flag-off (default) = strategy output is byte-for-byte unchanged; nothing
+# fetches, gates, or modifies confluence. See specs/active/news-integration/.
+news:
+  enabled: false
+  source: investing            # investing (Investing.com calendar scrape)
+  fetch_days: 7                # how many days ahead to pull each run
+  fetch:
+    retry:
+      max_attempts: 5
+      backoff_min: [5, 15, 30, 60]   # minutes between retries (tenacity)
+  notify:
+    on_fetch_failure: true     # one ERROR alert after all retries exhausted
+    on_fetch_success: false    # success → log only (no Telegram spam)
+  blackout:                    # Phase 3 (not yet wired into the strategy)
+    high:   {window_min: 30}
+    medium: {window_min: 10}
+
 logging:
   level: "INFO"
   file_path: "./logs/trading_bot.log"

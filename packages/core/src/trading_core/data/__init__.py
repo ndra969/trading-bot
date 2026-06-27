@@ -3,6 +3,7 @@
 from .database import Base, DatabaseManager, get_session
 from .models import (
     ConfigSnapshot,
+    NewsEventRecord,
     Position,
     SupplyDemandZone,
     TradingAccount,
@@ -14,6 +15,7 @@ __all__ = [
     "DatabaseManager",
     "get_session",
     "ConfigSnapshot",
+    "NewsEventRecord",
     "Position",
     "SupplyDemandZone",
     "TradingAccount",

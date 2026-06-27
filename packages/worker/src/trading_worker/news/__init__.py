@@ -10,6 +10,16 @@ a warning, never a raised exception into the trading loop.
 """
 
 from .models import NewsEvent, NewsImpact
+from .repository import NewsRepository
+from .service import NewsFetchResult, NewsFetchService
 from .source import NewsParseError, NewsSource
 
-__all__ = ["NewsEvent", "NewsImpact", "NewsSource", "NewsParseError"]
+__all__ = [
+    "NewsEvent",
+    "NewsImpact",
+    "NewsSource",
+    "NewsParseError",
+    "NewsRepository",
+    "NewsFetchService",
+    "NewsFetchResult",
+]
