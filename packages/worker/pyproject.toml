@@ -29,6 +29,9 @@ dependencies = [
     # async / http
     "httpx>=0.25.0",
     "aiofiles>=23.0.0",
+    # news (economic-calendar scrape + bounded retry)
+    "beautifulsoup4>=4.12.0",
+    "tenacity>=8.2.0",
     # data / indicators
     "pandas>=2.0.0",
     "numpy>=1.24.0",

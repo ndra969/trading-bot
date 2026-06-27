@@ -6,11 +6,38 @@
 Phased; every phase behind `news.enabled: false`. Strategy output must be
 identical when the flag is off (golden test).
 
-## Phase 0 — Source + parser (pure, offline)
-- [ ] `NewsSource` interface + `InvestingScraper` (FF fallback). Parse against
-      SAVED HTML fixtures — no live network in tests.
-- [ ] Normalize to `NewsEvent` (UTC time, currency, impact, fcst/prev/actual).
-- [ ] Robust to layout drift: parse failure → empty list + warning, never raise.
+## Phase 0 — Source + parser (pure, offline) ✅ DONE 2026-06-27
+- [x] `NewsSource` interface (`source.py`) + `InvestingScraper`
+      (`investing_scraper.py`). Parse against SAVED fixture
+      (`tests/fixtures/news/investing_calendar.html`) — no live network in tests.
+- [x] Normalize to `NewsEvent`/`NewsImpact` (`models.py`): UTC-aware time
+      (naive rejected), currency, impact tier, fcst/prev/actual as raw strings,
+      `source_id` (Investing `occurrenceId`) for Phase-1 upsert.
+- [x] Robust to schema drift: missing/invalid `__NEXT_DATA__` or store path →
+      `NewsParseError` caught → empty list + warning; bad event skipped, rest
+      survive. 24 unit tests, mypy/ruff clean.
+- [x] **VERIFIED LIVE** 2026-06-27: end-to-end `fetch()` returns real events.
+      Diagnostic/refresh tool: `scripts/fetch_investing_calendar.py [--save]`.
+- New deps added to worker: `beautifulsoup4`, `tenacity`.
+
+> ⚠️ DESIGN CHANGE (supersedes design.md "scrape HTML table"). Two surfaces on
+> investing.com, verified live 2026-06-27:
+> - Public page = Next.js; calendar is `__NEXT_DATA__` JSON, CURRENT DAY ONLY,
+>   presentation classes hashed per build. Not used.
+> - XHR filter endpoint `…/Service/getCalendarFilteredData` returns a DATE RANGE
+>   for ALL countries as the classic, long-stable `tr.js-event-item` rows
+>   (`data-event-datetime`, `td.flagCur|sentiment|event|act|fore|prev`). **This
+>   is what the parser uses.** `source_id` = `eventRowId_<n>` (== homepage
+>   `occurrenceId`). `timeZone=0` ⇒ times are GMT, stored as UTC.
+> Requires realistic browser headers (Referer + Sec-Fetch-*) or it 403s.
+
+## Phase 1 (partial) — weekly fetch ✅ live-verified 2026-06-27
+- [x] `InvestingScraper.fetch()` pulls the upcoming 7 days day-by-day (stays
+      under the endpoint's ~200-row cap, no pagination), dedups by `source_id`,
+      returns sorted events. Live run: 498 events / 7 days, 17 high-impact.
+- [ ] STILL TODO: `news_events` table + Alembic migration; `NewsRepository`
+      upsert/query; scheduler (daily job) + intraday refresh; tenacity bounded
+      retry + Telegram failure alert (per Operability section in design.md).
 
 ## Phase 1 — Persistence + fetch
 - [ ] `news_events` table + Alembic migration; `NewsRepository` upsert/query.

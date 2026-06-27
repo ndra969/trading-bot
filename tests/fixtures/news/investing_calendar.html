@@ -1,0 +1,71 @@
+<!--
+  Investing.com economic-calendar fixture for InvestingScraper unit tests.
+
+  This mirrors the FILTER-ENDPOINT fragment
+  (/economic-calendar/Service/getCalendarFilteredData -> JSON .data), the
+  classic long-stable row format the scraper parses. Schema verified live
+  2026-06-27 via scripts/fetch_investing_calendar.py. It includes a day
+  separator, high/medium/low events, an "All Day" holiday row (no datetime →
+  skipped), and a malformed row (no currency → skipped). Refresh with
+  `uv run python scripts/fetch_investing_calendar.py --save`.
+-->
+<table id="economicCalendarData"><tbody>
+  <tr><td colspan="9" class="theDay" id="theDay1782518400">Thursday, June 25, 2026</td></tr>
+
+  <tr id="eventRowId_551001" class="js-event-item" event_attr_id="1982"
+      data-event-datetime="2026/06/25 12:30:00">
+    <td class="first left time js-time">12:30</td>
+    <td class="left flagCur noWrap"><span class="ceFlags United_States"></span>&nbsp;USD</td>
+    <td class="left textNum sentiment noWrap" title="High Volatility Expected" data-img_key="bull3">
+      <i class="grayFullBullishIcon"></i><i class="grayFullBullishIcon"></i><i class="grayFullBullishIcon"></i>
+    </td>
+    <td class="left event"><a href="/x">Nonfarm Payrolls</a> (May)</td>
+    <td class="bold act blackFont event-551001-actual">200K</td>
+    <td class="fore event-551001-forecast">180K</td>
+    <td class="prev blackFont event-551001-previous">175K</td>
+    <td></td>
+  </tr>
+
+  <tr id="eventRowId_551002" class="js-event-item" event_attr_id="1775"
+      data-event-datetime="2026/06/25 09:00:00">
+    <td class="first left time js-time">09:00</td>
+    <td class="left flagCur noWrap"><span class="ceFlags Euro_Zone"></span>&nbsp;EUR</td>
+    <td class="left textNum sentiment noWrap" title="Moderate Volatility Expected" data-img_key="bull2">
+      <i class="grayFullBullishIcon"></i><i class="grayFullBullishIcon"></i><i class="grayEmptyBullishIcon"></i>
+    </td>
+    <td class="left event"><a href="/y">German Ifo Business Climate</a> (Jun)</td>
+    <td class="bold act blackFont event-551002-actual">&nbsp;</td>
+    <td class="fore event-551002-forecast">88.3</td>
+    <td class="prev blackFont event-551002-previous">87.5</td>
+    <td></td>
+  </tr>
+
+  <tr id="eventRowId_551004" class="js-event-item" event_attr_id="1234"
+      data-event-datetime="2026/06/26 14:30:00">
+    <td class="first left time js-time">14:30</td>
+    <td class="left flagCur noWrap"><span class="ceFlags United_States"></span>&nbsp;USD</td>
+    <td class="left textNum sentiment noWrap" title="Low Volatility Expected">
+      <i class="grayFullBullishIcon"></i><i class="grayEmptyBullishIcon"></i><i class="grayEmptyBullishIcon"></i>
+    </td>
+    <td class="left event"><a href="/z">Crude Oil Inventories</a></td>
+    <td class="bold act blackFont event-551004-actual">&nbsp;</td>
+    <td class="fore event-551004-forecast">&nbsp;</td>
+    <td class="prev blackFont event-551004-previous">-2.5M</td>
+    <td></td>
+  </tr>
+
+  <!-- "All Day" / holiday: no data-event-datetime → dropped, not crashed -->
+  <tr id="eventRowId_551003" class="js-event-item" event_attr_id="999">
+    <td class="first left time js-time">All Day</td>
+    <td class="left flagCur noWrap"><span class="ceFlags Japan"></span>&nbsp;JPY</td>
+    <td class="left textNum sentiment noWrap" data-img_key="bull1"></td>
+    <td class="left event"><a href="/h">Bank Holiday</a></td>
+    <td class="act"></td><td class="fore"></td><td class="prev"></td><td></td>
+  </tr>
+
+  <!-- Malformed: no currency cell → row skipped, others survive -->
+  <tr id="eventRowId_551005" class="js-event-item"
+      data-event-datetime="2026/06/26 16:00:00">
+    <td class="left event"><a href="/m">Orphan Event</a></td>
+  </tr>
+</tbody></table>
