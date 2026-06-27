@@ -132,7 +132,11 @@ position_management:
     # zone SL (~188) made it ~0.93R instead of the intended 0.5R.
     breakeven_trigger_r: 0.4
     trailing_activation_r: 0.7
-    trailing_distance_r: 0.4
+    # 2026-06-27: 0.4→0.3. Gold's R is large (~600 pips), so a 0.4R trail gave
+    # back ~half the run (last live trail: reached 487p, kept 246p). Tightening
+    # keeps more (backtest: kept 0.38R→0.48R, net -10.74R→-10.54R). Stopped at
+    # 0.3 (not 0.2) — bar backtest can't see the whipsaw a too-tight trail eats.
+    trailing_distance_r: 0.3
 
     # Fallback to fixed pips if ATR not available
     breakeven_trigger: 50     # $0.50 move (activate sooner)
