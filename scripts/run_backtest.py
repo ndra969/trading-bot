@@ -430,6 +430,13 @@ def main() -> None:
         "Higher = let winners run before locking BE (default 0.4).",
     )
     parser.add_argument(
+        "--trailing-distance-r",
+        type=float,
+        default=None,
+        help="Override trailing distance as a fraction of risk (all asset classes). "
+        "Lower = trail tighter / give back less of the run (default 0.4).",
+    )
+    parser.add_argument(
         "--tp-ratio", type=float, default=None, help="Override default_take_profit_ratio"
     )
     parser.add_argument("--partial", choices=["off", "on"], default=None)
@@ -489,6 +496,10 @@ def _build_overrides(args) -> dict:
         pm = overrides.setdefault("position_management", {})
         for asset in ("forex_major", "forex_jpy", "commodities", "crypto"):
             pm.setdefault(asset, {})["breakeven_trigger_r"] = args.breakeven_trigger_r
+    if args.trailing_distance_r is not None:
+        pm = overrides.setdefault("position_management", {})
+        for asset in ("forex_major", "forex_jpy", "commodities", "crypto"):
+            pm.setdefault(asset, {})["trailing_distance_r"] = args.trailing_distance_r
     return overrides
 
 
