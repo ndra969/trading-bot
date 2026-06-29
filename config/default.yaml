@@ -64,9 +64,13 @@ telegram:
 # Flag-off (default) = strategy output is byte-for-byte unchanged; nothing
 # fetches, gates, or modifies confluence. See specs/active/news-integration/.
 news:
-  enabled: false
+  # Master switch: ON = fetch + persist the calendar (scheduler runs).
+  # This ALONE has NO trading impact — the gate/modifier below are separate and
+  # default OFF, so today this is pure data collection ahead of Phase 3/4.
+  enabled: true
   source: investing            # investing (Investing.com calendar scrape)
   fetch_days: 7                # how many days ahead to pull each run
+  fetch_interval_hours: 24     # daily calendar refresh cadence
   fetch:
     retry:
       max_attempts: 5
@@ -74,9 +78,15 @@ news:
   notify:
     on_fetch_failure: true     # one ERROR alert after all retries exhausted
     on_fetch_success: false    # success → log only (no Telegram spam)
-  blackout:                    # Phase 3 (not yet wired into the strategy)
+  blackout:                    # Phase 3 — reject entries near high-impact events
+    enabled: false             # KEEP OFF until backtested; data-collection only
     high:   {window_min: 30}
     medium: {window_min: 10}
+  confidence:                  # Phase 4 — modify confluence from the surprise
+    enabled: false             # KEEP OFF until backtested
+    pre_event_dampen: 0.85
+    surprise_boost:   1.15
+    surprise_dampen:  0.80
 
 logging:
   level: "INFO"

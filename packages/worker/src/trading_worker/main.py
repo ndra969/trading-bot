@@ -12,6 +12,7 @@ from trading_core.utils.logger import get_logger
 from .connectors.data_manager import DataManager
 from .connectors.mt5_connector import MT5Connector
 from .connectors.symbol_mapper import SymbolMapper
+from .news import InvestingScraper, NewsFetchService, NewsRepository
 from .position.automation.breakeven_manager import BreakevenManager
 from .position.automation.partial_close_manager import PartialCloseManager
 from .position.automation.trailing_stop_manager import TrailingStopManager
@@ -71,6 +72,9 @@ class TradingBot:
         self.execution_service: ExecutionService | None = None
         self.position_orchestrator: PositionOrchestrator | None = None
         self.analysis_service: AnalysisService | None = None
+
+        # News / economic-calendar fetch service (built only when news.enabled).
+        self.news_fetch_service: NewsFetchService | None = None
 
         # Account Management components
         self.account_sync_service = None
@@ -209,6 +213,9 @@ class TradingBot:
 
             # Start notification manager
             await self.notification_manager.start()
+
+            # Initialize news fetch service (no-op unless news.enabled)
+            self._initialize_news_service()
 
             # Start main trading loop
             self.is_running = True
@@ -870,6 +877,10 @@ class TradingBot:
         # Start heartbeat loop in background
         asyncio.create_task(self._heartbeat_loop())
 
+        # Start the daily news-calendar fetch loop (only if news.enabled)
+        if self.news_fetch_service is not None:
+            asyncio.create_task(self._news_fetch_loop())
+
         while self.is_running:
             try:
                 # CRITICAL: Sync balance from MT5 on every loop iteration
@@ -985,6 +996,51 @@ class TradingBot:
             except Exception as e:
                 logger.error(f"Error in heartbeat loop: {e}")
                 await asyncio.sleep(300)  # Retry after 5 mins on error
+
+    def _initialize_news_service(self) -> None:
+        """Build the news fetch service when ``news.enabled`` is true.
+
+        Left as ``None`` (and never scheduled) when the feature is off, so the
+        default config path is unchanged. The service degrades safely on its
+        own — a failed fetch alerts and leaves the calendar stale, never raising
+        into the loop.
+        """
+        news_config = self.config.get("news", {}) or {}
+        if not news_config.get("enabled", False):
+            logger.info("News integration disabled (news.enabled=false)")
+            return
+
+        source = InvestingScraper(days=int(news_config.get("fetch_days", 7)))
+        self.news_fetch_service = NewsFetchService.from_config(
+            news_config, source, NewsRepository(), notifier=self.notification_manager
+        )
+        logger.info("📰 News fetch service initialized (news.enabled=true)")
+
+    async def _news_fetch_loop(self) -> None:
+        """Fetch the economic calendar at startup, then once per interval.
+
+        Mirrors ``_heartbeat_loop``: an independent background task. The fetch
+        service handles retry/backoff + failure alerting internally, so this
+        loop only schedules and never needs to guard the call.
+        """
+        assert self.news_fetch_service is not None
+        interval_hours = int(self.config.get("news", {}).get("fetch_interval_hours", 24))
+        logger.info(f"News fetch loop started (interval: {interval_hours}h)")
+
+        # Initial pull immediately so the bot isn't blind on the first day.
+        await self.news_fetch_service.fetch_and_store()
+
+        while self.is_running:
+            try:
+                await asyncio.sleep(interval_hours * 3600)
+                if not self.is_running:
+                    break
+                await self.news_fetch_service.fetch_and_store()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in news fetch loop: {e}")
+                await asyncio.sleep(300)  # Retry the scheduler after 5 mins
 
     def _is_market_open(self, symbol: str) -> bool:
         """Check market open (weekend + per-symbol session filter)."""

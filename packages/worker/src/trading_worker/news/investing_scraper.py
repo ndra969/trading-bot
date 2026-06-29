@@ -24,6 +24,7 @@ shape).
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 
 import httpx
@@ -41,6 +42,7 @@ _DATETIME_ATTR = "data-event-datetime"
 _DATETIME_FMT = "%Y/%m/%d %H:%M:%S"
 _ROW_ID_PREFIX = "eventRowId_"
 _DEFAULT_DAYS = 7
+_REQUEST_SPACING_S = 1.5  # polite delay between per-day requests (anti-429)
 
 _HEADERS = {
     "User-Agent": (
@@ -195,6 +197,10 @@ class InvestingScraper(NewsSource):
 
         async with httpx.AsyncClient(timeout=self.timeout, headers=_XHR_HEADERS) as client:
             for offset in range(self.days):
+                if offset:
+                    # Polite spacing between day requests — "not a hammer" (spec),
+                    # and avoids the 429 seen on rapid back-to-back pulls.
+                    await asyncio.sleep(_REQUEST_SPACING_S)
                 day = start + timedelta(days=offset)
                 for event in await self._fetch_day(client, day):
                     key = event.source_id or f"{event.event_time_utc}|{event.name}"

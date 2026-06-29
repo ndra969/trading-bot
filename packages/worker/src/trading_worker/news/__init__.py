@@ -9,6 +9,7 @@ and must degrade safely: a parse/layout failure yields an empty event list and
 a warning, never a raised exception into the trading loop.
 """
 
+from .investing_scraper import InvestingScraper
 from .models import NewsEvent, NewsImpact
 from .repository import NewsRepository
 from .service import NewsFetchResult, NewsFetchService
@@ -22,4 +23,5 @@ __all__ = [
     "NewsRepository",
     "NewsFetchService",
     "NewsFetchResult",
+    "InvestingScraper",
 ]

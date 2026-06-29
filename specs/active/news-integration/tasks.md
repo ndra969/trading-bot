@@ -45,9 +45,16 @@ identical when the flag is off (golden test).
       NOT hard 4xx), one Telegram ERROR after retries exhausted (no per-retry
       spam), success quiet; `from_config` builder; `is_stale` surfaced. 9 tests.
 - [x] Config `news` block in default.yaml (enabled:false), loads cleanly.
-- [ ] STILL TODO: wire the daily fetch job into the worker (reuse `schedule`) +
-      intraday refresh near high-impact events (fill `actual` + force a fresh
-      market-data pull). This is the only live-loop change left in Phase 1.
+- [x] Daily fetch job wired into the worker: `_news_fetch_loop` (mirrors
+      `_heartbeat_loop`) — initial pull at startup + every
+      `news.fetch_interval_hours` (default 24). Built by `_initialize_news_service`
+      ONLY when `news.enabled` (else None, never scheduled). Dry-run verified:
+      with the flag off the bot logs "News integration disabled" and starts
+      clean — default path unchanged.
+- [ ] STILL TODO (deferred to Phase 3-adjacent): intraday refresh near
+      high-impact events (fill `actual` + force a fresh market-data pull). Left
+      out here because the market-data-pull coupling belongs with the gate, not
+      the data layer.
 - Total news suite: 42 unit tests; ruff/black clean; mypy clean except the
   pre-existing `get_session` context-manager annotation shared with all repos.
 
