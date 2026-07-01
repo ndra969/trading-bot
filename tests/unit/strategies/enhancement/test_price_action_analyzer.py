@@ -937,3 +937,23 @@ async def test_evening_star_zone_type_none(analyzer):
     assert signal is not None
     assert signal.pattern_type == "EVENING_STAR"
     assert signal.direction == "BEARISH"
+
+
+@pytest.mark.asyncio
+async def test_directional_pattern_not_masked_by_inside_bar(analyzer):
+    """A bullish ORDER_BLOCK candle that also sits inside the prior range must
+    be read as the directional pattern, not preempted by the generic NEUTRAL
+    Inside Bar. The old detector order checked inside_bar/doji BEFORE the
+    structural directional patterns, so ~62% of setups were buried as neutral."""
+    # prev (idx -2): strong bullish candle (body 10 / range 11 ~= 0.91 > 0.7).
+    # curr (idx -1): inside prev range AND closes above prev close -> order block.
+    opens = [100.0, 100.0, 100.0, 100.0, 100.0, 110.1]
+    highs = [101.0, 101.0, 101.0, 101.0, 110.5, 110.45]
+    lows = [99.0, 99.0, 99.0, 99.0, 99.5, 110.0]
+    closes = [100.0, 100.0, 100.0, 100.0, 110.0, 110.4]
+
+    signal = await analyzer.analyze_pattern("EURUSD", opens, highs, lows, closes, "DEMAND")
+
+    assert signal is not None
+    assert signal.pattern_type == "ORDER_BLOCK"
+    assert signal.direction == "BULLISH"
