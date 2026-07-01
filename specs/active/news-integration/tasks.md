@@ -69,9 +69,16 @@ identical when the flag is off (golden test).
       exhausted; NO per-fetch / per-retry spam; `news_data_stale` flag surfaced
       in the daily report.
 
-## Phase 2 — NewsService + symbol mapping
-- [ ] Symbol→currencies map (EURUSD→EUR,USD; XAUUSD→USD; BTCUSD→USD…).
-- [ ] `nearest_event`, `in_blackout`, `confidence_adjustment` — pure, unit-tested.
+## Phase 2 — NewsService + symbol mapping ✅ DONE 2026-07-01
+- [x] `symbol_currencies` map (EURUSD→EUR,USD; USDJPY→USD,JPY; XAUUSD→USD;
+      BTCUSD→USD; broker suffixes tolerated) — non-fiat legs drop out.
+- [x] `NewsService` (`news_service.py`): `nearest_event` (closest high-impact in
+      lookahead), `in_blackout` (tier-aware — high vs medium window, returns the
+      triggering event + signed minutes), `confidence_adjustment` (pre-event
+      dampen implemented; post-event surprise deferred to Phase 4 → neutral).
+      Config-driven windows/dampen. 22 unit tests.
+- Total news suite now: 64 tests; ruff/black/mypy clean. NOT wired into the
+  strategy yet — Phase 3 is the first change that touches `foundation_engine`.
 
 ## Phase 3 — Blackout gate (protect-only first)
 - [ ] Gate in `foundation_engine._passes_final_quality_filters`: reject inside

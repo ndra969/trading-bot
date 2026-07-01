@@ -11,6 +11,7 @@ a warning, never a raised exception into the trading loop.
 
 from .investing_scraper import InvestingScraper
 from .models import NewsEvent, NewsImpact
+from .news_service import BlackoutStatus, NewsService, symbol_currencies
 from .repository import NewsRepository
 from .service import NewsFetchResult, NewsFetchService
 from .source import NewsParseError, NewsSource
@@ -24,4 +25,7 @@ __all__ = [
     "NewsFetchService",
     "NewsFetchResult",
     "InvestingScraper",
+    "NewsService",
+    "BlackoutStatus",
+    "symbol_currencies",
 ]
