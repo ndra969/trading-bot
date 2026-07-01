@@ -124,7 +124,7 @@ async def test_demand_zone_confluence(analyzer):
     assert signal.swing_high == 200
     assert signal.swing_low == 100
     assert signal.confluence_level.level == 0.618
-    assert signal.score == 20  # Score for 61.8%
+    assert signal.score == pytest.approx(20, abs=0.05)  # dead-centre 61.8% ~= full prestige
     assert abs(signal.confluence_level.price - 138.2) < 0.1
 
 
@@ -140,7 +140,7 @@ async def test_supply_zone_confluence(analyzer):
     assert signal is not None
     assert signal.direction == "DOWN"
     assert signal.confluence_level.level == 0.5
-    assert signal.score == 15  # Score for 50%
+    assert signal.score == pytest.approx(15, abs=0.05)  # dead-centre 50% ~= full prestige
     assert abs(signal.confluence_level.price - 150.0) < 0.1
 
 
@@ -262,3 +262,34 @@ async def test_flat_data_has_no_leg(analyzer):
     signal = await analyzer.analyze_fibonacci("EURUSD", highs, lows, 138.2, "DEMAND")
 
     assert signal is None
+
+
+@pytest.mark.asyncio
+async def test_edge_touch_scores_lower_than_centred(analyzer):
+    """Confidence must decay with distance to the level. A touch near the
+    tolerance edge scores far below a dead-centre touch of the SAME level —
+    the old code returned the level's flat prestige regardless of distance,
+    which made fib fire a max score on every marginal alignment."""
+    # 61.8% level sits at 138.2 (leg 100->200). tolerance ~= 138 * 0.01 ~= 1.38.
+    centred = await analyzer.analyze_fibonacci("EURUSD", UP_HIGHS, UP_LOWS, 138.2, "DEMAND")
+    edge = await analyzer.analyze_fibonacci("EURUSD", UP_HIGHS, UP_LOWS, 139.37, "DEMAND")
+
+    assert centred is not None and edge is not None
+    assert centred.confluence_level.level == 0.618
+    assert edge.confluence_level.level == 0.618
+    assert edge.score < centred.score
+    assert edge.score < 0.3 * centred.score  # heavily decayed near the edge
+
+
+@pytest.mark.asyncio
+async def test_closest_level_chosen_not_highest_prestige():
+    """With two levels inside the tolerance band, the CLOSEST is chosen — not
+    the highest-prestige one. The old code always grabbed 0.618 (score 20)
+    even when a nearer level was the real match."""
+    wide = FibonacciAnalyzer({"fibonacci": {"lookback": 20, "tolerance": 0.2}})
+    # Leg 100->200; zone exactly on the 50% level (150). 61.8% (138.2) is also
+    # inside the wide band but farther from 150.
+    signal = await wide.analyze_fibonacci("EURUSD", UP_HIGHS, UP_LOWS, 150.0, "DEMAND")
+
+    assert signal is not None
+    assert signal.confluence_level.level == 0.5  # not 0.618

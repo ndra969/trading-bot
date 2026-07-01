@@ -95,25 +95,33 @@ class FibonacciAnalyzer:
         range_val = abs(max_high - min_low)
 
         best_level = None
-        best_score = 0
-        # min_dist = float("inf")  # Not used in current implementation
+        best_score = 0.0
 
-        for ratio, score_val in self.levels.items():
+        tol = zone_price * self.tolerance
+        for ratio, prestige in self.levels.items():
             level_price = 0.0
             if direction == "UP":  # Retracing down to Demand
                 level_price = max_high - (range_val * ratio)
             else:  # Retracing up to Supply
                 level_price = min_low + (range_val * ratio)
 
-            # Check Confluence with Zone Price
-            # Use percentage difference or fixed tolerance
             dist = abs(level_price - zone_price)
+            if dist >= tol:  # Outside the tolerance band — not a match
+                continue
 
-            # Normalize distance by price? or use tolerance
-            if dist < (zone_price * self.tolerance):  # Within tolerance (e.g. 0.05%)
-                if score_val > best_score:
-                    best_score = score_val
-                    best_level = FibonacciLevel(ratio, level_price, f"{ratio * 100:.1f}%")
+            # Grade the score by PROXIMITY, not just the level's prestige. A
+            # dead-centre touch keeps the level's full prestige; a touch at the
+            # tolerance edge decays toward 0. This picks the CLOSEST-and-strongest
+            # level (highest graded score), so the layer no longer returns a flat
+            # max score on every marginal alignment — the old "score_val >
+            # best_score" always grabbed 0.618 and fired confidence 100 on ~83%
+            # of setups, inflating confluence indiscriminately (fib-active trades
+            # were net-negative live, 30d to 2026-07-01).
+            closeness = 1.0 - dist / tol
+            graded = prestige * closeness
+            if graded > best_score:
+                best_score = graded
+                best_level = FibonacciLevel(ratio, level_price, f"{ratio * 100:.1f}%")
 
         if best_level:
             return FibonacciSignal(

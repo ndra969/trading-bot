@@ -242,6 +242,40 @@ def _ascending_support_prices() -> list[float]:
     return prices
 
 
+def _descending_support_prices() -> list[float]:
+    """Swing lows at idx 10/30/50 on a DESCENDING line (slope -0.3, projects
+    ~91.3 at idx 99). Support built from *lower lows* = downtrend; it must NOT
+    reinforce a demand (BUY) zone even though its label is SUPPORT."""
+    prices = [130.0] * 100
+    prices[10] = 118.0
+    prices[9] = 124.0
+    prices[11] = 124.0
+    prices[30] = 112.0
+    prices[29] = 118.0
+    prices[31] = 118.0
+    prices[50] = 106.0
+    prices[49] = 112.0
+    prices[51] = 112.0
+    return prices
+
+
+def _ascending_resistance_prices() -> list[float]:
+    """Swing highs at idx 10/30/50 on an ASCENDING line (slope +0.3, projects
+    ~138.7 at idx 99). Resistance built from *higher highs* = uptrend; it must
+    NOT reinforce a supply (SELL) zone even though its label is RESISTANCE."""
+    prices = [100.0] * 100
+    prices[10] = 112.0
+    prices[9] = 106.0
+    prices[11] = 106.0
+    prices[30] = 118.0
+    prices[29] = 112.0
+    prices[31] = 112.0
+    prices[50] = 124.0
+    prices[49] = 118.0
+    prices[51] = 118.0
+    return prices
+
+
 class TestZoneConfluence:
     """Zone-based trendline confluence (enhancement-layer-rework Phase 1)."""
 
@@ -265,6 +299,33 @@ class TestZoneConfluence:
         prices = _ascending_support_prices()
         signal = await analyzer.analyze_zone_confluence(
             "EURUSD", prices, "H1", zone_lower=117.5, zone_upper=118.5, is_demand=False
+        )
+
+        assert signal.signal_type == "NEUTRAL"
+        assert signal.confidence == 0
+
+    @pytest.mark.asyncio
+    async def test_descending_support_does_not_reinforce_demand(self, analyzer):
+        """A DESCENDING support line (downtrend) must NOT reinforce a demand
+        zone — slope disagrees with the BUY direction (counter-trend)."""
+        prices = _descending_support_prices()
+        # Line projects to ~91.3 at the current bar; place the demand zone there
+        # so only the slope filter (not the band check) can reject it.
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=91.0, zone_upper=91.8, is_demand=True
+        )
+
+        assert signal.signal_type == "NEUTRAL"
+        assert signal.confidence == 0
+
+    @pytest.mark.asyncio
+    async def test_ascending_resistance_does_not_reinforce_supply(self, analyzer):
+        """An ASCENDING resistance line (uptrend) must NOT reinforce a supply
+        zone — slope disagrees with the SELL direction (counter-trend)."""
+        prices = _ascending_resistance_prices()
+        # Line projects to ~138.7 at the current bar; supply zone placed there.
+        signal = await analyzer.analyze_zone_confluence(
+            "EURUSD", prices, "H1", zone_lower=138.3, zone_upper=139.1, is_demand=False
         )
 
         assert signal.signal_type == "NEUTRAL"

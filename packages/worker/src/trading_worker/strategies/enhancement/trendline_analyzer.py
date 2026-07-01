@@ -107,6 +107,16 @@ class TrendlineAnalyzer:
         for line in top_lines:
             if line.line_type != wanted_type:
                 continue
+            # Slope must agree with the trade direction. A SUPPORT line built
+            # from *lower lows* (slope <= 0) is a downtrend and does NOT support
+            # a BUY; a RESISTANCE line built from *higher highs* (slope >= 0) is
+            # an uptrend and does NOT cap a SELL. Counting these counter-trend
+            # lines added false confluence (30d live: trendline-active trades
+            # were net-negative, driven by counter-trend entries straight to SL).
+            if is_demand and line.slope <= 0:
+                continue
+            if not is_demand and line.slope >= 0:
+                continue
             line_price = line.slope * current_idx + line.intercept
             if not (band_lower <= line_price <= band_upper):
                 continue
