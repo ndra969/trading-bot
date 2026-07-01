@@ -80,11 +80,20 @@ identical when the flag is off (golden test).
 - Total news suite now: 64 tests; ruff/black/mypy clean. NOT wired into the
   strategy yet — Phase 3 is the first change that touches `foundation_engine`.
 
-## Phase 3 — Blackout gate (protect-only first)
-- [ ] Gate in `foundation_engine._passes_final_quality_filters`: reject inside
-      `±window` of high-impact events for the symbol's currencies.
-- [ ] `RejectionStage.NEWS_BLACKOUT` + `entry_tags.news` context.
-- [ ] Config `news.blackout.{high,medium}.window_min`.
+## Phase 3 — Blackout gate (protect-only first) ✅ WIRED (flag-off) 2026-07-01
+- [x] Async gate `FoundationEngine._passes_news_blackout` runs in
+      `_create_signal_from_zone` just before the scoring filters: rejects when
+      the latest bar sits in a high/medium window for the symbol's currencies.
+      Uses `data.index[-1]` as the lookahead-safe "now".
+- [x] `RejectionStage.NEWS_BLACKOUT` recorded with event/currency/impact/minutes.
+- [x] Wired end-to-end: `NewsService` built in main (when `news.enabled`) and
+      threaded to `FoundationEngine` + `MTFAnalyzer`. Gate fires only when
+      `news.blackout.enabled` (flag lives on the service).
+- [x] **Flag-off guarantee**: `news_service=None` (default, all existing callers)
+      OR `blackout.enabled:false` → gate is inert, output byte-for-byte. Golden
+      tests in `test_news_blackout_gate.py`; full strategies suite green.
+- [ ] DEFERRED: `entry_tags.news` context on PASSING trades (needs nearest_event
+      threaded into `_build_strategy_result`) — telemetry only, do with Phase 4.
 
 ## Phase 4 — Confidence modifier (inform)
 - [ ] Pre-event dampen + post-event surprise boost/dampen on the confluence

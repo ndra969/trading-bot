@@ -29,6 +29,7 @@ class MTFAnalyzer:
         config: dict | None = None,
         use_database: bool = False,
         rejection_recorder=None,
+        news_service=None,
     ):
         """
         Initialize MTF Analyzer.
@@ -37,6 +38,8 @@ class MTFAnalyzer:
             config: Strategy configuration
             use_database: Whether to use database for persistence
             rejection_recorder: Optional RejectionRecorder for tuning telemetry.
+            news_service: Optional NewsService for the news-blackout gate; passed
+                straight through to the FoundationEngine (no-op unless enabled).
         """
         self.config = config or {}
         self.use_database = use_database
@@ -46,6 +49,7 @@ class MTFAnalyzer:
             config=self.config,
             use_database=self.use_database,
             rejection_recorder=rejection_recorder,
+            news_service=news_service,
         )
 
         # Initialize TimeframeManager for validation

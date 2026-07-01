@@ -12,7 +12,7 @@ from trading_core.utils.logger import get_logger
 from .connectors.data_manager import DataManager
 from .connectors.mt5_connector import MT5Connector
 from .connectors.symbol_mapper import SymbolMapper
-from .news import InvestingScraper, NewsFetchService, NewsRepository
+from .news import InvestingScraper, NewsFetchService, NewsRepository, NewsService
 from .position.automation.breakeven_manager import BreakevenManager
 from .position.automation.partial_close_manager import PartialCloseManager
 from .position.automation.trailing_stop_manager import TrailingStopManager
@@ -352,10 +352,17 @@ class TradingBot:
             retention_days=int(telemetry_cfg.get("rejection_retention_days", 30)),
         )
 
+        # News-blackout gate wiring: build a NewsService when news.enabled so the
+        # gate is AVAILABLE. It stays inert until news.blackout.enabled is also
+        # true (checked inside the service), so flipping the gate on later needs
+        # no code change. None when news is off → gate is a pure no-op.
+        news_service = self._build_news_service(use_database)
+
         self.foundation_engine = FoundationEngine(
             strategy_config,
             use_database=use_database,
             rejection_recorder=self.rejection_recorder,
+            news_service=news_service,
         )
 
         # Initialize MTFAnalyzer if in MTF mode
@@ -366,6 +373,7 @@ class TradingBot:
                 config=strategy_config,
                 use_database=use_database,
                 rejection_recorder=self.rejection_recorder,
+                news_service=news_service,
             )
             logger.info(
                 f"MTFAnalyzer initialized (Zone: {self.zone_timeframe}, Entry: {self.entry_timeframe})"
@@ -996,6 +1004,18 @@ class TradingBot:
             except Exception as e:
                 logger.error(f"Error in heartbeat loop: {e}")
                 await asyncio.sleep(300)  # Retry after 5 mins on error
+
+    def _build_news_service(self, use_database: bool) -> NewsService | None:
+        """Build a NewsService for the blackout/confidence gates, or None.
+
+        Returns None when news is disabled or there's no DB (the calendar lives
+        in the DB). The returned service carries its own enabled flags, so the
+        strategy engine stays inert until news.blackout.enabled is set.
+        """
+        news_config = self.config.get("news", {}) or {}
+        if not news_config.get("enabled", False) or not use_database:
+            return None
+        return NewsService(NewsRepository(), news_config)
 
     def _initialize_news_service(self) -> None:
         """Build the news fetch service when ``news.enabled`` is true.

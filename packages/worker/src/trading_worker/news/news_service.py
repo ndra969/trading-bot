@@ -71,6 +71,10 @@ class NewsService:
         cfg = news_config or {}
         blackout = cfg.get("blackout") or {}
         confidence = cfg.get("confidence") or {}
+        # Gate switches — consumers check these, so the engine needn't see the
+        # news config at all (keeps the blackout gate flag-off byte-for-byte).
+        self.blackout_enabled = bool(blackout.get("enabled", False))
+        self.confidence_enabled = bool(confidence.get("enabled", False))
         self.high_window_min = int(
             (blackout.get("high") or {}).get("window_min", _DEFAULT_HIGH_WINDOW_MIN)
         )

@@ -60,9 +60,12 @@ telegram:
   chat_id: null
   enabled: false
 
-# News / economic-calendar integration (Phase 1: fetch + persist).
-# Flag-off (default) = strategy output is byte-for-byte unchanged; nothing
-# fetches, gates, or modifies confluence. See specs/active/news-integration/.
+# News / economic-calendar integration. Two independent layers:
+#   news.enabled            → fetch + persist the calendar (data only)
+#   news.blackout.enabled   → reject entries near high-impact events (strategy)
+#   news.confidence.enabled → modify confluence from the surprise (strategy)
+# The strategy layers are OFF by default, so turning on `enabled` alone has no
+# trading impact. See specs/active/news-integration/.
 news:
   # Master switch: ON = fetch + persist the calendar (scheduler runs).
   # This ALONE has NO trading impact — the gate/modifier below are separate and
@@ -159,7 +162,13 @@ position_management:
     # Fixes the gold case where fixed BE (175) never armed because the real
     # zone SL (~188) made it ~0.93R instead of the intended 0.5R.
     breakeven_trigger_r: 0.4
-    trailing_activation_r: 0.7
+    # 2026-07-01: 0.7→0.5. 30d live evidence: all 8 BE-stops on XAU/XAG peaked
+    # at 0.44R–0.66R but round-tripped to BE (~0.1R) because trailing never
+    # armed (peaks sat just below the 0.7R gate). Trailing exits that DID fire
+    # averaged +$26.85 (11 trades). Lowering activation lets trailing catch
+    # those mid-range peaks (a 0.65R peak now keeps ~0.35R vs 0.1R). Dead zone
+    # shrinks to 0.4R–0.5R. Pending backtest re-validation (harness stale).
+    trailing_activation_r: 0.5
     # 2026-06-27: 0.4→0.3. Gold's R is large (~600 pips), so a 0.4R trail gave
     # back ~half the run (last live trail: reached 487p, kept 246p). Tightening
     # keeps more (backtest: kept 0.38R→0.48R, net -10.74R→-10.54R). Stopped at

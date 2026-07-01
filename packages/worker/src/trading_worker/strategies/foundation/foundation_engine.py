@@ -1,6 +1,6 @@
 """Foundation Engine - Coordinates foundation strategy."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
@@ -35,6 +35,7 @@ class FoundationEngine:
         use_database: bool = True,
         symbol_mapper=None,
         rejection_recorder=None,
+        news_service=None,
     ):
         """
         Initialize foundation engine.
@@ -45,10 +46,15 @@ class FoundationEngine:
             symbol_mapper: Optional SymbolMapper for symbol normalization (EURUSDc -> EURUSD)
             rejection_recorder: Optional RejectionRecorder for tuning telemetry.
                 When None (tests/backtests), rejection recording is a no-op.
+            news_service: Optional NewsService for the news-blackout gate. When
+                None (the default, and all existing callers/tests), the gate is
+                a no-op and signal output is byte-for-byte unchanged. Even when
+                provided, the gate only fires if ``news.blackout.enabled``.
         """
         self.config = config or {}
         self.symbol_mapper = symbol_mapper  # Store for symbol normalization
         self.rejection_recorder = rejection_recorder
+        self.news_service = news_service
         self.pip_calculator = PipCalculator()
 
         # Initialize S&D strategy
@@ -97,6 +103,79 @@ class FoundationEngine:
             )
         except Exception:  # pragma: no cover - telemetry must never break trading
             pass
+
+    def _news_blackout_enabled(self) -> bool:
+        """True only when a NewsService is wired AND the gate is turned on.
+
+        The switch lives on the service (``blackout_enabled``), so the engine
+        stays decoupled from the news config.
+        """
+        return self.news_service is not None and getattr(
+            self.news_service, "blackout_enabled", False
+        )
+
+    @staticmethod
+    def _evaluation_time(data: pd.DataFrame) -> datetime | None:
+        """UTC-aware timestamp of the latest bar — the lookahead-safe 'now'.
+
+        Using the last candle's time (not wall-clock) keeps the blackout check
+        correct in backtest replay. Returns None if the index isn't datetime,
+        which makes the gate no-op rather than guess.
+        """
+        try:
+            ts = data.index[-1]
+            dt = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            if not isinstance(dt, datetime):
+                return None
+            return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
+        except Exception:
+            return None
+
+    async def _passes_news_blackout(
+        self,
+        symbol: str,
+        direction: SignalDirection,
+        asset_class: str,
+        final_score: float,
+        data: pd.DataFrame,
+    ) -> bool:
+        """News-blackout gate (protect-only). No-op unless wired + enabled.
+
+        Rejects an otherwise-valid setup when the latest bar sits inside a
+        high/medium-impact event window for the symbol's currencies. Records a
+        ``NEWS_BLACKOUT`` rejection for telemetry. Never raises into the signal
+        path — a news-layer error degrades to "no blackout".
+        """
+        if not self._news_blackout_enabled():
+            return True
+        try:
+            now = self._evaluation_time(data)
+            if now is None:
+                return True
+            status = await self.news_service.in_blackout(symbol, now)
+            if not status.blocked:
+                return True
+            event = status.event
+            logger.info(
+                f"{symbol}: REJECTED - news blackout "
+                f"({event.currency if event else '?'} {event.name if event else '?'}, "
+                f"{status.minutes_to_event:+.0f} min)"
+            )
+            self._record_rejection(
+                RejectionStage.NEWS_BLACKOUT,
+                symbol,
+                direction=direction,
+                asset_class=asset_class,
+                confluence_score=final_score,
+                event=event.name if event else None,
+                currency=event.currency if event else None,
+                impact=event.impact.value if event else None,
+                minutes_to_event=status.minutes_to_event,
+            )
+            return False
+        except Exception as e:  # pragma: no cover - gate must never break trading
+            logger.warning(f"{symbol}: news blackout check failed, allowing entry: {e}")
+            return True
 
     async def analyze_symbol(
         self,
@@ -1906,6 +1985,14 @@ class FoundationEngine:
                 weighted_foundation_score,
                 weighted_enhancement_score,
             ) = self._calculate_confluence_score(zone, raw_confidences)
+
+            # News-blackout gate (protect-only; no-op unless wired + enabled).
+            # Placed before the scoring filters so a blacked-out window short-
+            # circuits regardless of confluence.
+            if not await self._passes_news_blackout(
+                symbol, direction, asset_class, final_score, data
+            ):
+                return None
 
             # Apply final quality filters (min confluence, price action req, H1 gate, etc)
             if not self._passes_final_quality_filters(

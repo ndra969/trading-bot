@@ -39,4 +39,7 @@ class RejectionStage(str, Enum):
     MAX_STOP_LOSS = "max_stop_loss"  # risk too large
     NO_ENHANCEMENT_LAYER = "no_enhancement_layer"  # commodities require >=1 layer
 
+    # News / economic-calendar
+    NEWS_BLACKOUT = "news_blackout"  # inside a high/medium-impact event window
+
     OTHER = "other"
