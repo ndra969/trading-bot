@@ -957,3 +957,26 @@ async def test_directional_pattern_not_masked_by_inside_bar(analyzer):
     assert signal is not None
     assert signal.pattern_type == "ORDER_BLOCK"
     assert signal.direction == "BULLISH"
+
+
+@pytest.mark.asyncio
+async def test_commodities_keep_neutral_first_order(analyzer):
+    """Commodities (gold/silver) keep the PROTECTIVE order: neutral indecision
+    is checked BEFORE structural directional patterns. Their large volatile
+    bars over-read as order blocks / sweeps under the generic reorder (backtest:
+    XAU -3.3R), so the SAME order-block-inside-bar candle must stay INSIDE_BAR
+    for commodities while reading ORDER_BLOCK for forex."""
+    opens = [100.0, 100.0, 100.0, 100.0, 100.0, 110.1]
+    highs = [101.0, 101.0, 101.0, 101.0, 110.5, 110.45]
+    lows = [99.0, 99.0, 99.0, 99.0, 99.5, 110.0]
+    closes = [100.0, 100.0, 100.0, 100.0, 110.0, 110.4]
+
+    gold = await analyzer.analyze_pattern(
+        "XAUUSD", opens, highs, lows, closes, "DEMAND", asset_class="commodities"
+    )
+    forex = await analyzer.analyze_pattern(
+        "EURUSD", opens, highs, lows, closes, "DEMAND", asset_class="forex_major"
+    )
+
+    assert gold is not None and gold.pattern_type == "INSIDE_BAR"
+    assert forex is not None and forex.pattern_type == "ORDER_BLOCK"

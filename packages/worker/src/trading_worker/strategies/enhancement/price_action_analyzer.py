@@ -84,6 +84,7 @@ class PriceActionAnalyzer:
         lows: list[float],
         closes: list[float],
         zone_type: str = None,
+        asset_class: str | None = None,
     ) -> PriceActionSignal | None:
         """
         Analyze candlestick patterns on the latest candle(s).
@@ -96,14 +97,43 @@ class PriceActionAnalyzer:
         if candle is None:
             return None  # Invalid candle (zero range)
 
-        # Pattern detection in priority order. Specific DIRECTIONAL patterns are
-        # checked before the generic NEUTRAL indecision patterns (inside_bar,
-        # doji): a candle that is both a directional structure (order block,
-        # liquidity sweep, double top/bottom, star) AND happens to sit inside the
-        # prior range must be read directionally, not buried as a half-credit
-        # neutral. inside_bar/doji stay LAST as the weak fallback. (harami — a
-        # specialised directional inside bar — still precedes inside_bar.)
-        detectors = [
+        for detector in self._detector_order(asset_class):
+            signal = detector(candle, zone_type)
+            if signal is not None:
+                return signal
+
+        return None
+
+    def _detector_order(self, asset_class: str | None) -> list:
+        """Detector priority list, asset-class aware.
+
+        Forex/crypto/default: specific DIRECTIONAL patterns are checked before
+        the generic NEUTRAL indecision patterns (inside_bar, doji), so a candle
+        that is both a directional structure AND happens to sit inside the prior
+        range is read directionally instead of buried as a half-credit neutral.
+
+        Commodities (gold/silver): keep the PROTECTIVE original order with
+        inside_bar/doji FIRST. Their large, volatile bars over-read as order
+        blocks / liquidity sweeps under the generic reorder — backtest showed it
+        cost XAU -3.3R while the reorder helped forex (USDJPY -6R->+3.4R). Neutral
+        indecision is the safer read for these bars. (harami — a specialised
+        directional inside bar — precedes inside_bar in both orders.)
+        """
+        if asset_class == "commodities":
+            return [
+                self._detect_pinbar,
+                self._detect_engulfing,
+                self._detect_harami,
+                self._detect_inside_bar,
+                self._detect_doji,
+                self._detect_outside_bar,
+                self._detect_morning_evening_star,
+                self._detect_pullback,
+                self._detect_order_block,
+                self._detect_liquidity_sweep,
+                self._detect_double_top_bottom,
+            ]
+        return [
             self._detect_pinbar,
             self._detect_engulfing,
             self._detect_harami,
@@ -116,13 +146,6 @@ class PriceActionAnalyzer:
             self._detect_inside_bar,
             self._detect_doji,
         ]
-
-        for detector in detectors:
-            signal = detector(candle, zone_type)
-            if signal is not None:
-                return signal
-
-        return None
 
     def _build_candle_data(
         self,

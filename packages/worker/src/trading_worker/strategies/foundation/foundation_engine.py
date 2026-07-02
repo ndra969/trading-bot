@@ -1113,7 +1113,7 @@ class FoundationEngine:
 
         # 4. Price Action (Weight: 0.15) - REQUIRED for entry quality
         pa_res = await self.price_action_analyzer.analyze_pattern(
-            symbol, opens, highs, lows, closes, zone_type_str
+            symbol, opens, highs, lows, closes, zone_type_str, asset_class=asset_class
         )
         self._score_price_action(
             symbol, pa_res, direction, layer_scores, layer_details, raw_confidences
