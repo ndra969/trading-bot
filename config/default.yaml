@@ -13,8 +13,12 @@ trading:
       enabled: true
     - symbol: GBPUSD
       enabled: true
+    # 2026-07-02: temporarily disabled during layer-fix evaluation (user request)
+    # to reduce noise. NB: USDJPY is historically PROFITABLE (live +$10/30d,
+    # June bt +3.4R, fresh-bt pre-fix +3.1R); only the fixed code on the Apr–Jul
+    # window was marginally negative (-0.97R). Re-enable after evaluation.
     - symbol: USDJPY
-      enabled: true
+      enabled: false
     - symbol: USDCHF
       enabled: true
     - symbol: AUDUSD
