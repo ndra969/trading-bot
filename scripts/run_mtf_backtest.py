@@ -177,6 +177,11 @@ async def main() -> None:
     parser.add_argument("--entry-data")
     parser.add_argument("--volume", type=float, default=0.10)
     parser.add_argument("--trailing-activation-r", type=float, default=None)
+    # _build_overrides (shared with run_backtest.py) reads breakeven_trigger_r
+    # and trailing_distance_r too; declare them here or the Namespace lookup
+    # raises AttributeError before the run even starts.
+    parser.add_argument("--breakeven-trigger-r", type=float, default=None)
+    parser.add_argument("--trailing-distance-r", type=float, default=None)
     parser.add_argument("--tp-ratio", type=float, default=None)
     parser.add_argument("--partial", choices=["off", "on"], default=None)
     args = parser.parse_args()
