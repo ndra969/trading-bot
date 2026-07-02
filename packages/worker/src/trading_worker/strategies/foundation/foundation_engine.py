@@ -383,9 +383,9 @@ class FoundationEngine:
             return config
 
         # Fallback to asset class config (strategy_parameters.yaml)
-        from trading_worker.position.pip_calculator import PipCalculator
-
-        pip_calc = PipCalculator()
+        # Reuse the cached calculator (each PipCalculator() lazily reloads the
+        # SymbolMapper YAML — instantiating per signal made backtests crawl).
+        pip_calc = self.pip_calculator
         asset_class = pip_calc._determine_asset_class(symbol)
 
         strategy_cfg = self.config.get("signal_generation", {}).get("risk_reward", {})
@@ -427,9 +427,7 @@ class FoundationEngine:
         Returns:
             Tuple of (sl_price, sl_distance_pips)
         """
-        from trading_worker.position.pip_calculator import PipCalculator
-
-        pip_calc = PipCalculator()
+        pip_calc = self.pip_calculator
         pip_size = pip_calc.get_pip_size(symbol)
 
         # Get config (with fallback hierarchy)
@@ -1278,9 +1276,7 @@ class FoundationEngine:
             gates = self._commodity_gates()  # per-direction commodities gate thresholds
 
             # Determine asset class (needed for per-asset TP + SL buffer)
-            from trading_worker.position.pip_calculator import PipCalculator
-
-            pip_calc = PipCalculator()
+            pip_calc = self.pip_calculator
             asset_class = pip_calc._determine_asset_class(symbol)
             pip_size = pip_calc.get_pip_size(symbol)
 
