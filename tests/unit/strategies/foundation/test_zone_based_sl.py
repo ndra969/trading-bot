@@ -96,13 +96,13 @@ class TestGetSLConfig:
         assert config["max_sl"] == 60
         assert config["default_sl"] == 30
 
-    @patch("trading_worker.position.pip_calculator.PipCalculator")
-    def test_asset_class_fallback_for_unknown_symbol(self, mock_pip_calc, engine):
-        """Unknown symbols should fall back to asset class config."""
-        # Mock PipCalculator to return 'commodities' asset class
-        mock_pip_calc_instance = MagicMock()
-        mock_pip_calc_instance._determine_asset_class.return_value = "commodities"
-        mock_pip_calc.return_value = mock_pip_calc_instance
+    def test_asset_class_fallback_for_unknown_symbol(self, engine):
+        """Unknown symbols should fall back to asset class config.
+
+        The engine reuses a cached ``self.pip_calculator`` (perf, d267bf2), so
+        the mock must target that instance's method, not the class.
+        """
+        engine.pip_calculator._determine_asset_class = MagicMock(return_value="commodities")
 
         config = engine._get_sl_config("XAGEUR")  # Unknown symbol
 
@@ -110,12 +110,9 @@ class TestGetSLConfig:
         assert config["min_sl"] == 80.0  # From commodities config
         assert config["max_sl"] == 300.0
 
-    @patch("trading_worker.position.pip_calculator.PipCalculator")
-    def test_forex_asset_class_fallback(self, mock_pip_calc, engine):
+    def test_forex_asset_class_fallback(self, engine):
         """Forex symbols without symbol config should use asset class."""
-        mock_pip_calc_instance = MagicMock()
-        mock_pip_calc_instance._determine_asset_class.return_value = "forex_major"
-        mock_pip_calc.return_value = mock_pip_calc_instance
+        engine.pip_calculator._determine_asset_class = MagicMock(return_value="forex_major")
 
         config = engine._get_sl_config("NZDUSD")  # Not in symbol config
 
