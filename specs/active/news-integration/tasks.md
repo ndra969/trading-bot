@@ -95,10 +95,22 @@ identical when the flag is off (golden test).
 - [ ] DEFERRED: `entry_tags.news` context on PASSING trades (needs nearest_event
       threaded into `_build_strategy_result`) — telemetry only, do with Phase 4.
 
-## Phase 4 — Confidence modifier (inform)
-- [ ] Pre-event dampen + post-event surprise boost/dampen on the confluence
-      score; surface in `confluence_breakdown` (no silent override).
-- [ ] Config `news.confidence.*`; bounded multipliers.
+## Phase 4 — Confidence modifier (inform) ✅ WIRED (flag-off) 2026-07-02
+- [x] `NewsService.confidence_adjustment` full: pre-event dampen + post-event
+      surprise boost/dampen. `_parse_numeric` (200K/3.2%/-2.5M/…) +
+      `_surprise_favored_direction` (coarse: higher actual = stronger currency;
+      base-strong→BUY, quote-strong→SELL; gold/crypto USD=quote). Nearest event
+      wins. Bounded multipliers from `news.confidence.*`.
+- [x] Engine: `_news_confidence_multiplier` applied to `final_score` BEFORE the
+      quality filters (so a dampened score can drop below min-confluence).
+      Surfaced in `confluence_breakdown.news_confidence` only when ≠1.0 → no
+      silent override, and metadata byte-for-byte when off.
+- [x] **Flag-off guarantee**: no service OR `confidence.enabled:false` → neutral
+      1.0, no score change, no breakdown key. Golden tests; full strategies
+      suite green.
+- ⚠️ Surprise-direction is intentionally coarse (some indicators invert, e.g.
+      unemployment) — MUST be backtest-validated (Phase 5) before enabling.
+- [ ] DEFERRED: `entry_tags.news` on passing trades (telemetry).
 
 ## Phase 5 — Backtest + validation
 - [ ] Replay stored calendar over historical candles (no lookahead: only

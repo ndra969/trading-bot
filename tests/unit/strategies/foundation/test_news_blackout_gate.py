@@ -19,10 +19,20 @@ pytestmark = pytest.mark.asyncio
 
 
 class FakeNewsService:
-    def __init__(self, *, blackout_enabled=True, status=None, raises=False):
+    def __init__(
+        self,
+        *,
+        blackout_enabled=True,
+        status=None,
+        raises=False,
+        confidence_enabled=False,
+        confidence=1.0,
+    ):
         self.blackout_enabled = blackout_enabled
+        self.confidence_enabled = confidence_enabled
         self._status = status or BlackoutStatus(blocked=False)
         self._raises = raises
+        self._confidence = confidence
         self.calls = 0
 
     async def in_blackout(self, symbol, now):
@@ -30,6 +40,11 @@ class FakeNewsService:
         if self._raises:
             raise RuntimeError("news layer boom")
         return self._status
+
+    async def confidence_adjustment(self, symbol, direction, now):
+        if self._raises:
+            raise RuntimeError("news layer boom")
+        return self._confidence
 
 
 class SpyRecorder:
@@ -103,6 +118,36 @@ class TestGateEnabled:
     async def test_news_error_degrades_to_allow(self):
         svc = FakeNewsService(blackout_enabled=True, raises=True)
         assert await _gate(_engine(news_service=svc)) is True  # never blocks on error
+
+
+class TestNewsConfidenceMultiplier:
+    async def test_disabled_is_neutral(self):
+        # confidence_enabled defaults False even with a service present.
+        svc = FakeNewsService(confidence_enabled=False, confidence=1.15)
+        engine = _engine(news_service=svc)
+        assert (
+            await engine._news_confidence_multiplier("EURUSD", SignalDirection.BUY, _data()) == 1.0
+        )
+
+    async def test_no_service_is_neutral(self):
+        engine = _engine(news_service=None)
+        assert (
+            await engine._news_confidence_multiplier("EURUSD", SignalDirection.BUY, _data()) == 1.0
+        )
+
+    async def test_enabled_returns_multiplier(self):
+        svc = FakeNewsService(confidence_enabled=True, confidence=0.8)
+        engine = _engine(news_service=svc)
+        assert await engine._news_confidence_multiplier(
+            "EURUSD", SignalDirection.SELL, _data()
+        ) == pytest.approx(0.8)
+
+    async def test_error_degrades_to_neutral(self):
+        svc = FakeNewsService(confidence_enabled=True, raises=True)
+        engine = _engine(news_service=svc)
+        assert (
+            await engine._news_confidence_multiplier("EURUSD", SignalDirection.BUY, _data()) == 1.0
+        )
 
 
 class TestEvaluationTime:

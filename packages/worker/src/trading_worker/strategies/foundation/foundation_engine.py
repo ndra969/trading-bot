@@ -177,6 +177,34 @@ class FoundationEngine:
             logger.warning(f"{symbol}: news blackout check failed, allowing entry: {e}")
             return True
 
+    def _news_confidence_enabled(self) -> bool:
+        """True only when a NewsService is wired AND the modifier is turned on."""
+        return self.news_service is not None and getattr(
+            self.news_service, "confidence_enabled", False
+        )
+
+    async def _news_confidence_multiplier(
+        self, symbol: str, direction: SignalDirection, data: pd.DataFrame
+    ) -> float:
+        """Bounded news confidence multiplier (1.0 = neutral / disabled).
+
+        No-op unless wired + ``news.confidence.enabled``. Never raises into the
+        signal path — a news-layer error degrades to neutral (1.0).
+        """
+        if not self._news_confidence_enabled():
+            return 1.0
+        try:
+            now = self._evaluation_time(data)
+            if now is None:
+                return 1.0
+            mult = await self.news_service.confidence_adjustment(symbol, direction.name, now)
+            if mult != 1.0:
+                logger.info(f"{symbol}: news confidence x{mult:.2f} applied to confluence")
+            return mult
+        except Exception as e:  # pragma: no cover - modifier must never break trading
+            logger.warning(f"{symbol}: news confidence check failed, staying neutral: {e}")
+            return 1.0
+
     async def analyze_symbol(
         self,
         symbol: str,
@@ -540,6 +568,7 @@ class FoundationEngine:
         raw_confidences: dict,
         current_price: float,
         h1_trend_bias: str | None = None,
+        news_confidence: float = 1.0,
     ) -> StrategyResult:
         """Build the final StrategyResult after all filters have passed.
 
@@ -558,6 +587,11 @@ class FoundationEngine:
             "raw_confidences": {k: round(float(v), 2) for k, v in raw_confidences.items()},
             "active_layers": sorted(raw_confidences.keys()),
         }
+        # Surface the news modifier only when it actually moved the score — keeps
+        # the breakdown (and every existing signal's metadata) unchanged when the
+        # feature is off. Never a silent override.
+        if news_confidence != 1.0:
+            confluence_breakdown["news_confidence"] = round(news_confidence, 3)
 
         logger.info(
             f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
@@ -1990,6 +2024,13 @@ class FoundationEngine:
             ):
                 return None
 
+            # News confidence modifier (inform; no-op unless wired + enabled).
+            # Adjusts the confluence BEFORE the quality filters, so a dampened
+            # score can fall below min-confluence (and a boosted one clear it).
+            news_confidence = await self._news_confidence_multiplier(symbol, direction, data)
+            if news_confidence != 1.0:
+                final_score = max(0.0, min(100.0, final_score * news_confidence))
+
             # Apply final quality filters (min confluence, price action req, H1 gate, etc)
             if not self._passes_final_quality_filters(
                 symbol=symbol,
@@ -2016,6 +2057,7 @@ class FoundationEngine:
                 take_profit=take_profit,
                 timeframe=timeframe,
                 final_score=final_score,
+                news_confidence=news_confidence,
                 weighted_foundation_score=weighted_foundation_score,
                 weighted_enhancement_score=weighted_enhancement_score,
                 layer_scores=layer_scores,

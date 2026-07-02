@@ -38,6 +38,31 @@ _DEFAULT_MEDIUM_WINDOW_MIN = 10
 # How far ahead/behind nearest_event looks (minutes). Coarse — just for context.
 _DEFAULT_NEAREST_LOOKAHEAD_MIN = 240
 _DEFAULT_PRE_EVENT_DAMPEN = 0.85
+_DEFAULT_SURPRISE_BOOST = 1.15
+_DEFAULT_SURPRISE_DAMPEN = 0.80
+_MAGNITUDE_SUFFIXES = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
+
+
+def _parse_numeric(raw: str | None) -> float | None:
+    """Parse a calendar value string to a float, or None if unparseable.
+
+    Handles ``"200K"`` → 200000, ``"3.2%"`` → 3.2, ``"-2.5M"`` → -2_500_000,
+    ``"1.5B"`` → 1.5e9, thousands commas, and empty/``"—"`` → None. Deliberately
+    coarse — only the sign of (actual − forecast) is used downstream.
+    """
+    if raw is None:
+        return None
+    s = raw.strip().replace(",", "").replace("%", "").replace("$", "")
+    if not s:
+        return None
+    mult = 1.0
+    if s[-1].upper() in _MAGNITUDE_SUFFIXES:
+        mult = _MAGNITUDE_SUFFIXES[s[-1].upper()]
+        s = s[:-1]
+    try:
+        return float(s) * mult
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -85,6 +110,8 @@ class NewsService:
             cfg.get("nearest_lookahead_min", _DEFAULT_NEAREST_LOOKAHEAD_MIN)
         )
         self.pre_event_dampen = float(confidence.get("pre_event_dampen", _DEFAULT_PRE_EVENT_DAMPEN))
+        self.surprise_boost = float(confidence.get("surprise_boost", _DEFAULT_SURPRISE_BOOST))
+        self.surprise_dampen = float(confidence.get("surprise_dampen", _DEFAULT_SURPRISE_DAMPEN))
 
     async def nearest_event(self, symbol: str, now: datetime) -> NewsEvent | None:
         """Closest HIGH-impact event within the lookahead window, or None."""
@@ -128,11 +155,14 @@ class NewsService:
     async def confidence_adjustment(self, symbol: str, direction: str, now: datetime) -> float:
         """Bounded multiplier on the confluence score (neutral = 1.0).
 
-        Phase 2 implements the safe, direction-agnostic half: when a HIGH-impact
-        event is PENDING within the pre-event window, dampen (elevated
-        uncertainty). The post-event surprise boost/dampen — which needs
-        reliable per-indicator surprise-direction mapping — is deferred to
-        Phase 4 to avoid over-fitting; it returns neutral here.
+        Considers the nearest HIGH-impact event in the window:
+          * PENDING (not yet printed) → ``pre_event_dampen`` (uncertainty).
+          * PRINTED with a parseable surprise → ``surprise_boost`` when the
+            surprise favours the trade ``direction``, else ``surprise_dampen``.
+
+        Surprise direction uses a coarse, documented assumption (higher actual
+        vs forecast = stronger currency). It is intentionally simple and gated
+        off by default; validate/refine in backtest (Phase 5) before enabling.
         """
         currencies = symbol_currencies(symbol)
         if not currencies:
@@ -141,8 +171,40 @@ class NewsService:
         events = await self.repository.get_in_window(
             currencies, now, self.high_window_min, min_impact=NewsImpact.HIGH
         )
+        # Nearest event to now takes precedence when several overlap.
+        events.sort(key=lambda e: abs((e.event_time_utc - now).total_seconds()))
         for event in events:
-            # Pending (not yet printed) high-impact event just ahead → dampen.
             if event.event_time_utc >= now and not event.has_actual:
-                return self.pre_event_dampen
+                return self.pre_event_dampen  # pre-event uncertainty
+            if event.has_actual:
+                favored = self._surprise_favored_direction(symbol, event)
+                if favored is None:
+                    continue  # unparseable surprise → ignore this event
+                return self.surprise_boost if favored == direction.upper() else self.surprise_dampen
         return 1.0
+
+    @staticmethod
+    def _surprise_favored_direction(symbol: str, event: NewsEvent) -> str | None:
+        """Which trade direction ('BUY'/'SELL') the surprise favours, or None.
+
+        Coarse model: a positive surprise (actual > forecast) strengthens the
+        event's currency. A stronger BASE currency favours BUY; a stronger QUOTE
+        currency favours SELL (gold/crypto: USD is the quote, so a strong-USD
+        surprise favours SELL). Returns None when the surprise can't be parsed
+        or the event currency isn't a leg of the symbol.
+        """
+        actual = _parse_numeric(event.actual)
+        forecast = _parse_numeric(event.forecast)
+        if actual is None or forecast is None or actual == forecast:
+            return None
+
+        legs = symbol_currencies(symbol)
+        if event.currency not in legs:
+            return None
+
+        s = "".join(ch for ch in symbol.upper() if ch.isalnum())
+        is_base = s[:3] == event.currency
+        currency_stronger = actual > forecast
+        if is_base:
+            return "BUY" if currency_stronger else "SELL"
+        return "SELL" if currency_stronger else "BUY"
