@@ -112,11 +112,18 @@ class BacktestEngine:
         *,
         open_volume: float = 0.10,
         overrides: dict | None = None,
+        news_service=None,
     ):
         self.symbol = symbol
         self.timeframe = timeframe
         self.data_path = data_path
         self.open_volume = open_volume
+        # Optional NewsService for news-effect measurement (Phase 5). Default
+        # None → backtest is byte-for-byte unchanged. A measurement script wires
+        # one built against a calendar-populated DB; the gate/modifier are then
+        # lookahead-safe because _create_signal_from_zone is fed data[:i+1], so
+        # data.index[-1] is the current bar time.
+        self.news_service = news_service
 
         self.config = self._load_config(overrides or {})
         self.full_data = self._load_data()
@@ -128,7 +135,9 @@ class BacktestEngine:
         Shared by the single-TF engine and the MTF subclass so both drive the
         exact same live machinery off the same merged config.
         """
-        self.engine = FoundationEngine(config=self.config, use_database=False)
+        self.engine = FoundationEngine(
+            config=self.config, use_database=False, news_service=self.news_service
+        )
         self.tracker = PositionTracker()
         self.breakeven = BreakevenManager(self.config)
         self.trailing = TrailingStopManager(self.config)

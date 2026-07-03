@@ -38,12 +38,14 @@ class MTFBacktestEngine(BacktestEngine):
         *,
         open_volume: float = 0.10,
         overrides: dict | None = None,
+        news_service=None,
     ):
         self.symbol = symbol
         self.zone_tf = zone_tf
         self.entry_tf = entry_tf
         self.timeframe = entry_tf  # for the inherited report header
         self.open_volume = open_volume
+        self.news_service = news_service  # Phase 5 news-effect measurement seam
 
         self.config = self._load_config(overrides or {})
         self.zone_data = self._load_data_from(zone_data_path)

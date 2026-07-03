@@ -112,10 +112,22 @@ identical when the flag is off (golden test).
       unemployment) — MUST be backtest-validated (Phase 5) before enabling.
 - [ ] DEFERRED: `entry_tags.news` on passing trades (telemetry).
 
-## Phase 5 — Backtest + validation
-- [ ] Replay stored calendar over historical candles (no lookahead: only
-      actuals with `event_time <= bar_time`).
-- [ ] Measure blackout-only vs blackout+modifier on EURUSD/USDJPY/XAUUSD/BTCUSD.
+## Phase 5 — Backtest + validation 🟡 replay-ready 2026-07-03 (data pending)
+- [x] **No-lookahead replay**: `confidence_adjustment` keys on `event_time > now`
+      (not `has_actual`) — a future event whose `actual` was later back-filled by
+      a live scrape is treated as PENDING (dampen), never peeked. Blackout gate
+      already used only scheduled times. Both use `data.index[-1]` as bar-time
+      (backtest feeds `data[:i+1]`). Unit test: `test_future_actual_is_not_peeked`.
+- [x] **Backtest seam**: `BacktestEngine(..., news_service=None)` (+ MTF
+      subclass) → threaded to the FoundationEngine. Default None = byte-for-byte.
+- [ ] MEASURE (blocked on data): needs a calendar-populated DB spanning the price
+      CSVs. Scraping only started 2026-06-30, so backfill/history is thin — run
+      once coverage exists. Procedure:
+        1. `init_database(<calendar DB url>)`; ensure `news_events` covers the
+           backtest window.
+        2. `svc = NewsService(NewsRepository(), {"blackout": {"enabled": True}, ...})`.
+        3. Run MTF backtest 3×: news off / blackout-only / blackout+confidence,
+           on EURUSD/USDJPY/XAUUSD/BTCUSD; diff net-R, payoff, NEWS_BLACKOUT count.
 - [ ] Record table here; decide what (if anything) goes live.
 
 ## Phase 6 — Live (gated, staged)

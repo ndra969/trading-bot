@@ -146,6 +146,16 @@ class TestSurpriseDirection:
         svc = NewsService(NewsRepository())
         assert await svc.confidence_adjustment("XAUUSD", "SELL", NOW) == pytest.approx(1.15)
 
+    async def test_future_actual_is_not_peeked(self, db):
+        # Lookahead safety: a still-future event already carries an actual (a
+        # later live scrape filled it). Replay must dampen (pending), NOT use the
+        # surprise — otherwise the backtest peeks at the release before its bar.
+        await NewsRepository().upsert_events(
+            [_event(10, currency="USD", actual="250K", forecast="180K")]
+        )
+        svc = NewsService(NewsRepository())
+        assert await svc.confidence_adjustment("EURUSD", "SELL", NOW) == pytest.approx(0.85)
+
     async def test_pending_takes_precedence_over_printed(self, db):
         # A closer pending event dampens even if a printed one is also in window.
         await NewsRepository().upsert_events(

@@ -174,8 +174,12 @@ class NewsService:
         # Nearest event to now takes precedence when several overlap.
         events.sort(key=lambda e: abs((e.event_time_utc - now).total_seconds()))
         for event in events:
-            if event.event_time_utc >= now and not event.has_actual:
+            # LOOKAHEAD SAFETY (backtest replay): an event still in the future
+            # relative to `now` is PENDING — never read its `actual`, even if the
+            # stored row already has one (filled by a later live scrape). Dampen.
+            if event.event_time_utc > now:
                 return self.pre_event_dampen  # pre-event uncertainty
+            # Released (event_time <= now): the surprise is legitimately known.
             if event.has_actual:
                 favored = self._surprise_favored_direction(symbol, event)
                 if favored is None:
