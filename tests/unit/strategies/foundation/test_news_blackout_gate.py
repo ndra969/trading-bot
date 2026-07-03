@@ -5,7 +5,7 @@ guarantee is flag-off byte-for-byte behaviour: with no NewsService, or with the
 gate disabled, `_passes_news_blackout` is an inert pass-through.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -27,12 +27,14 @@ class FakeNewsService:
         raises=False,
         confidence_enabled=False,
         confidence=1.0,
+        nearest=None,
     ):
         self.blackout_enabled = blackout_enabled
         self.confidence_enabled = confidence_enabled
         self._status = status or BlackoutStatus(blocked=False)
         self._raises = raises
         self._confidence = confidence
+        self._nearest = nearest
         self.calls = 0
 
     async def in_blackout(self, symbol, now):
@@ -45,6 +47,11 @@ class FakeNewsService:
         if self._raises:
             raise RuntimeError("news layer boom")
         return self._confidence
+
+    async def nearest_event(self, symbol, now):
+        if self._raises:
+            raise RuntimeError("news layer boom")
+        return self._nearest
 
 
 class SpyRecorder:
@@ -148,6 +155,56 @@ class TestNewsConfidenceMultiplier:
         assert (
             await engine._news_confidence_multiplier("EURUSD", SignalDirection.BUY, _data()) == 1.0
         )
+
+
+class TestNewsEntryTag:
+    def _event(self, minutes_from_now=15.0, actual=None, forecast=None):
+        return NewsEvent(
+            event_time_utc=datetime(2026, 6, 25, 12, 0, tzinfo=UTC)
+            + timedelta(minutes=minutes_from_now),
+            currency="USD",
+            impact=NewsImpact.HIGH,
+            name="NFP",
+            actual=actual,
+            forecast=forecast,
+            source_id="1",
+        )
+
+    async def test_no_service_returns_none(self):
+        engine = _engine(news_service=None)
+        assert await engine._news_entry_tag("EURUSD", _data(), 1.0) is None
+
+    async def test_nearest_event_tagged(self):
+        svc = FakeNewsService(nearest=self._event(minutes_from_now=15.0))
+        engine = _engine(news_service=svc)
+        tag = await engine._news_entry_tag("EURUSD", _data(), 1.0)
+        assert tag == {
+            "event": "NFP",
+            "currency": "USD",
+            "impact": "high",
+            "minutes_to_event": 15.0,
+        }
+
+    async def test_printed_event_includes_surprise(self):
+        svc = FakeNewsService(
+            nearest=self._event(minutes_from_now=-5.0, actual="250K", forecast="180K")
+        )
+        tag = await _engine(news_service=svc)._news_entry_tag("EURUSD", _data(), 1.0)
+        assert tag["actual"] == "250K"
+        assert tag["forecast"] == "180K"
+
+    async def test_confidence_mult_recorded_without_event(self):
+        svc = FakeNewsService(nearest=None)
+        tag = await _engine(news_service=svc)._news_entry_tag("EURUSD", _data(), 0.85)
+        assert tag == {"confidence_mult": 0.85}
+
+    async def test_no_event_neutral_is_none(self):
+        svc = FakeNewsService(nearest=None)
+        assert await _engine(news_service=svc)._news_entry_tag("EURUSD", _data(), 1.0) is None
+
+    async def test_error_returns_none(self):
+        svc = FakeNewsService(raises=True, nearest=self._event())
+        assert await _engine(news_service=svc)._news_entry_tag("EURUSD", _data(), 1.0) is None
 
 
 class TestEvaluationTime:

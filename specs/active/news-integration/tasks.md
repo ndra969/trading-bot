@@ -92,8 +92,11 @@ identical when the flag is off (golden test).
 - [x] **Flag-off guarantee**: `news_service=None` (default, all existing callers)
       OR `blackout.enabled:false` → gate is inert, output byte-for-byte. Golden
       tests in `test_news_blackout_gate.py`; full strategies suite green.
-- [ ] DEFERRED: `entry_tags.news` context on PASSING trades (needs nearest_event
-      threaded into `_build_strategy_result`) — telemetry only, do with Phase 4.
+- [x] `entry_tags.news` on PASSING trades ✅ 2026-07-03: `_news_entry_tag`
+      (nearest event name/currency/impact/minutes + surprise + applied
+      confidence_mult) → `metadata["news"]`. Emitted whenever a NewsService is
+      wired (independent of the gate switches) so effect is measurable from day
+      one; None on the default path → metadata byte-for-byte. 6 golden tests.
 
 ## Phase 4 — Confidence modifier (inform) ✅ WIRED (flag-off) 2026-07-02
 - [x] `NewsService.confidence_adjustment` full: pre-event dampen + post-event
@@ -110,7 +113,7 @@ identical when the flag is off (golden test).
       suite green.
 - ⚠️ Surprise-direction is intentionally coarse (some indicators invert, e.g.
       unemployment) — MUST be backtest-validated (Phase 5) before enabling.
-- [ ] DEFERRED: `entry_tags.news` on passing trades (telemetry).
+- [x] `entry_tags.news` telemetry now done (see Phase 3 section).
 
 ## Phase 5 — Backtest + validation 🟡 replay-ready 2026-07-03 (data pending)
 - [x] **No-lookahead replay**: `confidence_adjustment` keys on `event_time > now`
