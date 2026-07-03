@@ -3189,6 +3189,7 @@ class TestRejectionTelemetry:
             weighted_foundation_score=10.0,
             weighted_enhancement_score=0.0,
             layer_scores={},
+            layer_details={},
             h1_trend_bias=None,
             data=df,
             current_price=1.05,
@@ -3235,6 +3236,7 @@ class TestRejectionTelemetry:
             weighted_foundation_score=40.0,
             weighted_enhancement_score=40.0,
             layer_scores={},  # no trendline contribution
+            layer_details={},
             h1_trend_bias=None,
             data=df,
             current_price=1.05,
@@ -3265,6 +3267,7 @@ class TestRejectionTelemetry:
             weighted_foundation_score=40.0,
             weighted_enhancement_score=40.0,
             layer_scores={"trendline": 6.0},
+            layer_details={},
             h1_trend_bias=None,
             data=df,
             current_price=1.05,

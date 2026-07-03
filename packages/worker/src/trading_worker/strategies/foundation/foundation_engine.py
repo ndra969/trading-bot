@@ -205,6 +205,42 @@ class FoundationEngine:
             logger.warning(f"{symbol}: news confidence check failed, staying neutral: {e}")
             return 1.0
 
+    async def _news_entry_tag(
+        self, symbol: str, data: pd.DataFrame, news_confidence: float
+    ) -> dict | None:
+        """Nearest-event context for a passing signal, or None.
+
+        Pure telemetry (metadata only — never affects the decision). Emitted
+        whenever a NewsService is wired, independent of the blackout/confidence
+        switches, so the effect is measurable while the gates are still off.
+        Returns None when no service is wired or there's nothing to report.
+        """
+        if self.news_service is None:
+            return None
+        try:
+            now = self._evaluation_time(data)
+            if now is None:
+                return None
+            event = await self.news_service.nearest_event(symbol, now)
+            tag: dict = {}
+            if event is not None:
+                delta_min = (event.event_time_utc - now).total_seconds() / 60.0
+                tag = {
+                    "event": event.name,
+                    "currency": event.currency,
+                    "impact": event.impact.value,
+                    "minutes_to_event": round(delta_min, 1),
+                }
+                if event.has_actual:
+                    tag["actual"] = event.actual
+                    tag["forecast"] = event.forecast
+            if news_confidence != 1.0:
+                tag["confidence_mult"] = round(news_confidence, 3)
+            return tag or None
+        except Exception as e:  # pragma: no cover - telemetry must never break trading
+            logger.warning(f"{symbol}: news entry-tag failed: {e}")
+            return None
+
     async def analyze_symbol(
         self,
         symbol: str,
@@ -569,6 +605,7 @@ class FoundationEngine:
         current_price: float,
         h1_trend_bias: str | None = None,
         news_confidence: float = 1.0,
+        news_tag: dict | None = None,
     ) -> StrategyResult:
         """Build the final StrategyResult after all filters have passed.
 
@@ -592,6 +629,11 @@ class FoundationEngine:
         # feature is off. Never a silent override.
         if news_confidence != 1.0:
             confluence_breakdown["news_confidence"] = round(news_confidence, 3)
+
+        # entry_tags.news: nearest-event context for "did news help?" analysis.
+        # Only present when a NewsService is wired and had something to report,
+        # so existing signals' metadata is unchanged on the default path.
+        news_metadata = {"news": news_tag} if news_tag else {}
 
         logger.info(
             f"{symbol}: ✅ SIGNAL CREATED - {direction.value} | "
@@ -619,6 +661,7 @@ class FoundationEngine:
                 "layer_details": layer_details,
                 "confluence_breakdown": confluence_breakdown,
                 "h1_trend_bias": h1_trend_bias,
+                **news_metadata,
             },
         )
 
@@ -637,6 +680,7 @@ class FoundationEngine:
         weighted_foundation_score: float,
         weighted_enhancement_score: float,
         layer_scores: dict,
+        layer_details: dict,
         h1_trend_bias: str | None,
         data: pd.DataFrame,
         current_price: float,
@@ -716,6 +760,9 @@ class FoundationEngine:
                     asset_class=asset_class,
                     confluence_score=final_score,
                     pa_raw=round(pa_raw, 1),
+                    # Distinguish "no pattern at all" (possible detection gap)
+                    # from "pattern opposes trade" (gate working as intended).
+                    pa_status=layer_details.get("price_action", {}).get("status", "unknown"),
                 )
                 return False
             logger.debug(
@@ -2040,6 +2087,7 @@ class FoundationEngine:
                 weighted_foundation_score=weighted_foundation_score,
                 weighted_enhancement_score=weighted_enhancement_score,
                 layer_scores=layer_scores,
+                layer_details=layer_details,
                 h1_trend_bias=h1_trend_bias,
                 data=data,
                 current_price=current_price,
@@ -2047,6 +2095,12 @@ class FoundationEngine:
                 avg_range=avg_range,
             ):
                 return None
+
+            # Telemetry: attach nearest-event context to the passing signal so
+            # "did news help?" is measurable from day one (even with the gate /
+            # modifier off). None unless a NewsService is wired → no metadata
+            # change on the default path.
+            news_tag = await self._news_entry_tag(symbol, data, news_confidence)
 
             return self._build_strategy_result(
                 symbol=symbol,
@@ -2057,6 +2111,7 @@ class FoundationEngine:
                 take_profit=take_profit,
                 timeframe=timeframe,
                 final_score=final_score,
+                news_tag=news_tag,
                 news_confidence=news_confidence,
                 weighted_foundation_score=weighted_foundation_score,
                 weighted_enhancement_score=weighted_enhancement_score,
