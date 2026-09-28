@@ -1,5 +1,6 @@
 ---
-description: Development workflow guide
+name: workflow
+description: Development workflow guide for the Python trading bot: analysis, design, TDD, migrate, validate, commit.
 argument-hint: [phase]
 ---
 
@@ -24,10 +25,10 @@ Phases: `analysis` → `design` → `implement` → `migrate` → `validate` →
 
 ```bash
 # 1. Write failing test → tests/unit/<module>/test_<feature>.py
-# 2. Write minimal code → src/<module>/<feature>.py
+# 2. Write minimal code → packages/worker/src/trading_worker/<module>/<feature>.py
 # 3. Refactor while green
 # 4. Verify coverage
-uv run pytest tests/ --cov=src/trading_bot --cov-fail-under=85
+uv run pytest tests/ --cov=packages/core/src/trading_core --cov=packages/worker/src/trading_worker --cov-fail-under=85
 ```
 
 Coverage: new 100%, critical 95%, overall 85%

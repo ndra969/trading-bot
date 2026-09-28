@@ -1,5 +1,6 @@
 ---
-description: Analyze symbol with foundation strategy
+name: analyze
+description: Analyze a symbol with the Python bot foundation strategy (S&D + confluence layers). Use for strategy analysis of the Python trading bot in packages/, not the MQL5 SDBot EA.
 argument-hint: <symbol> [--timeframe <tf>] [--trading-type <type>]
 ---
 

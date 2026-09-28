@@ -1,5 +1,6 @@
 ---
-description: Database migration management
+name: migrate
+description: Alembic database migration management for the Python trading bot (revision, upgrade, downgrade, current).
 argument-hint: [revision|upgrade|downgrade|current]
 ---
 

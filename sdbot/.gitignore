@@ -1,0 +1,30 @@
+# SDBot — from docs/RULES.md "Git, versi, dan rahasia"
+
+# MQL5
+*.ex5
+*.local.set
+
+# Data dan laporan
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.log
+reports/
+!shared/schema/fixtures/*.sqlite
+
+# Python
+.venv/
+__pycache__/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+
+# Re-include what the root .gitignore (Python bot) hides but SDBot must commit
+!lib/
+!uv.lock
+!*.json

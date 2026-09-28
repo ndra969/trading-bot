@@ -1,5 +1,6 @@
 ---
-description: Quick access to documentation
+name: docs
+description: Quick access to the Python trading bot documentation in docs/ by topic (architecture, setup, trading, guides).
 argument-hint: [topic]
 ---
 

@@ -1,5 +1,6 @@
 ---
-description: View/filter trading bot logs
+name: logs
+description: View and filter the Python trading bot logs (errors, signals, trades, risk).
 argument-hint: [tail|errors|signals|trades|risk|N]
 ---
 

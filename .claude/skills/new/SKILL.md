@@ -1,5 +1,6 @@
 ---
-description: Create new documentation file
+name: new
+description: Create a new documentation file in docs/ or specs/ with the project template and kebab-case naming.
 argument-hint: <category>/<name>
 ---
 

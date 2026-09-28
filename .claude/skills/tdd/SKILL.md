@@ -1,5 +1,6 @@
 ---
-description: TDD workflow guidance
+name: tdd
+description: TDD Red-Green-Refactor workflow guidance for the Python trading bot.
 argument-hint: [feature-name]
 ---
 
@@ -20,7 +21,7 @@ uv run pytest tests/unit/<feature>_test.py -v  # Should fail
 # Write implementation, then:
 uv run pytest tests/unit/<feature>_test.py -v  # Should pass
 # Full suite:
-uv run pytest tests/ --cov=src/trading_bot --cov-fail-under=85
+uv run pytest tests/ --cov=packages/core/src/trading_core --cov=packages/worker/src/trading_worker --cov-fail-under=85
 /quality fix
 /dry-run
 ```

@@ -1,5 +1,6 @@
 ---
-description: Display project rules from CLAUDE.md (alias for /rules command)
+name: claude
+description: Display project rules from CLAUDE.md (alias for the rules skill).
 argument-hint: [full|summary|rules-only]
 ---
 

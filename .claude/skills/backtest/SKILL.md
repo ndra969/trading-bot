@@ -1,5 +1,6 @@
 ---
-description: Run backtesting on strategies
+name: backtest
+description: Run or locate backtests for the Python trading bot strategies (scripts/). Not for the MQL5 SDBot EA — that uses MT5 Strategy Tester (see the sdbot-ea skill).
 argument-hint: <symbol> [--period <days>] [--strategy <name>]
 ---
 

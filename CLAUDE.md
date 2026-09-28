@@ -6,7 +6,22 @@ Trading bot guidance for Claude Code.
 
 Multi-asset trading bot (Forex/Commodities/Crypto) with MT5. Python 3.12+, UV, Click, SQLAlchemy 2.0, async-first. **Production Ready** (1605+ tests, 98% coverage).
 
-## Commands
+> **Two projects in this repo.** Everything below is about the **Python bot**
+> (`packages/`, `apps/`, `tests/`, `config/`). **`sdbot/`** is a separate MQL5
+> EA + local backoffice with its own rules: read [sdbot/CLAUDE.md](sdbot/CLAUDE.md)
+> and use the `sdbot-ea` skill. The Python rules here (pytest/black/mypy, YAML
+> config, pip values, layer weights) do not apply inside `sdbot/`, and SDBot
+> rules do not apply to the Python bot.
+
+## Skills
+
+Project skills live in `.claude/skills/<name>/SKILL.md` (invoke as `/<name>`).
+The former `.claude/commands/` were converted to skills with the same names.
+
+### SDBot (MQL5 EA)
+| Skill | Purpose |
+|-----|---------|
+| `/sdbot-ea [module]` | Build/review/test the SDBot EA: PRD, layer & safety rules, compile, DoD |
 
 ### Development
 | Cmd | Purpose |
@@ -127,6 +142,7 @@ config/   YAML configs (loaded relative to repo root)
 docs/     User docs
 specs/    active/ (3-file specs: requirements+design+tasks) · archive/
 alembic/  DB migrations
+sdbot/    SDBot MQL5 EA + backoffice (separate project, own CLAUDE.md + .gitignore)
 ```
 
 > Monorepo (uv workspace). Root `pyproject.toml` is a virtual workspace root
@@ -157,6 +173,8 @@ Priority: ENV → env YAML → specific YAML → default YAML → code defaults
 - [Troubleshooting](docs/guides/troubleshooting-guide.md)
 
 Or use `/docs [topic]` command.
+
+SDBot: [PRD EA](sdbot/docs/PRD-EA.md) · [PRD Backoffice](sdbot/docs/PRD-Backoffice.md) · [Rules](sdbot/docs/RULES.md)
 
 ## Requirements
 

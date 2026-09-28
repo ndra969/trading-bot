@@ -1,5 +1,6 @@
 ---
-description: Validate bot with dry-run mode
+name: dry-run
+description: Validate the Python trading bot with dry-run mode. Mandatory after code/config changes under packages/.
 argument-hint: [config-name]
 ---
 

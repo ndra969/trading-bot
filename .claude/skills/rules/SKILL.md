@@ -1,5 +1,6 @@
 ---
-description: Display project rules from CLAUDE.md
+name: rules
+description: Display project rules from CLAUDE.md (full, summary, or critical rules only).
 argument-hint: [full|summary|rules-only]
 ---
 

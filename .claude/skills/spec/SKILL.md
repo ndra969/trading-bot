@@ -1,5 +1,6 @@
 ---
-description: Create a new 3-file spec (requirements, design, tasks)
+name: spec
+description: Scaffold a new 3-file spec (requirements, design, tasks) under specs/active/<name>/.
 argument-hint: <spec-name>
 ---
 
@@ -21,7 +22,7 @@ specs/active/<spec-name>/
 └── tasks.md          # STEPS: ordered checklist (pre-flight, impl, verify, commit)
 ```
 
-Reference example: [refactor-main-services](../../specs/active/refactor-main-services/).
+Reference example: [refactor-main-services](../../../specs/active/refactor-main-services/).
 
 ## File templates
 
@@ -110,5 +111,5 @@ Reference example: [refactor-main-services](../../specs/active/refactor-main-ser
 
 ## Related
 
-- [/new](new.md) — create a single doc file
-- [specs/README.md](../../specs/README.md) — spec index
+- [/new](../new/SKILL.md) — create a single doc file
+- [specs/README.md](../../../specs/README.md) — spec index

@@ -1,5 +1,6 @@
 ---
-description: Check bot status (MT5, account)
+name: status
+description: Check Python trading bot status: bot, MT5 connection, account.
 argument-hint: [bot|mt5|account|all]
 ---
 

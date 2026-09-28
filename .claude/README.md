@@ -1,57 +1,36 @@
-# Claude Slash Commands
+# Claude Code Skills
 
-This directory contains custom slash commands for Claude Code in Cursor IDE.
+Project skills live in `.claude/skills/<name>/SKILL.md` and are invoked as
+`/<name>`. Claude can also load a skill on its own when the task matches its
+`description`. (These were `.claude/commands/*.md` slash commands before.)
 
-## Available Commands
+## Skills
 
-### `/rules` - Display Project Rules
-Display project rules and guidelines from CLAUDE.md file.
+| Skill | Scope | Purpose |
+|-------|-------|---------|
+| `sdbot-ea` | SDBot (`sdbot/`) | MQL5 EA work: PRD, layer & safety rules, compile, definition of done |
+| `workflow` | Python bot | Dev workflow (start here) |
+| `rules` / `claude` | Repo | Show `CLAUDE.md` |
+| `docs` | Python bot | Browse `docs/` by topic |
+| `tdd` | Python bot | Red-Green-Refactor guidance |
+| `test` / `coverage` | Python bot | Test suite and coverage |
+| `quality` | Python bot | black / ruff / mypy |
+| `dry-run` | Python bot | Validate the bot (mandatory pre-commit) |
+| `commit` | Python bot | Pre-commit validation |
+| `new` / `spec` | Repo | New doc / 3-file spec |
+| `status` / `logs` | Python bot | Runtime status and logs |
+| `analyze` / `backtest` | Python bot | Strategy analysis and backtests |
+| `migrate` | Python bot | Alembic migrations |
 
-**Usage:**
-- `/rules` - Display complete rules
-- `/rules summary` - Display quick summary
-- `/rules rules-only` - Display only critical rules
+## Adding a skill
 
-**File:** `.claude/commands/rules.md`
-
-### `/claude` - Display Project Rules (Alias)
-Same functionality as `/rules`, provides an alternative command name.
-
-**Usage:**
-- `/claude` - Display complete rules
-- `/claude summary` - Display quick summary
-- `/claude rules-only` - Display only critical rules
-
-**File:** `.claude/commands/claude.md`
-
-## How Slash Commands Work
-
-Slash commands in Claude Code allow you to:
-1. Define reusable commands in markdown files
-2. Invoke commands with `/command-name` syntax
-3. Pass arguments to commands
-4. Have Claude automatically execute the command based on context
-
-## Command Structure
-
-Each command file (`.md`) in `.claude/commands/` should contain:
-- Command name and description
-- Usage syntax
-- Arguments (if any)
-- Examples
-- Expected behavior
-- Related commands or references
-
-## Adding New Commands
-
-To add a new slash command:
-1. Create a new `.md` file in `.claude/commands/`
-2. Follow the structure of existing commands
-3. Document the command behavior clearly
-4. Update this README with the new command
-
-## Related Documentation
-
-- `CLAUDE.md` - Main project rules and guidelines
-- `.cursorrules` - Auto-loaded context for Claude
-- CLI commands: `uv run trading-bot rules` or `uv run trading-bot claude`
+1. Create `.claude/skills/<name>/SKILL.md` with frontmatter:
+   ```yaml
+   ---
+   name: <name>
+   description: <what it does and when to use it — this drives auto-loading>
+   argument-hint: [optional args]
+   ---
+   ```
+2. Put supporting files (templates, references) next to `SKILL.md` and link them.
+3. Add a row to the table above and to `CLAUDE.md`.
