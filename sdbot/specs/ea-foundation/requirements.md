@@ -1,6 +1,8 @@
 # Requirements — EA Foundation (Fase 1)
 
-Status: Approved (2026-09-28)
+> **SUPERSEDED (2026-09-29)**: dipecah menjadi spec `ea-01` … `ea-07`, lihat [../README.md](../README.md). Dokumen ini hanya sumber pemindahan isi dan akan dihapus.
+
+Status: Revisi 2, menunggu review (revisi 1 disetujui 2026-09-28; revisi 2 menambah use case, Requirement 21, kriteria 20.4, dan pertanyaan R2-1)
 Sumber: PRD-EA §Platform dan arsitektur, §Akun dan koneksi, §Eksekusi order, §Position management, §Risk management, §Data dan database, §Parameter input EA, §Pengujian, §Roadmap Fase 1 · RULES seluruhnya
 
 ## Pendahuluan
@@ -22,6 +24,127 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 - **STOPPED**: status emergency stop per akun. Entry diblokir sampai di-reset manual.
 - **Pause**: status sementara yang memblokir entry baru. Posisi yang ada tetap dikelola.
 - **Error sementara**: requote, harga berubah, server sibuk, tidak ada harga. Error lain dianggap permanen.
+- **Operasi saldo**: deposit, penarikan, atau kredit (`DEAL_TYPE_BALANCE`, `DEAL_TYPE_CREDIT`). Bukan hasil trading.
+
+## Use cases
+
+Aktor: **Trader** (pemilik akun, memasang dan mengatur EA), **EA** (instance SDBot di satu chart), **Broker** (server MT5 yang mengeksekusi order dan SL/TP), **Developer** (menjalankan uji). Use case menjelaskan alur dari sudut pengguna. Requirement di bawahnya adalah aturan yang harus dipenuhi di setiap langkah.
+
+| ID | Use case | Aktor utama | Requirement |
+|---|---|---|---|
+| UC-01 | Memasang EA pertama kali di akun cent | Trader | 1, 2, 17 |
+| UC-02 | Posisi berjalan sampai BE, partial, trailing, lalu tertutup di server | EA, Broker | 6, 7, 8, 9, 10, 16 |
+| UC-03 | Posisi kena SL sebelum BE | Broker, EA | 16 |
+| UC-04 | Rugi harian mencapai 3% | EA | 12, 14 |
+| UC-05 | Drawdown naik ke 10% lalu 15% | EA | 5, 11, 13 |
+| UC-06 | Membuka emergency stop | Trader | 13 |
+| UC-07 | Restart atau update EA saat ada posisi terbuka | Trader, EA | 4, 13, 15 |
+| UC-08 | Koneksi internet putus | EA | 3 |
+| UC-09 | Empat pair jalan bersamaan di satu akun | Trader, EA | 15 |
+| UC-10 | Deposit atau penarikan saat EA berjalan | Trader | 21 |
+| UC-11 | Menjalankan uji fondasi | Developer | 19, 20 |
+
+### UC-01: Memasang EA pertama kali di akun cent
+
+- **Prasyarat**: MT5 login ke akun cent Exness, junction sudah dibuat, EA sudah dicompile.
+- **Alur utama**:
+    1. Trader memasang SDBot di chart EURUSDc dan memuat file `.set` day trading dengan `InpAllowLiveTrading = true`.
+    2. EA memvalidasi input, koneksi, tipe akun, mode margin hedging, dan simbol.
+    3. EA membuka `sdbot.sqlite`, menyimpan baris akun, dan membaca status risiko dari Global Variables.
+    4. EA siap. Log terminal mencatat inisialisasi tanpa error.
+- **Alur alternatif**:
+    - 2a. `InpAllowLiveTrading = false` di akun cent (terbaca real): EA berhenti dengan pesan CRITICAL. Trader mengubah input lalu memasang ulang.
+    - 2b. Akun netting, atau simbol tanpa akhiran `c`: EA berhenti dan menyebut penyebabnya.
+    - 2c. Input di luar batas (misalnya risiko 2%): EA berhenti dan menyebut input serta batasnya.
+    - 3a. File DB terkunci: EA tetap jalan, log ERROR.
+- **Hasil**: EA aktif, atau berhenti dengan alasan yang jelas tanpa mengirim order apa pun.
+
+### UC-02: Posisi berjalan sampai BE, partial, trailing, lalu tertutup di server
+
+- **Prasyarat**: ada posisi EA dengan SL dan TP (Fase 1 dibuka harness di tester, Fase 3 dibuka strategi).
+- **Alur utama**:
+    1. Harga bergerak ≥ 1R: EA memindahkan SL ke entry + spread + 2 point dan mencatat event BE.
+    2. Harga ≥ 1.5R: EA menutup 50% volume awal dan mencatat event partial.
+    3. Selama BE aktif: EA menggeser SL ke harga − ATR(14, M15) × 2 setiap kali SL baru lebih baik minimal 5 point.
+    4. Broker menutup sisa posisi di SL trailing atau TP. EA mencatat closure dengan alasan dan R hasil.
+- **Alur alternatif**:
+    - 1a. Modify ditolak broker: retry 3 kali tiap 30 detik, lalu event `modify_gagal` dan alert Medium.
+    - 2a. Volume 0.01: partial dilewati dan dicatat sekali.
+    - 3a. Harga dalam freeze level: modifikasi ditunda ke tick berikutnya.
+- **Hasil**: `position_events` berisi BE, partial, dan trailing; `closures` berisi satu baris dengan R hasil.
+
+### UC-03: Posisi kena SL sebelum BE
+
+- **Alur utama**: harga berbalik sebelum 1R. Broker menutup di SL. EA mendeteksi deal penutupan dan mencatat closure `SL` dengan R hasil sekitar −1R (ditambah efek slippage).
+- **Hasil**: tidak ada event BE atau partial. R hasil tercatat untuk statistik.
+
+### UC-04: Rugi harian mencapai 3%
+
+- **Alur utama**:
+    1. Rugi realized + floating hari ini mencapai 3% dari balance awal hari server.
+    2. EA menyetel pause harian di Global Variable dan mencatat alert High.
+    3. Semua instance di akun menolak entry baru. Posisi yang ada tetap dikelola.
+    4. Hari server berganti: pause dicabut dan balance saat itu jadi dasar hari baru.
+- **Hasil**: tidak ada entry baru sampai hari server berikutnya.
+
+### UC-05: Drawdown naik ke 10% lalu 15%
+
+- **Alur utama**:
+    1. Drawdown dari puncak equity mencapai 10%: flag lot × 0.5 aktif, alert High.
+    2. Drawdown turun di bawah 8%: flag nonaktif, alert Info.
+    3. Drawdown mencapai 15%: status STOPPED, semua posisi EA ditutup, alert Critical.
+- **Alur alternatif**:
+    - 3a. Close gagal (pasar tutup atau ditolak): EA mencoba lagi tiap 5 detik. Setelah 3 kali gagal, alert Critical.
+- **Hasil**: akun berhenti trading sampai trader membuka STOPPED (UC-06).
+
+### UC-06: Membuka emergency stop
+
+- **Prasyarat**: status STOPPED aktif.
+- **Alur utama**:
+    1. Trader mengevaluasi penyebab, lalu mengubah input `InpResetEmergencyStop = true`.
+    2. EA re-init, membuka STOPPED, menyetel puncak equity ke equity saat ini, dan mencatat alert Info.
+    3. EA mengingatkan lewat log WARN agar input dikembalikan ke `false`.
+- **Hasil**: EA boleh entry lagi. Drawdown dihitung dari equity saat reset.
+
+### UC-07: Restart atau update EA saat ada posisi terbuka
+
+- **Alur utama**:
+    1. Trader meng-compile versi baru, atau MT5/PC di-restart.
+    2. EA re-init: membaca Global Variables, mencocokkan posisi MT5 dengan tabel `trades`, dan mencatat closure yang terjadi saat EA mati.
+    3. Untuk setiap posisi, EA menyimpulkan BE dari posisi SL, partial dari volume, dan R dari SL awal di komentar order.
+    4. Manajemen posisi berlanjut tanpa mengulang BE atau partial.
+- **Alur alternatif**:
+    - 3a. Komentar order hilang atau diubah broker: SL awal diambil dari cadangan (design §3).
+    - 3b. SL awal tidak ditemukan sama sekali: BE dan partial dilewati untuk posisi itu, log ERROR sekali.
+- **Hasil**: posisi lanjut dikelola dan status risiko tetap, termasuk STOPPED.
+
+### UC-08: Koneksi internet putus
+
+- **Alur utama**: terminal kehilangan koneksi. EA menahan entry. Setelah 5 menit, alert Medium. Koneksi pulih: alert Info, EA lanjut tanpa restart.
+- **Catatan**: SL/TP tetap aman di server. BE, partial, dan trailing tertunda sampai koneksi pulih.
+
+### UC-09: Empat pair jalan bersamaan di satu akun
+
+- **Alur utama**: trader memasang SDBot di chart EURUSDc, GBPUSDc, EURJPYc, dan GBPJPYc, masing-masing dengan MagicNumber berbeda. Keempat instance membaca dan menulis Global Variables yang sama. Jika satu instance menyetel pause atau STOPPED, instance lain ikut berhenti entry pada detik berikutnya.
+- **Alur alternatif**: posisi pair yang chart-nya tidak aktif saat emergency, lihat pertanyaan R2-1.
+
+### UC-10: Deposit atau penarikan saat EA berjalan
+
+- **Alur utama**:
+    1. Trader menarik 20% saldo.
+    2. EA mendeteksi operasi saldo, lalu menurunkan puncak equity dan balance awal hari sebesar nominal yang ditarik.
+    3. Drawdown dan rugi harian tidak berubah karena penarikan itu.
+- **Alur alternatif**:
+    - 2a. Penarikan terjadi saat EA mati: saat start, EA memindai history sejak operasi saldo terakhir yang sudah diproses.
+- **Hasil**: penarikan tidak memicu lot × 0.5, pause harian, atau emergency stop.
+
+### UC-11: Menjalankan uji fondasi
+
+- **Alur utama**:
+    1. Developer menjalankan unit test. Semua test case lulus.
+    2. Developer menjalankan skenario di Strategy Tester dengan harness.
+    3. Hasil dicek terhadap test case skenario di design.md §6.
+- **Hasil**: bukti bahwa Fase 1 memenuhi requirement sebelum strategi ditambahkan.
 
 ## Requirements
 
@@ -253,6 +376,18 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 20.1. Setiap fungsi murni (lot, pembulatan, R, profit dalam R, buffer BE, SL trailing, validasi SL lebih baik, drawdown, rugi harian) WAJIB punya unit test di `ea/tests/Scripts/SDBotTests/` yang mencetak `ALL PASS`.
 20.2. Repo WAJIB berisi file `.ini` Strategy Tester di `ea/tests/scenarios/` untuk skenario: BE, partial, trailing, rugi harian 3%, drawdown 15% dan STOPPED setelah restart, lot di bawah minimum, posisi ditutup manual, akun real dengan `AllowLiveTrading = false`.
 20.3. Repo WAJIB berisi file `.set` contoh untuk day trading tanpa nilai rahasia.
+20.4. Setiap fungsi murni WAJIB ditulis test-first: test case ditulis dan terbukti gagal sebelum implementasinya dibuat.
+
+### Requirement 21: Operasi saldo
+
+**User story:** Sebagai trader, saya ingin deposit dan penarikan tidak terhitung sebagai profit atau rugi, agar penarikan dana tidak memicu pengurangan lot, pause harian, atau emergency stop.
+
+#### Acceptance criteria
+
+21.1. KETIKA terjadi operasi saldo MAKA EA WAJIB menyesuaikan puncak equity dan balance awal hari server sebesar nominal operasi itu.
+21.2. KETIKA EA di-init MAKA EA WAJIB memproses operasi saldo yang terjadi sejak operasi terakhir yang sudah diproses, dengan waktu operasi terakhir disimpan di Global Variable.
+21.3. JIKA beberapa instance berjalan di akun yang sama MAKA setiap operasi saldo WAJIB diproses tepat sekali untuk akun itu.
+21.4. EA WAJIB mencatat setiap operasi saldo yang diproses sebagai alert Info.
 
 ## Keputusan (dijawab 2026-09-28)
 
@@ -262,3 +397,7 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 4. **R awal setelah restart**: SL awal di komentar order, tabel `trades` sebagai cadangan (4.4).
 5. **Partial dengan lot kecil**: diterima. Jika volume yang ditutup atau sisanya < lot minimum, partial dilewati dan dicatat (8.2).
 6. **Posisi uji**: EA harness terpisah di `ea/tests/`, EA utama bersih dari kode uji (19.3, 19.4).
+
+## Pertanyaan terbuka (revisi 2)
+
+R2-1. **Posisi "yatim" saat emergency stop.** Aturan sekarang (15.3): setiap instance hanya menutup posisi dengan magic miliknya. Jika chart GBPJPYc tertutup atau EA-nya error saat drawdown 15%, posisi GBPJPYc tidak ada yang menutup, padahal akun sudah STOPPED. Usulan: semua instance SDBot memakai magic dalam satu blok (misalnya `2026091900`–`2026091999`, satu nomor per pair). Saat emergency, setiap instance menutup semua posisi dengan magic dalam blok itu di simbol mana pun. Aturan "loop posisi memfilter magic dan simbol" tetap berlaku untuk semua operasi lain. Ini pengecualian tertulis dari RULES, jadi perlu persetujuan. Alternatifnya tetap per instance dan menerima risiko tersebut.

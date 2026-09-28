@@ -1,7 +1,9 @@
 # Design — EA Foundation (Fase 1)
 
-Status: Draft
-Requirements: [requirements.md](requirements.md) (Approved 2026-09-28)
+> **SUPERSEDED (2026-09-29)**: dipecah menjadi spec `ea-01` … `ea-07`, lihat [../README.md](../README.md). Dokumen ini hanya sumber pemindahan isi dan akan dihapus.
+
+Status: Draft revisi 2
+Requirements: [requirements.md](requirements.md) (revisi 2)
 
 ## 1. Overview
 
@@ -105,6 +107,7 @@ interface ISdbEventSink
    void OnPositionEvent(const PositionEvent &e);
    void OnClosure(const ClosureRecord &c);
    void OnAlert(const AlertEvent &a);
+   bool FindInitialSl(ulong ticket, double &sl);   // cadangan terakhir untuk 4.4, dibaca dari tabel trades
   };
 ```
 
@@ -159,6 +162,7 @@ double EffectiveRiskPct(double riskPct, bool lotReduced);                       
 double PositionOpenRiskPct(double riskMoney, bool beActive, double balance);       // 14.2
 ENUM_SDB_DD_LEVEL DrawdownLevel(double ddPct, ENUM_SDB_DD_LEVEL current,
                                 double reducePct, double stopPct);                 // 11.3–11.6, histeresis 8%
+double AdjustForBalanceOp(double value, double amount);                            // 21.1, dipakai untuk puncak equity dan balance awal hari
 ```
 
 `moneyPerLot` dihitung di `CRiskManager` dengan `OrderCalcProfit()` pada harga yang akan dieksekusi dan harga SL.
@@ -173,6 +177,7 @@ bool CalcVolume(OrderRequest &req, string &rejectReason);          // 5.1–5.5,
 Urutan `PreTradeCheck`: STOPPED/pause harian/koneksi → risiko per trade ≤ `InpRiskPerTradePct` → total risiko terbuka + order baru ≤ `InpMaxOpenRiskPct` (posisi BE = 0%) → eksposur mata uang (selalu lolos sampai Fase 4) → margin level ≥ 200%. Alasan tolak memakai kode dari `enums.md` (misalnya `STOPPED`, `DAILY_PAUSE`, `MAX_OPEN_RISK`, `MARGIN_LOW`, `LOT_BELOW_MIN`).
 
 `Risk/RiskMonitor.mqh`, `CRiskMonitor::Run()` tiap detik:
+0. Operasi saldo baru? `ProcessBalanceOps()` membaca deal `DEAL_TYPE_BALANCE`/`DEAL_TYPE_CREDIT` setelah tiket terakhir yang tersimpan di `SDB_<login>_LAST_BAL_DEAL`. Setiap deal diklaim dengan `GlobalVariableSetOnCondition` (compare-and-set dari tiket lama ke tiket baru), jadi hanya satu instance yang memprosesnya (21.3). Instance pemenang menyesuaikan puncak equity dan balance awal hari, lalu mencatat alert Info (21.1, 21.4). Fungsi yang sama dipanggil di `OnInit` untuk operasi yang terjadi saat EA mati (21.2).
 1. Ganti hari server? Jika ya: `SetDayStart(balance, hari)`, cabut pause harian (12.3).
 2. Perbarui puncak equity bila equity lebih tinggi (11.2).
 3. `DrawdownLevel(...)`. Transisi level memicu alert dan flag (11.3–11.5). Level STOP memicu emergency (11.6).
@@ -205,7 +210,7 @@ void Deinit();       // IndicatorRelease
 ```
 
 `OnTick` untuk setiap posisi dengan magic dan simbol ini:
-1. Bangun `PositionContext`: entry, SL, volume sekarang, `initialSl` (dari komentar, cadangan `trades` lewat callback sink, lihat §5), `initialVolume` (dari deal `DEAL_ENTRY_IN` di history posisi), R, profit dalam R.
+1. Bangun `PositionContext`: entry, SL, volume sekarang, `initialSl`, `initialVolume` (dari deal `DEAL_ENTRY_IN` di history posisi), R, profit dalam R. `initialSl` dicari berurutan: komentar posisi (`ParseInitialSl`) → `ORDER_SL` order pembuka di history MT5 → `ISdbEventSink::FindInitialSl` (tabel `trades`). Hasilnya di-cache per ticket.
 2. BE, partial, dan trailing dicek terpisah, tidak sebagai rantai `else` (10.1).
 3. ATR dibaca dari bar tutup (`CopyBuffer(handle, 0, 1, 1, ...)`, cek jumlah = 1) (9.3).
 4. Kegagalan modify disimpan per ticket (jumlah, waktu terakhir). Retry setelah `SDB_MODIFY_COOLDOWN_SEC` (30 detik), maksimal 3, lalu event `MODIFY_FAILED` + alert Medium (10.4).
@@ -215,6 +220,7 @@ void Deinit();       // IndicatorRelease
 - Hanya `TRADE_TRANSACTION_DEAL_ADD` dengan magic dan simbol ini.
 - Deal `DEAL_ENTRY_OUT` atau `OUT_BY`: jika posisi masih ada, itu partial dan sudah dicatat PositionManager. Jika posisi sudah tidak ada, jumlahkan profit, komisi, dan swap semua deal posisi itu, ambil alasan dari `DEAL_REASON` deal terakhir, hitung R hasil, lalu kirim `ClosureRecord` (16.1–16.3).
 - Pemetaan alasan: `DEAL_REASON_SL` → `SL`, `TP` → `TP`, `CLIENT`/`MOBILE`/`WEB` → `MANUAL`, `SO` → `STOP_OUT`, `EXPERT` → `EA`, lainnya → `OTHER`. Pemetaan ini fungsi murni `MapDealReason()`.
+- Tracker juga menyimpan jumlah trade dan total R di memori. Nilai ini dipakai `OnTester`, karena DB mati saat optimasi (17.3, 19.2).
 
 ### Storage
 
@@ -238,11 +244,16 @@ void Reconcile(long login, long magic, string symbol);     // 4.1, 4.2
 
 `App/SdbApp.mqh`, `CSdbApp`: memiliki semua objek di atas (dibuat dengan `new` di `Init`, dihapus di destruktor) dan menjalankan pemetaan event di §2. `SDBot.mq5` berisi `#property version "1.0"`, satu instance `CSdbApp`, dan enam handler event yang meneruskan ke instance itu.
 
+`CSdbApp::TesterMetric()` = `TesterMetric(totalR, trades, maxDdPct)` [murni] dengan R dari `CClosureTracker` dan max DD dari `TesterStatistics(STAT_EQUITY_DDREL_PERCENT)`. Tanpa trade atau DD = 0, metriknya 0 agar optimasi tidak memilih pass kosong.
+
 ### Harness uji — `ea/tests/Experts/SDBotTests/SDBotHarness.mq5`
 
 - Include `App/SdbApp.mqh` dan `Core/Inputs.mqh` yang sama, ditambah input khusus harness (`HarnessEveryBars`, `HarnessSlPoints`, `HarnessTpPoints`, `HarnessDirection`, `HarnessMaxOpen`).
 - `OnInit`: jika `!MQLInfoInteger(MQL_TESTER)` → `INIT_FAILED` dengan log CRITICAL (19.4).
 - Setiap N bar baru LTF, harness membangun `OrderRequest`, memanggil `CRiskManager::PreTradeCheck` dan `CalcVolume`, lalu `CExecutor::OpenMarket`. Jalur entry-nya sama dengan yang akan dipakai strategi Fase 3.
+- **Simulasi restart**: input `HarnessRestartAtBar` menghapus instance `CSdbApp` lalu membuat dan meng-init yang baru di tengah run. Global Variables dan posisi tetap ada, sama seperti restart sungguhan. Dengan ini kriteria restart (4.x, 13.3) bisa diuji di tester.
+- **Simulasi penarikan**: input `HarnessWithdrawAtBar` dan `HarnessWithdrawPct` memanggil `TesterWithdrawal()` untuk menguji Requirement 21.
+- **Assert skenario**: harness mencatat observasi (urutan event per ticket, SL sebelumnya per ticket, alasan tolak, status risiko) dan di `OnDeinit` mengecek harapan skenario yang dipilih input `HarnessScenario`. Hasil `SC-xx PASS/FAIL` dicetak ke log dan ditulis ke `Common/Files/sdbot_test_results.txt`.
 
 ## 4. Data models
 
@@ -309,6 +320,7 @@ Input PRD lain (`EntryMode`, `MinConfluenceScore`, `MinRR`, `MaxZoneAgeBars`, fi
 | `SDB_<login>_LOT_REDUCED` | 1 = flag lot × 0.5 |
 | `SDB_<login>_DAY_START_BAL` | balance awal hari server |
 | `SDB_<login>_DAY_START_DATE` | tanggal hari server (epoch 00:00) |
+| `SDB_<login>_LAST_BAL_DEAL` | tiket deal operasi saldo terakhir yang sudah diproses (21.2, 21.3) |
 
 Semua instance di akun yang sama membaca dan menulis kunci yang sama (15.1, 15.2). Global Variable di Strategy Tester terpisah dari terminal, sehingga backtest tidak mengganggu status live.
 
@@ -346,67 +358,194 @@ Semua tabel punya `id INTEGER PRIMARY KEY` dan `login INTEGER NOT NULL` (17.6). 
 | SL awal tidak ditemukan sama sekali | kedua sumber gagal | BE dan partial untuk posisi itu dilewati, trailing tetap jalan bila SL sudah di atas entry | ERROR sekali per ticket |
 | Partial tidak mungkin karena lot minimum | `PartialVolume` skip | lewati | INFO sekali per ticket |
 
-## 6. Testing strategy
+## 6. Testing strategy (TDD)
 
-### Unit test (script, cetak `ALL PASS`)
+### 6.1 Alur TDD per task
 
-| Script | Menguji |
-|---|---|
-| `TestCoreUtils.mq5` | `RoundLotDown`, `ProfitInR`, `IsSlBetter`, `BuildOrderComment`/`ParseInitialSl` (termasuk digit 3 dan 5), `ValidateInputs` |
-| `TestRiskMath.mq5` | `CalcLotSize` (normal, di bawah min, di atas max, flag 0.5), `DrawdownPct`, `DrawdownLevel` (naik, turun, histeresis 8%), `DailyLossPct`, `PositionOpenRiskPct` (BE = 0) |
-| `TestPositionMath.mq5` | `IsBreakevenActive`, `BreakevenSl` buy/sell, `ShouldPartial`, `PartialVolume` (0.01 skip, 0.03 → 0.01, 0.10 → 0.05), `TrailingSl`, `IsTrailStepEnough` |
-| `TestAccountRules.mq5` | `EvaluateAccount` (demo, real + allowLive false/true, netting, simbol tidak ada), `MapDealReason`, `CheckStops` |
+Setiap task di `tasks.md` mengikuti Red → Green → Refactor:
 
-### Skenario Strategy Tester (`ea/tests/scenarios/*.ini`, Expert = harness)
+1. **Red**: tulis test case dari katalog §6.3 ke suite yang sesuai. Buat stub fungsi yang mengembalikan nilai salah (misalnya `return 0;`) agar compile lolos. Jalankan suite: test case baru harus **FAIL**. Test yang langsung lulus berarti tidak menguji apa-apa.
+2. **Green**: tulis implementasi minimum sampai suite **ALL PASS**, dengan compile 0 error dan 0 warning.
+3. **Refactor**: rapikan (fungsi ≤ 50 baris, tanpa angka ajaib) sambil suite tetap ALL PASS.
+4. Untuk kelas yang menyentuh terminal (Executor, PositionManager, RiskMonitor, ClosureTracker, Logger), skenario §6.4 ditulis dulu di harness beserta assert-nya dan terbukti FAIL (atau belum bisa jalan), lalu diimplementasikan sampai PASS.
 
-Semua memakai EURUSDc M15, real ticks. Ambang risiko diturunkan lewat input agar cepat tercapai.
+Bug yang ditemukan kemudian dimulai dengan test case baru yang mereproduksinya (RULES §Testing).
 
-| File | Kriteria |
-|---|---|
-| `be_partial_trail.ini` | 7.x, 8.x, 9.x, 10.1, 10.5 |
-| `daily_loss.ini` (`InpDailyLossPct` kecil, SL rapat) | 12.x |
-| `dd_reduce_stop.ini` (`InpDDReducePct`/`InpDDStopPct` kecil) | 11.4–11.6, 13.1, 13.3 dalam satu sesi |
-| `lot_below_min.ini` (`InpRiskPerTradePct` sangat kecil) | 5.3 |
-| `retcode_and_stops.ini` (SL lebih dekat dari stops + spread) | 6.3 |
+### 6.2 Struktur uji
 
-### Tidak bisa di Strategy Tester
+```
+sdbot/ea/tests/
+  Include/SDBotTests/
+    TestFramework.mqh        AssertEq(tol), AssertTrue, BeginSuite/EndSuite, ringkasan PASS/FAIL,
+                             tulis hasil ke Common/Files/sdbot_test_results.txt
+    Suites/TestCoreUtils.mqh, TestRiskMath.mqh, TestPositionMath.mqh, TestAccountRules.mqh
+  Scripts/SDBotTests/RunUnitTests.mq5   script: jalankan semua suite di chart (manual)
+  Experts/SDBotTests/RunUnitTestsEA.mq5 EA: jalankan semua suite di OnInit (untuk runner otomatis)
+  Experts/SDBotTests/SDBotHarness.mq5   harness skenario (§3)
+  scenarios/SC-xx_<nama>.ini            konfigurasi Strategy Tester per skenario
+  manual-checklist.md                   uji yang hanya bisa manual (§6.5)
+```
 
-Kriteria berikut bergantung pada restart terminal, aksi manual, atau akun sungguhan. Logikanya diuji lewat unit test, dan perilaku nyatanya lewat checklist manual:
+Suite ditulis sekali sebagai `.mqh`, lalu dipakai oleh script (dijalankan manual di chart) dan EA runner (dijalankan otomatis di tester). Junction ditambah `Include/SDBotTests` agar suite bisa di-include.
 
-| Kriteria | Unit test | Cek manual |
-|---|---|---|
-| 2.2, 2.3 akun real / netting | `EvaluateAccount` | Pasang EA di akun cent dengan `InpAllowLiveTrading = false`: EA menolak jalan |
-| 4.x, 13.3 restart | `IsBreakevenActive`, `ShouldPartial`, parse komentar | Fase 3 di akun cent: ubah satu input (EA re-init) saat ada posisi BE + partial |
-| 16.1 close manual | `MapDealReason` | Fase 3 di akun cent: tutup posisi manual, cek `closures.reason = MANUAL` |
-| 3.x putus koneksi | — | Matikan jaringan > 5 menit dengan EA terpasang di akun cent |
+**Runner otomatis (usulan, dicek di task 1).** `tools/run-ea-tests.ps1` meng-compile lewat `metaeditor64.exe /compile`, menjalankan `RunUnitTestsEA` atau skenario harness di Strategy Tester lewat `terminal64.exe /config:<ini>` dengan `ShutdownTerminal=1`, lalu membaca `sdbot_test_results.txt` dan keluar dengan kode 0 atau 1. Dengan ini siklus Red/Green bisa saya jalankan sendiri tanpa Anda membuka MT5. Syaratnya ada instalasi MT5 terpisah (mode portable) khusus uji, karena terminal yang sedang login dipakai untuk trading. Jika mekanisme ini tidak jalan di mesin ini, fallback-nya manual: saya compile, Anda jalankan script dan menempelkan hasilnya.
 
-Karena itu **kriteria 20.2 perlu diubah**: file `.ini` hanya untuk skenario yang bisa jalan di tester, dan sisanya masuk checklist manual `ea/tests/manual-checklist.md` (lihat §8).
+### 6.3 Katalog test case fungsi murni
+
+Toleransi perbandingan harga 1e-8 dan volume 1e-9. Point EURUSDc 0.00001, JPY 0.001.
+
+**TestCoreUtils**
+
+| ID | Fungsi | Input | Harapan | Req |
+|---|---|---|---|---|
+| TC-CU-01 | `RoundLotDown` | 0.0379, step 0.01 | 0.03 | 5.2 |
+| TC-CU-02 | `RoundLotDown` | 0.29, step 0.01 | 0.29 (jebakan floating point) | 5.2 |
+| TC-CU-03 | `RoundLotDown` | 0.10, step 0.01 | 0.10 | 5.2 |
+| TC-CU-04 | `ProfitInR` | buy, entry 1.10000, SL awal 1.09800, harga 1.10200 | 1.0 | 7.1 |
+| TC-CU-05 | `ProfitInR` | sell, entry 1.10000, SL awal 1.10200, harga 1.09700 | 1.5 | 8.1 |
+| TC-CU-06 | `ProfitInR` | buy, entry 1.10000, SL awal 1.09800, harga 1.09900 | −0.5 | 7.1 |
+| TC-CU-07 | `IsSlBetter` | buy, lama 1.09900, baru 1.10010 | true | 10.2 |
+| TC-CU-08 | `IsSlBetter` | buy, lama 1.09900, baru 1.09800 | false | 10.2 |
+| TC-CU-09 | `IsSlBetter` | buy, lama = baru 1.09900 | false | 10.2 |
+| TC-CU-10 | `IsSlBetter` | sell, lama 1.10100, baru 1.10050 | true | 10.2 |
+| TC-CU-11 | `IsSlBetter` | sell, lama 1.10100, baru 1.10200 | false | 10.2 |
+| TC-CU-12 | `BuildOrderComment` | 1.08234, digits 5 | `SDB\|1.08234` | 4.4 |
+| TC-CU-13 | `BuildOrderComment` | 161.234, digits 3 | `SDB\|161.234` | 4.4 |
+| TC-CU-14 | `ParseInitialSl` | `SDB\|1.08234` | true, 1.08234 | 4.4 |
+| TC-CU-15 | `ParseInitialSl` | `""`, `SDB\|`, `SDB\|abc`, `[sl 1.08234]` | false untuk semua | 4.4 |
+| TC-CU-16 | `ValidateInputs` | semua default | true | 2.5 |
+| TC-CU-17 | `ValidateInputs` | risk per trade 1.5 | false, alasan menyebut `InpRiskPerTradePct` | 2.5 |
+| TC-CU-18 | `ValidateInputs` | risk per trade 0 | false | 2.5 |
+| TC-CU-19 | `ValidateInputs` | DD reduce 15, DD stop 10 | false | 2.5 |
+| TC-CU-20 | `ValidateInputs` | partial R 1.0, BE R 1.0 | false | 2.5 |
+| TC-CU-21 | `StyleTimeframes` | day trading | H4, H1, M15 | 9.1 |
+
+**TestRiskMath**
+
+| ID | Fungsi | Input | Harapan | Req |
+|---|---|---|---|---|
+| TC-RM-01 | `CalcLotSize` | balance 1000, risk 0.5%, money/lot 20, step 0.01, min 0.01, max 100 | 0.25 | 5.1 |
+| TC-RM-02 | `CalcLotSize` | sama, money/lot 30 | 0.16 (dibulatkan ke bawah dari 0.1667) | 5.2 |
+| TC-RM-03 | `CalcLotSize` | balance 100, risk 0.5%, money/lot 100 | 0, `belowMin = true` | 5.3 |
+| TC-RM-04 | `CalcLotSize` | balance 100000, risk 1%, money/lot 10, max 50 | 50 | 5.4 |
+| TC-RM-05 | `EffectiveRiskPct` | 0.5, flag aktif | 0.25 | 5.5 |
+| TC-RM-06 | `EffectiveRiskPct` | 0.5, flag tidak aktif | 0.5 | 5.5 |
+| TC-RM-07 | `DrawdownPct` | puncak 1000, equity 900 | 10.0 | 11.x |
+| TC-RM-08 | `DrawdownPct` | puncak 1000, equity 1100 | 0 (tidak negatif) | 11.x |
+| TC-RM-09 | `DrawdownLevel` | 4.9, NORMAL | NORMAL | 11.3 |
+| TC-RM-10 | `DrawdownLevel` | 5.0, NORMAL | INFO | 11.3 |
+| TC-RM-11 | `DrawdownLevel` | 10.0, INFO | REDUCE | 11.4 |
+| TC-RM-12 | `DrawdownLevel` | 9.0, REDUCE | REDUCE (histeresis) | 11.5 |
+| TC-RM-13 | `DrawdownLevel` | 7.9, REDUCE | INFO | 11.5 |
+| TC-RM-14 | `DrawdownLevel` | 15.0, REDUCE | STOP | 11.6 |
+| TC-RM-15 | `DrawdownLevel` | 0, STOP | STOP (hanya reset manual) | 13.5 |
+| TC-RM-16 | `DailyLossPct` | awal hari 1000, equity 970 | 3.0 | 12.1 |
+| TC-RM-17 | `DailyLossPct` | awal hari 1000, equity 1010 | −1.0 | 12.1 |
+| TC-RM-18 | `PositionOpenRiskPct` | risk 5, BE tidak aktif, balance 1000 | 0.5 | 14.2 |
+| TC-RM-19 | `PositionOpenRiskPct` | risk 5, BE aktif | 0 | 14.2 |
+| TC-RM-20 | `AdjustForBalanceOp` | 1000, −200 (penarikan) | 800 | 21.1 |
+| TC-RM-21 | `AdjustForBalanceOp` | 1000, +100 (deposit) | 1100 | 21.1 |
+| TC-RM-22 | `TesterMetric` | total R 30, 100 trade, DD 10% | 0.03 | 19.2 |
+| TC-RM-23 | `TesterMetric` | 0 trade atau DD 0 | 0 | 19.2 |
+
+**TestPositionMath**
+
+| ID | Fungsi | Input | Harapan | Req |
+|---|---|---|---|---|
+| TC-PM-01 | `IsBreakevenActive` | buy, entry 1.10000, SL 1.10010 | true | 4.3 |
+| TC-PM-02 | `IsBreakevenActive` | buy, entry 1.10000, SL 1.09800 | false | 4.3 |
+| TC-PM-03 | `IsBreakevenActive` | sell, entry 1.10000, SL 1.09990 | true | 4.3 |
+| TC-PM-04 | `BreakevenSl` | buy, entry 1.10000, spread 8, buffer 2, point 0.00001 | 1.10010 | 7.2 |
+| TC-PM-05 | `BreakevenSl` | sell, sama | 1.09990 | 7.2 |
+| TC-PM-06 | `BreakevenSl` | buy, entry 161.500, spread 35, buffer 2, point 0.001 | 161.537 | 7.2 |
+| TC-PM-07 | `ShouldPartial` | profit 1.6R, ambang 1.5, vol 0.10 = awal 0.10 | true | 8.1 |
+| TC-PM-08 | `ShouldPartial` | profit 1.4R | false | 8.1 |
+| TC-PM-09 | `ShouldPartial` | profit 2.0R, vol 0.05, awal 0.10 | false (sudah partial) | 4.3 |
+| TC-PM-10 | `PartialVolume` | awal 0.10, 50%, step 0.01, min 0.01, sekarang 0.10 | 0.05 | 8.1 |
+| TC-PM-11 | `PartialVolume` | awal 0.03 | 0.01 | 8.1 |
+| TC-PM-12 | `PartialVolume` | awal 0.02 | 0.01 (sisa 0.01 = min) | 8.2 |
+| TC-PM-13 | `PartialVolume` | awal 0.01 | `skip = true` | 8.2 |
+| TC-PM-14 | `TrailingSl` | buy, harga 1.10500, ATR 0.00100, mult 2 | 1.10300 | 9.1 |
+| TC-PM-15 | `TrailingSl` | sell, sama | 1.10700 | 9.1 |
+| TC-PM-16 | `IsTrailStepEnough` | buy, lama 1.10280, baru 1.10300, min 5 point | true (20 point) | 9.2 |
+| TC-PM-17 | `IsTrailStepEnough` | buy, lama 1.10298, baru 1.10300 | false (2 point) | 9.2 |
+| TC-PM-18 | `IsTrailStepEnough` | sell, lama 1.10720, baru 1.10700 | true | 9.2 |
+
+**TestAccountRules**
+
+| ID | Fungsi | Input | Harapan | Req |
+|---|---|---|---|---|
+| TC-AR-01 | `EvaluateAccount` | demo, hedging, allowLive false, simbol ada | lolos | 2.2 |
+| TC-AR-02 | `EvaluateAccount` | real, hedging, allowLive false | tolak, alasan menyebut `InpAllowLiveTrading` | 2.2 |
+| TC-AR-03 | `EvaluateAccount` | real, hedging, allowLive true | lolos | 2.2 |
+| TC-AR-04 | `EvaluateAccount` | real, netting, allowLive true | tolak, alasan menyebut mode margin | 2.3 |
+| TC-AR-05 | `EvaluateAccount` | demo, hedging, simbol tidak ada | tolak, alasan menyebut simbol | 2.4 |
+| TC-AR-06 | `AccountTypeOf` | real + USC | CENT | 2.6 |
+| TC-AR-07 | `AccountTypeOf` | real + USD | REAL | 2.6 |
+| TC-AR-08 | `AccountTypeOf` | demo + USC | DEMO | 2.6 |
+| TC-AR-09 | `MapDealReason` | SL, TP, CLIENT, MOBILE, WEB, SO, EXPERT, lainnya | SL, TP, MANUAL ×3, STOP_OUT, EA, OTHER | 16.1 |
+| TC-AR-10 | `CheckStops` | buy di 1.10000, SL 1.09995, stops 0, spread 8 | tolak (5 < 8 point) | 6.3 |
+| TC-AR-11 | `CheckStops` | buy di 1.10000, SL 1.09900, stops 0, spread 8 | lolos | 6.3 |
+| TC-AR-12 | `CheckStops` | buy di 1.10000, SL 1.09980, stops 20, spread 8 | tolak (20 < 28 point) | 6.3 |
+| TC-AR-13 | `CheckStops` | TP di dalam freeze level | tolak | 6.3 |
+
+### 6.4 Skenario Strategy Tester (harness, assert otomatis)
+
+Semua memakai EURUSDc M15, *Every tick based on real ticks*, periode 1 bulan data akun cent, kecuali disebut lain. Ambang risiko diturunkan lewat input agar cepat tercapai.
+
+| ID | Given (input harness) | When | Then (assert di `OnDeinit`) | Req |
+|---|---|---|---|---|
+| SC-01 BE-partial-trailing | buy/sell bergantian tiap 20 bar, SL 200 point, TP 1000 point | posisi mencapai 1R, 1.5R, lalu trailing | ada posisi dengan urutan BE → partial → trailing; tiap ticket paling banyak 1 BE dan 1 partial; SL tidak pernah memburuk; closure tercatat dengan alasan SL/TP dan R hasil | 7–10, 16 |
+| SC-02 Rugi harian | `InpDailyLossPct` 0.5, SL 100 point, TP 1000 point | rugi hari itu ≥ 0.5% | pause aktif; semua entry harness sesudahnya di hari yang sama ditolak `DAILY_PAUSE`; entry diterima lagi di hari server berikutnya | 12, 14 |
+| SC-03 DD reduce dan stop | `InpDDReducePct` 1, `InpDDStopPct` 2, SL 100 point | drawdown 1% lalu 2% | risk efektif setengah setelah 1%; STOPPED di 2%; posisi EA habis dalam ≤ 5 detik simulasi; tidak ada entry sampai akhir run | 5.5, 11, 13 |
+| SC-04 Restart | `HarnessRestartAtBar` setelah posisi sudah BE dan partial; run kedua setelah STOPPED | app dibuat ulang | tidak ada BE atau partial kedua; SL awal dan R tetap sama; STOPPED tetap aktif setelah restart | 4.3–4.5, 13.3 |
+| SC-05 Lot di bawah minimum | `InpRiskPerTradePct` 0.01 | harness mencoba entry | semua ditolak `LOT_BELOW_MIN`; 0 order terkirim | 5.3 |
+| SC-06 Stops level | SL 3 point | harness mencoba entry | semua ditolak sebelum dikirim; 0 order terkirim | 6.1–6.3 |
+| SC-07 Penarikan | `HarnessWithdrawAtBar`, `HarnessWithdrawPct` 20 | `TesterWithdrawal()` | puncak equity dan balance awal hari turun sebesar nominalnya; tidak ada perubahan level DD, pause, atau STOPPED | 21 |
+| SC-08 Optimasi tanpa DB | optimasi 2 pass | optimasi selesai | `sdbot.sqlite` tidak berubah; `OnTester` mengembalikan metrik | 17.3, 19.2 |
+
+### 6.5 Uji manual (`ea/tests/manual-checklist.md`)
+
+Hanya yang tidak bisa disimulasikan di tester:
+
+| ID | Langkah | Harapan | Req |
+|---|---|---|---|
+| MC-01 | Pasang EA di akun cent dengan `InpAllowLiveTrading = false` | EA menolak jalan dengan pesan CRITICAL | 2.2 |
+| MC-02 | Pasang EA di akun cent dengan `.set` day trading | inisialisasi tanpa error, baris `accounts` tipe CENT | 2.6, 17 |
+| MC-03 | Matikan jaringan > 5 menit | alert Medium tercatat, lalu Info saat pulih | 3 |
+| MC-04 | Dua chart di akun cent, set STOPPED dari satu instance lewat skenario reset | instance lain ikut memblokir entry | 15 |
+| MC-05 | (Fase 3) Tutup posisi manual | `closures.reason = MANUAL` | 16.1 |
+| MC-06 | (Fase 3) Cek `ORDER_SL` order pembuka di Exness | SL awal terbaca dari history, bukan 0 | 4.4 |
 
 ## 7. Traceability
 
 | Requirement | Komponen | Uji |
 |---|---|---|
 | 1 | `tools/link-mt5.ps1`, semua file | compile 0/0 |
-| 2 | `CAccount`, `ValidateInputs`, `EvaluateAccount` | `TestAccountRules`, `TestCoreUtils`, manual |
-| 3 | `CAccount::CheckConnection` | manual |
-| 4 | `PositionManager`, `ParseInitialSl`, `CLogger::Reconcile`, `FindInitialSl` | `TestCoreUtils`, `TestPositionMath`, manual |
-| 5 | `RiskMath::CalcLotSize`, `CRiskManager::CalcVolume` | `TestRiskMath`, `lot_below_min.ini` |
-| 6 | `CExecutor::OpenMarket`, `CheckStops` | `TestAccountRules`, `retcode_and_stops.ini` |
-| 7, 8, 9, 10 | `CPositionManager`, `PositionMath`, `CExecutor::ModifySl/ClosePartial` | `TestPositionMath`, `be_partial_trail.ini` |
-| 11, 13 | `CRiskMonitor`, `RiskMath`, `CState` | `TestRiskMath`, `dd_reduce_stop.ini` |
-| 12 | `CRiskMonitor`, `DailyLossPct`, `CState` | `TestRiskMath`, `daily_loss.ini` |
-| 14 | `CRiskManager::PreTradeCheck` | `TestRiskMath`, harness (semua skenario melewati pintu ini) |
-| 15 | `CState` | manual (dua chart di akun cent) |
-| 16 | `CClosureTracker`, `MapDealReason` | `TestAccountRules`, `be_partial_trail.ini` (SL/TP), manual |
-| 17 | `CLogger`, `Schema.mqh`, `data_db.sql` | semua skenario (cek isi DB dengan DB Browser) |
-| 18 | `Core/Utils` log, `ISdbEventSink::OnAlert` | review log skenario |
-| 19 | `CSdbApp::TesterMetric`, harness | skenario mana pun, cek hasil `OnTester` |
-| 20 | `ea/tests/**` | semua di atas |
+| 2 | `CAccount`, `ValidateInputs`, `EvaluateAccount`, `AccountTypeOf` | TC-CU-16..20, TC-AR-01..08, MC-01, MC-02 |
+| 3 | `CAccount::CheckConnection` | MC-03 |
+| 4 | `CPositionManager`, `ParseInitialSl`, `CLogger::Reconcile` | TC-CU-12..15, TC-PM-01..03, SC-04, MC-06 |
+| 5 | `CalcLotSize`, `EffectiveRiskPct`, `CRiskManager::CalcVolume` | TC-CU-01..03, TC-RM-01..06, SC-05, SC-03 |
+| 6 | `CExecutor::OpenMarket`, `CheckStops` | TC-AR-10..13, SC-06 |
+| 7, 8, 9, 10 | `CPositionManager`, `PositionMath`, `CExecutor::ModifySl/ClosePartial` | TC-CU-04..11, TC-PM-04..18, SC-01 |
+| 11, 13 | `CRiskMonitor`, `DrawdownPct`, `DrawdownLevel`, `CState` | TC-RM-07..15, SC-03, SC-04 |
+| 12 | `CRiskMonitor`, `DailyLossPct`, `CState` | TC-RM-16..17, SC-02 |
+| 14 | `CRiskManager::PreTradeCheck`, `PositionOpenRiskPct` | TC-RM-18..19, SC-02, SC-03, SC-05 |
+| 15 | `CState` | MC-04 |
+| 16 | `CClosureTracker`, `MapDealReason` | TC-AR-09, SC-01, MC-05 |
+| 17 | `CLogger`, `Schema.mqh`, `data_db.sql` | SC-01 (isi DB), SC-08, MC-02 |
+| 18 | `Core/Utils` log, `ISdbEventSink::OnAlert` | review log SC-01..07 |
+| 19 | `CSdbApp::TesterMetric`, harness | TC-RM-22..23, SC-08 |
+| 20 | `ea/tests/**`, alur TDD §6.1 | semua di atas |
+| 21 | `CRiskMonitor::ProcessBalanceOps`, `AdjustForBalanceOp` | TC-RM-20..21, SC-07 |
 
 ## 8. Keputusan yang perlu disetujui
 
-1. **Folder `App/` untuk `CSdbApp`.** Ini lapisan baru di atas semua modul. RULES (struktur folder dan tabel lapisan) perlu ditambah satu baris: *App: orkestrasi event, boleh memakai semua modul, tidak boleh berisi logika trading.* Alternatifnya orkestrasi tetap di `SDBot.mq5` dan harness menyalinnya, dengan risiko keduanya berbeda.
-2. **`ISdbEventSink` di Core.** Modul menulis log DB lewat interface ini, bukan dengan memanggil Storage. Ini menjaga aturan "hanya Storage menulis DB" dan "Position/Risk tidak memanggil Storage".
-3. **Perubahan kriteria 20.2.** Skenario restart, close manual, putus koneksi, dan akun real dipindah dari `.ini` ke unit test + `ea/tests/manual-checklist.md`, karena Strategy Tester tidak bisa me-restart terminal atau menerima aksi manual. Uji restart dan close manual yang sungguhan baru bisa dilakukan di Fase 3, saat EA punya jalur entry di akun cent.
-4. **SL awal di komentar dengan format `SDB|<harga SL>`**, misalnya `SDB|1.08234` (maks 31 karakter). Jika broker mengubah komentar, cadangannya tabel `trades` (sudah disetujui). Opsi cadangan tambahan yang lebih tahan: `ORDER_SL` dari order pembuka di history MT5, karena tetap ada di terminal walau DB hilang. Usulan saya: urutan komentar → history order → `trades`.
-5. **Tabel `signals` dibuat sekarang, diisi mulai Fase 3**, supaya `schema_version` tidak perlu naik hanya untuk menambah tabel yang sudah diketahui di PRD.
+1. **Folder `App/` untuk `CSdbApp`.** Lapisan baru di atas semua modul, hanya berisi orkestrasi. RULES perlu ditambah satu baris: *App: orkestrasi event, boleh memakai semua modul, tidak boleh berisi logika trading.* Tanpa ini, harness harus menyalin orkestrasi `SDBot.mq5`, dan yang diuji bisa berbeda dari yang jalan live.
+2. **`ISdbEventSink` di Core.** Modul menulis dan membaca log DB lewat interface ini, bukan dengan memanggil Storage. Aturan "hanya Storage menulis DB" dan "Position/Risk tidak memanggil Storage" tetap terjaga.
+3. **Struktur uji dan revisi kriteria 20.1–20.2.** Suite unit test menjadi `.mqh` di `ea/tests/Include/SDBotTests/` (dipakai script dan EA runner), dan skenario memakai assert otomatis di harness. Restart dan penarikan kini diuji di tester (SC-04, SC-07). Yang tetap manual hanya MC-01..06.
+4. **Runner otomatis dengan MT5 portable khusus uji.** Siklus TDD jadi cepat karena compile dan uji bisa saya jalankan sendiri. Butuh satu instalasi MT5 tambahan (sekitar 1 GB) yang login ke akun demo atau cent yang sama hanya untuk data historis. Task 1 memverifikasi mekanismenya dulu. Jika gagal, uji dijalankan manual.
+5. **SL awal: komentar → `ORDER_SL` history → tabel `trades`.** Cadangan kedua tetap ada walau DB hilang. Perilaku `ORDER_SL` di Exness dicek di MC-06.
+6. **Tabel `signals` dibuat sekarang**, diisi mulai Fase 3, agar versi skema tidak naik hanya untuk tabel yang sudah diketahui.
+7. **Operasi saldo diproses tepat sekali** lewat compare-and-set di Global Variable (`GlobalVariableSetOnCondition`), tanpa perlu instance "pemimpin".
+8. **Emergency close lintas pair** mengikuti jawaban R2-1 di requirements. Jika disetujui: `CExecutor::CloseAllSdbot(magicFrom, magicTo)` dipakai hanya oleh `CRiskMonitor` saat STOPPED, dan RULES mencatat pengecualian ini.
