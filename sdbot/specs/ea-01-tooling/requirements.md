@@ -83,7 +83,7 @@ Spec ini selesai jika `build-ea` meng-compile kerangka EA dengan 0 error dan 0 w
 
 #### Acceptance criteria
 
-6.1. `Experts/SDBot/SDBot.mq5` WAJIB compile 0 error 0 warning dengan `#property version "0.1"` dan handler event kosong yang aman (tidak mengirim order).
+6.1. `Experts/SDBot/SDBot.mq5` WAJIB compile 0 error 0 warning dengan `#property version "0.0"` dan handler event kosong yang aman (tidak mengirim order).
 6.2. KETIKA EA kerangka dipasang di chart MAKA EA WAJIB mencatat log INFO bahwa ini versi kerangka, lalu tidak melakukan apa pun.
 
 ### Requirement 7: Konfigurasi lokal

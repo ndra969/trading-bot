@@ -34,7 +34,7 @@ time. For the EA code itself, use the `sdbot-ea` skill.
 
 ```
 sdbot/
-  specs/       <feature>/requirements.md · design.md · tasks.md (Kiro-style)
+  specs/       README.md (urutan spec) · fase-N-overview.md (use case) · ea-NN-<name>/{requirements,design,tasks}.md
   docs/        PRD-EA, PRD-Backoffice, RULES, flows/ (Mermaid), decisions/ (ADR)
   shared/schema/  data_db.sql (EA writes) · control_db.sql (API writes) · enums.md · fixtures/
   ea/src/      mirrors MQL5/: Experts/SDBot/SDBot.mq5 · Include/SDBot/<Layer>/ · Scripts/SDBot/ · Presets/

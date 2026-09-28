@@ -105,12 +105,17 @@ Template for a unit-test script: [templates/UnitTest.mq5](templates/UnitTest.mq5
    ```
    If MetaEditor or the junctions aren't found, say so and ask the user to
    press F7. Never claim it compiles without a compile log showing 0/0.
-2. **Unit tests**: every new pure function in Core, Risk or Analysis gets an
-   assert in `ea/tests/Scripts/SDBotTests/`. Compile the test script the same
-   way. Running it (drag onto a chart → Experts tab shows `ALL PASS`) is
-   manual: ask the user to run it and report the result.
-3. **Scenario**: behaviour changes get a Strategy Tester visual-mode check
-   (`ea/tests/scenarios/*.ini`); list which PRD scenario the user should run.
+2. **Unit tests**: every new pure function gets test cases (IDs from the
+   spec's design catalogue) in a suite under
+   `ea/tests/Include/SDBotTests/Suites/`, written **before** the function
+   (Red → Green). Run them with `sdbot/tools/run-ea-tests.ps1 -Unit` (built in
+   spec `ea-01-tooling`; exit 0 = all pass). Until that runner exists, or if it
+   reports the environment is not ready, ask the user to run the
+   `RunUnitTests` script on a chart and paste the result.
+3. **Scenario**: behaviour that needs real positions is proven by a harness
+   scenario `SC-nn` with automatic asserts, run by
+   `run-ea-tests.ps1 -Scenario SC-nn`. Only what the tester cannot simulate goes
+   to `ea/tests/manual-checklist.md` (`MC-nn`).
 4. Every bug fix starts with a test that reproduces it.
 
 ## Definition of done (EA side)

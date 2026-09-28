@@ -14,7 +14,7 @@ Risiko utama: mekanisme `/config` + `ShutdownTerminal` dan pembacaan file hasil 
 ```
 sdbot/
   ea/src/
-    Experts/SDBot/SDBot.mq5              kerangka (Req 6)
+    Experts/SDBot/SDBot.mq5              kerangka v0.0 (Req 6)
     Include/SDBot/{Core,Account,Risk,Analysis,Strategies,Signals,Filters,
                    Execution,Position,Control,Notify,Storage,UI,App}/   (.gitkeep)
     Scripts/SDBot/                       (.gitkeep)
@@ -148,7 +148,7 @@ Membuka `sdbot_envcheck.sqlite` di Common (dihapus di akhir), lalu menjalankan t
 
 ### 3.7 `SDBot.mq5` kerangka
 
-`#property version "0.1"`, `#property description`, `OnInit` mencetak log INFO "SDBot kerangka v0.1, tidak ada logika trading" lewat `Print` sementara (fungsi log baru ada di spec 02), `OnDeinit`/`OnTick` kosong. Tidak ada `#include` modul.
+`#property version "0.0"`, `#property description`, `OnInit` mencetak log INFO "SDBot kerangka v0.0, tidak ada logika trading" lewat `Print` sementara (fungsi log baru ada di spec 02), `OnDeinit`/`OnTick` kosong. Tidak ada `#include` modul.
 
 ## 4. Error handling
 

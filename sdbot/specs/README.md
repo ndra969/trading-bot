@@ -25,6 +25,8 @@ flowchart LR
     S4 --> S6
 ```
 
+Versi EA naik satu MINOR setiap spec selesai: 01 = `0.0`, 02 = `0.1`, … 06 = `0.5`, 07 = `0.6` (Fase 1 selesai). `1.0` setelah validasi Fase 6.
+
 Urutan ini dipilih agar setiap spec bisa diuji penuh saat selesai: framework uji ada sebelum kode apa pun, event sink dan storage ada sebelum modul yang menulis log, dan harness ada sebelum modul yang butuh posisi sungguhan (risk, position).
 
 Pelajaran dari bot Python yang memengaruhi spec ini: [python-bot-lessons.md](python-bot-lessons.md).
