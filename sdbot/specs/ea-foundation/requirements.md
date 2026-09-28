@@ -1,6 +1,6 @@
 # Requirements — EA Foundation (Fase 1)
 
-Status: Draft
+Status: Approved (2026-09-28)
 Sumber: PRD-EA §Platform dan arsitektur, §Akun dan koneksi, §Eksekusi order, §Position management, §Risk management, §Data dan database, §Parameter input EA, §Pengujian, §Roadmap Fase 1 · RULES seluruhnya
 
 ## Pendahuluan
@@ -31,7 +31,7 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 
 #### Acceptance criteria
 
-1.1. Skrip `tools/link-mt5.ps1` WAJIB membuat junction `Experts/SDBot`, `Include/SDBot`, `Scripts/SDBot`, dan `Presets/SDBot` dari folder data MT5 ke `sdbot/ea/src/` dengan path folder data sebagai parameter.
+1.1. Skrip `tools/link-mt5.ps1` WAJIB membuat junction `Experts/SDBot`, `Include/SDBot`, `Scripts/SDBot`, dan `Presets/SDBot` dari folder data MT5 ke `sdbot/ea/src/`, serta junction folder uji (`Scripts/SDBotTests`, `Experts/SDBotTests`) ke `sdbot/ea/tests/`, dengan path folder data sebagai parameter.
 1.2. JIKA junction tujuan sudah ada MAKA skrip WAJIB melewatinya tanpa menghapus isi folder MT5.
 1.3. EA dan semua script uji WAJIB compile dengan 0 error dan 0 warning.
 1.4. Semua deklarasi `input` WAJIB berada di `Core/Inputs.mqh` saja.
@@ -68,7 +68,7 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 4.1. KETIKA EA di-init MAKA EA WAJIB mencatat ke log setiap posisi EA yang terbuka di MT5 tetapi belum ada di tabel `trades`.
 4.2. KETIKA EA di-init MAKA EA WAJIB memperbarui posisi di tabel `trades` yang sudah tertutup di MT5 menjadi closure, dari history deal.
 4.3. EA WAJIB menyimpulkan status BE dari posisi SL relatif terhadap harga entry, dan status partial dari volume saat ini dibanding volume awal.
-4.4. EA WAJIB dapat menentukan R awal setiap posisi EA setelah restart, walau SL sudah dipindah ke BE atau trailing.
+4.4. EA WAJIB dapat menentukan R awal setiap posisi EA setelah restart, walau SL sudah dipindah ke BE atau trailing. SL awal disimpan di komentar order saat entry, dengan tabel `trades` sebagai cadangan.
 4.5. KETIKA EA di-restart saat ada posisi yang sudah BE dan sudah partial MAKA EA WAJIB tidak menggeser BE ulang dan tidak melakukan partial kedua.
 
 ### Requirement 5: Perhitungan lot
@@ -125,7 +125,7 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 
 #### Acceptance criteria
 
-9.1. SELAMA BE aktif EA WAJIB menghitung SL trailing = harga saat ini − ATR(`InpTrailATRPeriod`) × `InpTrailATRMult` untuk buy, dan + untuk sell (default 14 dan 2.0).
+9.1. SELAMA BE aktif EA WAJIB menghitung SL trailing = harga saat ini − ATR(`InpTrailATRPeriod`) × `InpTrailATRMult` untuk buy, dan + untuk sell (default 14 dan 2.0), dengan ATR dari timeframe LTF gaya trading (M15 untuk day trading).
 9.2. EA WAJIB hanya mengirim SL trailing jika lebih baik dari SL sekarang minimal sebesar langkah minimum (default 5 point).
 9.3. EA WAJIB memakai nilai ATR dari bar yang sudah tutup, dengan handle indikator dibuat saat init.
 
@@ -163,9 +163,9 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 
 #### Acceptance criteria
 
-12.1. KETIKA rugi hari server ini (realized + floating) ≥ `InpDailyLossPct` (default 3%) MAKA EA WAJIB menyetel pause harian dan mencatat alert High.
+12.1. KETIKA rugi hari server ini (realized + floating) ≥ `InpDailyLossPct` (default 3%) dari balance saat pergantian hari server MAKA EA WAJIB menyetel pause harian dan mencatat alert High.
 12.2. SELAMA pause harian aktif EA WAJIB memblokir entry baru dan tetap mengelola posisi terbuka.
-12.3. KETIKA hari server berganti MAKA EA WAJIB mencabut pause harian dan menyetel ulang titik awal perhitungan rugi harian.
+12.3. KETIKA hari server berganti MAKA EA WAJIB mencabut pause harian dan menyimpan balance saat itu sebagai dasar rugi harian di Global Variable.
 
 ### Requirement 13: Emergency stop
 
@@ -241,8 +241,8 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 
 19.1. SELAMA berjalan di Strategy Tester EA WAJIB tidak memanggil `WebRequest` atau fungsi kalender.
 19.2. EA WAJIB mengembalikan metrik `OnTester` = expectancy per trade dalam R ÷ max drawdown (%).
-19.3. EA WAJIB menyediakan cara membuka posisi uji dengan MagicNumber EA di Strategy Tester tanpa strategi, untuk skenario BE, partial, trailing, dan limit risiko.
-19.4. JIKA tidak berjalan di Strategy Tester MAKA mekanisme posisi uji WAJIB tidak bisa membuka posisi.
+19.3. Repo WAJIB menyediakan EA harness terpisah di `ea/tests/` yang memakai modul yang sama dengan EA utama dan membuka posisi uji terjadwal, untuk skenario BE, partial, trailing, dan limit risiko.
+19.4. JIKA harness tidak berjalan di Strategy Tester MAKA harness WAJIB menolak jalan. EA utama WAJIB tidak berisi kode pembuka posisi uji.
 
 ### Requirement 20: Pengujian fondasi
 
@@ -254,11 +254,11 @@ Konteks yang sudah diputuskan: day trading, simbol EURUSD, GBPUSD, EURJPY, GBPJP
 20.2. Repo WAJIB berisi file `.ini` Strategy Tester di `ea/tests/scenarios/` untuk skenario: BE, partial, trailing, rugi harian 3%, drawdown 15% dan STOPPED setelah restart, lot di bawah minimum, posisi ditutup manual, akun real dengan `AllowLiveTrading = false`.
 20.3. Repo WAJIB berisi file `.set` contoh untuk day trading tanpa nilai rahasia.
 
-## Pertanyaan terbuka
+## Keputusan (dijawab 2026-09-28)
 
-1. **Dasar rugi harian 3%.** PRD belum menyebut persen dari apa. Usulan: dari balance saat pergantian hari server (disimpan di Global Variable). Alternatif: dari equity awal hari.
-2. **Timeframe ATR untuk trailing.** PRD menyebut ATR(14) tanpa timeframe. Usulan: LTF gaya trading (M15 untuk day trading). Alternatif: MTF (H1) supaya trailing lebih longgar.
-3. **Buffer BE.** Tabel PRD menyebut "spread + komisi", input menyebut "spread + 2". Usulan: spread saat ini + `InpBreakevenBufferPoints` (default 2), karena akun cent Exness tanpa komisi per lot. Mohon konfirmasi.
-4. **Penyimpanan R awal (4.4).** Setelah BE, SL awal hilang dari posisi. Opsi: (a) SL awal disimpan di komentar order saat entry; (b) di Global Variable per ticket; (c) dibaca dari tabel `trades`. Usulan: (a) sebagai utama dan (c) sebagai cadangan, karena PRD menjadikan terminal sebagai sumber kebenaran. Detailnya diputuskan di design.
-5. **Partial dengan lot minimum.** Di akun cent dengan risiko 0.5%, lot posisi kemungkinan kecil (misalnya 0.01–0.03). Posisi 0.01 tidak bisa di-partial, dan 50% dari 0.03 dibulatkan jadi 0.01, sehingga partial sering terlewat atau tidak tepat 50% (8.2). Apakah ini diterima, atau partial dinonaktifkan otomatis untuk posisi di bawah 2 × lot minimum?
-6. **Posisi uji (19.3).** Usulan: EA harness terpisah di `ea/tests/` yang memakai modul yang sama dan membuka posisi terjadwal, sehingga kode uji tidak masuk ke EA produksi. Alternatif: input khusus tester di EA utama.
+1. **Dasar rugi harian**: balance saat pergantian hari server (12.1, 12.3).
+2. **Timeframe ATR trailing**: LTF gaya trading, M15 untuk day trading (9.1).
+3. **Buffer BE**: spread saat ini + `InpBreakevenBufferPoints` (default 2), karena akun cent Exness tanpa komisi per lot (7.2).
+4. **R awal setelah restart**: SL awal di komentar order, tabel `trades` sebagai cadangan (4.4).
+5. **Partial dengan lot kecil**: diterima. Jika volume yang ditutup atau sisanya < lot minimum, partial dilewati dan dicatat (8.2).
+6. **Posisi uji**: EA harness terpisah di `ea/tests/`, EA utama bersih dari kode uji (19.3, 19.4).
