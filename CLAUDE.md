@@ -21,6 +21,7 @@ The former `.claude/commands/` were converted to skills with the same names.
 ### SDBot (MQL5 EA)
 | Skill | Purpose |
 |-----|---------|
+| `/sdbot-spec <feature> [phase]` | Kiro-style spec: requirements → design → tasks (each approved) → execute one task |
 | `/sdbot-ea [module]` | Build/review/test the SDBot EA: PRD, layer & safety rules, compile, DoD |
 
 ### Development

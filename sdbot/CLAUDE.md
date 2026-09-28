@@ -25,12 +25,16 @@ they change, re-export them here in the same commit as the code that follows.
 Numbers (risk %, R multiples, scores, timeouts) come from the PRDs. Never
 invent them. Open decisions ("Keputusan terbuka") go to the user.
 
-**For any EA work, use the `sdbot-ea` skill.**
+**Workflow**: spec-driven (Kiro method) with the `sdbot-spec` skill. Every feature or
+roadmap phase gets `specs/<feature>/{requirements,design,tasks}.md`, each approved by
+the user before the next; code only when executing an approved task, one task at a
+time. For the EA code itself, use the `sdbot-ea` skill.
 
 ## Layout
 
 ```
 sdbot/
+  specs/       <feature>/requirements.md · design.md · tasks.md (Kiro-style)
   docs/        PRD-EA, PRD-Backoffice, RULES, flows/ (Mermaid), decisions/ (ADR)
   shared/schema/  data_db.sql (EA writes) · control_db.sql (API writes) · enums.md · fixtures/
   ea/src/      mirrors MQL5/: Experts/SDBot/SDBot.mq5 · Include/SDBot/<Layer>/ · Scripts/SDBot/ · Presets/
