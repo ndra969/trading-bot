@@ -1,0 +1,9 @@
+{
+  "metaeditor": "C:\\Program Files\\MetaTrader 5\\<Instalasi uji>\\MetaEditor64.exe",
+  "liveDataDir": "C:\\Users\\<user>\\AppData\\Roaming\\MetaQuotes\\Terminal\\<ID terminal live>",
+  "testTerminal": "C:\\Program Files\\MetaTrader 5\\<Instalasi uji>\\terminal64.exe",
+  "testDataDir": "C:\\Users\\<user>\\AppData\\Roaming\\MetaQuotes\\Terminal\\<ID terminal uji>",
+  "commonFilesDir": "C:\\Users\\<user>\\AppData\\Roaming\\MetaQuotes\\Terminal\\Common\\Files",
+  "testSymbol": "EURUSDc",
+  "timeoutSec": 600
+}

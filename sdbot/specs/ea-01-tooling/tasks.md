@@ -14,7 +14,7 @@ Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditu
   - Hapus EA spike setelah temuan dicatat (framework asli dibuat di task 5)
   - _Requirements: 2.1, 4.1, 5.2, 8.6_
 
-- [ ] 2. Kerangka folder dan konfigurasi lokal
+- [x] 2. Kerangka folder dan konfigurasi lokal
   - Buat folder `ea/src/...` dan `ea/tests/...` sesuai design §2 (dengan `.gitkeep`) dan `tools/mt5-paths.example.json`
   - Verifikasi `git check-ignore` untuk `mt5-paths.local.json` dan `tools/.tmp/`
   - _Requirements: 1.1, 7.1, 7.2_
