@@ -28,8 +28,9 @@ Also read `sdbot/specs/python-bot-lessons.md`: bugs and findings from the
 Python bot that a spec in the same area must prevent or measure.
 
 A spec narrows the PRD to one deliverable. It does not change product
-decisions. If the spec needs a PRD change, say so and ask; update the PRD
-(Claude Docs master + `sdbot/docs/` copy) only after the user agrees.
+decisions. If the spec needs a PRD change, say so and ask. Once the user
+approves, record it with the `sdbot-docs-sync` skill (entry in
+`sdbot/docs/PENDING-CHANGES.md`); never edit the `sdbot/docs/` copies directly.
 
 ## Phases and gates
 

@@ -20,8 +20,9 @@ option, Adaptive only if backtests prove it · Exness cent, USC, hedging
 | [docs/RULES.md](docs/RULES.md) | Folder layout, layers, naming, safety rules, testing, git, definition of done |
 | [docs/PRD-Backoffice.md](docs/PRD-Backoffice.md) | API + admin panel, SQLite contract, commands/settings |
 
-The masters are Claude Docs on claude.ai (links at the top of each file). If
-they change, re-export them here in the same commit as the code that follows.
+The masters are Claude Docs on claude.ai (links at the top of each file); the
+files here are read-only copies. Approved changes go to `docs/PENDING-CHANGES.md`
+and are synced with the `sdbot-docs-sync` skill. Never edit the copies directly.
 Numbers (risk %, R multiples, scores, timeouts) come from the PRDs. Never
 invent them. Open decisions ("Keputusan terbuka") go to the user.
 

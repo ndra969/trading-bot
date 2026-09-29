@@ -9,6 +9,7 @@ Project skills live in `.claude/skills/<name>/SKILL.md` and are invoked as
 | Skill | Scope | Purpose |
 |-------|-------|---------|
 | `sdbot-spec` | SDBot (`sdbot/specs/`) | Kiro-style spec workflow: requirements → design → tasks → execute |
+| `sdbot-docs-sync` | SDBot (`sdbot/docs/`) | Record approved PRD/RULES changes, sync to Claude Docs masters |
 | `sdbot-ea` | SDBot (`sdbot/`) | MQL5 EA work: PRD, layer & safety rules, compile, definition of done |
 | `workflow` | Python bot | Dev workflow (start here) |
 | `rules` / `claude` | Repo | Show `CLAUDE.md` |

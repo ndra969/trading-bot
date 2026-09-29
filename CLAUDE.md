@@ -23,6 +23,7 @@ The former `.claude/commands/` were converted to skills with the same names.
 |-----|---------|
 | `/sdbot-spec <feature> [phase]` | Kiro-style spec: requirements → design → tasks (each approved) → execute one task |
 | `/sdbot-ea [module]` | Build/review/test the SDBot EA: PRD, layer & safety rules, compile, DoD |
+| `/sdbot-docs-sync [record\|sync\|status]` | Record approved PRD/RULES changes; sync them to the Claude Docs masters and repo copies |
 
 ### Development
 | Cmd | Purpose |
