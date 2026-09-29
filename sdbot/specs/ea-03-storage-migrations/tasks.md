@@ -11,10 +11,11 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 6.1, 6.3, 6.4, 7.1–7.7_
   - Hasil (2026-09-29): `0001_initial.sql` + `seed_sample.sql` diterapkan ke SQLite 3.50 in-memory tanpa error: 10 tabel + view terisi (sessions 2, trades 5, deals 9, closures 4, …); `v_trade_results` menampilkan posisi rekonsiliasi dengan closure NULL; deal ticket 7.000.000.009 (> 2^32) utuh. `enums.md` punya kolom "Kolom" agar `schema.py` bisa mencocokkan CHECK; enum baru `deal_reason`, `deinit_reason`, nilai `SL_RESTORED` (spec 06) dan `MARGIN_OK` (spec 05).
 
-- [ ] 2. `schema.py` inti: pemisah pernyataan, validasi, penerapan
+- [x] 2. `schema.py` inti: pemisah pernyataan, validasi, penerapan
   - Red: `tools/tests/test_schema.py` TS-08, TS-09, TS-14, TS-15, TS-16 (dan TS-07 untuk penomoran) terhadap modul kosong
   - Green: tokenizer pemisah pernyataan, larangan pernyataan, pembaca migrasi dan penomoran, penerapan ke DB kosong dan bertahap dengan data contoh
   - _Requirements: 5.5 (sebagian), 7.1, 7.4, 7.5_ · _Tests: TS-07..09, TS-14..16_
+  - Hasil (2026-09-29): Red = 16 FAIL (modul stub). Green = 16/16 (`uv run pytest -c sdbot/tools/pytest.ini`). Satu perbaikan saat Green: komentar setelah `;` sempat terbawa ke awal pernyataan berikutnya; komentar di awal pernyataan kini dibuang. Checksum dinormalkan ke LF agar checkout CRLF di Windows tidak mengubahnya. `sdbot/tools/pytest.ini` sendiri agar addopts coverage bot Python tidak ikut.
 
 - [ ] 3. `schema.py` build/check/new/release/status dan file hasil generate
   - Red: TS-01..06, TS-10..13 terhadap perintah yang belum ada
