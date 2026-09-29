@@ -5,10 +5,11 @@ Requirements: [requirements.md](requirements.md) · Design: [design.md](design.m
 
 Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/run-ea-tests.ps1 -Unit`, lalu implementasi sampai ALL PASS dengan compile 0/0. Hasil verifikasi ditulis di baris "Hasil" tiap task.
 
-- [ ] 1. Tipe dasar, konstanta, dan event sink
+- [x] 1. Tipe dasar, konstanta, dan event sink
   - Red: suite `TestEventSink` (TC-LG-02 versi dasar: `CFakeSink` menyimpan `AlertEvent` yang dikirim; TC-LG-03 versi dasar: `CNullSink` tidak melakukan apa pun) terhadap stub yang tidak menyimpan event
   - Green: `Core/Types.mqh` (enum §4.1, `AccountSnapshot`, `AlertEvent`, struct event lain minimal), `Core/Constants.mqh` (§4.4), `Core/EventSink.mqh` (`ISdbEventSink`, `CNullSink`), `tests/.../FakeSink.mqh`
-  - _Requirements: 6.1, 6.2, 6.3_ · _Tests: TC-LG-02a, TC-LG-03a_
+  - _Requirements: 6.1, 6.2, 6.3_ · _Tests: TC-LG-02a..g, TC-LG-03a_
+  - Hasil (2026-09-29): Red = 6 FAIL (TC-LG-02a..f, `CFakeSink` stub). Green = EventSink 8/8, total 24/24, build 0/0. `Constants.mqh` juga berisi batas blok magic (`SDB_MAGIC_MIN/MAX/HARNESS`) untuk task 2. Struct event selain `AccountSnapshot` dan `AlertEvent` masih satu field, dilengkapi spec 03–06.
 
 - [ ] 2. Input dan aturan validasinya
   - Red: suite `TestCoreUtils` bagian input (TC-CU-01..08c) terhadap `ValidateInputValues` yang selalu lolos

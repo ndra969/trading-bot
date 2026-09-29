@@ -8,11 +8,13 @@
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/Suites/TestFrameworkSelf.mqh>
 #include <SDBotTests/Suites/TestEnvCheck.mqh>
+#include <SDBotTests/Suites/TestEventSink.mqh>
 
 void RunAllSuites()
   {
    RunTestFrameworkSelf();
    RunTestEnvCheck();
+   RunTestEventSink();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH
