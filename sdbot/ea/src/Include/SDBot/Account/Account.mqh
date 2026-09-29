@@ -9,6 +9,7 @@
 
 #include <SDBot/Core/EventSink.mqh>
 #include <SDBot/Core/Utils.mqh>
+#include <SDBot/Core/SchemaEnums.mqh>
 #include <SDBot/Account/AccountRules.mqh>
 
 class CAccount
@@ -88,12 +89,12 @@ private:
       else if(act == SDB_CONN_ALERT_MEDIUM)
         {
          LogWarn("Account", "terminal terputus lebih dari 5 menit");
-         SendAlert(SDB_ALERT_CONN_DOWN, SDB_SEV_MEDIUM, "Terminal terputus lebih dari 5 menit, entry ditahan");
+         SendAlert(SDB_ALERT_TYPE_CONN_DOWN, SDB_SEV_MEDIUM, "Terminal terputus lebih dari 5 menit, entry ditahan");
         }
       else if(act == SDB_CONN_ALERT_RECOVERED)
         {
          LogInfo("Account", "koneksi pulih");
-         SendAlert(SDB_ALERT_CONN_UP, SDB_SEV_INFO, "Koneksi terminal pulih");
+         SendAlert(SDB_ALERT_TYPE_CONN_UP, SDB_SEV_INFO, "Koneksi terminal pulih");
         }
      }
 
@@ -128,7 +129,7 @@ public:
         {
          m_state = SDB_VAL_REJECTED;
          LogCritical("Account", "EA tidak boleh jalan di akun ini | " + m_reason);
-         SendAlert(SDB_ALERT_ACCOUNT_REJECTED, SDB_SEV_CRITICAL, "SDBot berhenti: " + m_reason);
+         SendAlert(SDB_ALERT_TYPE_ACCOUNT_REJECTED, SDB_SEV_CRITICAL, "SDBot berhenti: " + m_reason);
          return m_state;
         }
       m_state = SDB_VAL_PASSED;
@@ -190,6 +191,7 @@ public:
       s.leverage = AccountInfoInteger(ACCOUNT_LEVERAGE);
       s.balance = AccountInfoDouble(ACCOUNT_BALANCE);
       s.equity = AccountInfoDouble(ACCOUNT_EQUITY);
+      s.peakEquity = s.equity;   // diganti puncak dari status risiko di spec 05
       s.time = TimeCurrent();
       return s;
      }

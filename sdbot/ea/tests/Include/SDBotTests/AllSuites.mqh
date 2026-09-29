@@ -13,9 +13,11 @@
 #include <SDBotTests/Suites/TestState.mqh>
 #include <SDBotTests/Suites/TestAccountRules.mqh>
 #include <SDBotTests/Suites/TestAccount.mqh>
+#include <SDBotTests/Suites/TestCodec.mqh>
 
 void RunAllSuites()
   {
+   RunTestCodec();
    RunTestFrameworkSelf();
    RunTestEnvCheck();
    RunTestEventSink();

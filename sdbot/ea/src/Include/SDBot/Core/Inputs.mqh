@@ -10,6 +10,7 @@
 #include <SDBot/Core/Types.mqh>
 #include <SDBot/Core/Constants.mqh>
 #include <SDBot/Core/InputRules.mqh>
+#include <SDBot/Core/Utils.mqh>
 
 input group "Umum"
 input long                   InpMagicNumber           = SDB_DEF_MAGIC;              // Magic (2026091901-2026091999, satu per pair)
@@ -51,6 +52,36 @@ InputValues CurrentInputs()
    v.trailAtrPeriod = InpTrailATRPeriod;
    v.trailAtrMult = InpTrailATRMult;
    return v;
+  }
+
+// Semua input dalam JSON kanonik untuk sessions.inputs_json; hash-nya mengelompokkan hasil
+// per setelan (spec 03 Req 8). Setiap input baru wajib ditambahkan di sini.
+string CurrentInputsJson()
+  {
+   string k[] = {"InpMagicNumber", "InpTradingStyle", "InpSymbolSuffix", "InpAllowLiveTrading", "InpLogLevel",
+                 "InpRiskPerTradePct", "InpMaxOpenRiskPct", "InpDailyLossPct", "InpDDReducePct", "InpDDStopPct",
+                 "InpResetEmergencyStop", "InpBreakevenR", "InpBreakevenBufferPoints", "InpPartialR",
+                 "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult"};
+   string v[];
+   ArrayResize(v, ArraySize(k));
+   v[0] = JsonNum((double)InpMagicNumber);
+   v[1] = JsonStr(EnumToString(InpTradingStyle));
+   v[2] = JsonStr(InpSymbolSuffix);
+   v[3] = JsonBool(InpAllowLiveTrading);
+   v[4] = JsonStr(EnumToString(InpLogLevel));
+   v[5] = JsonNum(InpRiskPerTradePct);
+   v[6] = JsonNum(InpMaxOpenRiskPct);
+   v[7] = JsonNum(InpDailyLossPct);
+   v[8] = JsonNum(InpDDReducePct);
+   v[9] = JsonNum(InpDDStopPct);
+   v[10] = JsonBool(InpResetEmergencyStop);
+   v[11] = JsonNum(InpBreakevenR);
+   v[12] = JsonNum(InpBreakevenBufferPoints);
+   v[13] = JsonNum(InpPartialR);
+   v[14] = JsonNum(InpPartialPct);
+   v[15] = JsonNum(InpTrailATRPeriod);
+   v[16] = JsonNum(InpTrailATRMult);
+   return CanonicalJson(k, v);
   }
 
 #endif // SDB_CORE_INPUTS_MQH

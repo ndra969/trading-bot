@@ -30,10 +30,11 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 5.6_
   - Hasil (2026-09-29): hook `sdbot-schema-check` dan `sdbot-schema-tests` ditambahkan; `pre-commit validate-config` valid. Uji: `enums.md` ditambah nilai tanpa `build` → hook gagal dengan "SchemaEnums.mqh tidak sama dengan hasil build"; setelah dikembalikan kedua hook Passed. Pytest memakai `-c sdbot/tools/pytest.ini` agar coverage bot Python tidak ikut.
 
-- [ ] 5. Struct event lengkap, kode enum dari hasil generate, util waktu dan hash
+- [x] 5. Struct event lengkap, kode enum dari hasil generate, util waktu dan hash
   - Red: suite `TestStorageUtil` (UTC offset, `ServerToUtc`, JSON input kanonik, hash input) terhadap stub
   - Green: lengkapi `TradeRecord`, `DealRecord`, `PositionEvent`, `ClosureRecord`, `BalanceOpRecord` sesuai skema; `SDB_ALERT_*` di `Constants.mqh` diganti konstanta dari `SchemaEnums.mqh`; `ServerUtcOffset`, `ServerToUtc`, `CanonicalJson`, `Sha256Hex`, `CurrentInputsJson`
   - _Requirements: 6.2, 7.3, 8.5_ · _Tests: TC-DB-11, TC-DB-14, TC-SU-xx_
+  - Hasil (2026-09-29): Red = 12 FAIL (stub). Green: suite `Codec` 14/14 (TC-SU-01a..d pembulatan offset ke 15 menit, TC-DB-11, TC-SU-02a..c JSON kanonik, TC-SU-03 SHA-256 vektor NIST, TC-DB-14a/b hash input, TC-SU-04a..c `CurrentInputsJson` 17 input); total unit 111/111, build 0/0. Nama akhir: suite `TestCodec` (bukan `TestStorageUtil`) dan `RoundUtcOffset` (fungsi murni; pembacaan `TimeTradeServer()-TimeGMT()` ada di Logger). Struct event mengikuti kolom `data_db.sql`, kolom NULL memakai `SDB_NULL_DOUBLE`/`SDB_NULL_LONG`; `AccountSnapshot.peakEquity` ditambahkan (sementara = equity sampai spec 05). `SDB_ALERT_*` sementara dihapus dari `Constants.mqh`, `CAccount` memakai `SDB_ALERT_TYPE_*` dari `SchemaEnums.mqh`.
 
 - [ ] 6. Runner migrasi di EA
   - Red: suite `TestStorage` TC-DB-01..05 terhadap runner kosong

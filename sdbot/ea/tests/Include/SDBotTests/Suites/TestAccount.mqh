@@ -43,7 +43,7 @@ void RunTestAccount()
    bool hasAlert = fake2.LastAlert(alert);
    AssertTrue("TC-AC-25", "suffix salah: REJECTED, alert Critical ACCOUNT_REJECTED, alasan menyebut suffix",
               v2 == SDB_VAL_REJECTED && hasAlert && alert.severity == SDB_SEV_CRITICAL &&
-              alert.type == SDB_ALERT_ACCOUNT_REJECTED && StringFind(wrong.LastReason(), "zz") >= 0);
+              alert.type == SDB_ALERT_TYPE_ACCOUNT_REJECTED && StringFind(wrong.LastReason(), "zz") >= 0);
    AssertTrue("TC-AC-25b", "akun yang ditolak tidak boleh trading", !wrong.CanTrade(why));
 
    CAccount noSink;

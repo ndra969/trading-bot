@@ -52,7 +52,14 @@ enum ENUM_SDB_CONN_ACTION
    SDB_CONN_ALERT_RECOVERED = 3
   };
 
-// Snapshot akun untuk tabel accounts (spec 03).
+// Nilai penanda NULL untuk kolom yang boleh kosong: DatabaseBind MQL5 tidak bisa mengikat NULL,
+// jadi Logger mengubah penanda ini menjadi NULL (NULLIF) saat menulis.
+#define SDB_NULL_DOUBLE DBL_MAX
+#define SDB_NULL_LONG   LONG_MIN
+
+// Semua waktu di struct event adalah waktu server MT5; Logger mengubahnya ke UTC saat menulis.
+
+// Snapshot akun untuk tabel accounts.
 struct AccountSnapshot
   {
    long                     login;
@@ -64,6 +71,7 @@ struct AccountSnapshot
    long                     leverage;
    double                   balance;
    double                   equity;
+   double                   peakEquity;   // puncak dari status risiko (spec 05); sebelum itu = equity
    datetime                 time;
   };
 
@@ -78,12 +86,93 @@ struct AlertEvent
    datetime          time;
   };
 
-// Struct event berikut dilengkapi oleh spec pemakainya (04: trade, 05: operasi saldo,
-// 06: deal, event posisi, closure). Satu field cukup agar interface sink bisa di-compile.
-struct TradeRecord      { long positionId; };
-struct DealRecord       { long dealTicket; };
-struct PositionEvent    { long positionId; };
-struct ClosureRecord    { long positionId; };
-struct BalanceOpRecord  { long dealTicket; };
+// Struct event berikut mengikuti kolom tabel di shared/schema/data_db.sql. Kolom teks enum
+// diisi dengan konstanta Core/SchemaEnums.mqh. Kolom yang boleh NULL memakai SDB_NULL_*.
+
+struct TradeRecord          // tabel trades (spec 04 mengisi dari Executor, spec 06 dari rekonsiliasi)
+  {
+   long              positionId;
+   long              magic;
+   string            symbol;
+   string            direction;       // SDB_DIRECTION_*
+   string            source;          // SDB_TRADE_SOURCE_*
+   double            volumeInitial;
+   double            priceRequested;  // SDB_NULL_DOUBLE untuk RECONCILED
+   double            priceOpen;
+   long              slippagePoints;  // SDB_NULL_LONG untuk RECONCILED
+   long              spreadPoints;    // SDB_NULL_LONG untuk RECONCILED
+   double            slInitial;
+   double            tpInitial;
+   double            riskMoney;       // SDB_NULL_DOUBLE bila tidak diketahui
+   double            riskPct;         // SDB_NULL_DOUBLE bila tidak diketahui
+   long              signalId;        // SDB_NULL_LONG sebelum Fase 3
+   string            eaVersion;
+   datetime          openedAt;
+  };
+
+struct DealRecord           // tabel deals
+  {
+   long              dealTicket;
+   long              positionId;
+   long              magic;
+   string            symbol;
+   datetime          time;
+   string            entry;           // SDB_DEAL_ENTRY_*
+   string            dealType;        // SDB_DEAL_TYPE_*
+   double            volume;
+   double            price;
+   string            reason;          // SDB_DEAL_REASON_*
+   double            profit;
+   double            commission;
+   double            swap;
+   double            fee;
+  };
+
+struct PositionEvent        // tabel position_events
+  {
+   long              positionId;
+   datetime          time;
+   string            type;            // SDB_POSITION_EVENT_*
+   double            slOld;           // SDB_NULL_DOUBLE bila tidak relevan
+   double            slNew;           // SDB_NULL_DOUBLE bila tidak relevan
+   double            volume;
+   double            price;
+   long              spreadPoints;
+   string            detail;          // "" = NULL
+  };
+
+struct ClosureRecord        // tabel closures
+  {
+   long              positionId;
+   long              magic;
+   string            symbol;
+   datetime          closedAt;
+   string            reason;          // SDB_CLOSE_REASON_*
+   double            levelPrice;      // SDB_NULL_DOUBLE untuk close manual
+   double            priceClose;
+   long              slippagePoints;  // SDB_NULL_LONG bila tidak ada level
+   double            volumeTotal;
+   double            profit;
+   double            commission;
+   double            swap;
+   double            fee;
+   double            netProfit;
+   double            rResult;         // SDB_NULL_DOUBLE bila risiko awal tidak diketahui
+   double            mfeR;            // SDB_NULL_DOUBLE bila bar M1 tidak tersedia
+   double            maeR;
+   long              holdingSec;
+   bool              beActivated;
+   bool              partialDone;
+   bool              trailActivated;
+  };
+
+struct BalanceOpRecord      // tabel balance_ops (spec 05)
+  {
+   long              dealTicket;
+   datetime          time;
+   string            opType;          // SDB_BALANCE_OP_TYPE_*
+   double            amount;
+   string            comment;
+  };
 
 #endif // SDB_CORE_TYPES_MQH

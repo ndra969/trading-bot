@@ -17,12 +17,6 @@
 #define SDB_MAGIC_MAX                 2026091999
 #define SDB_MAGIC_HARNESS             2026091900  // dicadangkan untuk harness uji
 
-// Kode alert (kolom alerts.type). Sementara di sini; spec 03 memindahkannya ke
-// Core/SchemaEnums.mqh yang di-generate dari shared/schema/enums.md.
-#define SDB_ALERT_ACCOUNT_REJECTED    "ACCOUNT_REJECTED"
-#define SDB_ALERT_CONN_DOWN           "CONN_DOWN"
-#define SDB_ALERT_CONN_UP             "CONN_UP"
-
 // Default input dari PRD. Satu sumber untuk Inputs.mqh dan DefaultInputValues().
 #define SDB_DEF_MAGIC                 2026091901
 #define SDB_DEF_RISK_PER_TRADE_PCT    0.5

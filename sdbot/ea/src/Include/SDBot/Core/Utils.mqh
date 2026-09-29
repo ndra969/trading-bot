@@ -160,4 +160,72 @@ string ErrText(const int code)
    return "err=" + IntegerToString(code);
   }
 
+//--- Waktu: DB menyimpan UTC; waktu MT5 adalah waktu server broker.
+
+// Selisih server-GMT dibulatkan ke 15 menit: TimeGMT dan TimeTradeServer bisa selisih beberapa detik.
+int RoundUtcOffset(const long serverMinusGmtSec)
+  {
+   return (int)(MathRound(serverMinusGmtSec / 900.0) * 900);
+  }
+
+datetime ServerToUtc(const datetime serverTime, const int offsetSec)
+  {
+   return serverTime - offsetSec;
+  }
+
+//--- JSON kanonik (kunci terurut) untuk sessions.inputs_json dan hash input.
+
+string JsonStr(const string s)
+  {
+   string out = s;
+   StringReplace(out, "\\", "\\\\");
+   StringReplace(out, "\"", "\\\"");
+   StringReplace(out, "\n", "\\n");
+   StringReplace(out, "\r", "\\r");
+   StringReplace(out, "\t", "\\t");
+   return "\"" + out + "\"";
+  }
+
+string JsonNum(const double v)  { return StringFormat("%.15g", v); }
+string JsonBool(const bool v)   { return v ? "true" : "false"; }
+
+// values sudah berupa literal JSON (JsonStr/JsonNum/JsonBool). Kunci diurutkan agar hash
+// tidak bergantung urutan penulisan (Req 8.5); ArraySort MQL5 tidak mendukung string.
+string CanonicalJson(const string &keys[], const string &values[])
+  {
+   int n = ArraySize(keys);
+   int order[];
+   ArrayResize(order, n);
+   for(int i = 0; i < n; i++)
+      order[i] = i;
+   for(int i = 1; i < n; i++)
+     {
+      int cur = order[i];
+      int j = i - 1;
+      while(j >= 0 && StringCompare(keys[order[j]], keys[cur]) > 0)
+        {
+         order[j + 1] = order[j];
+         j--;
+        }
+      order[j + 1] = cur;
+     }
+   string out = "{";
+   for(int i = 0; i < n; i++)
+      out += (i > 0 ? "," : "") + JsonStr(keys[order[i]]) + ":" + values[order[i]];
+   return out + "}";
+  }
+
+string Sha256Hex(const string text)
+  {
+   uchar data[], key[], hash[];
+   int len = StringToCharArray(text, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, MathMax(len - 1, 0));   // buang terminator nol
+   if(CryptEncode(CRYPT_HASH_SHA256, data, key, hash) <= 0)
+      return "";
+   string hex = "";
+   for(int i = 0; i < ArraySize(hash); i++)
+      hex += StringFormat("%02x", hash[i]);
+   return hex;
+  }
+
 #endif // SDB_CORE_UTILS_MQH
