@@ -1,6 +1,6 @@
 # Implementation plan — 01 Tooling
 
-Status: Draft
+Status: Done (2026-09-29), validasi manual tertunda di bawah
 Requirements: [requirements.md](requirements.md) · Design: [design.md](design.md)
 
 Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditulis di laporan task.
@@ -54,11 +54,16 @@ Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditu
   - _Requirements: 5.1, 5.2, 5.3_ · _Tests: TC-ENV-00..08_
   - Hasil (2026-09-29): Red = TC-ENV-00 FAIL (helper stub). Green = EnvCheck 9/9, total 16/16 lewat `run-ea-tests.ps1`. SQLite 3.53.0; CHECK, UPSERT DO NOTHING/DO UPDATE, WAL di Common, BEGIN IMMEDIATE + COMMIT/ROLLBACK, dan bind integer 2^40 (TC-ENV-08, tambahan untuk ticket MT5) semuanya bekerja. Di tester TimeGMT = TimeTradeServer. Helper `TestDb.mqh` dipakai lagi di spec 03. Refactor: `ResetLastError()` sebelum membaca hasil statement. Temuan runner: jalur timeout kini menghapus file hasil parsial. **Tertunda (manual)**: TC-ENV-07 versi live (selisih waktu server kelipatan 15 menit) lewat script `RunUnitTests` di chart.
 
-- [ ] 8. EA kerangka `SDBot.mq5` v1.00
+- [x] 8. EA kerangka `SDBot.mq5` v1.00
   - `#property version "1.00"`, handler kosong yang aman, log INFO saat init
   - Verifikasi: `build-ea.ps1` 0/0 untuk semua target; `run-ea-tests.ps1 -Unit` exit 0
   - _Requirements: 6.1, 6.2_
+  - Hasil (2026-09-29): `build-ea.ps1` 3 target 0/0; `run-ea-tests.ps1 -Unit` pass=16 fail=0. Cek tambahan di tester Broker A (EURUSDc M15, 7 hari): log `[SDB][INFO][App][EURUSDc] SDBot kerangka v1.00 aktif…` saat init dan log saat deinit, tanpa deal, final balance tetap 10000.00.
 
-## Validasi manual (di luar tasks)
+## Validasi manual (di luar tasks), tertunda
 
-- Pasang `SDBot.mq5` v1.00 di satu chart Broker A, pastikan log INFO muncul dan tidak ada aktivitas lain (6.2).
+Dilakukan trader di GUI MT5 Broker A; tidak memblokir spec 02.
+
+- [ ] Pasang `SDBot.mq5` v1.00 di satu chart Broker A: log INFO muncul, tidak ada aktivitas lain (6.2).
+- [ ] Seret script `SDBotTests\RunUnitTests` ke chart Broker A: hasil sama dengan runner (pass=16 fail=0) dan TC-ENV-07 versi live (selisih waktu server kelipatan 15 menit) lulus (3.5, 5.2).
+- Tutup kembali terminal Broker A setelahnya; runner menolak jalan saat terminal uji terbuka.
