@@ -152,7 +152,7 @@ Enum untuk event posisi, alasan tutup, dan level drawdown ditambahkan spec 04–
 
 | Input | Default | Batas |
 |---|---|---|
-| `InpMagicNumber` | 20260919 | > 0 (blok magic mengikuti keputusan R2-1 di spec 05) |
+| `InpMagicNumber` | 2026091901 | 2026091901 ≤ x ≤ 2026091999 (blok SDBot, R2-1; `…00` untuk harness) |
 | `InpTradingStyle` | `SDB_STYLE_DAY` | — |
 | `InpSymbolSuffix` | `""` | — |
 | `InpAllowLiveTrading` | `false` | — |
@@ -215,6 +215,8 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-CU-06 | sama | DD reduce 15, DD stop 10 | gagal | 1.4 |
 | TC-CU-07 | sama | partial pct 100 | gagal | 1.2 |
 | TC-CU-08 | sama | magic 0 dan risk 2 sekaligus | gagal, pesan menyebut keduanya | 1.3 |
+| TC-CU-08b | sama | magic 2026091904 / 2026091999 | lolos | 1.6 |
+| TC-CU-08c | sama | magic 20260919 (default PRD lama) / 2026092000 / 2026091900 | gagal, menyebut rentang `2026091901–2026091999` | 1.6 |
 | TC-CU-09 | `FormatLogLine` | WARN, Filters, EURUSDc, "x \| a=1" | `[SDB][WARN][Filters][EURUSDc] x \| a=1` | 5.1 |
 | TC-CU-10 | `ThrottleAllow` | kunci sama 5x dalam 10 detik, interval 60 | true, false ×4 | 5.4 |
 | TC-CU-11 | `ThrottleAllow` | kunci sama di detik 61 | true, suppressed = 4 | 5.4 |
@@ -281,7 +283,7 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 
 | Requirement | Komponen | Uji |
 |---|---|---|
-| 1 | `Inputs.mqh`, `InputRules.mqh` | TC-CU-01..08 |
+| 1 | `Inputs.mqh`, `InputRules.mqh` | TC-CU-01..08c |
 | 2 | `AccountRules.mqh`, `CAccount` | TC-AC-01..12, MC-01..03 |
 | 3 | `TradePermission`, `ConnectionStep`, `CAccount::OnTimer` | TC-AC-13..21, MC-04, MC-05 |
 | 4 | `CState` | TC-ST-01..05 |

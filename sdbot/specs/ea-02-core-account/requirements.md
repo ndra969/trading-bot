@@ -30,6 +30,7 @@ Selesai jika suite `CoreUtils`, `AccountRules`, `State`, dan `Log` ALL PASS lewa
 1.3. JIKA ada input di luar batas MAKA EA WAJIB gagal init (`INIT_PARAMETERS_INCORRECT`) dan menyebut semua input yang salah beserta batasnya dalam satu pesan.
 1.4. JIKA `InpMaxOpenRiskPct` < `InpRiskPerTradePct`, atau `InpBreakevenR` ≥ `InpPartialR`, atau `InpDDReducePct` ≥ `InpDDStopPct` MAKA validasi WAJIB gagal dengan alasan hubungan antar-input tersebut.
 1.5. KETIKA trader mengubah input saat EA berjalan MAKA EA WAJIB memvalidasi ulang seluruh input pada init berikutnya.
+1.6. JIKA `InpMagicNumber` berada di luar blok SDBot `2026091900`–`2026091999` MAKA validasi WAJIB gagal dan menyebut rentang yang benar. Nomor `…00` dicadangkan untuk harness uji (keputusan R2-1, disetujui 2026-09-29).
 
 ### Requirement 2: Validasi akun dan simbol
 
