@@ -31,6 +31,10 @@ roadmap phase gets `specs/<feature>/{requirements,design,tasks}.md`, each approv
 the user before the next; code only when executing an approved task, one task at a
 time. For the EA code itself, use the `sdbot-ea` skill.
 
+Configuration map (inputs, presets, constants, panel settings, local files) and the tuning
+flow live in [README.md](README.md#konfigurasi-dan-tuning). Keep that table current when an
+input, preset, or constant is added.
+
 ## Layout
 
 ```
