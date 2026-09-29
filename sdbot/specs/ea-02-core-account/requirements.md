@@ -1,6 +1,6 @@
 # Requirements — 02 Core dan akun
 
-Status: Draft
+Status: Approved (2026-09-29)
 Use case: UC-03 (validasi), UC-04 ([overview](../fase-1-overview.md))
 Asal: ea-foundation R1.4, R2, R3, R15.1, R18.1–18.3
 Butuh: spec 01

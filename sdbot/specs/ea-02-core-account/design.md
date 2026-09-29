@@ -1,6 +1,6 @@
 # Design — 02 Core dan akun
 
-Status: Draft
+Status: Approved (2026-09-29)
 Requirements: [requirements.md](requirements.md)
 
 ## 1. Overview
@@ -268,6 +268,14 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-LG-01 | level INFO, `LogDebug` dipanggil | tidak tercetak (cek lewat hook uji) | 5.2 |
 | TC-LG-02 | `CFakeSink` menerima `OnAlert` dari `CAccount` palsu | 1 alert, severity dan type sesuai | 6.3 |
 | TC-LG-03 | Modul diberi sink `NULL` | memakai `CNullSink`, tidak crash | 6.4 |
+
+**TestAccount** (di Strategy Tester, akun tester)
+
+| ID | Kasus | Harapan | Req |
+|---|---|---|---|
+| TC-AC-22 | `Validate()` di tester | `PASSED`; tepat satu `AccountSnapshot` diterima `CFakeSink` dengan login dan mata uang terisi | 2.1, 2.10 |
+| TC-AC-23 | `CanTrade(why)` di tester setelah validasi | true, `why` kosong | 3.1 |
+| TC-AC-24 | `Init(NULL)` lalu `Validate()` | tidak crash, memakai `CNullSink` | 6.4 |
 
 **Manual (terminal live)**
 
