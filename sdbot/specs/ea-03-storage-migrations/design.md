@@ -456,7 +456,7 @@ Pre-commit (`.pre-commit-config.yaml`, hook lokal):
 
 ## 9. Keputusan yang perlu disetujui
 
-1. **Skema baru menggantikan tabel PRD** sesuai §2 (`sessions`, `deals`, `signal_scores`, `balance_ops`, `schema_migrations`, kolom closure baru, UTC). Setelah disetujui, PRD-EA §Data, PRD-Backoffice §Database, dan RULES §Kontrak lintas bagian diperbarui (dokumen induk di claude.ai + salinan repo).
+1. **[Disetujui 2026-09-29] Skema baru menggantikan tabel PRD** sesuai §2 (`sessions`, `deals`, `signal_scores`, `balance_ops`, `schema_migrations`, kolom closure baru, UTC). Setelah disetujui, PRD-EA §Data, PRD-Backoffice §Database, dan RULES §Kontrak lintas bagian diperbarui (dokumen induk di claude.ai + salinan repo). **Tertunda**: connector Claude Docs terputus 2026-09-29; dilakukan saat tersambung lagi.
 2. **DB tester terpisah** (`sdbot_tester.sqlite`), bukan kolom penanda di satu file.
 3. **Antrean + flush di `OnTimer`** dan busy timeout **500 ms** (PRD Backoffice menyebut 2 detik). Karena tulis sudah tidak pernah di `OnTick`, timeout pendek cukup dan risk monitor tidak tertahan. Nilai ini jadi konstanta dan bisa diubah.
 4. **Tanpa foreign key**; keterkaitan dijaga `UNIQUE` dan uji.

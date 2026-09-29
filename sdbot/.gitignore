@@ -28,3 +28,7 @@ node_modules/
 !lib/
 !uv.lock
 !*.json
+
+# Konfigurasi mesin lokal dan file sementara tools
+*.local.json
+tools/.tmp/

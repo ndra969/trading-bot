@@ -51,7 +51,7 @@ Diuji di `sdbot/tools/tests/test_queries.py` terhadap `data_latest_sample.sqlite
 
 - `sdbot/docs/flows/`: `init.md`, `tick.md`, `timer.md`, `order-execution.md`, `risk-monitor.md`, `closure.md` (Mermaid), diambil dari design spec 02–06.
 - `sdbot/CHANGELOG.md`: bagian EA dengan versi, daftar spec, ringkasan regresi (jumlah test, durasi).
-- Versi EA: spec 01 `0.0`, naik MINOR setiap spec 02–06 selesai (`0.1` … `0.5`), Fase 1 selesai `0.6`. Versi `1.0` dicadangkan untuk rilis setelah validasi Fase 6.
+- Versi EA: spec 01 `1.00`, naik `0.01` setiap spec 02–06 selesai (`1.01` … `1.05`), Fase 1 selesai `1.06`. Versi `2.00` dicadangkan untuk rilis setelah validasi Fase 6. MAJOR 0 tidak dipakai (warning 68 MetaEditor).
 
 ## 3. Test case
 
@@ -78,6 +78,6 @@ Diuji di `sdbot/tools/tests/test_queries.py` terhadap `data_latest_sample.sqlite
 
 ## 5. Keputusan yang perlu disetujui
 
-1. **Skema versi EA** `0.0` → `0.6` sepanjang Fase 1, `1.0` setelah validasi Fase 6.
+1. **Skema versi EA** `1.00` → `1.06` sepanjang Fase 1, `2.00` setelah validasi Fase 6.
 2. **Minimal 30 trade** agar metrik optimasi dihitung.
 3. **Preset dengan `InpAllowLiveTrading = false`** walau untuk akun cent, sehingga trader harus mengaktifkannya dengan sadar.

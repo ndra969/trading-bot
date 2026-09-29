@@ -15,7 +15,7 @@ Requirements: [requirements.md](requirements.md)
 Include/SDBot/Execution/ExecutionRules.mqh   [murni]
 Include/SDBot/Execution/Executor.mqh         CExecutor
 Include/SDBot/App/SdbApp.mqh                 CSdbApp
-Experts/SDBot/SDBot.mq5                      meneruskan event ke CSdbApp (versi 0.3)
+Experts/SDBot/SDBot.mq5                      meneruskan event ke CSdbApp (versi 1.03)
 tests/Include/SDBotTests/Suites/TestExecution.mqh
 tests/Include/SDBotTests/ScenarioRecorder.mqh   CTeeSink + CScenarioRecorder
 tests/Include/SDBotTests/Scenarios.mqh          harapan per SC-nn

@@ -190,7 +190,7 @@ Konstanta: `SDB_DD_INFO_PCT` 5 · `SDB_DD_RECOVER_PCT` 8 · `SDB_MARGIN_ALERT_PC
 
 ## 8. Keputusan yang perlu disetujui
 
-1. **R2-1: blok magic SDBot** (`2026091900`–`2026091999`) untuk emergency lintas pair dan risiko terbuka akun. Ini pengecualian tertulis dari RULES "loop posisi memfilter magic dan simbol".
+1. **[Disetujui 2026-09-29] R2-1: blok magic SDBot** (`2026091900`–`2026091999`) untuk emergency lintas pair dan risiko terbuka akun. Ini pengecualian tertulis dari RULES "loop posisi memfilter magic dan simbol".
 2. **Reset emergency hanya pada transisi input false → true**, menutup celah input yang lupa dikembalikan.
 3. **Dasar rugi harian = balance saat pergantian hari**, dengan konsekuensi floating dari hari sebelumnya ikut terhitung (EC-03). Sudah disetujui sebagai angka dasar; konsekuensinya dicatat di sini agar disadari.
 4. **Close all saat pasar tutup** dicoba tiap 60 detik, bukan 5 detik, agar log dan broker tidak dibanjiri.

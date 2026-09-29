@@ -25,7 +25,7 @@ flowchart LR
     S4 --> S6
 ```
 
-Versi EA naik satu MINOR setiap spec selesai: 01 = `0.0`, 02 = `0.1`, … 06 = `0.5`, 07 = `0.6` (Fase 1 selesai). `1.0` setelah validasi Fase 6.
+Versi EA naik 0.01 setiap spec selesai: 01 = `1.00`, 02 = `1.01`, … 06 = `1.05`, 07 = `1.06` (Fase 1 selesai). `2.00` setelah validasi Fase 6. MAJOR 0 tidak dipakai karena MetaEditor memberi warning 68 untuk versi `0.x` (temuan spike spec 01).
 
 Urutan ini dipilih agar setiap spec bisa diuji penuh saat selesai: framework uji ada sebelum kode apa pun, event sink dan storage ada sebelum modul yang menulis log, dan harness ada sebelum modul yang butuh posisi sungguhan (risk, position).
 

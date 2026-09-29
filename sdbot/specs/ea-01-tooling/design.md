@@ -1,6 +1,6 @@
 # Design — 01 Tooling
 
-Status: Draft
+Status: Approved (2026-09-29), dengan perubahan §7 (terminal uji = instalasi "Broker A")
 Requirements: [requirements.md](requirements.md)
 
 ## 1. Overview
@@ -14,7 +14,7 @@ Risiko utama: mekanisme `/config` + `ShutdownTerminal` dan pembacaan file hasil 
 ```
 sdbot/
   ea/src/
-    Experts/SDBot/SDBot.mq5              kerangka v0.0 (Req 6)
+    Experts/SDBot/SDBot.mq5              kerangka v1.00 (Req 6)
     Include/SDBot/{Core,Account,Risk,Analysis,Strategies,Signals,Filters,
                    Execution,Position,Control,Notify,Storage,UI,App}/   (.gitkeep)
     Scripts/SDBot/                       (.gitkeep)
@@ -148,7 +148,7 @@ Membuka `sdbot_envcheck.sqlite` di Common (dihapus di akhir), lalu menjalankan t
 
 ### 3.7 `SDBot.mq5` kerangka
 
-`#property version "0.0"`, `#property description`, `OnInit` mencetak log INFO "SDBot kerangka v0.0, tidak ada logika trading" lewat `Print` sementara (fungsi log baru ada di spec 02), `OnDeinit`/`OnTick` kosong. Tidak ada `#include` modul.
+`#property version "1.00"`, `#property description`, `OnInit` mencetak log INFO "SDBot kerangka v1.00, tidak ada logika trading" lewat `Print` sementara (fungsi log baru ada di spec 02), `OnDeinit`/`OnTick` kosong. Tidak ada `#include` modul.
 
 ## 4. Error handling
 
@@ -223,7 +223,33 @@ Membuka `sdbot_envcheck.sqlite` di Common (dihapus di akhir), lalu menjalankan t
 | 7 | `mt5-paths.*.json`, `.gitignore` | `git check-ignore` |
 | 8 | `run-ea-tests.ps1`, `build-ea.ps1` | VT-07..12 |
 
-## 7. Butuh dari Anda (sekali)
+## 7. Terminal uji di mesin ini
 
-1. Salin folder instalasi MT5 (misalnya `C:\Program Files\MetaTrader 5`) ke `D:\MT5-Test`, jalankan `D:\MT5-Test\terminal64.exe /portable`, login ke akun cent yang sama (hanya untuk mengunduh data historis EURUSDc, GBPUSDc, EURJPYc, GBPJPYc), lalu tutup. Terminal ini tidak pernah dipakai memasang EA di chart.
-2. Isi `tools/mt5-paths.local.json` dari contoh (saya bantu isi path yang bisa dideteksi otomatis).
+Hasil pemeriksaan 2026-09-29:
+
+| Instalasi | Data folder | Login | Pemakaian |
+|---|---|---|---|
+| `C:\Program Files\MetaTrader 5\Broker B` | `…\Terminal\336EDF3E7DE9B50DE79164ED72A7B9E5` | Exness-MT5Real20 | bot Python (aktif, `config/development.yaml`). **Tidak disentuh runner.** |
+| `C:\Program Files\MetaTrader 5\Broker A` | `…\Terminal\A15177F083F06F4EDF29350AB4ECDC24` | Exness-MT5Real20 | terakhir dipakai Mei 2026; tidak ada EA di profil chart, Algo Trading mati. **Dipakai sebagai terminal uji.** |
+
+Keputusan: salinan portable tidak diperlukan; Broker A menjadi terminal uji (disetujui sebagai pengganti opsi portable). Pengaman runner:
+- Runner menolak jalan jika proses `terminal64.exe` Broker A sedang berjalan (8.1).
+- File konfigurasi runner selalu menyertakan `[Experts] Enabled=0` dan `AllowLiveTrading=0`, sehingga EA di chart (jika kelak ada) tidak jalan saat runner membuka terminal. Strategy Tester tetap bisa menjalankan EA uji (dibuktikan di task 1).
+- Terminal tempat SDBot live nanti dijalankan diputuskan di Fase 3 (Broker B dipakai bot Python pada akun yang sama; perlu diputuskan apakah keduanya boleh berjalan bersamaan).
+
+## 8. Temuan spike (task 1, 2026-09-29)
+
+| Temuan | Bukti | Dampak ke design |
+|---|---|---|
+| Compile CLI jalan lewat path junction; `.ex5` muncul di repo (diabaikan git) | `Result: 0 errors, 1 warnings, 505 ms` untuk EA spike | §3.3 tetap |
+| **Exit code MetaEditor tidak bisa dipakai** (1 walau tanpa error) | exit=1 dengan `0 errors` | `build-ea.ps1` hanya membaca baris `Result: N errors, M warnings` di log (sudah di §3.3) |
+| **Versi dengan MAJOR 0 selalu memicu warning 68** ("must be xxx.yyy") | `0.0`, `0.00`, `0.01`, `0.1`, `0.10` → warning; `1.0`, `1.00` → bersih | Skema versi diganti: spec 01 = `1.00`, naik `0.01` per spec (spec 07 = `1.06`), `2.00` setelah validasi Fase 6. Diterapkan di README, spec 01 Req 6, spec 04, spec 07 |
+| Strategy Tester lewat `/config` + `ShutdownTerminal=1` jalan dan terminal menutup sendiri | run 1 hari M15 model 2: **8 detik** termasuk login; tidak ada proses tersisa | §3.4 tetap; `timeoutSec` 600 cukup longgar |
+| File `.set` untuk `ExpertParameters` harus berada di `<data>\MQL5\Profiles\Tester\` | run sukses dengan `.set` di sana | §3.4 langkah 3: `.set` sementara ditulis ke folder itu dan dihapus setelah run |
+| File `.ini` dan `.set` UTF-16 LE diterima | run sukses | runner menulis keduanya sebagai UTF-16 LE |
+| `FILE_COMMON` dari agen tester menulis ke `%APPDATA%\MetaQuotes\Terminal\Common\Files` | file hasil terbaca | §3.2 `commonFilesDir` benar |
+| **SQLite bawaan MT5 versi 3.53.0** | `SELECT sqlite_version()` | UPSERT, `CHECK`, WAL, `BEGIN IMMEDIATE` tersedia; TC-ENV tetap dijalankan di task 7 sebagai pengaman |
+| Di tester `TimeGMT() == TimeTradeServer()` | keduanya `2026.09.01 00:00:00` | sesuai asumsi spec 03 §3.2 |
+| Kegagalan tester tidak menghasilkan file hasil; alasannya ada di **log terminal** `<data>\logs\yyyymmdd.log` (UTF-16), bukan di `Tester\logs` | `Tester symbol NOSUCHc not exist`, `tester didn't start`, `shutdown with -1000012358 (tester symbol does not exist)` | §3.4 langkah 5 dan §4: saat file hasil tidak ada, runner membaca baris log terminal sejak waktu mulai run yang mengandung `Tester` level 2 atau `shutdown with`, lalu menampilkannya (8.3) |
+| Terminal uji login ke akun Exness (`159394302`) saat tester jalan, lalu disconnect saat shutdown | log terminal | aman karena `[Experts] Enabled=0` dan tidak ada EA di chart; tetap dicek setiap run (8.1) |
+| Penghapusan file dengan wildcard di `tools/.tmp` diblokir sandbox Claude Code | error "protected from removal" | runner menghapus file sementaranya sendiri per nama file yang ia buat |

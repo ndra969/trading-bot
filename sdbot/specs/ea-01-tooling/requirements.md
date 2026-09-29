@@ -1,6 +1,6 @@
 # Requirements — 01 Tooling (build, uji, lingkungan)
 
-Status: Draft
+Status: Approved (2026-09-29)
 Use case: UC-01, UC-02 ([overview](../fase-1-overview.md))
 Asal: ea-foundation R1, R20.1, R20.4, keputusan design runner otomatis
 
@@ -13,7 +13,7 @@ Spec ini selesai jika `build-ea` meng-compile kerangka EA dengan 0 error dan 0 w
 ## Glosarium
 
 - **Terminal live**: instalasi MT5 yang login ke akun cent dan menjalankan EA di chart.
-- **Terminal uji**: instalasi MT5 terpisah (mode portable) yang hanya dipakai runner untuk Strategy Tester.
+- **Terminal uji**: instalasi MT5 terpisah dari terminal yang menjalankan bot/EA live, hanya dipakai runner untuk Strategy Tester. Di mesin ini: `C:\Program Files\MetaTrader 5\Broker A`.
 - **Suite**: kumpulan test case dalam satu file `.mqh`.
 - **Runner**: skrip yang meng-compile, menjalankan suite di Strategy Tester, dan membaca hasilnya.
 
@@ -83,7 +83,7 @@ Spec ini selesai jika `build-ea` meng-compile kerangka EA dengan 0 error dan 0 w
 
 #### Acceptance criteria
 
-6.1. `Experts/SDBot/SDBot.mq5` WAJIB compile 0 error 0 warning dengan `#property version "0.0"` dan handler event kosong yang aman (tidak mengirim order).
+6.1. `Experts/SDBot/SDBot.mq5` WAJIB compile 0 error 0 warning dengan `#property version "1.00"` dan handler event kosong yang aman (tidak mengirim order).
 6.2. KETIKA EA kerangka dipasang di chart MAKA EA WAJIB mencatat log INFO bahwa ini versi kerangka, lalu tidak melakukan apa pun.
 
 ### Requirement 7: Konfigurasi lokal
