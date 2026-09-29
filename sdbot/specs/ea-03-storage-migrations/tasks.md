@@ -5,10 +5,11 @@ Requirements: [requirements.md](requirements.md) · Design: [design.md](design.m
 
 TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.ini`), dan suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`. Hasil verifikasi ditulis di baris "Hasil" tiap task.
 
-- [ ] 1. Kontrak data: enum, migrasi awal, data contoh
+- [x] 1. Kontrak data: enum, migrasi awal, data contoh
   - `shared/schema/enums.md` (tabel enum: nilai, CHECK ya/tidak, kolom yang memakai), `migrations/data/0001_initial.sql` (design §3), `migrations/data/seed_sample.sql` (blok per versi), `shared/schema/README.md` (aturan data dan alur migrasi)
   - Verifikasi: SQL diterapkan ke SQLite kosong lewat Python tanpa error
   - _Requirements: 6.1, 6.3, 6.4, 7.1–7.7_
+  - Hasil (2026-09-29): `0001_initial.sql` + `seed_sample.sql` diterapkan ke SQLite 3.50 in-memory tanpa error: 10 tabel + view terisi (sessions 2, trades 5, deals 9, closures 4, …); `v_trade_results` menampilkan posisi rekonsiliasi dengan closure NULL; deal ticket 7.000.000.009 (> 2^32) utuh. `enums.md` punya kolom "Kolom" agar `schema.py` bisa mencocokkan CHECK; enum baru `deal_reason`, `deinit_reason`, nilai `SL_RESTORED` (spec 06) dan `MARGIN_OK` (spec 05).
 
 - [ ] 2. `schema.py` inti: pemisah pernyataan, validasi, penerapan
   - Red: `tools/tests/test_schema.py` TS-08, TS-09, TS-14, TS-15, TS-16 (dan TS-07 untuk penomoran) terhadap modul kosong
