@@ -117,3 +117,23 @@ repos:
         always_run: false
         files: ^(packages/api/|tests/api/)
         stages: [pre-commit]
+
+      # SDBot skema: file hasil generate harus sinkron dengan migrasi dan enums.md,
+      # dan alat skemanya lulus uji. Hanya jalan bila skema/alat/hasil generate berubah.
+      - id: sdbot-schema-check
+        name: SDBot schema check
+        entry: uv run python sdbot/tools/schema.py check
+        language: system
+        pass_filenames: false
+        always_run: false
+        files: ^sdbot/(shared/schema/|tools/schema\.py|ea/src/Include/SDBot/(Storage/Migrations|Core/SchemaEnums)\.mqh)
+        stages: [pre-commit]
+
+      - id: sdbot-schema-tests
+        name: SDBot schema tool tests
+        entry: uv run pytest -c sdbot/tools/pytest.ini sdbot/tools/tests
+        language: system
+        pass_filenames: false
+        always_run: false
+        files: ^sdbot/(shared/schema/|tools/)
+        stages: [pre-commit]

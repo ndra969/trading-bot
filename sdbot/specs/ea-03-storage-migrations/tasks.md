@@ -24,10 +24,11 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 5.1–5.8, 6.2, 6.3_ · _Tests: TS-01..06, TS-10..13_
   - Hasil (2026-09-29): Red = 15 FAIL (CLI belum ada). Green = 31/31 (inti 16 + CLI 15; tambahan: migrasi baru tanpa build, CHECK tanpa enum, konstanta/validator SchemaEnums, fixture, status, file hasil berakhir satu newline tanpa spasi akhir). `build` sungguhan skema v1 menghasilkan 6 file dan `check` lolos. Dua bug ditemukan saat build sungguhan dan diperbaiki: `os.replace` tidak bisa lintas drive (TEMP di C:, repo di D:) sehingga staging dipindah ke dalam `sdbot/`; snapshot berakhir dua newline yang akan diubah hook end-of-file-fixer. Fixture dibandingkan lewat `iterdump` (bukan byte) agar tidak bergantung versi SQLite.
 
-- [ ] 4. Pre-commit
+- [x] 4. Pre-commit
   - Hook `sdbot-schema-check` dan `sdbot-schema-tests` di `.pre-commit-config.yaml` (design §5)
   - Verifikasi: commit yang mengubah `enums.md` tanpa `build` ditolak hook
   - _Requirements: 5.6_
+  - Hasil (2026-09-29): hook `sdbot-schema-check` dan `sdbot-schema-tests` ditambahkan; `pre-commit validate-config` valid. Uji: `enums.md` ditambah nilai tanpa `build` → hook gagal dengan "SchemaEnums.mqh tidak sama dengan hasil build"; setelah dikembalikan kedua hook Passed. Pytest memakai `-c sdbot/tools/pytest.ini` agar coverage bot Python tidak ikut.
 
 - [ ] 5. Struct event lengkap, kode enum dari hasil generate, util waktu dan hash
   - Red: suite `TestStorageUtil` (UTC offset, `ServerToUtc`, JSON input kanonik, hash input) terhadap stub
