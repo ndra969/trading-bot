@@ -55,7 +55,7 @@ int OnInit()
   {
    SdbSetLogLevel(InpLogLevel);
    string errors;
-   if(!ValidateInputValues(CurrentInputs(), errors))
+   if(!ValidateInputValues(CurrentInputs(), false, errors))
      {
       LogCritical("App", "input tidak valid | " + errors);
       return INIT_PARAMETERS_INCORRECT;

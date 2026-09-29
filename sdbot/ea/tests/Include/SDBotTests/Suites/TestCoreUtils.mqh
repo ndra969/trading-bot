@@ -17,7 +17,7 @@ bool CuContains(const string text, const string part)
 // Validasi satu set input; kembalikan hasil dan pesan kesalahannya.
 bool CuValidate(const InputValues &v, string &errors)
   {
-   return ValidateInputValues(v, errors);
+   return ValidateInputValues(v, false, errors);
   }
 
 void RunTestCoreUtilsInputs()
@@ -98,6 +98,17 @@ void RunTestCoreUtilsInputs()
      }
    AssertTrue("TC-CU-08c", "magic 20260919 / 2026092000 / 2026091900 ditolak dengan rentang yang benar",
               allRejected && allMention);
+
+   // Magic cadangan harness hanya diterima dalam mode harness (spec 04 Req 7.3, EC-19).
+   v = DefaultInputValues();
+   v.magic = SDB_MAGIC_HARNESS;
+   bool harnessOk = ValidateInputValues(v, true, err);
+   v.magic = SDB_MAGIC_HARNESS - 1;
+   bool belowRejected = !ValidateInputValues(v, true, err);
+   v.magic = 2026091901;
+   bool normalOk = ValidateInputValues(v, true, err);
+   AssertTrue("TC-IR-01", "mode harness: 2026091900 lolos, 2026091899 ditolak, 2026091901 tetap lolos",
+              harnessOk && belowRejected && normalOk);
 
    v = DefaultInputValues();
    v.trailAtrPeriod = 1;

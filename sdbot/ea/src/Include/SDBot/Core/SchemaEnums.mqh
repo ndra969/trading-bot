@@ -109,6 +109,8 @@
 #define SDB_REJECT_STAGE_SCORE_TOO_LOW "SCORE_TOO_LOW"
 #define SDB_REJECT_STAGE_RR_TOO_LOW "RR_TOO_LOW"
 #define SDB_REJECT_STAGE_SL_TOO_CLOSE "SL_TOO_CLOSE"
+#define SDB_REJECT_STAGE_INVALID_STOPS "INVALID_STOPS"
+#define SDB_REJECT_STAGE_INVALID_VOLUME "INVALID_VOLUME"
 #define SDB_REJECT_STAGE_LOT_BELOW_MIN "LOT_BELOW_MIN"
 #define SDB_REJECT_STAGE_BROKER_REJECTED "BROKER_REJECTED"
 #define SDB_REJECT_STAGE_OTHER "OTHER"
@@ -183,7 +185,7 @@ bool SdbEnumIsValid(const string enumName, const string value)
    if(enumName == "position_event")
       return value == "BE" || value == "PARTIAL" || value == "PARTIAL_SKIPPED" || value == "TRAILING" || value == "MODIFY_FAILED" || value == "SL_RESTORED";
    if(enumName == "reject_stage")
-      return value == "STOPPED" || value == "DAILY_PAUSE" || value == "NOT_TRADABLE" || value == "MAX_OPEN_RISK" || value == "MARGIN_LOW" || value == "CURRENCY_EXPOSURE" || value == "NEWS_BLACKOUT" || value == "OUTSIDE_SESSION" || value == "SPREAD_TOO_WIDE" || value == "NO_HTF_BIAS" || value == "NO_VALID_ZONE" || value == "ZONE_USED" || value == "NO_PA_TRIGGER" || value == "SCORE_TOO_LOW" || value == "RR_TOO_LOW" || value == "SL_TOO_CLOSE" || value == "LOT_BELOW_MIN" || value == "BROKER_REJECTED" || value == "OTHER";
+      return value == "STOPPED" || value == "DAILY_PAUSE" || value == "NOT_TRADABLE" || value == "MAX_OPEN_RISK" || value == "MARGIN_LOW" || value == "CURRENCY_EXPOSURE" || value == "NEWS_BLACKOUT" || value == "OUTSIDE_SESSION" || value == "SPREAD_TOO_WIDE" || value == "NO_HTF_BIAS" || value == "NO_VALID_ZONE" || value == "ZONE_USED" || value == "NO_PA_TRIGGER" || value == "SCORE_TOO_LOW" || value == "RR_TOO_LOW" || value == "SL_TOO_CLOSE" || value == "INVALID_STOPS" || value == "INVALID_VOLUME" || value == "LOT_BELOW_MIN" || value == "BROKER_REJECTED" || value == "OTHER";
    if(enumName == "alert_type")
       return value == "ACCOUNT_REJECTED" || value == "CONN_DOWN" || value == "CONN_UP" || value == "DB_UNAVAILABLE" || value == "DB_RECOVERED" || value == "DB_NEWER_SCHEMA" || value == "MIGRATION_FAILED" || value == "ORDER_FAILED" || value == "MODIFY_FAILED" || value == "DD_INFO" || value == "DD_REDUCE" || value == "DD_RECOVERED" || value == "DD_STOP" || value == "DAILY_LOSS" || value == "MARGIN_LOW" || value == "MARGIN_OK" || value == "CLOSE_ALL_FAILED" || value == "EMERGENCY_RESET" || value == "BALANCE_OP" || value == "STATE_RESET" || value == "SL_RESTORED";
    if(enumName == "deinit_reason")

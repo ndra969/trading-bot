@@ -61,6 +61,69 @@ enum ENUM_SDB_DB_TARGET
    SDB_DB_UNITTEST = 3     // sdbot_unittest.sqlite
   };
 
+// Eksekusi (spec 04 design §4.1, §5).
+enum ENUM_SDB_RETCODE_CLASS
+  {
+   SDB_RC_SUCCESS = 0,
+   SDB_RC_NO_CHANGES = 1,
+   SDB_RC_TRANSIENT = 2,       // requote, harga berubah: aman diulang
+   SDB_RC_AMBIGUOUS = 3,       // tanpa jawaban pasti: cari dulu berdasarkan ID permintaan
+   SDB_RC_POSITION_GONE = 4,
+   SDB_RC_PERMANENT = 5
+  };
+
+enum ENUM_SDB_NEXT_STEP
+  {
+   SDB_STEP_SUCCEED = 0,
+   SDB_STEP_RETRY = 1,
+   SDB_STEP_GONE = 2,
+   SDB_STEP_GIVE_UP = 3
+  };
+
+enum ENUM_SDB_EXEC
+  {
+   SDB_EXEC_OK = 0,
+   SDB_EXEC_SKIPPED = 1,       // ditolak aturan sebelum ke broker (misalnya SL tidak lebih baik)
+   SDB_EXEC_GONE = 2,          // posisi sudah tidak ada
+   SDB_EXEC_FAILED = 3
+  };
+
+enum ENUM_SDB_APP_MODE
+  {
+   SDB_APP_LIVE = 0,           // SDBot.mq5 (live dan backtest)
+   SDB_APP_HARNESS = 1,        // SDBotHarness.mq5
+   SDB_APP_UNITTEST = 2        // suite TestApp
+  };
+
+// Permintaan market order ke CExecutor. SL dan TP harga absolut.
+struct OrderRequest
+  {
+   bool              isBuy;
+   double            sl;
+   double            tp;
+   double            volume;
+   long              signalId;        // SDB_NULL_LONG sebelum Fase 3
+  };
+
+// Hasil OpenMarket (Req 3.4). rejectStage "" = berhasil, selain itu kode reject_stage.
+struct OrderResult
+  {
+   bool              ok;
+   string            rejectStage;
+   string            detail;
+   uint              retcode;
+   string            requestId;
+   long              positionId;
+   long              dealTicket;
+   double            priceRequested;
+   double            priceFilled;
+   double            volumeFilled;
+   long              slippagePts;     // SDB_NULL_LONG bila harga isi tidak diketahui
+   long              spreadPts;
+   double            riskMoney;       // SDB_NULL_DOUBLE bila tidak bisa dihitung
+   int               attempts;
+  };
+
 // Nilai penanda NULL untuk kolom yang boleh kosong: DatabaseBind MQL5 tidak bisa mengikat NULL,
 // jadi Logger mengubah penanda ini menjadi NULL (NULLIF) saat menulis.
 #define SDB_NULL_DOUBLE DBL_MAX

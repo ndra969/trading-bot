@@ -61,6 +61,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - §Instalasi 4 "Siapkan bot Telegram": tidak membuat bot baru lewat @BotFather; token dan chat ID diambil dari `.env` bot Python (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) dan diisi ke input EA lewat preset pribadi `*.local.set`.
     - §Notifikasi: format pesan mengikuti bot Python (emoji per level, HTML, start/stop, heartbeat tanpa bunyi, laporan harian) dengan penanda `SDBot` + pair + tipe akun di setiap pesan; batas kirim Telegram dibagi dengan bot Python.
 
+### PC-07: Lapisan App, komentar order, dan aturan eksekusi
+- Status: Open
+- Tanggal disetujui: 2026-09-29
+- Dokumen: RULES §Struktur folder repo (tabel lapisan), §Aturan wajib keamanan trading; PRD-EA §Eksekusi order
+- Sumber: spec `ea-04-execution-harness` design §9
+- Perubahan:
+    - Lapisan baru `Include/SDBot/App/` (paling atas, hanya orkestrasi: `CSdbApp`, `CTeeSink`); `SDBot.mq5` hanya meneruskan event ke `CSdbApp`.
+    - Komentar order `SDB|<SL awal>|<ID permintaan 4 karakter>` untuk deteksi order ganda setelah retcode ambigu.
+    - `OrderCheck` wajib sebelum setiap `OrderSend`; deviasi maksimum 10 point (konstanta); modify dan close ikut diulang maksimal 3 kali seperti open.
+    - Alasan tolak baru di `reject_stage`: `INVALID_STOPS`, `INVALID_VOLUME`.
+
 ## Done
 
 (belum ada)

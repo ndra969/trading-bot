@@ -26,6 +26,16 @@
 #define SDB_DB_UNAVAILABLE_ALERT_SEC  300      // DB tidak bisa ditulis selama ini -> alert High sekali
 #define SDB_DB_REOPEN_SEC             60       // buka ulang file yang gagal/hilang paling sering sekali per menit
 
+// Eksekusi (spec 04 design §5).
+#define SDB_MAX_RETRY                 3        // ulangan setelah kiriman pertama (retcode sementara/ambigu)
+#define SDB_RETRY_DELAY_MS            500
+#define SDB_MAX_DEVIATION_POINTS      10       // PRD tidak mengatur; kandidat input di Fase 3
+#define SDB_COMMENT_PREFIX            "SDB|"
+#define SDB_COMMENT_MAX_LEN           31       // batas komentar order MT5
+#define SDB_REQUEST_ID_LEN            4
+#define SDB_AMBIGUOUS_LOOKBACK_SEC    300      // cari posisi/deal dengan ID permintaan sejauh ini ke belakang
+#define SDB_ACCOUNT_SNAPSHOT_SEC      60
+
 // Default input dari PRD. Satu sumber untuk Inputs.mqh dan DefaultInputValues().
 #define SDB_DEF_MAGIC                 2026091901
 #define SDB_DEF_RISK_PER_TRADE_PCT    0.5

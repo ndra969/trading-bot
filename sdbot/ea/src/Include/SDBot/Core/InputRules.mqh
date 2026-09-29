@@ -6,6 +6,7 @@
 #define SDB_CORE_INPUTRULES_MQH
 
 #include <SDBot/Core/Constants.mqh>
+#include <SDBot/Core/Types.mqh>
 
 struct InputValues
   {
@@ -21,6 +22,21 @@ struct InputValues
    double            partialPct;
    int               trailAtrPeriod;
    double            trailAtrMult;
+  };
+
+// Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
+// (spec 04 design §4.4). Dibangun CurrentAppConfig() di Inputs.mqh.
+struct SdbAppConfig
+  {
+   ENUM_SDB_APP_MODE      mode;
+   InputValues            inputs;
+   string                 symbolSuffix;
+   bool                   allowLive;
+   ENUM_SDB_LOG_LEVEL     logLevel;
+   ENUM_SDB_TRADING_STYLE style;
+   string                 inputsJson;
+   string                 eaVersion;
+   ENUM_SDB_DB_TARGET     dbTarget;
   };
 
 InputValues DefaultInputValues()
@@ -87,10 +103,12 @@ void IrCheckPosition(const InputValues &v, string &errors)
   }
 
 // true bila semua lolos; errors berisi semua kesalahan dipisah "; ".
-bool ValidateInputValues(const InputValues &v, string &errors)
+// allowHarnessMagic: hanya harness uji yang boleh memakai SDB_MAGIC_HARNESS (spec 04 Req 7.3).
+bool ValidateInputValues(const InputValues &v, const bool allowHarnessMagic, string &errors)
   {
    errors = "";
-   if(v.magic < SDB_MAGIC_MIN || v.magic > SDB_MAGIC_MAX)
+   bool harnessMagic = allowHarnessMagic && v.magic == SDB_MAGIC_HARNESS;
+   if(!harnessMagic && (v.magic < SDB_MAGIC_MIN || v.magic > SDB_MAGIC_MAX))
       IrAdd(errors, "InpMagicNumber=" + IntegerToString(v.magic) + " harus di blok SDBot " +
             IntegerToString(SDB_MAGIC_MIN) + "-" + IntegerToString(SDB_MAGIC_MAX) + " (satu nomor per pair)");
    IrCheckRisk(v, errors);
