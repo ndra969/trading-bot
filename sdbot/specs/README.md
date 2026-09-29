@@ -12,7 +12,7 @@ Kerjakan **berurutan**. Spec berikutnya baru dimulai setelah semua task spec seb
 |---|---|---|---|---|---|
 | 1 | [ea-01-tooling](ea-01-tooling/) | Kerangka folder, junction MT5, compile otomatis, framework unit test, runner tester, cek SQLite MT5 | — | `build-ea` dan `run-ea-tests` jalan; self-test framework lulus | **Done** 2026-09-29 (2 cek manual tertunda) |
 | 2 | [ea-02-core-account](ea-02-core-account/) | Core (tipe, konstanta, input, util, state GV, event sink), validasi akun, koneksi, log terminal | 1 | suite CoreUtils + AccountRules ALL PASS | **Done** 2026-09-29 (MC-01..06 manual tertunda) |
-| 3 | [ea-03-storage-migrations](ea-03-storage-migrations/) | Skema SQLite baru, migrasi via skrip, file DB live vs tester terpisah, `CLogger` | 2 | pytest `schema.py` + suite Storage ALL PASS | Requirements + design draft |
+| 3 | [ea-03-storage-migrations](ea-03-storage-migrations/) | Skema SQLite baru, migrasi via skrip, file DB live vs tester terpisah, `CLogger` | 2 | pytest `schema.py` + suite Storage ALL PASS | Approved, dikerjakan |
 | 4 | [ea-04-execution-harness](ea-04-execution-harness/) | `CExecutor`, orkestrasi `CSdbApp`, `SDBot.mq5`, harness uji dasar | 2, 3 | suite Execution ALL PASS, SC-06 PASS | Requirements + design draft |
 | 5 | [ea-05-risk](ea-05-risk/) | Lot sizing, pre-trade check, drawdown, rugi harian, emergency stop, operasi saldo | 4 | suite RiskMath ALL PASS, SC-02/03/05/07 PASS | Requirements + design draft |
 | 6 | [ea-06-position](ea-06-position/) | BE, partial, trailing, deteksi closure, restart aman | 4, 5 | suite PositionMath ALL PASS, SC-01/04 PASS | Requirements + design draft |

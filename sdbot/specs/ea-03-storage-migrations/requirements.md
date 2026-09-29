@@ -1,6 +1,6 @@
 # Requirements — 03 Storage dan migrasi skema
 
-Status: Draft
+Status: Approved (2026-09-29)
 Use case: UC-03 (DB), UC-05, UC-06, UC-19 ([overview](../fase-1-overview.md))
 Asal: ea-foundation R17, R18.4, review skema 2026-09-28, [python-bot-lessons.md](../python-bot-lessons.md) §2–3
 Butuh: spec 01 (runner, cek SQLite), spec 02 (event sink, tipe)

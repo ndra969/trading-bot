@@ -1,6 +1,6 @@
 # Design — 03 Storage dan migrasi skema
 
-Status: Draft
+Status: Approved (2026-09-29)
 Requirements: [requirements.md](requirements.md)
 
 ## 1. Overview
