@@ -39,6 +39,14 @@ Spec detail (requirements, design, tasks) dibuat saat fase sebelumnya selesai. C
 
 Isi PRD: `CNotifier` satu pintu, Telegram lewat `WebRequest` dari antrean di `OnTimer` (tidak pernah di tengah proses order), push HP (`SendNotification`) bila Telegram gagal 3x untuk Critical, heartbeat tiap 60 menit, HTML mode, kuota non-Critical 20/jam, pesan non-Critical > 30 menit dibuang, Critical tanpa limit, cooldown per tipe, token dan chat ID hanya di input.
 
+**Keputusan 2026-09-29: pakai bot dan chat Telegram yang sama dengan bot Python** (PC-06).
+- Kredensial: nilai `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` dari `.env` bot Python diisi ke input EA `InpTelegramToken` / `InpTelegramChatID` lewat preset pribadi `*.local.set` (tidak pernah di-commit). Spec 08 menimbang skrip kecil yang membuat `*.local.set` dari `.env` agar tidak disalin tangan.
+- Format mengikuti `NotificationManager` bot Python: emoji per level (INFO ℹ️, SUCCESS ✅, WARNING ⚠️, ERROR ❌, CRITICAL 🚨), HTML mode dengan escape, pesan start (🚀) dan stop (🛑), heartbeat tanpa bunyi (💓 balance + posisi terbuka + status), laporan harian (📈/📉 P&L, jumlah trade, win rate, balance akhir), satuan mata uang dari akun (USC).
+- Pemetaan severity PRD ke level bot Python: Critical → CRITICAL 🚨, High → ERROR ❌, Medium → WARNING ⚠️, Info → INFO ℹ️; open/close profit, BE, partial → SUCCESS ✅ atau INFO.
+- Karena satu chat menerima pesan dari dua bot, setiap pesan SDBot diawali penanda `SDBot` + pair + tipe akun + versi EA, supaya tidak tertukar dengan pesan bot Python.
+- Satu token dipakai dua proses: batas kirim Telegram per bot (sekitar 20 pesan/menit ke satu chat grup, 1 pesan/detik per chat) dibagi berdua. Kuota non-Critical SDBot (PRD: 20/jam) tetap, dan HTTP 429 dipatuhi lewat `retry_after`.
+- Terminal yang menjalankan SDBot wajib mengizinkan `https://api.telegram.org` di pengaturan WebRequest.
+
 Disiapkan di Fase 1: tabel `alerts` dengan status `PENDING`/`SENT`/`FAILED`/`SKIPPED`, `attempts`, `sent_at` (spec 03); semua modul sudah mengirim `AlertEvent` lewat event sink (spec 02).
 
 Edge case yang wajib masuk requirements:

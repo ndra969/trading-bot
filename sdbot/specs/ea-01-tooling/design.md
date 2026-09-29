@@ -88,7 +88,7 @@ Per baris: jika belum ada, buat junction (`New-Item -ItemType Junction`, tidak b
 ### 3.4 `run-ea-tests.ps1`
 
 ```
-.\run-ea-tests.ps1 [-Unit] [-Scenario SC-06] [-All]
+.\run-ea-tests.ps1 [-Unit] [-Scenario SC-06[,SC-07]] [-All] [-SkipBuild] [-TimeoutSec <n>] [-Config <json>]
 ```
 
 1. Jalankan `build-ea.ps1 -DataDir test`. Gagal → exit 1.
@@ -255,3 +255,14 @@ Keputusan: salinan portable tidak diperlukan; Broker A menjadi terminal uji (dis
 | Kegagalan tester tidak menghasilkan file hasil; alasannya ada di **log terminal** `<data>\logs\yyyymmdd.log` (UTF-16), bukan di `Tester\logs` | `Tester symbol NOSUCHc not exist`, `tester didn't start`, `shutdown with -1000012358 (tester symbol does not exist)` | §3.4 langkah 5 dan §4: saat file hasil tidak ada, runner membaca baris log terminal sejak waktu mulai run yang mengandung `Tester` level 2 atau `shutdown with`, lalu menampilkannya (8.3) |
 | Terminal uji login ke akun Exness (`159394302`) saat tester jalan, lalu disconnect saat shutdown | log terminal | aman karena `[Experts] Enabled=0` dan tidak ada EA di chart; tetap dicek setiap run (8.1) |
 | Penghapusan file dengan wildcard di `tools/.tmp` diblokir sandbox Claude Code | error "protected from removal" | runner menghapus file sementaranya sendiri per nama file yang ia buat |
+
+### 8.1 Temuan saat membangun runner (task 6)
+
+| Temuan | Penanganan di `run-ea-tests.ps1` |
+|---|---|
+| Output EA uji dan alasan berhentinya ada di **jurnal tester** `<data>\Tester\logs\yyyymmdd.log` (UTF-16), bukan di folder agen `%APPDATA%\MetaQuotes\Tester\<id>\Agent-*` | Saat baris `END` tidak ada, runner menampilkan 20 baris terakhir jurnal tester |
+| `ExpertRemove()` di `OnInit` dicatat tester sebagai "removed itself within OnInit / tester stopped because OnInit failed" | Tidak masalah: hasil sudah ditulis dan di-flush sebelumnya; runner menilai dari file hasil, bukan dari status tester |
+| `.ex5` bisa basi bila source dikembalikan tanpa build ulang, lalu `-SkipBuild` menjalankan versi lama (terjadi saat VT-08) | Dengan `-SkipBuild`, runner menolak (exit 2) bila ada `.mq5`/`.mqh` yang lebih baru dari `.ex5` yang akan dijalankan |
+| `Get-ChildItem -LiteralPath -Include` di PowerShell 5.1 ikut mencocokkan file lain | Filter ekstensi manual |
+| Rentang tanggal tetap bisa tidak punya data di mesin lain | Unit test memakai 7 hari terakhir; skenario menentukan rentangnya sendiri di file `.ini` |
+| Unit test 1 minggu model 2: 6–14 detik per run | `timeoutSec` 600 tetap longgar untuk skenario real ticks |

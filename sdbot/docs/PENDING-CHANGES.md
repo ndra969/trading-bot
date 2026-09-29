@@ -52,6 +52,15 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - `link-mt5.ps1` juga membuat junction `Experts/SDBotTests`, `Include/SDBotTests`, `Scripts/SDBotTests` ke `ea/tests/`.
     - Unit test ditulis sebagai suite `.mqh` di `ea/tests/Include/SDBotTests/Suites/`, dijalankan otomatis oleh `run-ea-tests.ps1` di Strategy Tester terminal uji (terpisah dari terminal live), atau manual lewat script `RunUnitTests`.
 
+### PC-06: Telegram memakai bot yang sama dengan bot Python
+- Status: Open
+- Tanggal disetujui: 2026-09-29
+- Dokumen: PRD-EA §Notifikasi, §Instalasi dan pemasangan 4
+- Sumber: permintaan user 2026-09-29; catatan Fase 2 di `sdbot/specs/README.md`
+- Perubahan:
+    - §Instalasi 4 "Siapkan bot Telegram": tidak membuat bot baru lewat @BotFather; token dan chat ID diambil dari `.env` bot Python (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) dan diisi ke input EA lewat preset pribadi `*.local.set`.
+    - §Notifikasi: format pesan mengikuti bot Python (emoji per level, HTML, start/stop, heartbeat tanpa bunyi, laporan harian) dengan penanda `SDBot` + pair + tipe akun di setiap pesan; batas kirim Telegram dibagi dengan bot Python.
+
 ## Done
 
 (belum ada)

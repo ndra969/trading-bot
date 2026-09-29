@@ -40,10 +40,11 @@ Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditu
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_ · _Tests: TC-TF-01..06_
   - Hasil (2026-09-29): Red dengan stub = tidak ada file hasil (runner akan gagal). Green = `RUN … END pass=7 fail=0` lewat EA runner di tester Broker A (runner sementara, sebelum task 6). Cek tambahan: assert gagal sungguhan tercetak `FAIL TC-TMP sengaja gagal | expected=0.31 actual=0.3` dan `fail=1`, lalu dihapus. Build 0/0 untuk kedua entry point. **Tertunda (manual)**: menjalankan script `RunUnitTests` di chart Broker A sekali untuk membandingkan hasil dengan EA runner.
 
-- [ ] 6. `run-ea-tests.ps1`
+- [x] 6. `run-ea-tests.ps1`
   - Implementasi design §3.4 dan kondisi tepi §4: lock file, cek proses terminal uji, ini + `.set` sementara, timeout dengan kill, parse hasil, kode keluar 0/1/2/3, validasi `END` dan jumlah test > 0
   - Verifikasi VT-04, VT-05, VT-07, VT-08, VT-09, VT-10, VT-11
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
+  - Hasil (2026-09-29): VT-05 lolos (pass=7 fail=0, 14 detik, exit 0, tanpa sisa lock/.set/.ini). VT-04 lolos (FAIL TC-VT04 dengan expected/actual, exit 1). VT-09 lolos (0 test, exit 1). VT-10 lolos (tanpa baris END, exit 1, jurnal tester ditampilkan). VT-08 lolos (runner kedua exit 2, runner pertama tetap lulus). VT-11 lolos (timeout 5 detik, exit 3, 0 proses tersisa). VT-07 lolos (terminal uji terbuka: exit 2, terminal tidak ditutup). Tambahan dari temuan: penjaga `.ex5` basi untuk `-SkipBuild` (diuji: exit 2 saat basi, exit 0 setelah build). VT-03/08.3 (data historis kosong) sudah dibuktikan di spike: alasan diambil dari log terminal.
 
 - [ ] 7. Suite `EnvCheck`
   - Red: TC-ENV-01..07 ditulis dulu dan dijalankan lewat runner (akan FAIL sampai helper DB uji ada)
