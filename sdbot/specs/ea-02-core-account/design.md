@@ -80,7 +80,7 @@ ENUM_SDB_CONN_ACTION ConnectionStep(bool connected, datetime now, datetime &down
                                     datetime &lastAlert, bool &alerted);            // 3.3–3.5
 ```
 
-`ConnectionStep` mengembalikan `NONE`, `LOG_DOWN`, `ALERT_MEDIUM`, atau `ALERT_RECOVERED`. Seluruh logika waktu koneksi ada di sini sehingga EC-04 bisa diuji dengan waktu buatan.
+`ConnectionStep` mengembalikan `NONE`, `LOG_DOWN`, `ALERT_MEDIUM`, atau `ALERT_RECOVERED`. `TradePermission` hanya menerima `SYMBOL_TRADE_MODE_FULL`; `LONGONLY`/`SHORTONLY` dianggap tidak bisa ditradingkan karena strategi bisa membuka arah mana pun (keputusan task 5). Seluruh logika waktu koneksi ada di sini sehingga EC-04 bisa diuji dengan waktu buatan.
 
 ### 3.5 `Account.mqh`, `CAccount`
 
@@ -255,6 +255,10 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-AC-19 | sama | masih putus t=600 | ALERT_MEDIUM | 3.3 |
 | TC-AC-20 | sama | pulih setelah alert | ALERT_RECOVERED sekali | 3.5 |
 | TC-AC-21 | sama | putus-sambung tiap 120 detik × 10 | tidak ada ALERT_MEDIUM | EC-04 |
+| TC-AC-05b | `EvaluateAccount` | real + netting + allowLive false | ditolak, kedua alasan disebut | 2.2, 2.3 |
+| TC-AC-08b/c | `AccountTypeOf` | real + EUC / real + US | CENT / REAL (cocok utuh, bukan awalan) | 2.10 |
+| TC-AC-12b | `SymbolMatchesSuffix` | "c", "cc" | false | 2.4 |
+| TC-AC-15b/c | `TradePermission` | terputus / beberapa izin mati | false, semua izin yang mati disebut dengan nama properti MT5 | 3.1, 3.6 |
 
 **TestState** (prefix `SDBTEST`, dihapus di awal dan akhir suite)
 

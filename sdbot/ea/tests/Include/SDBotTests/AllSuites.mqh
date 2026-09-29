@@ -11,6 +11,7 @@
 #include <SDBotTests/Suites/TestEventSink.mqh>
 #include <SDBotTests/Suites/TestCoreUtils.mqh>
 #include <SDBotTests/Suites/TestState.mqh>
+#include <SDBotTests/Suites/TestAccountRules.mqh>
 
 void RunAllSuites()
   {
@@ -19,6 +20,7 @@ void RunAllSuites()
    RunTestEventSink();
    RunTestCoreUtils();
    RunTestState();
+   RunTestAccountRules();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

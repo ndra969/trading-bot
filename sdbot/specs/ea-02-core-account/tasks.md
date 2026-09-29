@@ -29,10 +29,11 @@ Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/r
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_ · _Tests: TC-ST-00..06_
   - Hasil (2026-09-29): Red = 7 FAIL. Green = State 9/9, total 63/63, build 0/0. Keterbatasan: di tester Global Variables disimulasikan, jadi ketahanan `GlobalVariablesFlush` terhadap crash terminal (EC-06) hanya bisa dicek manual (MC-06).
 
-- [ ] 5. Aturan akun, izin trading, dan koneksi (fungsi murni)
+- [x] 5. Aturan akun, izin trading, dan koneksi (fungsi murni)
   - Red: suite `TestAccountRules` (TC-AC-01..21) terhadap stub
   - Green: `Account/AccountRules.mqh`: `AccountTypeOf`, `EvaluateAccount`, `SymbolMatchesSuffix`, `TradePermission`, `ConnectionStep`
-  - _Requirements: 2.2, 2.3, 2.4, 2.10, 3.1, 3.3, 3.4, 3.5, 3.6_ · _Tests: TC-AC-01..21_
+  - _Requirements: 2.2, 2.3, 2.4, 2.10, 3.1, 3.3, 3.4, 3.5, 3.6_ · _Tests: TC-AC-01..21 (+05b, 08b/c, 12b, 15b/c)_
+  - Hasil (2026-09-29): Red = 19 FAIL. Green = AccountRules 27/27, total 90/90, build 0/0. Keputusan: hanya `SYMBOL_TRADE_MODE_FULL` yang boleh trading. Deteksi cent mencocokkan mata uang utuh dari `SDB_CENT_CURRENCIES` (USC, EUC).
 
 - [ ] 6. Kelas `CAccount`
   - Red: suite `TestAccount` di tester (akun tester): `Validate()` mengembalikan PASSED dan mengirim satu `AccountSnapshot` ke `CFakeSink`; `CanTrade()` di tester true; sink `NULL` memakai `CNullSink` (TC-LG-03)
