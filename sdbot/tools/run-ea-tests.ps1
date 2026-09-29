@@ -149,6 +149,8 @@ function Invoke-TesterRun($r) {
     $secs = [int]((Get-Date) - $start).TotalSeconds
 
     if ($timedOut) {
+        # EA uji bisa sempat menulis sebagian hasil sebelum dihentikan; jangan biarkan tertinggal.
+        Remove-Item -LiteralPath $resultFile -Force -ErrorAction SilentlyContinue
         $left = @(Get-TestTerminalProcesses).Count
         Write-Run "TIMEOUT $($r.Id) setelah $($script:timeoutSec) detik; proses terminal uji tersisa: $left"
         return 3

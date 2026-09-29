@@ -7,10 +7,12 @@
 
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/Suites/TestFrameworkSelf.mqh>
+#include <SDBotTests/Suites/TestEnvCheck.mqh>
 
 void RunAllSuites()
   {
    RunTestFrameworkSelf();
+   RunTestEnvCheck();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

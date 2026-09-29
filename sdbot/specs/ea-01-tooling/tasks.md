@@ -46,12 +46,13 @@ Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditu
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
   - Hasil (2026-09-29): VT-05 lolos (pass=7 fail=0, 14 detik, exit 0, tanpa sisa lock/.set/.ini). VT-04 lolos (FAIL TC-VT04 dengan expected/actual, exit 1). VT-09 lolos (0 test, exit 1). VT-10 lolos (tanpa baris END, exit 1, jurnal tester ditampilkan). VT-08 lolos (runner kedua exit 2, runner pertama tetap lulus). VT-11 lolos (timeout 5 detik, exit 3, 0 proses tersisa). VT-07 lolos (terminal uji terbuka: exit 2, terminal tidak ditutup). Tambahan dari temuan: penjaga `.ex5` basi untuk `-SkipBuild` (diuji: exit 2 saat basi, exit 0 setelah build). VT-03/08.3 (data historis kosong) sudah dibuktikan di spike: alasan diambil dari log terminal.
 
-- [ ] 7. Suite `EnvCheck`
+- [x] 7. Suite `EnvCheck`
   - Red: TC-ENV-01..07 ditulis dulu dan dijalankan lewat runner (akan FAIL sampai helper DB uji ada)
   - Green: helper buka/hapus `sdbot_envcheck.sqlite`, eksekusi SQL, baca hasil; catat versi SQLite dan hubungan waktu sebagai `INFO`
   - Jalankan juga lewat script di chart Broker A untuk membandingkan `TimeGMT`/`TimeTradeServer` live vs tester
   - Jika ada fitur yang FAIL: berhenti dan laporkan dampaknya ke design spec 03 sebelum lanjut
-  - _Requirements: 5.1, 5.2, 5.3_ · _Tests: TC-ENV-01..07_
+  - _Requirements: 5.1, 5.2, 5.3_ · _Tests: TC-ENV-00..08_
+  - Hasil (2026-09-29): Red = TC-ENV-00 FAIL (helper stub). Green = EnvCheck 9/9, total 16/16 lewat `run-ea-tests.ps1`. SQLite 3.53.0; CHECK, UPSERT DO NOTHING/DO UPDATE, WAL di Common, BEGIN IMMEDIATE + COMMIT/ROLLBACK, dan bind integer 2^40 (TC-ENV-08, tambahan untuk ticket MT5) semuanya bekerja. Di tester TimeGMT = TimeTradeServer. Helper `TestDb.mqh` dipakai lagi di spec 03. Refactor: `ResetLastError()` sebelum membaca hasil statement. Temuan runner: jalur timeout kini menghapus file hasil parsial. **Tertunda (manual)**: TC-ENV-07 versi live (selisih waktu server kelipatan 15 menit) lewat script `RunUnitTests` di chart.
 
 - [ ] 8. EA kerangka `SDBot.mq5` v1.00
   - `#property version "1.00"`, handler kosong yang aman, log INFO saat init
