@@ -1,6 +1,6 @@
 # Implementation plan — 03 Storage dan migrasi skema
 
-Status: Draft
+Status: Done (2026-09-29)
 Requirements: [requirements.md](requirements.md) · Design: [design.md](design.md)
 
 TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.ini`), dan suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`. Hasil verifikasi ditulis di baris "Hasil" tiap task.
@@ -48,10 +48,11 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 1.1–1.4, 2.1–2.5, 3.1–3.4, 8.1–8.4, 9.1–9.4_ · _Tests: TC-DB-06..10, 12, 13, 15, 16_
   - Hasil (2026-09-29): Red = 23 FAIL (stub). Green: suite `Logger` 23/23, total unit 151/151, build 0/0. Catatan desain: (1) `Init(alertSink, …)` — alert milik Logger (`DB_*`, `MIGRATION_FAILED`, `DB_NEWER_SCHEMA`) diteruskan ke penerima itu dan ikut disimpan di `alerts`; di Fase 2 penerimanya Notifier. (2) NULL lewat parameter penanda terikat `?90`/`?91` + `NULLIF`, teks kosong lewat `NULLIF(?, '')`. (3) Statement di-cache per jenis selama koneksi hidup. (4) Waktu interval (5 menit, buka ulang 60 detik) memakai `GetTickCount64`, bisa disuntik lewat `SetNowForTest`, sehingga Req 2.4 ikut teruji (TC-DB-09b/c). (5) TC-DB-16 men-drop semua tabel (bukan hanya `trades`) agar mirip file baru kosong; bila hanya satu tabel hilang, `schema_migrations` masih mencatat v1 dan migrasi tidak mengulang. Setelah buka ulang, sesi dan snapshot akun terakhir ditulis lagi. (6) Kasus tambahan TC-DB-17..22 dicatat di design §7.2. Buka file gagal (2.2) dan disk penuh (EC-06) tidak diuji otomatis.
 
-- [ ] 8. Pasang di `SDBot.mq5` v1.02
+- [x] 8. Pasang di `SDBot.mq5` v1.02
   - `OnInit`: buka logger (LIVE / TESTER / NONE saat optimasi) dan sesi, logger menjadi sink `CAccount`; `OnTimer`: flush setelah pemeriksaan akun; `OnDeinit`: akhiri sesi dan flush terakhir
   - Verifikasi: build 0/0, unit ALL PASS, smoke run tester membuat `sdbot_tester.sqlite` dengan `sessions` (mode TESTER), `accounts`, dan `schema_migrations` versi 1; `sdbot.sqlite` tidak tersentuh
   - _Requirements: 1.1–1.3, 8.1, 8.3_
+  - Hasil (2026-09-29): build 0/0, unit 152/152. Smoke di tester Broker A (EURUSDc M15, 3 hari): input valid → `sdbot_tester.sqlite` di folder Common berisi `schema_migrations` v1 (applied_by `SDBot 1.02 login=… magic=2026091901`), `sessions` mode TESTER dengan `inputs_json` 17 input dan `ended_at`, `accounts` 1 baris; suffix salah → `INIT_FAILED`, sesi berakhir `INITFAILED` dan alert `ACCOUNT_REJECTED` Critical tersimpan `PENDING` (OnDeinit tetap dipanggil setelah init gagal). Tiga run: satu baris migrasi, `sdbot.sqlite` tidak dibuat. Temuan saat smoke: `CanonicalJson` memakai `StringCompare` yang tidak peka huruf besar (`InpDailyLossPct` sebelum `InpDDReducePct`), berbeda dengan `sort_keys` Python; diganti `OrdinalCompare` + TC-SU-02d (Red → Green). MQL5 tidak menyediakan tanggal akhir dan model tester: `tester_from` = waktu simulasi awal, `tester_to` diisi saat `EndSession`, `tester_model` NULL. Target NONE saat optimasi hanya teruji lewat unit (TC-DB-13).
 
 ## Validasi manual (di luar tasks)
 

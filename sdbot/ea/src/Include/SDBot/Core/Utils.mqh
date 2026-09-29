@@ -189,6 +189,20 @@ string JsonStr(const string s)
 string JsonNum(const double v)  { return StringFormat("%.15g", v); }
 string JsonBool(const bool v)   { return v ? "true" : "false"; }
 
+// Urutan kode karakter (UTF-16), sama dengan sort_keys Python; StringCompare MQL5 tidak peka huruf besar.
+int OrdinalCompare(const string a, const string b)
+  {
+   int na = StringLen(a), nb = StringLen(b);
+   int n = MathMin(na, nb);
+   for(int i = 0; i < n; i++)
+     {
+      ushort ca = StringGetCharacter(a, i), cb = StringGetCharacter(b, i);
+      if(ca != cb)
+         return (ca < cb) ? -1 : 1;
+     }
+   return (na == nb) ? 0 : ((na < nb) ? -1 : 1);
+  }
+
 // values sudah berupa literal JSON (JsonStr/JsonNum/JsonBool). Kunci diurutkan agar hash
 // tidak bergantung urutan penulisan (Req 8.5); ArraySort MQL5 tidak mendukung string.
 string CanonicalJson(const string &keys[], const string &values[])
@@ -202,7 +216,7 @@ string CanonicalJson(const string &keys[], const string &values[])
      {
       int cur = order[i];
       int j = i - 1;
-      while(j >= 0 && StringCompare(keys[order[j]], keys[cur]) > 0)
+      while(j >= 0 && OrdinalCompare(keys[order[j]], keys[cur]) > 0)
         {
          order[j + 1] = order[j];
          j--;

@@ -666,14 +666,16 @@ public:
       return m_sessionId;
      }
 
-   // Sesi tanpa ended_at = berakhir tidak normal (Req 8.4).
+   // Sesi tanpa ended_at = berakhir tidak normal (Req 8.4). Sesi tester: tester_to = waktu simulasi terakhir,
+   // karena MQL5 tidak menyediakan tanggal akhir dan model tester.
    void EndSession(const int reason)
      {
       m_haveSession = false;
       if(!IsWritable() || m_sessionId == 0)
          return;
       m_offset = UtcOffset();
-      int st = DatabasePrepare(m_db, "UPDATE sessions SET ended_at = ?1, end_reason = ?2 WHERE id = ?3");
+      int st = DatabasePrepare(m_db, "UPDATE sessions SET ended_at = ?1, end_reason = ?2, "
+                                     "tester_to = CASE WHEN mode = 'TESTER' THEN ?1 ELSE tester_to END WHERE id = ?3");
       if(st == INVALID_HANDLE)
          return;
       string err;

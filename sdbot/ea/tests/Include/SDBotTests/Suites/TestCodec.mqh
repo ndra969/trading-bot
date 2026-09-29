@@ -25,6 +25,10 @@ void RunTestCodec()
    AssertStrEq("TC-SU-02a", "CanonicalJson mengurutkan kunci", CanonicalJson(k1, v1), "{\"a\":\"x\",\"b\":2,\"c\":true}");
    AssertStrEq("TC-SU-02b", "JsonStr meng-escape kutip, backslash, dan baris baru",
                JsonStr("a\"b\\c\nd"), "\"a\\\"b\\\\c\\nd\"");
+   string k4[] = {"a", "Da", "B", "DD"};
+   string v4[] = {"1", "2", "3", "4"};
+   AssertStrEq("TC-SU-02d", "CanonicalJson urut ordinal peka huruf besar (sama dengan json.dumps sort_keys Python)",
+               CanonicalJson(k4, v4), "{\"B\":3,\"DD\":4,\"Da\":2,\"a\":1}");
    AssertStrEq("TC-SU-02c", "JsonNum tanpa nol berlebih", JsonNum(0.5) + "," + JsonNum(15.0) + "," + JsonNum(2026091901), "0.5,15,2026091901");
 
    AssertStrEq("TC-SU-03", "Sha256Hex(\"abc\") sesuai vektor uji NIST", Sha256Hex("abc"),

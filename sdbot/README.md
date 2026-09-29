@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.01** (spec 01–02 selesai: alat build/uji, input, validasi akun, koneksi, status bersama). Belum ada logika trading.
+Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.02** (spec 01–03 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi). Belum ada logika trading.
 
 ## Konfigurasi dan tuning
 
@@ -20,6 +20,8 @@ PRD mengganti konfigurasi YAML bot Python dengan **input EA** yang disimpan seba
 | Preset pribadi (rahasia) | `*.local.set`, misalnya `SDBot_DAY_EURUSDc.local.set` | Trader, **tidak di-commit** | Berisi token dan chat ID Telegram (sama dengan `.env` bot Python) |
 | Konstanta tetap dari PRD | `ea/src/Include/SDBot/Core/Constants.mqh` (retry 3x, cooldown 30 detik, DD info 5%, pulih 8%, margin 300%/200%, dll.) | Developer, lewat perubahan kode + compile | Versi EA berikutnya |
 | Setting dari panel backoffice (Fase B5) | tabel `settings` di `sdbot_control.sqlite` | Admin lewat panel | Siklus timer berikutnya; **hanya boleh lebih ketat** dari input MT5 |
+| File database EA | `sdbot.sqlite` (live), `sdbot_tester.sqlite` (Strategy Tester), `sdbot_unittest.sqlite` (unit test) di folder Common MT5 (`%APPDATA%\MetaQuotes\Terminal\Common\Files`). Optimasi tidak menulis DB. Konstanta `SDB_DB_*` di `Constants.mqh`: busy timeout 500 ms, antrean 2000 event, alert DB tidak bisa ditulis setelah 300 detik, buka ulang tiap 60 detik | EA sendiri; skema hanya lewat `tools/schema.py` | Migrasi diterapkan otomatis saat EA start |
+| Skema dan enum DB | `shared/schema/` (`migrations/data/*.sql`, `enums.md`); file hasil generate `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, `data_db.sql`, fixture | Developer lewat `schema.py new/build`, dicek pre-commit | Versi EA berikutnya |
 | Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal (puncak equity, STOPPED, pause harian, …) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
 | Path mesin untuk alat build/uji | `tools/mt5-paths.local.json` (contoh: `tools/mt5-paths.example.json`) | Developer, **tidak di-commit** | Dibaca setiap kali skrip `tools/` jalan |
 
@@ -69,5 +71,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `link-mt5.ps1 -DataDir <folder data MT5>` | Hubungkan `ea/src` dan `ea/tests` ke MT5 lewat junction |
 | `build-ea.ps1` | Compile EA dan entry point uji; gagal bila ada error atau warning |
 | `run-ea-tests.ps1 [-Unit] [-Scenario SC-xx] [-All]` | Compile lalu jalankan unit test/skenario di Strategy Tester terminal uji; exit 0 = semua lulus |
+| `uv run python tools/schema.py new data "<deskripsi>"` | Buat file migrasi baru bernomor berikutnya |
+| `uv run python tools/schema.py build` / `check` / `release` / `status <file>` | Bangun file hasil generate dari migrasi; cek konsistensi (juga dijalankan pre-commit); tandai migrasi sudah rilis; lihat versi skema sebuah file DB |
 
 Terminal uji di mesin ini adalah instalasi "Broker A". Terminal "Broker B" dipakai bot Python dan tidak disentuh alat-alat ini.
