@@ -181,7 +181,9 @@ at least one task.
 3. Verify per `sdbot-ea` (compile 0/0; say plainly what could not be run).
 4. Tick the checkbox in `tasks.md`, then report: what changed, verification
    result, anything that deviated from design (and update design.md if so).
-5. Stop. Wait for the user before the next task. Commit only when asked,
+5. Continue with the next unchecked task of the same spec without asking
+   (user preference 2026-09-29: confirm per spec, not per task). Stop only when
+   the spec is done, blocked, or needs a decision. Commit only when asked,
    `feat(ea/<layer>): … (spec <feature> task <n>)`.
 
 When all tasks are done, set Status to Done in all three files and list the

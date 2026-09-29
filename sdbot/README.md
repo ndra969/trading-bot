@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 1 (fondasi) sedang dibangun. Belum ada logika trading.
+Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.01** (spec 01–02 selesai: alat build/uji, input, validasi akun, koneksi, status bersama). Belum ada logika trading.
 
 ## Konfigurasi dan tuning
 

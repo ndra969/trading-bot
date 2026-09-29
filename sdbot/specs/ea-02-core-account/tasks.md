@@ -1,6 +1,6 @@
 # Implementation plan — 02 Core dan akun
 
-Status: Draft
+Status: Done (2026-09-29), validasi manual MC-01..06 tertunda
 Requirements: [requirements.md](requirements.md) · Design: [design.md](design.md)
 
 Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/run-ea-tests.ps1 -Unit`, lalu implementasi sampai ALL PASS dengan compile 0/0. Hasil verifikasi ditulis di baris "Hasil" tiap task.
@@ -41,10 +41,12 @@ Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/r
   - _Requirements: 2.1, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.2, 6.4_ · _Tests: TC-AC-22a..c, 23, 24, 25, 25b_
   - Hasil (2026-09-29): Red = 6 FAIL. Green = Account 7/7, total 97/97, build 0/0. `Init` menerima simbol, suffix, allowLive, dan magic sebagai parameter (bukan membaca `Inp*`) agar kasus suffix salah bisa diuji. Kode alert sementara di `Constants.mqh` (`SDB_ALERT_*`), dipindah ke `SchemaEnums.mqh` di spec 03. Jalur validasi tertunda, ganti akun, dan alert koneksi di terminal sungguhan dibuktikan lewat MC-03..05.
 
-- [ ] 7. Pasang di `SDBot.mq5` v1.01
+- [x] 7. Pasang di `SDBot.mq5` v1.01
   - `OnInit`: validasi input (`INIT_PARAMETERS_INCORRECT`) → `CState.Init` → `CAccount.Validate` (`INIT_FAILED` saat REJECTED, lanjut saat PENDING) → `EventSetTimer(1)`; `OnTimer` → `CAccount.OnTimer` (+ `ExpertRemove()` bila validasi tertunda ditolak); `OnDeinit` membersihkan; sink = `CNullSink` sampai spec 03
   - Verifikasi: build 0/0; `run-ea-tests.ps1 -Unit` ALL PASS; smoke run di tester (log init, validasi PASSED, tanpa deal)
   - _Requirements: 1.2, 1.3, 1.5, 2.6, 2.8_
+  - Hasil (2026-09-29): build 3 target 0/0; unit 97/97. Smoke run `SDBot.ex5` di tester Broker A: (a) input benar → `akun valid` + `SDBot v1.01 aktif … validasi=SDB_VAL_PASSED`, tanpa deal, balance tetap; (b) `InpRiskPerTradePct=2` → CRITICAL `input tidak valid`, tester: "OnInit reports incorrect input parameters"; (c) `InpSymbolSuffix=zz` → CRITICAL suffix, "OnInit returns non-zero code 1"; (d) magic 20260919 + BE R 2 → satu pesan berisi tiga kesalahan. `CState` diinisialisasi setelah validasi PASSED (login > 0), termasuk bila validasi tertunda lolos lewat timer.
+  - Temuan: akun di Strategy Tester terbaca **demo** (validasi lolos walau `InpAllowLiveTrading=false`), jadi penolakan akun real/cent hanya bisa dibuktikan lewat MC-01. Array parameter tidak bisa dikirim lewat `powershell -File`; skrip smoke memakai string dipisah `;`.
 
 ## Validasi manual (di luar tasks)
 
