@@ -32,12 +32,13 @@ Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditu
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 7.1_
   - Hasil (2026-09-29): VT-03 lolos (tanpa target: exit 1; file bersih: exit 0; warning 43 konversi dan warning 68 versi: exit 1 dengan baris pesan; error 154: exit 1, pesan tidak ganda). VT-06 lolos (config tidak ada, JSON rusak, test = live, target di luar folder link: exit 2 dengan petunjuk). Catatan: MQL5 tidak memberi warning untuk variabel lokal yang tidak dipakai; `$args` jangan dipakai sebagai nama variabel di skrip PowerShell.
 
-- [ ] 5. Framework unit test (TDD pada dirinya sendiri)
+- [x] 5. Framework unit test (TDD pada dirinya sendiri)
   - Red: tulis `Suites/TestFrameworkSelf.mqh` (TC-TF-01..06) dan `AllSuites.mqh` terhadap stub `TestFramework.mqh` yang belum menghitung apa pun → hasil tidak sesuai harapan
   - Green: implementasi `TestFramework.mqh` sesuai design §3.5 (assert, hitungan, `TfMute`, format baris, file hasil ber-`runId`)
   - Entry point `Scripts/SDBotTests/RunUnitTests.mq5` dan `Experts/SDBotTests/RunUnitTestsEA.mq5` (input `InpTestRunId`, `ExpertRemove()` setelah selesai)
   - Verifikasi: build 0/0; script dijalankan sekali di chart Broker A (manual) menampilkan hasil yang sama dengan EA runner di task 6
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_ · _Tests: TC-TF-01..06_
+  - Hasil (2026-09-29): Red dengan stub = tidak ada file hasil (runner akan gagal). Green = `RUN … END pass=7 fail=0` lewat EA runner di tester Broker A (runner sementara, sebelum task 6). Cek tambahan: assert gagal sungguhan tercetak `FAIL TC-TMP sengaja gagal | expected=0.31 actual=0.3` dan `fail=1`, lalu dihapus. Build 0/0 untuk kedua entry point. **Tertunda (manual)**: menjalankan script `RunUnitTests` di chart Broker A sekali untuk membandingkan hasil dengan EA runner.
 
 - [ ] 6. `run-ea-tests.ps1`
   - Implementasi design §3.4 dan kondisi tepi §4: lock file, cek proses terminal uji, ini + `.set` sementara, timeout dengan kill, parse hasil, kode keluar 0/1/2/3, validasi `END` dan jumlah test > 0

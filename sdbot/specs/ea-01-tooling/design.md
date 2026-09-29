@@ -127,6 +127,8 @@ void   TfEndSuite();
 int    TfEndRun();                               // tulis ringkasan, tutup file, kembalikan jumlah FAIL
 int    TfFailCount();  int TfPassCount();        // untuk self-test
 void   TfMute(bool mute);                        // self-test: assert yang sengaja gagal tidak mengotori ringkasan
+void   TfSetCounts(int pass, int fail);          // self-test: kembalikan hitungan setelah assert yang di-mute
+void   TfInfo(string text);                      // baris INFO (misalnya versi SQLite di EnvCheck)
 ```
 
 Format file hasil (juga dicetak ke log Experts):
