@@ -15,6 +15,7 @@
 #include <SDBotTests/Suites/TestAccount.mqh>
 #include <SDBotTests/Suites/TestCodec.mqh>
 #include <SDBotTests/Suites/TestMigrations.mqh>
+#include <SDBotTests/Suites/TestLogger.mqh>
 
 void RunAllSuites()
   {
@@ -27,6 +28,7 @@ void RunAllSuites()
    RunTestAccountRules();
    RunTestAccount();
    RunTestMigrations();
+   RunTestLogger();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

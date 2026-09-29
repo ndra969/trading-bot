@@ -17,6 +17,15 @@
 #define SDB_MAGIC_MAX                 2026091999
 #define SDB_MAGIC_HARNESS             2026091900  // dicadangkan untuk harness uji
 
+// Storage (spec 03 design §4). File di folder Common agar backoffice dan semua instance melihatnya.
+#define SDB_DB_FILE_LIVE              "sdbot.sqlite"
+#define SDB_DB_FILE_TESTER            "sdbot_tester.sqlite"
+#define SDB_DB_FILE_UNITTEST          "sdbot_unittest.sqlite"
+#define SDB_DB_BUSY_TIMEOUT_MS        500      // tunggu kunci maksimal ini per flush, lalu coba detik berikutnya
+#define SDB_DB_QUEUE_MAX              2000     // kapasitas antrean tulis
+#define SDB_DB_UNAVAILABLE_ALERT_SEC  300      // DB tidak bisa ditulis selama ini -> alert High sekali
+#define SDB_DB_REOPEN_SEC             60       // buka ulang file yang gagal/hilang paling sering sekali per menit
+
 // Default input dari PRD. Satu sumber untuk Inputs.mqh dan DefaultInputValues().
 #define SDB_DEF_MAGIC                 2026091901
 #define SDB_DEF_RISK_PER_TRADE_PCT    0.5

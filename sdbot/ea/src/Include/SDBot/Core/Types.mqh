@@ -52,6 +52,15 @@ enum ENUM_SDB_CONN_ACTION
    SDB_CONN_ALERT_RECOVERED = 3
   };
 
+// File database yang dibuka CLogger (spec 03 Req 1).
+enum ENUM_SDB_DB_TARGET
+  {
+   SDB_DB_NONE = 0,        // optimasi: tidak membuka file apa pun
+   SDB_DB_LIVE = 1,        // sdbot.sqlite
+   SDB_DB_TESTER = 2,      // sdbot_tester.sqlite
+   SDB_DB_UNITTEST = 3     // sdbot_unittest.sqlite
+  };
+
 // Nilai penanda NULL untuk kolom yang boleh kosong: DatabaseBind MQL5 tidak bisa mengikat NULL,
 // jadi Logger mengubah penanda ini menjadi NULL (NULLIF) saat menulis.
 #define SDB_NULL_DOUBLE DBL_MAX
@@ -73,6 +82,22 @@ struct AccountSnapshot
    double                   equity;
    double                   peakEquity;   // puncak dari status risiko (spec 05); sebelum itu = equity
    datetime                 time;
+  };
+
+// Satu baris tabel sessions (spec 03 Req 8). inputsJson wajib kanonik (CurrentInputsJson),
+// input_hash dihitung CLogger dari teks itu. testerFrom/testerTo 0 dan testerModel "" = NULL.
+struct SessionInfo
+  {
+   long              login;
+   long              magic;
+   string            symbol;
+   string            mode;            // SDB_SESSION_MODE_*
+   string            eaVersion;
+   string            inputsJson;
+   datetime          startedAt;
+   datetime          testerFrom;
+   datetime          testerTo;
+   string            testerModel;
   };
 
 // Alert untuk tabel alerts; dikirim Notifier di Fase 2. type = kode stabil dari enums.md.

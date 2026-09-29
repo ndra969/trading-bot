@@ -431,7 +431,13 @@ Pre-commit (`.pre-commit-config.yaml`, hook lokal):
 | TC-DB-13 | `Open(NONE)` | tidak ada file dibuat, semua method no-op | 1.3 |
 | TC-DB-14 | `BeginSession` dua instance dengan input sama urutan berbeda | `input_hash` sama | 8.5 |
 | TC-DB-15 | ticket 2^40 lewat `OnDeal` | terbaca utuh | 7.4 |
-| TC-DB-16 | tabel `trades` di-drop di tengah (simulasi file dihapus) | `Flush` berikutnya membuka ulang dan migrasi, event tersimpan | EC-05 |
+| TC-DB-16 | semua tabel di-drop di tengah (simulasi file dihapus lalu dibuat kosong) | `Flush` berikutnya membuka ulang dan migrasi, sesi dibuat ulang, event tersimpan, alert `DB_RECOVERED` | EC-05 |
+| TC-DB-17 | sesi tester lalu `EndSession` | mode, `started_at` UTC, rentang tester; sesi aktif `ended_at` NULL, sesi diakhiri punya alasan | 8.1–8.4 |
+| TC-DB-18 | event dengan `SDB_NULL_*` dan teks kosong | kolom NULL, nilai biasa (termasuk 0 dan negatif) tetap | 7.4, design §4.3 |
+| TC-DB-19 | offset server +3 jam | waktu event tersimpan UTC; event membawa `session_id` dan `login` | 7.2, 7.3 |
+| TC-DB-20 | `OnAccount` dua kali | satu baris `accounts`, nilai terbaru, teks enum, offset | 7.5 |
+| TC-DB-21 | `OnAlert` | status `PENDING`, `attempts` 0, `sent_at` NULL | 9.2 |
+| TC-DB-22 | event lalu `EndSession` + `Close` | flush terakhir tertulis, sesi diakhiri, Logger tidak menulis lagi | 3.3, 8.3 |
 
 ### 7.3 Manual
 

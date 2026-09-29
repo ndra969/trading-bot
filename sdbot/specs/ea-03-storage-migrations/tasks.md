@@ -42,10 +42,11 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 4.1–4.7_ · _Tests: TC-DB-01..05_
   - Hasil (2026-09-29): Red = 13 FAIL (runner stub). Green: suite `Migrations` 17/17, total unit 128/128, build 0/0. `Storage/MigrationSource.mqh` (interface `ISdbMigrationSource`) + `Storage/MigrationRunner.mqh` (`CSdbMigrationRunner::Run` → OK / NEWER_DB / FAILED). Migrasi gagal disuntik lewat `CFailingMigrations` di suite (v2 gagal di pernyataan kedua → pernyataan pertama ikut di-rollback, versi tetap 1, tidak ada transaksi tertinggal; v1 gagal di DB kosong → versi 0). Versi terbaru diambil dari sumber (bukan `SDB_SCHEMA_LATEST`) agar sumber palsu bisa diuji. Baca ulang versi di dalam `BEGIN IMMEDIATE` (4.3) belum diuji dengan dua instance sungguhan; tercakup MC-DB-02.
 
-- [ ] 7. `CLogger`: buka DB, sesi, antrean, flush, event sink
+- [x] 7. `CLogger`: buka DB, sesi, antrean, flush, event sink
   - Red: TC-DB-06..10, 12, 13, 15, 16 terhadap stub
   - Green: `Storage/Logger.mqh`: target LIVE/TESTER/UNITTEST/NONE, pragma, sesi, antrean berprioritas, flush satu transaksi, penulisan idempoten, NULL lewat nilai penanda, `FindInitialSl`, alert `DB_*`, buka ulang bila file hilang
   - _Requirements: 1.1–1.4, 2.1–2.5, 3.1–3.4, 8.1–8.4, 9.1–9.4_ · _Tests: TC-DB-06..10, 12, 13, 15, 16_
+  - Hasil (2026-09-29): Red = 23 FAIL (stub). Green: suite `Logger` 23/23, total unit 151/151, build 0/0. Catatan desain: (1) `Init(alertSink, …)` — alert milik Logger (`DB_*`, `MIGRATION_FAILED`, `DB_NEWER_SCHEMA`) diteruskan ke penerima itu dan ikut disimpan di `alerts`; di Fase 2 penerimanya Notifier. (2) NULL lewat parameter penanda terikat `?90`/`?91` + `NULLIF`, teks kosong lewat `NULLIF(?, '')`. (3) Statement di-cache per jenis selama koneksi hidup. (4) Waktu interval (5 menit, buka ulang 60 detik) memakai `GetTickCount64`, bisa disuntik lewat `SetNowForTest`, sehingga Req 2.4 ikut teruji (TC-DB-09b/c). (5) TC-DB-16 men-drop semua tabel (bukan hanya `trades`) agar mirip file baru kosong; bila hanya satu tabel hilang, `schema_migrations` masih mencatat v1 dan migrasi tidak mengulang. Setelah buka ulang, sesi dan snapshot akun terakhir ditulis lagi. (6) Kasus tambahan TC-DB-17..22 dicatat di design §7.2. Buka file gagal (2.2) dan disk penuh (EC-06) tidak diuji otomatis.
 
 - [ ] 8. Pasang di `SDBot.mq5` v1.02
   - `OnInit`: buka logger (LIVE / TESTER / NONE saat optimasi) dan sesi, logger menjadi sink `CAccount`; `OnTimer`: flush setelah pemeriksaan akun; `OnDeinit`: akhiri sesi dan flush terakhir
