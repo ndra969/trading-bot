@@ -67,6 +67,32 @@ Isi PRD: bias HTF sebagai gerbang wajib, zona S&D dari Fractals berjeda di MTF (
 
 Pelajaran bot Python yang wajib jadi requirement: skor dan alasan tolak setiap kandidat tercatat (kalibrasi ambang 65 dari data, bukan asumsi); urutan detektor pola dari yang spesifik ke netral; setiap komponen skor punya uji yang membuktikan ia terpanggil di pipeline; `trades.signal_id` selalu terisi.
 
+#### Katalog parameter strategi (draf, difinalkan di spec Fase 3 dan 5)
+
+Aturan dari RULES dan pelajaran bot Python: tidak ada angka ajaib di kode. Setiap angka strategi menjadi **input** (bisa di-tuning dan dioptimasi di Strategy Tester) atau **konstanta** di `Core/Constants.mqh` (tetap sesuai PRD). Kolom "Bot Python" menunjuk padanan di `config/strategy_parameters.yaml` sebagai pembanding, bukan sebagai default.
+
+| Area | Parameter | Default PRD | Bot Python | Usulan |
+|---|---|---|---|---|
+| Timeframe | HTF / MTF / LTF per gaya | day trading H4 / H1 / M15 | — | input `InpTradingStyle` (spec 02) |
+| Bias HTF | Metode bias (struktur BOS + EMA) | EMA 50 searah + BOS | `ma.slow_period` 50, `structure.lookback` 50 | input periode EMA, lookback struktur |
+| Zona S&D | Deteksi swing | Fractals dengan jeda bar | `zone_detection.*` (berbasis jam dan pip) | input jeda Fractals (bar) |
+| Zona S&D | Usia maksimum zona | 100 bar MTF | `max_zone_age_hours` 72 | input `InpMaxZoneAgeBars` |
+| Zona S&D | Status zona dan jumlah sentuhan | Fresh 0, Tested 1, ≥ 2 tidak dipakai | `min_touch_points` 2 (kebalikan PRD) | konstanta (aturan PRD) |
+| Zona S&D | Ukuran zona minimum dan maksimum | tidak disebut | `min/max_zone_size_pips` 5 / 1000 | input dalam point; **perlu keputusan** |
+| Entry | Mode entry | Market (opsi Limit) | — | input `InpEntryMode` |
+| Entry | Buffer SL di luar zona | "batas jauh zona + buffer" | `zone_sl_buffer_multiplier` 1.2 | input (point atau × ATR); **perlu keputusan** |
+| Entry | R:R minimum | 2.0 | `min_risk_reward_ratio` 2.0 | input `InpMinRR` |
+| Entry | Jarak SL minimum dan maksimum | "SL ≥ stops level + spread" | `min/max_stop_loss_distance` per aset | input dalam point per pair (preset); **perlu keputusan** |
+| Trigger PA | Pola dan urutan deteksi | engulfing kuat, pin bar, lainnya | 13 pola; bug urutan netral-dulu | konstanta daftar pola + urutan spesifik → netral (pelajaran bot Python) |
+| Skor | Ambang skor minimum | 65 | quality_thresholds per aset | input `InpMinConfluenceScore` |
+| Skor | Nilai maksimum per komponen | zona 30, Fibonacci 15, trendline 15, tren 15, breakout 10, PA 10, RSI 5 | `confluence_weights` (total 115%) | input per komponen dengan validasi total = 100, agar bisa dikalibrasi dari data (pelajaran: skor tidak prediktif) |
+| Fibonacci | Level dan nilai | 0.5–0.618 = 15, 0.382/0.786 = 8 | `fibonacci.levels`, `tolerance` | konstanta level, input toleransi; skor turun sesuai jarak (bug bot Python) |
+| Trendline | Sentuhan dan nilai | 3+ = 15, 2 = 7, searah | `trendline.min_touches` 3, `tolerance` | input minimal sentuhan dan toleransi; filter kemiringan wajib (bug bot Python) |
+| RSI | Periode, divergence | divergence searah = 5 | `rsi.period` 14, 70/30 | input periode |
+| Filter volatilitas | Candle klimaks | tidak disebut | `climax_multiplier` 2.0–2.5 × ATR | kandidat Fase 4/5; **perlu keputusan** |
+
+"Perlu keputusan" berarti PRD belum menentukan angkanya. Nilainya diputuskan bersama Anda di requirements spec Fase 3, lalu dicatat di `docs/PENDING-CHANGES.md`.
+
 ### Fase 4 — Filter (spec `ea-12-filters-news`)
 
 Isi PRD: filter berita memakai kalender bawaan MT5 (`CalendarValueHistory`) ±30 menit berita high impact; di Strategy Tester memakai CSV kalender historis di Common/Files (dibuat script `ExportCalendar`); filter sesi London + New York; filter spread per simbol; eksposur maks 2 posisi searah per mata uang.

@@ -50,6 +50,8 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Notifikasi | `InpHeartbeatMinutes` | 60 | — | Fase 2 |
 | Backoffice | `InpEnableBackoffice` / `InpControlPollSeconds` | true / 2 | — | Fase B5 |
 
+Parameter strategi lainnya (bias HTF, deteksi zona, buffer SL, nilai skor per komponen, Fibonacci, trendline, RSI) belum final. Draf katalognya ada di [specs/README.md](specs/README.md#katalog-parameter-strategi-draf-difinalkan-di-spec-fase-3-dan-5), dan akan dipindahkan ke tabel ini saat spec Fase 3 dan 5 disetujui.
+
 ### Alur tuning
 
 1. Ubah nilai input di Strategy Tester (tab Inputs), atau jalankan **optimasi** dengan rentang nilai. Metrik optimasi SDBot adalah expectancy per trade dalam R ÷ max drawdown (`OnTester`).
