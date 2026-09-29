@@ -217,6 +217,9 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-CU-08 | sama | magic 0 dan risk 2 sekaligus | gagal, pesan menyebut keduanya | 1.3 |
 | TC-CU-08b | sama | magic 2026091904 / 2026091999 | lolos | 1.6 |
 | TC-CU-08c | sama | magic 20260919 (default PRD lama) / 2026092000 / 2026091900 | gagal, menyebut rentang `2026091901–2026091999` | 1.6 |
+| TC-CU-08d | sama | ATR period 1, ATR mult 0, buffer BE −1, rugi harian 11 | gagal, keempat input disebut | 1.2 |
+| TC-CU-01b | `CurrentInputs()` vs `DefaultInputValues()` | input default | sama persis (default hanya ditulis sekali sebagai `SDB_DEF_*`) | 1.1 |
+| TC-CU-01c | `DefaultInputValues().magic` | — | 2026091901 | 1.6 |
 | TC-CU-09 | `FormatLogLine` | WARN, Filters, EURUSDc, "x \| a=1" | `[SDB][WARN][Filters][EURUSDc] x \| a=1` | 5.1 |
 | TC-CU-10 | `ThrottleAllow` | kunci sama 5x dalam 10 detik, interval 60 | true, false ×4 | 5.4 |
 | TC-CU-11 | `ThrottleAllow` | kunci sama di detik 61 | true, suppressed = 4 | 5.4 |

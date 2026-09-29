@@ -17,4 +17,29 @@
 #define SDB_MAGIC_MAX                 2026091999
 #define SDB_MAGIC_HARNESS             2026091900  // dicadangkan untuk harness uji
 
+// Default input dari PRD. Satu sumber untuk Inputs.mqh dan DefaultInputValues().
+#define SDB_DEF_MAGIC                 2026091901
+#define SDB_DEF_RISK_PER_TRADE_PCT    0.5
+#define SDB_DEF_MAX_OPEN_RISK_PCT     3.0
+#define SDB_DEF_DAILY_LOSS_PCT        3.0
+#define SDB_DEF_DD_REDUCE_PCT         10.0
+#define SDB_DEF_DD_STOP_PCT           15.0
+#define SDB_DEF_BREAKEVEN_R           1.0
+#define SDB_DEF_BREAKEVEN_BUFFER_PTS  2
+#define SDB_DEF_PARTIAL_R             1.5
+#define SDB_DEF_PARTIAL_PCT           50.0
+#define SDB_DEF_TRAIL_ATR_PERIOD      14
+#define SDB_DEF_TRAIL_ATR_MULT        2.0
+
+// Batas validasi input (spec 02 design §4.3). Batas antar-input dicek di InputRules.mqh.
+#define SDB_MAX_RISK_PER_TRADE_PCT    1.0
+#define SDB_MAX_OPEN_RISK_PCT         10.0
+#define SDB_MAX_DAILY_LOSS_PCT        10.0
+#define SDB_MAX_DD_STOP_PCT           50.0
+#define SDB_MAX_BREAKEVEN_BUFFER_PTS  1000
+#define SDB_MAX_PARTIAL_R             10.0
+#define SDB_MIN_TRAIL_ATR_PERIOD      2
+#define SDB_MAX_TRAIL_ATR_PERIOD      200
+#define SDB_MAX_TRAIL_ATR_MULT        10.0
+
 #endif // SDB_CORE_CONSTANTS_MQH

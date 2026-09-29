@@ -11,10 +11,11 @@ Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/r
   - _Requirements: 6.1, 6.2, 6.3_ · _Tests: TC-LG-02a..g, TC-LG-03a_
   - Hasil (2026-09-29): Red = 6 FAIL (TC-LG-02a..f, `CFakeSink` stub). Green = EventSink 8/8, total 24/24, build 0/0. `Constants.mqh` juga berisi batas blok magic (`SDB_MAGIC_MIN/MAX/HARNESS`) untuk task 2. Struct event selain `AccountSnapshot` dan `AlertEvent` masih satu field, dilengkapi spec 03–06.
 
-- [ ] 2. Input dan aturan validasinya
+- [x] 2. Input dan aturan validasinya
   - Red: suite `TestCoreUtils` bagian input (TC-CU-01..08c) terhadap `ValidateInputValues` yang selalu lolos
   - Green: `Core/InputRules.mqh` (`InputValues`, `ValidateInputValues` menggabungkan semua kesalahan) dan `Core/Inputs.mqh` (17 input §4.3 dengan default PRD dan magic `2026091901`, `CurrentInputs()`)
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6_ · _Tests: TC-CU-01..08c_
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6_ · _Tests: TC-CU-01..08d_
+  - Hasil (2026-09-29): Red = 11 FAIL (stub selalu lolos). Green = CoreUtils 13/13, total 37/37, build 0/0. Default input ditulis sekali sebagai `SDB_DEF_*` di `Constants.mqh` dan dipakai `Inputs.mqh` maupun `DefaultInputValues()`; TC-CU-01b memastikan keduanya sama. Tambahan: TC-CU-01c (magic default di blok), TC-CU-08d (batas ATR, buffer BE, rugi harian).
 
 - [ ] 3. Log terminal, throttle, dan util murni
   - Red: TC-CU-09..15 dan TC-LG-01 terhadap stub
