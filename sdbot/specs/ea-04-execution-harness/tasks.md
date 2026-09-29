@@ -13,10 +13,11 @@ TDD: suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`, skenario lewat `run-ea-tes
   - _Requirements: 1.1, 1.5, 7.3_ · _Tests: TC-IR (magic harness), EC-19_
   - Hasil (2026-09-29): Red = 1 FAIL (TC-IR-01, flag belum dipakai). Green: unit 153/153, build 0/0. `schema.py build` hanya mengubah `SchemaEnums.mqh` (+ `SDB_REJECT_STAGE_INVALID_STOPS`/`_INVALID_VOLUME`), `check` OK, tanpa migrasi. Penyimpangan design: `SdbAppConfig` diletakkan di `Core/InputRules.mqh` (setelah `InputValues`, yang dipakainya), bukan `Types.mqh`; `InputRules.mqh` kini meng-include `Types.mqh`. `OrderResult` ditambah `detail` (teks alasan untuk log).
 
-- [ ] 2. Aturan eksekusi murni: validasi order dan volume
+- [x] 2. Aturan eksekusi murni: validasi order dan volume
   - Red: suite `TestExecution` TC-EX-01..11b terhadap stub `ExecutionRules.mqh`
   - Green: `ValidateOrderSides`, `CheckStops`, `CheckVolume` (perbandingan volume toleran floating point)
   - _Requirements: 1.1–1.5_ · _Tests: TC-EX-01..11b_
+  - Hasil (2026-09-29): Red = 12 FAIL (4 kasus tolak kebetulan cocok dengan stub `false`). Green: suite `Execution` 16/16, unit 169/169, build 0/0. Tambahan kasus: TC-EX-04b (sell valid), TC-EX-09b (JPY 30 point < spread 35), TC-EX-11c (limit 0 = tanpa batas, tepat di limit lolos). Jarak point dibulatkan (`PriceDistancePoints`) agar batas tepat 28 point tidak jatuh ke 27,999.
 
 - [ ] 3. Aturan eksekusi murni: retcode, retry, filling, komentar, ID, slippage, modify, partial
   - Red: TC-EX-12..32 terhadap stub
