@@ -10,6 +10,7 @@
 #include <SDBotTests/Suites/TestEnvCheck.mqh>
 #include <SDBotTests/Suites/TestEventSink.mqh>
 #include <SDBotTests/Suites/TestCoreUtils.mqh>
+#include <SDBotTests/Suites/TestState.mqh>
 
 void RunAllSuites()
   {
@@ -17,6 +18,7 @@ void RunAllSuites()
    RunTestEnvCheck();
    RunTestEventSink();
    RunTestCoreUtils();
+   RunTestState();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

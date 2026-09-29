@@ -265,6 +265,9 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-ST-03 | `GetOrInit` kunci yang sudah 1 | 1, `wasMissing = false` | 4.2 |
 | TC-ST-04 | `Set` lalu instance `CState` kedua membaca | nilai sama (simulasi instance lain) | 4.1 |
 | TC-ST-05 | `DeleteAll` | tidak ada GV berprefix `SDBTEST_123_` tersisa | 4.5 |
+| TC-ST-00 | `Init("SDBTEST", 0)` | false (terminal belum login) | 2.6 |
+| TC-ST-04b | `Get` kunci yang tidak ada | fallback | 4.2 |
+| TC-ST-06 | `TouchAll` setelah 3 kunci dipakai | 3 | 4.4 |
 
 **TestLog**
 

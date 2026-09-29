@@ -23,10 +23,11 @@ Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/r
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 7.1, 7.2_ · _Tests: TC-CU-09..16, TC-LG-01a..c_
   - Hasil (2026-09-29): Red = 14 FAIL. Green = CoreUtils 30/30, total 54/54, build 0/0. Throttle berupa kelas `CLogThrottle` (64 slot, LRU) agar bisa diuji dengan waktu buatan; `LogThrottled` memakai satu instance internal dan `TimeLocal()`. Nilai uji pembulatan diganti dari 1.082345 (ambigu di floating point) ke 1.082346 / 1.082344.
 
-- [ ] 4. Status bersama di Global Variables
+- [x] 4. Status bersama di Global Variables
   - Red: suite `TestState` (TC-ST-01..05) terhadap stub
   - Green: `Core/State.mqh` `CState` (prefix, `Key`, `GetOrInit`, `Set` dengan flush, `TouchAll`, `DeleteAll`)
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_ · _Tests: TC-ST-01..05_
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_ · _Tests: TC-ST-00..06_
+  - Hasil (2026-09-29): Red = 7 FAIL. Green = State 9/9, total 63/63, build 0/0. Keterbatasan: di tester Global Variables disimulasikan, jadi ketahanan `GlobalVariablesFlush` terhadap crash terminal (EC-06) hanya bisa dicek manual (MC-06).
 
 - [ ] 5. Aturan akun, izin trading, dan koneksi (fungsi murni)
   - Red: suite `TestAccountRules` (TC-AC-01..21) terhadap stub
@@ -52,3 +53,4 @@ Di akun cent (terminal tempat SDBot live nanti, diputuskan di Fase 3) atau Broke
 - [ ] MC-03: tutup MT5 dengan EA terpasang lalu buka lagi → validasi tertunda lalu lolos
 - [ ] MC-04: matikan Algo Trading 1 menit → satu WARN, satu INFO saat hidup lagi
 - [ ] MC-05: cabut jaringan 6 menit → WARN, alert Medium di menit ke-5, Info saat pulih
+- [ ] MC-06: setel GV uji lewat EA (flush), lalu matikan paksa `terminal64.exe` dari Task Manager; buka lagi → GV tetap ada (EC-06)
