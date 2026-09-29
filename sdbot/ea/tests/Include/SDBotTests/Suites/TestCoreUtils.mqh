@@ -7,6 +7,7 @@
 
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBot/Core/Inputs.mqh>
+#include <SDBot/Core/Utils.mqh>
 
 bool CuContains(const string text, const string part)
   {
@@ -109,10 +110,76 @@ void RunTestCoreUtilsInputs()
               CuContains(err, "InpBreakevenBufferPoints") && CuContains(err, "InpDailyLossPct"));
   }
 
+bool CuTfEq(const ENUM_SDB_TRADING_STYLE style, const ENUM_TIMEFRAMES h, const ENUM_TIMEFRAMES m, const ENUM_TIMEFRAMES l)
+  {
+   ENUM_TIMEFRAMES htf, mtf, ltf;
+   StyleTimeframes(style, htf, mtf, ltf);
+   return htf == h && mtf == m && ltf == l;
+  }
+
+void RunTestCoreUtilsLogAndUtil()
+  {
+   AssertStrEq("TC-CU-09", "format baris log RULES",
+               FormatLogLine(SDB_LOG_WARN, "Filters", "EURUSDc", "sinyal ditolak | alasan=spread"),
+               "[SDB][WARN][Filters][EURUSDc] sinyal ditolak | alasan=spread");
+
+   CLogThrottle th;
+   datetime t0 = D'2026.09.29 10:00:00';
+   int sup = -1;
+   bool first = th.Allow("k", t0, 60, sup);
+   bool anyAllowed = false;
+   for(int i = 1; i <= 4; i++)
+      if(th.Allow("k", t0 + i * 2, 60, sup))
+         anyAllowed = true;
+   AssertTrue("TC-CU-10", "kunci sama 5x dalam 10 detik: pertama lolos, 4 berikutnya ditahan", first && !anyAllowed);
+   bool again = th.Allow("k", t0 + 61, 60, sup);
+   AssertTrue("TC-CU-11", "setelah 61 detik lolos lagi dengan 4 pesan ditahan", again && sup == 4);
+   AssertStrEq("TC-CU-11b", "jumlah yang ditahan disebut di cetakan berikutnya",
+               FormatSuppressed("koneksi putus", 4), "koneksi putus (+4 ditahan)");
+   AssertStrEq("TC-CU-11c", "tanpa pesan ditahan, teks tidak berubah", FormatSuppressed("koneksi putus", 0), "koneksi putus");
+
+   CLogThrottle lru;
+   datetime t1 = D'2026.09.29 11:00:00';
+   for(int k = 0; k < SDB_LOG_THROTTLE_SLOTS + 1; k++)
+      lru.Allow("key" + IntegerToString(k), t1 + k, 3600, sup);
+   AssertTrue("TC-CU-12", "65 kunci: kunci tertua tergusur sehingga lolos lagi walau masih dalam interval",
+              lru.Allow("key0", t1 + 100, 3600, sup));
+
+   AssertEq("TC-CU-13", "NormalizePriceTo 1.082346 ke 5 digit", NormalizePriceTo(1.082346, 5), 1.08235, 1e-10);
+   AssertEq("TC-CU-13b", "NormalizePriceTo 1.082344 ke 5 digit", NormalizePriceTo(1.082344, 5), 1.08234, 1e-10);
+   AssertEq("TC-CU-13c", "NormalizePriceTo JPY 161.2346 ke 3 digit", NormalizePriceTo(161.2346, 3), 161.235, 1e-10);
+
+   AssertTrue("TC-CU-14", "day trading: H4 / H1 / M15", CuTfEq(SDB_STYLE_DAY, PERIOD_H4, PERIOD_H1, PERIOD_M15));
+   AssertTrue("TC-CU-15a", "scalping: M15 / M5 / M1", CuTfEq(SDB_STYLE_SCALPING, PERIOD_M15, PERIOD_M5, PERIOD_M1));
+   AssertTrue("TC-CU-15b", "swing: W1 / D1 / H4", CuTfEq(SDB_STYLE_SWING, PERIOD_W1, PERIOD_D1, PERIOD_H4));
+   AssertTrue("TC-CU-15c", "position: MN1 / W1 / D1", CuTfEq(SDB_STYLE_POSITION, PERIOD_MN1, PERIOD_W1, PERIOD_D1));
+
+   AssertStrEq("TC-CU-16", "ErrText memberi kode error", ErrText(4756), "err=4756");
+
+   // TC-LG-01: level INFO tidak mencetak DEBUG; baris yang dicetak mengikuti format.
+   SdbSetLogLevel(SDB_LOG_INFO);
+   SdbLogCaptureStart();
+   LogDebug("Test", "tidak boleh muncul");
+   LogInfo("Test", "muncul");
+   LogThrottled(SDB_LOG_WARN, "tc-lg-01", 3600, "Test", "sekali saja");
+   LogThrottled(SDB_LOG_WARN, "tc-lg-01", 3600, "Test", "sekali saja");
+   SdbLogCaptureStop();
+   AssertIntEq("TC-LG-01a", "DEBUG disaring, INFO dan WARN pertama tercetak", SdbLogCapturedCount(), 2);
+   AssertStrEq("TC-LG-01b", "baris INFO sesuai format", SdbLogCaptured(0),
+               FormatLogLine(SDB_LOG_INFO, "Test", _Symbol, "muncul"));
+   SdbSetLogLevel(SDB_LOG_DEBUG);
+   SdbLogCaptureStart();
+   LogDebug("Test", "sekarang muncul");
+   SdbLogCaptureStop();
+   AssertIntEq("TC-LG-01c", "level DEBUG mencetak DEBUG", SdbLogCapturedCount(), 1);
+   SdbSetLogLevel(SDB_LOG_INFO);
+  }
+
 void RunTestCoreUtils()
   {
    TfBeginSuite("CoreUtils");
    RunTestCoreUtilsInputs();
+   RunTestCoreUtilsLogAndUtil();
    TfEndSuite();
   }
 

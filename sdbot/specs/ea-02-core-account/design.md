@@ -224,7 +224,7 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-CU-10 | `ThrottleAllow` | kunci sama 5x dalam 10 detik, interval 60 | true, false ×4 | 5.4 |
 | TC-CU-11 | `ThrottleAllow` | kunci sama di detik 61 | true, suppressed = 4 | 5.4 |
 | TC-CU-12 | `ThrottleAllow` | 65 kunci berbeda | kunci tertua tergusur, tidak error | 5.4 |
-| TC-CU-13 | `NormalizePriceTo` | 1.082345, 5 digit | 1.08235 (pembulatan terdekat) | — |
+| TC-CU-13 | `NormalizePriceTo` | 1.082346 / 1.082344, 5 digit; 161.2346, 3 digit | 1.08235 / 1.08234; 161.235 (nilai tengah seperti 1.082345 dihindari karena representasi floating point) | — |
 | TC-CU-14 | `StyleTimeframes` | DAY | H4, H1, M15 | 7.1 |
 | TC-CU-15 | `StyleTimeframes` | SCALPING, SWING, POSITION | sesuai tabel PRD | 7.1 |
 
