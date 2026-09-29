@@ -36,10 +36,11 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 6.2, 7.3, 8.5_ · _Tests: TC-DB-11, TC-DB-14, TC-SU-xx_
   - Hasil (2026-09-29): Red = 12 FAIL (stub). Green: suite `Codec` 14/14 (TC-SU-01a..d pembulatan offset ke 15 menit, TC-DB-11, TC-SU-02a..c JSON kanonik, TC-SU-03 SHA-256 vektor NIST, TC-DB-14a/b hash input, TC-SU-04a..c `CurrentInputsJson` 17 input); total unit 111/111, build 0/0. Nama akhir: suite `TestCodec` (bukan `TestStorageUtil`) dan `RoundUtcOffset` (fungsi murni; pembacaan `TimeTradeServer()-TimeGMT()` ada di Logger). Struct event mengikuti kolom `data_db.sql`, kolom NULL memakai `SDB_NULL_DOUBLE`/`SDB_NULL_LONG`; `AccountSnapshot.peakEquity` ditambahkan (sementara = equity sampai spec 05). `SDB_ALERT_*` sementara dihapus dari `Constants.mqh`, `CAccount` memakai `SDB_ALERT_TYPE_*` dari `SchemaEnums.mqh`.
 
-- [ ] 6. Runner migrasi di EA
+- [x] 6. Runner migrasi di EA
   - Red: suite `TestStorage` TC-DB-01..05 terhadap runner kosong
   - Green: `Storage/MigrationRunner.mqh` (buat `schema_migrations`, `BEGIN IMMEDIATE` per migrasi, baca ulang versi di dalam transaksi, rollback, versi DB lebih baru, cek checksum) dengan sumber migrasi berupa interface agar migrasi gagal bisa disuntik di uji
   - _Requirements: 4.1–4.7_ · _Tests: TC-DB-01..05_
+  - Hasil (2026-09-29): Red = 13 FAIL (runner stub). Green: suite `Migrations` 17/17, total unit 128/128, build 0/0. `Storage/MigrationSource.mqh` (interface `ISdbMigrationSource`) + `Storage/MigrationRunner.mqh` (`CSdbMigrationRunner::Run` → OK / NEWER_DB / FAILED). Migrasi gagal disuntik lewat `CFailingMigrations` di suite (v2 gagal di pernyataan kedua → pernyataan pertama ikut di-rollback, versi tetap 1, tidak ada transaksi tertinggal; v1 gagal di DB kosong → versi 0). Versi terbaru diambil dari sumber (bukan `SDB_SCHEMA_LATEST`) agar sumber palsu bisa diuji. Baca ulang versi di dalam `BEGIN IMMEDIATE` (4.3) belum diuji dengan dua instance sungguhan; tercakup MC-DB-02.
 
 - [ ] 7. `CLogger`: buka DB, sesi, antrean, flush, event sink
   - Red: TC-DB-06..10, 12, 13, 15, 16 terhadap stub
