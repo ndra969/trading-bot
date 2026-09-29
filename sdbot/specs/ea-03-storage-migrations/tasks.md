@@ -17,11 +17,12 @@ TDD di dua sisi: pytest untuk `schema.py` (`uv run pytest -c sdbot/tools/pytest.
   - _Requirements: 5.5 (sebagian), 7.1, 7.4, 7.5_ · _Tests: TS-07..09, TS-14..16_
   - Hasil (2026-09-29): Red = 16 FAIL (modul stub). Green = 16/16 (`uv run pytest -c sdbot/tools/pytest.ini`). Satu perbaikan saat Green: komentar setelah `;` sempat terbawa ke awal pernyataan berikutnya; komentar di awal pernyataan kini dibuang. Checksum dinormalkan ke LF agar checkout CRLF di Windows tidak mengubahnya. `sdbot/tools/pytest.ini` sendiri agar addopts coverage bot Python tidak ikut.
 
-- [ ] 3. `schema.py` build/check/new/release/status dan file hasil generate
+- [x] 3. `schema.py` build/check/new/release/status dan file hasil generate
   - Red: TS-01..06, TS-10..13 terhadap perintah yang belum ada
   - Green: `new`, `build` (atomik, deterministik), `check`, `release`, `status`; generator `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, `data_db.sql`, fixture; lock checksum; pencocokan CHECK dengan `enums.md`
   - Jalankan `build` sungguhan untuk skema v1, commit file hasil generate
   - _Requirements: 5.1–5.8, 6.2, 6.3_ · _Tests: TS-01..06, TS-10..13_
+  - Hasil (2026-09-29): Red = 15 FAIL (CLI belum ada). Green = 31/31 (inti 16 + CLI 15; tambahan: migrasi baru tanpa build, CHECK tanpa enum, konstanta/validator SchemaEnums, fixture, status, file hasil berakhir satu newline tanpa spasi akhir). `build` sungguhan skema v1 menghasilkan 6 file dan `check` lolos. Dua bug ditemukan saat build sungguhan dan diperbaiki: `os.replace` tidak bisa lintas drive (TEMP di C:, repo di D:) sehingga staging dipindah ke dalam `sdbot/`; snapshot berakhir dua newline yang akan diubah hook end-of-file-fixer. Fixture dibandingkan lewat `iterdump` (bukan byte) agar tidak bergantung versi SQLite.
 
 - [ ] 4. Pre-commit
   - Hook `sdbot-schema-check` dan `sdbot-schema-tests` di `.pre-commit-config.yaml` (design §5)
