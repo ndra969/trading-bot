@@ -17,10 +17,11 @@ Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/r
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6_ · _Tests: TC-CU-01..08d_
   - Hasil (2026-09-29): Red = 11 FAIL (stub selalu lolos). Green = CoreUtils 13/13, total 37/37, build 0/0. Default input ditulis sekali sebagai `SDB_DEF_*` di `Constants.mqh` dan dipakai `Inputs.mqh` maupun `DefaultInputValues()`; TC-CU-01b memastikan keduanya sama. Tambahan: TC-CU-01c (magic default di blok), TC-CU-08d (batas ATR, buffer BE, rugi harian).
 
-- [ ] 3. Log terminal, throttle, dan util murni
+- [x] 3. Log terminal, throttle, dan util murni
   - Red: TC-CU-09..15 dan TC-LG-01 terhadap stub
   - Green: `Core/Utils.mqh`: `FormatLogLine`, level log (`SdbSetLogLevel`, `LogDebug` … `LogCritical`), `ThrottleAllow` + `LogThrottled` (64 slot LRU, jumlah yang ditahan), `NormalizePriceTo`, `StyleTimeframes`, `ErrText`; hook uji untuk menangkap baris yang dicetak (TC-LG-01)
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 7.1, 7.2_ · _Tests: TC-CU-09..15, TC-LG-01_
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 7.1, 7.2_ · _Tests: TC-CU-09..16, TC-LG-01a..c_
+  - Hasil (2026-09-29): Red = 14 FAIL. Green = CoreUtils 30/30, total 54/54, build 0/0. Throttle berupa kelas `CLogThrottle` (64 slot, LRU) agar bisa diuji dengan waktu buatan; `LogThrottled` memakai satu instance internal dan `TimeLocal()`. Nilai uji pembulatan diganti dari 1.082345 (ambigu di floating point) ke 1.082346 / 1.082344.
 
 - [ ] 4. Status bersama di Global Variables
   - Red: suite `TestState` (TC-ST-01..05) terhadap stub

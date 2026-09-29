@@ -227,6 +227,8 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-CU-13 | `NormalizePriceTo` | 1.082346 / 1.082344, 5 digit; 161.2346, 3 digit | 1.08235 / 1.08234; 161.235 (nilai tengah seperti 1.082345 dihindari karena representasi floating point) | — |
 | TC-CU-14 | `StyleTimeframes` | DAY | H4, H1, M15 | 7.1 |
 | TC-CU-15 | `StyleTimeframes` | SCALPING, SWING, POSITION | sesuai tabel PRD | 7.1 |
+| TC-CU-11b/c | `FormatSuppressed` | "koneksi putus", 4 / 0 | "koneksi putus (+4 ditahan)" / tidak berubah | 5.4 |
+| TC-CU-16 | `ErrText` | 4756 | "err=4756" | 5.3 |
 
 **TestAccountRules**
 
@@ -268,7 +270,7 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 
 | ID | Kasus | Harapan | Req |
 |---|---|---|---|
-| TC-LG-01 | level INFO, `LogDebug` dipanggil | tidak tercetak (cek lewat hook uji) | 5.2 |
+| TC-LG-01 | level INFO: `LogDebug`, `LogInfo`, `LogThrottled` 2x; lalu level DEBUG: `LogDebug` | 2 baris (DEBUG disaring, throttle menahan yang kedua), format sesuai; lalu 1 baris DEBUG (hook capture) | 5.2, 5.4 |
 | TC-LG-02 | `CFakeSink` menerima `OnAlert` dari `CAccount` palsu | 1 alert, severity dan type sesuai | 6.3 |
 | TC-LG-03 | Modul diberi sink `NULL` | memakai `CNullSink`, tidak crash | 6.4 |
 
@@ -298,6 +300,6 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | 2 | `AccountRules.mqh`, `CAccount` | TC-AC-01..12, MC-01..03 |
 | 3 | `TradePermission`, `ConnectionStep`, `CAccount::OnTimer` | TC-AC-13..21, MC-04, MC-05 |
 | 4 | `CState` | TC-ST-01..05 |
-| 5 | `Utils.mqh` | TC-CU-09..12, TC-LG-01 |
+| 5 | `Utils.mqh` | TC-CU-09..12, TC-CU-16, TC-LG-01 |
 | 6 | `EventSink.mqh`, `FakeSink.mqh` | TC-LG-02..03 |
 | 7 | `StyleTimeframes` | TC-CU-14..15 |
