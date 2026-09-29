@@ -77,12 +77,12 @@ Per baris: jika belum ada, buat junction (`New-Item -ItemType Junction`, tidak b
 ### 3.3 `build-ea.ps1`
 
 ```
-.\build-ea.ps1 [-Target <path .mq5 relatif ke ea/>] [-DataDir <live|test>]
+.\build-ea.ps1 [-Target <path .mq5 relatif ke ea/>] [-Terminal test|live] [-Config <json>]
 ```
 
 1. Tanpa `-Target`: `src/Experts/SDBot/SDBot.mq5`, `tests/Experts/SDBotTests/*.mq5`, `tests/Scripts/SDBotTests/*.mq5`.
 2. Setiap target di-compile lewat path junction-nya di `<DataDir>\MQL5\...` agar `#include <SDBot/...>` dan `<SDBotTests/...>` ter-resolve: `metaeditor64.exe /compile:"<path>" /log:"tools\.tmp\<nama>.log"`.
-3. Log dibaca sebagai UTF-16. Baris `error`/`warning` ditampilkan, dan baris `Result: N errors, M warnings` diparse.
+3. Log dibaca sebagai UTF-16. Baris `error`/`warning` ditampilkan sekali (MetaEditor menulis setiap pesan dua kali), dan baris `Result: N errors, M warnings` diparse. Log tanpa baris `Result` dianggap gagal. Compile memakai `/inc:"<data>\MQL5"` dan log `tools\.tmp\build-<nama>.log`.
 4. Exit 0 jika semua target 0/0, 1 jika tidak (2.3), 2 jika lingkungan tidak siap (2.4).
 
 ### 3.4 `run-ea-tests.ps1`

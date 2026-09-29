@@ -25,11 +25,12 @@ Setiap task diverifikasi sebelum dicentang. Hasil verifikasi (VT-xx, TC-xx) ditu
   - _Requirements: 1.2, 1.3, 1.4, 1.5, 8.7_
   - Hasil (2026-09-29): VT-01 lolos di Broker A (run 1: 6 dibuat + 1 sudah ada dari spike; run 2: 7 sudah terhubung, exit 0). VT-02 lolos (folder biasa + junction ke tempat lain dilaporkan sekaligus, exit 1, tidak ada perubahan). VT-12 lolos (repo dan data folder berspasi, 7 dibuat lalu 7 sudah terhubung). Catatan: `$PSScriptRoot` kosong di default parameter PowerShell 5.1, default dihitung di badan skrip.
 
-- [ ] 4. `Mt5Paths.psm1` dan `build-ea.ps1`
+- [x] 4. `Mt5Paths.psm1` dan `build-ea.ps1`
   - Modul membaca dan memvalidasi `mt5-paths.local.json` (path ada, terminal uji ≠ terminal live)
   - `build-ea.ps1` sesuai design §3.3 (target default, compile lewat path junction, parse log UTF-16, kode keluar 0/1/2)
   - Verifikasi VT-03 (file uji sementara yang memicu warning), VT-06 (konfigurasi dihapus)
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 7.1_
+  - Hasil (2026-09-29): VT-03 lolos (tanpa target: exit 1; file bersih: exit 0; warning 43 konversi dan warning 68 versi: exit 1 dengan baris pesan; error 154: exit 1, pesan tidak ganda). VT-06 lolos (config tidak ada, JSON rusak, test = live, target di luar folder link: exit 2 dengan petunjuk). Catatan: MQL5 tidak memberi warning untuk variabel lokal yang tidak dipakai; `$args` jangan dipakai sebagai nama variabel di skrip PowerShell.
 
 - [ ] 5. Framework unit test (TDD pada dirinya sendiri)
   - Red: tulis `Suites/TestFrameworkSelf.mqh` (TC-TF-01..06) dan `AllSuites.mqh` terhadap stub `TestFramework.mqh` yang belum menghitung apa pun → hasil tidak sesuai harapan
