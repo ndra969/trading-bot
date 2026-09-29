@@ -8,6 +8,7 @@
 
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBot/Execution/ExecutionRules.mqh>
+#include <SDBot/Execution/Executor.mqh>   // dikompilasi di sini; perilakunya diuji di TestApp dan skenario
 
 #define TE_PT5 0.00001
 #define TE_PT3 0.001

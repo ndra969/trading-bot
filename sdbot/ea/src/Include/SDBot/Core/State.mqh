@@ -38,6 +38,7 @@ public:
      }
 
    string Key(const string name) const { return m_prefix + name; }
+   bool   IsReady() const              { return m_prefix != ""; }
 
    // Nilai GV, atau safeDefault yang langsung disimpan bila GV belum ada (Req 4.2).
    double GetOrInit(const string name, const double safeDefault, bool &wasMissing)

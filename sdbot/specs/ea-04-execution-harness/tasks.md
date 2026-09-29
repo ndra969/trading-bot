@@ -25,10 +25,11 @@ TDD: suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`, skenario lewat `run-ea-tes
   - _Requirements: 2.1–2.4, 3.1, 4.2–4.5, 5.1–5.3_ · _Tests: TC-EX-12..32_
   - Hasil (2026-09-29): Red = 26 FAIL. Green: suite `Execution` 45/45, unit 198/198, build 0/0. TC-EX-15 memeriksa 22 retcode sekaligus. Kasus tambahan: TC-EX-19 juga menolak ID huruf besar, SL 0, dua titik, dan prefix lain; TC-EX-20c (ID buatan selalu lolos parser); TC-EX-24d/e (stops level dan freeze level untuk modify); TC-EX-27c (volume 0/negatif). Design §4.1 diperbaiki: `NextStep` memakai `attempt ≤ SDB_MAX_RETRY` (1 kirim + 3 ulangan), sesuai TC-EX-30. `IsPartialVolumeValid` juga menolak volume tutup < lot minimum.
 
-- [ ] 4. `CExecutor`
+- [x] 4. `CExecutor`
   - `Execution/Executor.mqh`: `Init`, `OpenMarket` (alur design §4.2: `CanTrade`, ID permintaan dari GV, normalisasi, validasi, `OrderCheck`, kirim, `NextStep`, cari posisi/deal berdasarkan ID, harga isi, `OrderCalcProfit`, `TradeRecord`, alert sekali), `ModifySl`, `ClosePartial`, `ClosePosition`, `CountOwnPositions`, `SendCount`
   - Red → Green lewat TC-APP-06 (ditulis di task 5) dan skenario task 6–7; di task ini: compile 0/0 dan suite unit tetap ALL PASS
   - _Requirements: 1.3, 1.6, 1.7, 2.1–2.5, 3.1–3.4, 4.1, 4.3, 4.4, 4.6, 4.7, 5.3_
+  - Hasil (2026-09-29): `Execution/Executor.mqh` dikompilasi lewat suite `TestExecution` (belum ada pemakai lain): build 0/0, unit 198/198. Perilaku broker baru diuji di task 5–7. Tambahan: `CState::IsReady()` agar penghitung ID tidak ditulis ke GV sebelum state di-init (cadangan: penghitung memori + ERROR throttled). Modify/close yang diulang memeriksa dulu apakah kiriman sebelumnya ternyata sudah diterapkan (SL sudah sama, volume sudah berkurang, posisi sudah tertutup) → `OK`. Log `CTrade` dimatikan (`LOG_LEVEL_NO`) agar semua log lewat `Utils.mqh`.
 
 - [ ] 5. `CTeeSink` dan `CSdbApp`
   - Red: suite `TestApp` TC-APP-01..07 terhadap stub `CSdbApp`
