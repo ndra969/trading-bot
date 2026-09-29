@@ -19,10 +19,11 @@ TDD: suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`, skenario lewat `run-ea-tes
   - _Requirements: 1.1–1.5_ · _Tests: TC-EX-01..11b_
   - Hasil (2026-09-29): Red = 12 FAIL (4 kasus tolak kebetulan cocok dengan stub `false`). Green: suite `Execution` 16/16, unit 169/169, build 0/0. Tambahan kasus: TC-EX-04b (sell valid), TC-EX-09b (JPY 30 point < spread 35), TC-EX-11c (limit 0 = tanpa batas, tepat di limit lolos). Jarak point dibulatkan (`PriceDistancePoints`) agar batas tepat 28 point tidak jatuh ke 27,999.
 
-- [ ] 3. Aturan eksekusi murni: retcode, retry, filling, komentar, ID, slippage, modify, partial
+- [x] 3. Aturan eksekusi murni: retcode, retry, filling, komentar, ID, slippage, modify, partial
   - Red: TC-EX-12..32 terhadap stub
   - Green: `PickFillingMode`, `ClassifyRetcode`, `NextStep`, `BuildOrderComment`, `ParseOrderComment`, `MakeRequestId`, `SlippagePoints`, `IsModifySlAllowed`, `IsPartialVolumeValid`
   - _Requirements: 2.1–2.4, 3.1, 4.2–4.5, 5.1–5.3_ · _Tests: TC-EX-12..32_
+  - Hasil (2026-09-29): Red = 26 FAIL. Green: suite `Execution` 45/45, unit 198/198, build 0/0. TC-EX-15 memeriksa 22 retcode sekaligus. Kasus tambahan: TC-EX-19 juga menolak ID huruf besar, SL 0, dua titik, dan prefix lain; TC-EX-20c (ID buatan selalu lolos parser); TC-EX-24d/e (stops level dan freeze level untuk modify); TC-EX-27c (volume 0/negatif). Design §4.1 diperbaiki: `NextStep` memakai `attempt ≤ SDB_MAX_RETRY` (1 kirim + 3 ulangan), sesuai TC-EX-30. `IsPartialVolumeValid` juga menolak volume tutup < lot minimum.
 
 - [ ] 4. `CExecutor`
   - `Execution/Executor.mqh`: `Init`, `OpenMarket` (alur design §4.2: `CanTrade`, ID permintaan dari GV, normalisasi, validasi, `OrderCheck`, kirim, `NextStep`, cari posisi/deal berdasarkan ID, harga isi, `OrderCalcProfit`, `TradeRecord`, alert sekali), `ModifySl`, `ClosePartial`, `ClosePosition`, `CountOwnPositions`, `SendCount`

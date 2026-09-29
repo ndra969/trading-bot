@@ -57,10 +57,105 @@ void RunTestExecutionOrder()
               CheckVolume(0.05, 0.01, 100.0, 0.01, 0.20, 0.15, why));
   }
 
+void RunTestExecutionBroker()
+  {
+   AssertIntEq("TC-EX-12", "filling FOK+IOC -> FOK", PickFillingMode(SYMBOL_FILLING_FOK | SYMBOL_FILLING_IOC), ORDER_FILLING_FOK);
+   AssertIntEq("TC-EX-13", "filling IOC saja -> IOC", PickFillingMode(SYMBOL_FILLING_IOC), ORDER_FILLING_IOC);
+   AssertIntEq("TC-EX-14", "filling 0 -> RETURN", PickFillingMode(0), ORDER_FILLING_RETURN);
+
+   uint rc[] = {TRADE_RETCODE_DONE, TRADE_RETCODE_PLACED, TRADE_RETCODE_DONE_PARTIAL, TRADE_RETCODE_NO_CHANGES,
+                TRADE_RETCODE_REQUOTE, TRADE_RETCODE_PRICE_CHANGED, TRADE_RETCODE_PRICE_OFF,
+                TRADE_RETCODE_TOO_MANY_REQUESTS, TRADE_RETCODE_LOCKED, TRADE_RETCODE_TIMEOUT,
+                TRADE_RETCODE_CONNECTION, TRADE_RETCODE_ERROR, 0, TRADE_RETCODE_POSITION_CLOSED,
+                TRADE_RETCODE_MARKET_CLOSED, TRADE_RETCODE_NO_MONEY, TRADE_RETCODE_INVALID_VOLUME,
+                TRADE_RETCODE_INVALID_STOPS, TRADE_RETCODE_INVALID_FILL, TRADE_RETCODE_TRADE_DISABLED,
+                TRADE_RETCODE_LIMIT_VOLUME, TRADE_RETCODE_REJECT};
+   ENUM_SDB_RETCODE_CLASS cls[] = {SDB_RC_SUCCESS, SDB_RC_SUCCESS, SDB_RC_SUCCESS, SDB_RC_NO_CHANGES,
+                                   SDB_RC_TRANSIENT, SDB_RC_TRANSIENT, SDB_RC_TRANSIENT, SDB_RC_TRANSIENT, SDB_RC_TRANSIENT,
+                                   SDB_RC_AMBIGUOUS, SDB_RC_AMBIGUOUS, SDB_RC_AMBIGUOUS, SDB_RC_AMBIGUOUS,
+                                   SDB_RC_POSITION_GONE, SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT,
+                                   SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT};
+   string wrong = "";
+   for(int i = 0; i < ArraySize(rc); i++)
+      if(ClassifyRetcode(rc[i]) != cls[i])
+         wrong += IntegerToString(rc[i]) + " ";
+   AssertStrEq("TC-EX-15", "22 retcode masuk kelas sesuai tabel design §4.1 (daftar yang salah)", wrong, "");
+
+   AssertIntEq("TC-EX-28", "AMBIGUOUS, attempt 1, ID ditemukan -> SUCCEED", NextStep(SDB_RC_AMBIGUOUS, 1, true), SDB_STEP_SUCCEED);
+   AssertIntEq("TC-EX-29", "AMBIGUOUS, attempt 1, tidak ditemukan -> RETRY", NextStep(SDB_RC_AMBIGUOUS, 1, false), SDB_STEP_RETRY);
+   AssertTrue("TC-EX-30", "TRANSIENT: attempt 3 -> RETRY (ulangan ke-3), attempt 4 -> GIVE_UP",
+              NextStep(SDB_RC_TRANSIENT, 3, false) == SDB_STEP_RETRY && NextStep(SDB_RC_TRANSIENT, 4, false) == SDB_STEP_GIVE_UP);
+   AssertIntEq("TC-EX-31", "PERMANENT, attempt 1 -> GIVE_UP", NextStep(SDB_RC_PERMANENT, 1, false), SDB_STEP_GIVE_UP);
+   AssertTrue("TC-EX-32", "NO_CHANGES -> SUCCEED; POSITION_GONE -> GONE; SUCCESS -> SUCCEED",
+              NextStep(SDB_RC_NO_CHANGES, 1, false) == SDB_STEP_SUCCEED &&
+              NextStep(SDB_RC_POSITION_GONE, 1, false) == SDB_STEP_GONE &&
+              NextStep(SDB_RC_SUCCESS, 2, false) == SDB_STEP_SUCCEED);
+  }
+
+void RunTestExecutionComment()
+  {
+   AssertStrEq("TC-EX-16", "komentar 5 digit", BuildOrderComment(1.08234, 5, "k3f9"), "SDB|1.08234|k3f9");
+   string jpy = BuildOrderComment(161.234, 3, "zz00");
+   AssertTrue("TC-EX-17", "komentar JPY 3 digit, panjang <= 31", jpy == "SDB|161.234|zz00" && StringLen(jpy) <= SDB_COMMENT_MAX_LEN);
+
+   double sl = 0;
+   string id = "";
+   bool ok = ParseOrderComment("SDB|1.08234|k3f9", sl, id);
+   AssertTrue("TC-EX-18", "parse komentar valid: SL dan ID benar", ok && MathAbs(sl - 1.08234) < 1e-9 && id == "k3f9");
+
+   string bad[] = {"", "SDB|", "SDB|abc|k3f9", "[sl 1.08234]", "SDB|1.08234", "SDB|1.08234|k3", "SDB|1.08234|k3f9x",
+                   "SDB|1.08234|K3F9", "SDB|0|k3f9", "SDB|1.08.234|k3f9", "XDB|1.08234|k3f9"};
+   string accepted = "";
+   for(int i = 0; i < ArraySize(bad); i++)
+      if(ParseOrderComment(bad[i], sl, id))
+         accepted += "[" + bad[i] + "] ";
+   AssertStrEq("TC-EX-19", "komentar tidak valid/diubah broker ditolak (daftar yang lolos)", accepted, "");
+
+   string a = MakeRequestId(2026091900, 5);
+   string b = MakeRequestId(2026091901, 5);
+   AssertTrue("TC-EX-20", "magic berbeda, counter sama: ID berbeda, panjang 4", a != b && StringLen(a) == 4 && StringLen(b) == 4);
+   AssertTrue("TC-EX-20b", "counter 1 vs 2 berbeda; counter 1 vs 1297 sama (siklus 1.296)",
+              MakeRequestId(2026091901, 1) != MakeRequestId(2026091901, 2) &&
+              MakeRequestId(2026091901, 1) == MakeRequestId(2026091901, 1297));
+   ok = ParseOrderComment(BuildOrderComment(1.1, 5, MakeRequestId(2026091999, 1295)), sl, id);
+   AssertTrue("TC-EX-20c", "ID buatan MakeRequestId selalu lolos parser", ok && id == MakeRequestId(2026091999, 1295));
+
+   AssertIntEq("TC-EX-21", "buy diminta 1.10000 isi 1.10003 -> -3", SlippagePoints(true, 1.10000, 1.10003, TE_PT5), -3);
+   AssertIntEq("TC-EX-22", "sell diminta 1.10000 isi 1.10003 -> +3", SlippagePoints(false, 1.10000, 1.10003, TE_PT5), 3);
+  }
+
+void RunTestExecutionPosition()
+  {
+   string why;
+   AssertTrue("TC-EX-23", "buy: SL 1.09900 -> 1.09850 (lebih buruk) ditolak",
+              !IsModifySlAllowed(true, 1.09900, 1.09850, 1.10000, 1.10008, 0, 0, TE_PT5, why) && why != "");
+   AssertTrue("TC-EX-24", "buy: SL baru di atas bid ditolak",
+              !IsModifySlAllowed(true, 1.09900, 1.10010, 1.10000, 1.10008, 0, 0, TE_PT5, why));
+   AssertTrue("TC-EX-24b", "sell: SL 1.10100 -> 1.10050, ask 1.10000: lolos",
+              IsModifySlAllowed(false, 1.10100, 1.10050, 1.09992, 1.10000, 0, 0, TE_PT5, why));
+   AssertTrue("TC-EX-24c", "buy: SL sama dengan SL lama ditolak",
+              !IsModifySlAllowed(true, 1.09900, 1.09900, 1.10000, 1.10008, 0, 0, TE_PT5, why));
+   AssertTrue("TC-EX-24d", "buy: SL baru 5 point dari bid dengan stops 10 ditolak; 20 point lolos",
+              !IsModifySlAllowed(true, 1.09900, 1.09995, 1.10000, 1.10008, 10, 0, TE_PT5, why) &&
+              IsModifySlAllowed(true, 1.09900, 1.09980, 1.10000, 1.10008, 10, 0, TE_PT5, why));
+   AssertTrue("TC-EX-24e", "buy: SL lama 3 point dari bid, freeze 5 -> ditolak (beku)",
+              !IsModifySlAllowed(true, 1.09997, 1.09998, 1.10000, 1.10008, 0, 5, TE_PT5, why));
+
+   AssertTrue("TC-EX-25", "tutup 0.10 dari 0.10 ditolak", !IsPartialVolumeValid(0.10, 0.10, 0.01, 0.01, why) && why != "");
+   AssertTrue("TC-EX-26", "tutup 0.02 dari 0.03 (min 0.01) lolos", IsPartialVolumeValid(0.02, 0.03, 0.01, 0.01, why));
+   AssertTrue("TC-EX-27", "tutup 0.025 dari 0.05 (step 0.01) ditolak", !IsPartialVolumeValid(0.025, 0.05, 0.01, 0.01, why));
+   AssertTrue("TC-EX-27b", "tutup 0.045 dari 0.05 (sisa 0.005 < min) ditolak", !IsPartialVolumeValid(0.045, 0.05, 0.01, 0.001, why));
+   AssertTrue("TC-EX-27c", "volume 0 dan negatif ditolak", !IsPartialVolumeValid(0.0, 0.05, 0.01, 0.01, why) &&
+              !IsPartialVolumeValid(-0.01, 0.05, 0.01, 0.01, why));
+  }
+
 void RunTestExecution()
   {
    TfBeginSuite("Execution");
    RunTestExecutionOrder();
+   RunTestExecutionBroker();
+   RunTestExecutionComment();
+   RunTestExecutionPosition();
    TfEndSuite();
   }
 

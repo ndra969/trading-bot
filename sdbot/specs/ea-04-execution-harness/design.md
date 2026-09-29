@@ -86,7 +86,7 @@ Klasifikasi retcode:
 | POSITION_GONE | `POSITION_CLOSED` |
 | PERMANENT | lainnya, termasuk `MARKET_CLOSED`, `NO_MONEY`, `INVALID_VOLUME`, `INVALID_STOPS`, `INVALID_FILL`, `TRADE_DISABLED`, `LIMIT_VOLUME`, `REJECT` |
 
-`NextStep`: SUCCESS/NO_CHANGES → `SUCCEED`; AMBIGUOUS dengan `foundByRequestId` → `SUCCEED`; TRANSIENT/AMBIGUOUS dengan `attempt < SDB_MAX_RETRY` → `RETRY`; POSITION_GONE → `GONE`; sisanya → `GIVE_UP`. `attempt` dihitung dari 1 (kiriman pertama), jadi paling banyak 1 kirim + 3 ulangan.
+`NextStep`: SUCCESS/NO_CHANGES → `SUCCEED`; AMBIGUOUS dengan `foundByRequestId` → `SUCCEED`; TRANSIENT/AMBIGUOUS dengan `attempt ≤ SDB_MAX_RETRY` → `RETRY`; POSITION_GONE → `GONE`; sisanya → `GIVE_UP`. `attempt` dihitung dari 1 (kiriman pertama), jadi paling banyak 1 kirim + 3 ulangan.
 
 Komentar: `SDB|1.08234|k3f9` (16 karakter untuk harga 5 digit, 16 untuk JPY `SDB|161.234|k3f9`, maksimum realistis `SDB|99999.99999|zzzz` = 20). ID permintaan = base36 dari `(magic % 1296) × 1296 + counter % 1296`, dipadatkan 4 karakter. Magic 2026091900–2026091999 menghasilkan 100 awalan berbeda. ID berulang baru setelah 1.296 order per instance; bentrok hanya jika posisi dengan ID yang sama masih terbuka, yang tidak realistis untuk day trading.
 
