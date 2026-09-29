@@ -35,10 +35,11 @@ Setiap task memakai TDD: test case ditulis dulu dan terbukti FAIL lewat `tools/r
   - _Requirements: 2.2, 2.3, 2.4, 2.10, 3.1, 3.3, 3.4, 3.5, 3.6_ · _Tests: TC-AC-01..21 (+05b, 08b/c, 12b, 15b/c)_
   - Hasil (2026-09-29): Red = 19 FAIL. Green = AccountRules 27/27, total 90/90, build 0/0. Keputusan: hanya `SYMBOL_TRADE_MODE_FULL` yang boleh trading. Deteksi cent mencocokkan mata uang utuh dari `SDB_CENT_CURRENCIES` (USC, EUC).
 
-- [ ] 6. Kelas `CAccount`
+- [x] 6. Kelas `CAccount`
   - Red: suite `TestAccount` di tester (akun tester): `Validate()` mengembalikan PASSED dan mengirim satu `AccountSnapshot` ke `CFakeSink`; `CanTrade()` di tester true; sink `NULL` memakai `CNullSink` (TC-LG-03)
   - Green: `Account/Account.mqh`: state machine validasi (PENDING/CHECK/PASSED/REJECTED), `SymbolSelect`, `CanTrade` dengan alasan, `OnTimer` (koneksi lewat `ConnectionStep`, izin berubah, ganti akun, validasi tertunda), `Snapshot`
-  - _Requirements: 2.1, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.2, 6.4_ · _Tests: TC-AC-22..24 (baru, di design), TC-LG-02, TC-LG-03_
+  - _Requirements: 2.1, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.2, 6.4_ · _Tests: TC-AC-22a..c, 23, 24, 25, 25b_
+  - Hasil (2026-09-29): Red = 6 FAIL. Green = Account 7/7, total 97/97, build 0/0. `Init` menerima simbol, suffix, allowLive, dan magic sebagai parameter (bukan membaca `Inp*`) agar kasus suffix salah bisa diuji. Kode alert sementara di `Constants.mqh` (`SDB_ALERT_*`), dipindah ke `SchemaEnums.mqh` di spec 03. Jalur validasi tertunda, ganti akun, dan alert koneksi di terminal sungguhan dibuktikan lewat MC-03..05.
 
 - [ ] 7. Pasang di `SDBot.mq5` v1.01
   - `OnInit`: validasi input (`INIT_PARAMETERS_INCORRECT`) → `CState.Init` → `CAccount.Validate` (`INIT_FAILED` saat REJECTED, lanjut saat PENDING) → `EventSetTimer(1)`; `OnTimer` → `CAccount.OnTimer` (+ `ExpertRemove()` bila validasi tertunda ditolak); `OnDeinit` membersihkan; sink = `CNullSink` sampai spec 03

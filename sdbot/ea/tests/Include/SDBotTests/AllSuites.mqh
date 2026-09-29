@@ -12,6 +12,7 @@
 #include <SDBotTests/Suites/TestCoreUtils.mqh>
 #include <SDBotTests/Suites/TestState.mqh>
 #include <SDBotTests/Suites/TestAccountRules.mqh>
+#include <SDBotTests/Suites/TestAccount.mqh>
 
 void RunAllSuites()
   {
@@ -21,6 +22,7 @@ void RunAllSuites()
    RunTestCoreUtils();
    RunTestState();
    RunTestAccountRules();
+   RunTestAccount();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

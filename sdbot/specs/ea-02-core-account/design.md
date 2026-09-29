@@ -85,7 +85,7 @@ ENUM_SDB_CONN_ACTION ConnectionStep(bool connected, datetime now, datetime &down
 ### 3.5 `Account.mqh`, `CAccount`
 
 ```cpp
-bool   Init(ISdbEventSink *sink);
+bool   Init(ISdbEventSink *sink, string symbol, string suffix, bool allowLive, long magic); // nilai input lewat parameter agar bisa diuji
 ENUM_SDB_VALIDATION Validate();   // PASSED | PENDING | REJECTED, dipanggil di OnInit dan tiap timer selama PENDING
 bool   CanTrade(string &why);     // 3.1–3.2, hasil di-cache per siklus timer
 void   OnTimer();                 // koneksi, izin, validasi tertunda, ganti akun (2.9)
@@ -288,6 +288,8 @@ Jika `PEAK_EQUITY` tidak ada tetapi akun punya riwayat, EA mencatat WARN (EC-07)
 | TC-AC-22 | `Validate()` di tester | `PASSED`; tepat satu `AccountSnapshot` diterima `CFakeSink` dengan login dan mata uang terisi | 2.1, 2.10 |
 | TC-AC-23 | `CanTrade(why)` di tester setelah validasi | true, `why` kosong | 3.1 |
 | TC-AC-24 | `Init(NULL)` lalu `Validate()` | tidak crash, memakai `CNullSink` | 6.4 |
+| TC-AC-25 | `Init` dengan suffix salah (`zz`) lalu `Validate()` | `REJECTED`, alert Critical `ACCOUNT_REJECTED`, alasan menyebut suffix | 2.4, 2.8 |
+| TC-AC-25b | `CanTrade` pada akun yang ditolak | false | 2.7 |
 
 **Manual (terminal live)**
 
