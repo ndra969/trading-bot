@@ -35,6 +35,7 @@ SdbAppConfig TaConfig()
    c.allowLive = false;
    c.logLevel = SDB_LOG_INFO;
    c.dbTarget = SDB_DB_UNITTEST;
+   c.resetEmergencyStop = false;
    return c;
   }
 
@@ -49,6 +50,10 @@ int TaInitDeinit(const SdbAppConfig &c, const int deinitReason)
 
 void RunTestAppInit()
   {
+   SdbAppConfig live = CurrentAppConfig(SDB_APP_LIVE, "test");
+   AssertTrue("TC-IR-02", "CurrentAppConfig membawa InpResetEmergencyStop (spec 05 Req 5.5)",
+              live.resetEmergencyStop == InpResetEmergencyStop);
+
    SdbAppConfig c = TaConfig();
    c.inputs.riskPerTradePct = 2.0;
    int r = TaInitDeinit(c, REASON_INITFAILED);
@@ -181,6 +186,21 @@ void RunTestAppLifecycle()
    app.OnInit(TaConfig(), GetPointer(fake2));
    app.OnDeinit(REASON_REMOVE);
    delete app;
+   // TC-RK-09: snapshot akun membawa puncak dari status bersama, bukan equity (spec 05 Req 3.8).
+   string peakGv = SDB_GV_PREFIX_UNITTEST + "_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "_PEAK_EQUITY";
+   double peak = AccountInfoDouble(ACCOUNT_EQUITY) + 500.0;
+   GlobalVariableSet(peakGv, peak);
+   CFakeSink fake3;
+   app = new CSdbApp;
+   app.OnInit(TaConfig(), GetPointer(fake3));
+   AccountSnapshot snap;
+   bool haveSnap = fake3.LastAccount(snap);
+   app.OnDeinit(REASON_REMOVE);
+   delete app;
+   GlobalVariablesDeleteAll(SDB_GV_PREFIX_UNITTEST + "_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "_");
+   AssertTrue("TC-RK-09", StringFormat("snapshot setelah status siap: peakEquity = GV puncak (%.2f vs %.2f)", haveSnap ? snap.peakEquity : -1.0, peak),
+              haveSnap && MathAbs(snap.peakEquity - peak) < 1e-6);
+
    AssertTrue("TC-APP-07b", "observer menerima snapshot akun, DB juga", fake2.CountAccount() >= 1 && TaCount("accounts") == 1);
   }
 

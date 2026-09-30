@@ -8,5 +8,5 @@ HarnessDirection=2
 HarnessSlPoints=200
 HarnessTpPoints=200
 HarnessMaxOpen=1
-HarnessFixedLot=0.01
+HarnessFixedLot=0
 HarnessRestartAtBar=0

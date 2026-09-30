@@ -14,7 +14,7 @@ Kerjakan **berurutan**. Spec berikutnya baru dimulai setelah semua task spec seb
 | 2 | [ea-02-core-account](ea-02-core-account/) | Core (tipe, konstanta, input, util, state GV, event sink), validasi akun, koneksi, log terminal | 1 | suite CoreUtils + AccountRules ALL PASS | **Done** 2026-09-29 (MC-01..06 manual tertunda) |
 | 3 | [ea-03-storage-migrations](ea-03-storage-migrations/) | Skema SQLite baru, migrasi via skrip, file DB live vs tester terpisah, `CLogger` | 2 | pytest `schema.py` + suite Storage ALL PASS | **Done** 2026-09-29 (MC-DB-01..02 manual tertunda) |
 | 4 | [ea-04-execution-harness](ea-04-execution-harness/) | `CExecutor`, orkestrasi `CSdbApp`, `SDBot.mq5`, harness uji dasar | 2, 3 | suite Execution ALL PASS, SC-06 PASS | **Done** 2026-09-30 (MC-EX-01..02 manual tertunda; skema v2 `run_key`, PC-08) |
-| 5 | [ea-05-risk](ea-05-risk/) | Lot sizing, pre-trade check, drawdown, rugi harian, emergency stop, operasi saldo | 4 | suite RiskMath ALL PASS, SC-02/03/05/07 PASS | Requirements + design draft |
+| 5 | [ea-05-risk](ea-05-risk/) | Lot sizing, pre-trade check, drawdown, rugi harian, emergency stop, operasi saldo | 4 | suite RiskMath ALL PASS, SC-02/03/05/07 PASS | **Done** 2026-09-30 (MC-RK-01..02 manual tertunda; PC-09, PC-10) |
 | 6 | [ea-06-position](ea-06-position/) | BE, partial, trailing, deteksi closure, restart aman | 4, 5 | suite PositionMath ALL PASS, SC-01/04 PASS | Requirements + design draft |
 | 7 | [ea-07-integration](ea-07-integration/) | Metrik OnTester, preset `.set`, checklist manual, regresi penuh, DoD Fase 1 | 1–6 | semua suite + SC-01..08 PASS, MC Fase 1 dicek | Requirements + design draft |
 

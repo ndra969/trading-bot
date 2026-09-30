@@ -1,0 +1,14 @@
+; SC-03: drawdown lot x 0.5 di 1%, STOP di 2%, risiko 1%, SL 100 / TP 1000 point, entry tiap 4 bar.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpRiskPerTradePct=1.0
+InpDDReducePct=1.0
+InpDDStopPct=2.0
+HarnessScenario=SC-03
+HarnessEveryBars=4
+HarnessDirection=2
+HarnessSlPoints=100
+HarnessTpPoints=1000
+HarnessMaxOpen=1
+HarnessFixedLot=0

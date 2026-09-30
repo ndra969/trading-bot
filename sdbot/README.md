@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.03** (spec 01–04 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario). Belum ada logika trading: EA utama tidak membuka posisi apa pun.
+Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.04** (spec 01–05 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori). Belum ada logika entry: EA utama tidak membuka posisi apa pun.
 
 ## Konfigurasi dan tuning
 
@@ -16,13 +16,13 @@ PRD mengganti konfigurasi YAML bot Python dengan **input EA** yang disimpan seba
 |---|---|---|---|
 | **Input EA** (semua angka yang bisa di-tuning: risiko, BE, partial, trailing, skor, filter) | `ea/src/Include/SDBot/Core/Inputs.mqh`: satu-satunya tempat deklarasi `input`, dengan default dari PRD | Developer (default); trader lewat tab Inputs MT5 atau file `.set` | Saat EA dipasang atau input diubah (EA re-init) |
 | Batas aman input | `ea/src/Include/SDBot/Core/InputRules.mqh` | Developer | EA menolak jalan jika input di luar batas |
-| **Preset per pair** | `ea/src/Presets/SDBot_DAY_<PAIR>c.set` (EURUSDc, GBPUSDc, EURJPYc, GBPJPYc) | Hasil tuning, di-commit | Dimuat di tab Inputs: Load |
+| **Preset per simbol** | `ea/src/Presets/SDBot_DAY_<SIMBOL>c.set`, 12 simbol bot Python (PC-10): forex major EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD; cross EURJPY, GBPJPY; komoditas XAUUSD, XAGUSD; crypto BTCUSD. Nilai dibedakan per kategori (spec 07) | Hasil tuning, di-commit | Dimuat di tab Inputs: Load |
 | Preset pribadi (rahasia) | `*.local.set`, misalnya `SDBot_DAY_EURUSDc.local.set` | Trader, **tidak di-commit** | Berisi token dan chat ID Telegram (sama dengan `.env` bot Python) |
-| Konstanta tetap dari PRD | `ea/src/Include/SDBot/Core/Constants.mqh` (retry 3x, cooldown 30 detik, DD info 5%, pulih 8%, margin 300%/200%, dll.) | Developer, lewat perubahan kode + compile | Versi EA berikutnya |
+| Konstanta tetap dari PRD | `ea/src/Include/SDBot/Core/Constants.mqh` (retry 3x, cooldown 30 detik, DD info 5%, pulih 8% (atau `InpDDReducePct` × 0.8 bila lebih kecil), margin alert 300% / blok 200%, close all tiap 5 detik (pasar tutup 60 detik), Critical close all gagal setelah 3x lalu tiap 15 menit, posisi tanpa SL = 1% balance, scan operasi saldo tiap 10 detik, dll.) | Developer, lewat perubahan kode + compile | Versi EA berikutnya |
 | Setting dari panel backoffice (Fase B5) | tabel `settings` di `sdbot_control.sqlite` | Admin lewat panel | Siklus timer berikutnya; **hanya boleh lebih ketat** dari input MT5 |
 | File database EA | `sdbot.sqlite` (live), `sdbot_tester.sqlite` (Strategy Tester), `sdbot_unittest.sqlite` (unit test) di folder Common MT5 (`%APPDATA%\MetaQuotes\Terminal\Common\Files`). Optimasi tidak menulis DB. Konstanta `SDB_DB_*` di `Constants.mqh`: busy timeout 500 ms, antrean 2000 event, alert DB tidak bisa ditulis setelah 300 detik, buka ulang tiap 60 detik | EA sendiri; skema hanya lewat `tools/schema.py` | Migrasi diterapkan otomatis saat EA start |
 | Skema dan enum DB | `shared/schema/` (`migrations/data/*.sql`, `enums.md`); file hasil generate `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, `data_db.sql`, fixture | Developer lewat `schema.py new/build`, dicek pre-commit | Versi EA berikutnya |
-| Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal (puncak equity, STOPPED, pause harian, penghitung ID permintaan `<magic>_REQ_COUNTER`, …; di tester juga `RUN_KEY`) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
+| Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal: `PEAK_EQUITY`, `STOPPED`, `DAILY_PAUSE`, `LOT_REDUCED`, `DD_LEVEL`, `DAY_START_BAL`/`DAY_START_DATE`, `LAST_BAL_DEAL`/`LAST_BAL_TIME`, `MARGIN_LOW`, `CLOSE_ALL_ALERT_AT`, per instance `<magic>_RESET_SEEN` dan `<magic>_REQ_COUNTER`; di tester juga `RUN_KEY`. Satu set per akun, dibagi semua instance (compare-and-set) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
 | Konstanta eksekusi | `Constants.mqh`: ulang maksimal 3x dengan jeda 500 ms, deviasi 10 point, cari order ambigu 300 detik ke belakang, snapshot akun tiap 60 detik | Developer | Versi EA berikutnya |
 | Skenario uji harness | `ea/tests/scenarios/SC-nn_<nama>.ini` (simbol, periode, model, tanggal) + `.set` bernama sama (input EA dan input harness) | Developer | Dibaca `run-ea-tests.ps1 -Scenario SC-nn` |
 | Path mesin untuk alat build/uji | `tools/mt5-paths.local.json` (contoh: `tools/mt5-paths.example.json`) | Developer, **tidak di-commit** | Dibaca setiap kali skrip `tools/` jalan |
@@ -41,6 +41,7 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Risiko | `InpRiskPerTradePct` | 0.5 | 0 < x ≤ 1.0 | spec 02 (dipakai spec 05) |
 | Risiko | `InpMaxOpenRiskPct` | 3.0 | risk per trade ≤ x ≤ 10 | spec 02 (dipakai spec 05) |
 | Risiko | `InpDailyLossPct` | 3.0 | 0 < x ≤ 10 | spec 02 (dipakai spec 05) |
+| Risiko | `InpMaxPosForexMajor` / `InpMaxPosForexCross` / `InpMaxPosCommodity` / `InpMaxPosCrypto` | 5 / 3 / 1 / 1 (dari bot Python; batas akun, sama di semua preset) | 1–20 | spec 05 |
 | Risiko | `InpDDReducePct` / `InpDDStopPct` | 10 / 15 | 0 < reduce < stop ≤ 50 | spec 02 (dipakai spec 05) |
 | Risiko | `InpResetEmergencyStop` | false | reset hanya saat berubah false → true | spec 02 (dipakai spec 05) |
 | Posisi | `InpBreakevenR` / `InpBreakevenBufferPoints` | 1.0 / 2 | BE R < partial R | spec 02 (dipakai spec 06) |
@@ -83,13 +84,15 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | Input | Isi |
 |---|---|
 | `InpTestRunId` | ID run, diisi runner |
-| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-06`, `SC-08`); ID lain = FAIL |
+| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-02`, `SC-03`, `SC-03r`, `SC-05`, `SC-06`, `SC-07`, `SC-08`); ID lain = FAIL |
 | `HarnessEveryBars` | entry setiap N bar chart |
 | `HarnessDirection` | 0 BUY, 1 SELL, 2 bergantian |
 | `HarnessSlPoints` / `HarnessTpPoints` | jarak SL/TP dari harga (point) |
 | `HarnessMaxOpen` | posisi sendiri maksimum |
-| `HarnessFixedLot` | lot tetap (lot sizing mulai spec 05) |
+| `HarnessFixedLot` | lot tetap; 0 = lot dari risiko (`CalcVolume`). Selalu lewat pre-trade check |
 | `HarnessRestartAtBar` | bar tempat orkestrasi dibuat ulang (0 = tanpa restart) |
+| `HarnessRestartBarsAfterStop` | restart N bar setelah STOPPED pertama terlihat (0 = tidak) |
+| `HarnessWithdrawAtBar` / `HarnessWithdrawPct` | tarik saldo (`TesterWithdrawal`) di bar ini atau sesudahnya saat tanpa posisi; besar % balance |
 
 Menjalankan: `powershell -ExecutionPolicy Bypass -File tools/run-ea-tests.ps1 -Scenario SC-00,SC-08` (atau `-All` untuk unit + semua skenario). Skenario baru = pasangan `.ini`/`.set` di `ea/tests/scenarios/` plus cabang `CheckScenario` di `ea/tests/Include/SDBotTests/Scenarios.mqh`.
 

@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.03"
+#property version   "1.04"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.03"
+#define SDB_HARNESS_EA_VERSION "1.04"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
@@ -32,8 +32,11 @@ input ENUM_HARNESS_DIRECTION HarnessDirection    = HARNESS_ALTERNATE;
 input int                    HarnessSlPoints     = 200;        // jarak SL dari harga (point)
 input int                    HarnessTpPoints     = 200;        // jarak TP dari harga (point)
 input int                    HarnessMaxOpen      = 1;          // posisi sendiri maksimum
-input double                 HarnessFixedLot     = 0.01;       // lot tetap (lot sizing mulai spec 05)
+input double                 HarnessFixedLot     = 0.0;        // lot tetap; 0 = CalcVolume (spec 05). Tetap lewat pre-trade check
 input int                    HarnessRestartAtBar = 0;          // 0 = tanpa restart
+input int                    HarnessRestartBarsAfterStop = 0;  // restart N bar setelah STOPPED pertama terlihat (0 = tidak)
+input int                    HarnessWithdrawAtBar = 0;         // tarik saldo di bar ini atau sesudahnya saat tanpa posisi (0 = tidak)
+input double                 HarnessWithdrawPct   = 20.0;      // besar penarikan (% balance)
 
 CSdbApp          *g_app = NULL;
 CScenarioRecorder g_rec;
@@ -41,6 +44,8 @@ bool              g_runStarted = false;
 datetime          g_lastBar = 0;
 int               g_bar = 0;
 int               g_entries = 0;
+int               g_stopBar = 0;          // bar saat STOPPED pertama terlihat
+bool              g_withdrawn = false;
 
 // Posisi sendiri (magic + simbol) untuk pemeriksaan restart.
 void RecordOwnPositions(const bool before)
@@ -80,6 +85,7 @@ void StopApp(const int reason)
 // Restart simulasi (Req 7.5): GV dan posisi tetap, orkestrasi dibuat ulang, sesi baru.
 void Restart()
   {
+   g_rec.NoteRestart(TimeCurrent());
    RecordOwnPositions(true);
    StopApp(REASON_PROGRAM);
    if(StartApp() != INIT_SUCCEEDED)
@@ -113,10 +119,22 @@ void TryEntry()
    double dir = rq.isBuy ? 1.0 : -1.0;
    rq.sl = price - dir * HarnessSlPoints * point;
    rq.tp = price + dir * HarnessTpPoints * point;
-   OrderResult res;
-   g_app.Executor().OpenMarket(rq, res);
-   g_rec.AddOpenResult(res);
    g_entries++;
+   // Jalur risiko sama dengan EA (spec 05 Req 8.1, 8.2): lot -> pre-trade check -> executor.
+   string stage = "", detail = "";
+   bool ok = (HarnessFixedLot > 0.0) || g_app.RiskManager().CalcVolume(rq, stage, detail);
+   ok = ok && g_app.RiskManager().PreTradeCheck(rq, stage, detail);
+   OrderResult res;
+   if(!ok)
+     {
+      ZeroMemory(res);
+      res.rejectStage = stage;
+      res.detail = detail;
+      g_rec.AddOpenResult(res, TimeCurrent());
+      return;
+     }
+   g_app.Executor().OpenMarket(rq, res);
+   g_rec.AddOpenResult(res, TimeCurrent());
   }
 
 int OnInit()
@@ -141,16 +159,52 @@ void OnTick()
       return;
    g_lastBar = bar;
    g_bar++;
-   if(HarnessRestartAtBar > 0 && g_bar == HarnessRestartAtBar)
+   if(g_stopBar == 0 && g_app.RiskState().IsReady() && g_app.RiskState().IsStopped())
+      g_stopBar = g_bar;
+   bool restartAfterStop = HarnessRestartBarsAfterStop > 0 && g_stopBar > 0 && g_bar == g_stopBar + HarnessRestartBarsAfterStop;
+   if((HarnessRestartAtBar > 0 && g_bar == HarnessRestartAtBar) || restartAfterStop)
       Restart();
    if(g_app != NULL && HarnessEveryBars > 0 && g_bar % HarnessEveryBars == 0)
       TryEntry();
+   if(g_app != NULL)
+      TryWithdraw();
+  }
+
+// Penarikan saldo terjadwal (spec 05 Req 8.3, SC-07): saat tanpa posisi, agar puncak tidak ikut
+// berubah oleh floating antara penarikan dan pemrosesannya.
+void TryWithdraw()
+  {
+   if(g_withdrawn || HarnessWithdrawAtBar <= 0 || g_bar < HarnessWithdrawAtBar || CountSdbotPositions() > 0 ||
+      !g_app.RiskState().IsReady())
+      return;
+   double amount = NormalizeDouble(AccountInfoDouble(ACCOUNT_BALANCE) * HarnessWithdrawPct / 100.0, 2);
+   g_rec.NoteWithdraw(amount, g_app.RiskState().PeakEquity(), (int)g_app.RiskState().DdLevel());
+   g_withdrawn = TesterWithdrawal(amount);
+   if(!g_withdrawn)
+      LogError("Harness", "TesterWithdrawal gagal | " + ErrText(GetLastError()));
+  }
+
+// Posisi SDBot di akun (semua simbol), untuk sampel emergency stop (SC-03).
+int CountSdbotPositions()
+  {
+   int n = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+      if(PositionGetTicket(i) != 0 && IsSdbotMagic(PositionGetInteger(POSITION_MAGIC)))
+         n++;
+   return n;
   }
 
 void OnTimer()
   {
-   if(g_app != NULL)
-      g_app.OnTimer();
+   if(g_app == NULL)
+      return;
+   g_app.OnTimer();
+   if(!g_app.RiskState().IsReady())
+      return;
+   if(g_app.RiskState().IsStopped())
+      g_rec.NoteStoppedSample(TimeCurrent(), CountSdbotPositions());
+   if(g_withdrawn)
+      g_rec.NoteAfterBalanceOp(g_app.RiskState().PeakEquity(), (int)g_app.RiskState().DdLevel());
   }
 
 void OnTradeTransaction(const MqlTradeTransaction &t, const MqlTradeRequest &rq, const MqlTradeResult &rs)

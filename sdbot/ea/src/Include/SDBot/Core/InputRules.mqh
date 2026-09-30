@@ -22,6 +22,10 @@ struct InputValues
    double            partialPct;
    int               trailAtrPeriod;
    double            trailAtrMult;
+   int               maxPosForexMajor;   // batas posisi SDBot per kategori aset di akun (spec 05 Req 2.8)
+   int               maxPosForexCross;
+   int               maxPosCommodity;
+   int               maxPosCrypto;
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -37,6 +41,7 @@ struct SdbAppConfig
    string                 inputsJson;
    string                 eaVersion;
    ENUM_SDB_DB_TARGET     dbTarget;
+   bool                   resetEmergencyStop;   // InpResetEmergencyStop (spec 05 Req 5.5)
   };
 
 InputValues DefaultInputValues()
@@ -54,6 +59,10 @@ InputValues DefaultInputValues()
    v.partialPct = SDB_DEF_PARTIAL_PCT;
    v.trailAtrPeriod = SDB_DEF_TRAIL_ATR_PERIOD;
    v.trailAtrMult = SDB_DEF_TRAIL_ATR_MULT;
+   v.maxPosForexMajor = SDB_DEF_MAX_POS_FOREX_MAJOR;
+   v.maxPosForexCross = SDB_DEF_MAX_POS_FOREX_CROSS;
+   v.maxPosCommodity = SDB_DEF_MAX_POS_COMMODITY;
+   v.maxPosCrypto = SDB_DEF_MAX_POS_CRYPTO;
    return v;
   }
 
@@ -81,6 +90,12 @@ void IrCheckRisk(const InputValues &v, string &errors)
    if(v.ddStopPct <= v.ddReducePct || v.ddStopPct > SDB_MAX_DD_STOP_PCT)
       IrAdd(errors, "InpDDStopPct=" + IrNum(v.ddStopPct) + " harus InpDDReducePct (" + IrNum(v.ddReducePct) +
             ") < x <= " + IrNum(SDB_MAX_DD_STOP_PCT));
+  }
+
+void IrCheckClassLimit(const string name, const int value, string &errors)
+  {
+   if(value < 1 || value > SDB_MAX_POS_PER_CLASS)
+      IrAdd(errors, name + "=" + IntegerToString(value) + " harus 1 <= x <= " + IntegerToString(SDB_MAX_POS_PER_CLASS));
   }
 
 void IrCheckPosition(const InputValues &v, string &errors)
@@ -112,6 +127,10 @@ bool ValidateInputValues(const InputValues &v, const bool allowHarnessMagic, str
       IrAdd(errors, "InpMagicNumber=" + IntegerToString(v.magic) + " harus di blok SDBot " +
             IntegerToString(SDB_MAGIC_MIN) + "-" + IntegerToString(SDB_MAGIC_MAX) + " (satu nomor per pair)");
    IrCheckRisk(v, errors);
+   IrCheckClassLimit("InpMaxPosForexMajor", v.maxPosForexMajor, errors);
+   IrCheckClassLimit("InpMaxPosForexCross", v.maxPosForexCross, errors);
+   IrCheckClassLimit("InpMaxPosCommodity", v.maxPosCommodity, errors);
+   IrCheckClassLimit("InpMaxPosCrypto", v.maxPosCrypto, errors);
    IrCheckPosition(v, errors);
    return errors == "";
   }

@@ -124,7 +124,9 @@ void ScCheckSnapshots(const string id, const CScenarioRecorder &rec)
    for(int i = 1; i < n; i++)
      {
       long g = (long)(rec.SnapshotTime(i) - rec.SnapshotTime(i - 1));
-      if(g > 3600)
+      // Init mengirim dua snapshot di detik yang sama: dari validasi akun lalu dengan puncak equity
+      // setelah status risiko siap (spec 05 design §4.6). Jeda lebih dari 1 jam = pasar tutup.
+      if(g > 3600 || (i == 1 && g == 0))
          continue;
       gaps++;
       if(g < SDB_ACCOUNT_SNAPSHOT_SEC)
@@ -203,11 +205,252 @@ void CheckSc08(const string id, const CScenarioRecorder &rec)
    ScCheckNoErrorAlerts(id, rec);
   }
 
+// SC-05 (spec 05 Req 1.3): lot hitungan < minimum selalu ditolak LOT_BELOW_MIN, tidak pernah dibulatkan ke atas.
+void CheckSc05(const string id, const CScenarioRecorder &rec)
+  {
+   int n = rec.OpenCount();
+   int belowMin = 0;
+   string other = "";
+   for(int i = 0; i < n; i++)
+     {
+      OrderResult r;
+      rec.OpenAt(i, r);
+      if(!r.ok && r.rejectStage == SDB_REJECT_STAGE_LOT_BELOW_MIN)
+         belowMin++;
+      else if(other == "")
+         other = StringFormat("#%d ok=%s stage=%s %s", i, r.ok ? "true" : "false", r.rejectStage, r.detail);
+     }
+   AssertTrue(id + "-attempts", StringFormat("harness mencoba entry >= 3 kali (%d)", n), n >= 3);
+   AssertTrue(id + "-rejected", StringFormat("semua ditolak LOT_BELOW_MIN (%d/%d) %s", belowMin, n, other), n > 0 && belowMin == n);
+   AssertTrue(id + "-nosend", StringFormat("tidak ada OrderSend (%I64d)", rec.Sends()), rec.Sends() == 0);
+   ScCheckSessions(id, rec, 1);
+  }
+
+//--- Skenario risiko spec 05
+
+datetime ScFirstAlert(const CScenarioRecorder &rec, const string type)
+  {
+   for(int i = 0; i < rec.AlertCount(); i++)
+     {
+      AlertEvent a;
+      rec.AlertAt(i, a);
+      if(a.type == type)
+         return a.time;
+     }
+   return 0;
+  }
+
+bool ScStoppedGv()
+  {
+   string key = SDB_GV_PREFIX + "_" + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "_STOPPED";
+   return GlobalVariableCheck(key) && GlobalVariableGet(key) != 0.0;
+  }
+
+datetime ScDay(const datetime t) { return t - (datetime)((long)t % 86400); }
+
+// Semua percobaan sejak `from` ditolak dengan `stage` (minimal satu percobaan).
+bool ScAllRejectedSince(const CScenarioRecorder &rec, const datetime from, const string stage, int &count)
+  {
+   count = 0;
+   for(int i = 0; i < rec.OpenCount(); i++)
+     {
+      if(rec.OpenTimeAt(i) < from)
+         continue;
+      OrderResult r;
+      rec.OpenAt(i, r);
+      if(r.ok || r.rejectStage != stage)
+         return false;
+      count++;
+     }
+   return count > 0;
+  }
+
+// SC-02 (Req 4.1–4.4): pause harian, sekali per hari, dicabut di hari server berikutnya.
+void CheckSc02(const string id, const CScenarioRecorder &rec)
+  {
+   datetime lossDays[];
+   bool dupDay = false;
+   for(int i = 0; i < rec.AlertCount(); i++)
+     {
+      AlertEvent a;
+      rec.AlertAt(i, a);
+      if(a.type != SDB_ALERT_TYPE_DAILY_LOSS)
+         continue;
+      for(int k = 0; k < ArraySize(lossDays); k++)
+         if(lossDays[k] == ScDay(a.time))
+            dupDay = true;
+      int n = ArraySize(lossDays);
+      ArrayResize(lossDays, n + 1);
+      lossDays[n] = ScDay(a.time);
+     }
+   int pauses = 0, pausesOnLossDay = 0;
+   bool laterOk = false;
+   for(int i = 0; i < rec.OpenCount(); i++)
+     {
+      OrderResult r;
+      rec.OpenAt(i, r);
+      datetime day = ScDay(rec.OpenTimeAt(i));
+      if(r.ok && ArraySize(lossDays) > 0 && day > lossDays[0])
+         laterOk = true;
+      if(r.rejectStage != SDB_REJECT_STAGE_DAILY_PAUSE)
+         continue;
+      pauses++;
+      for(int k = 0; k < ArraySize(lossDays); k++)
+         if(lossDays[k] == day)
+           {
+            pausesOnLossDay++;
+            break;
+           }
+     }
+   AssertTrue(id + "-alert", StringFormat("DAILY_LOSS >= 1 dan maksimal sekali per hari server (%d hari, ganda=%s)",
+                                          ArraySize(lossDays), dupDay ? "ya" : "tidak"), ArraySize(lossDays) >= 1 && !dupDay);
+   AssertTrue(id + "-pause", StringFormat("setiap tolak DAILY_PAUSE jatuh di hari dengan DAILY_LOSS (%d/%d)", pausesOnLossDay, pauses),
+              pauses >= 1 && pausesOnLossDay == pauses);
+   AssertTrue(id + "-nextday", "ada entry berhasil di hari server sesudah pause pertama", laterOk);
+   AssertTrue(id + "-notstopped", "emergency stop tidak aktif (skenario hanya menguji rugi harian)", !ScStoppedGv());
+   ScCheckSessions(id, rec, 1);
+  }
+
+// SC-03 (Req 1.5, 3.4, 3.6, 5.1, 5.4): lot x 0.5 setelah DD_REDUCE, lalu STOPPED dan close all.
+void CheckSc03(const string id, const CScenarioRecorder &rec)
+  {
+   datetime tReduce = ScFirstAlert(rec, SDB_ALERT_TYPE_DD_REDUCE);
+   datetime tStop = ScFirstAlert(rec, SDB_ALERT_TYPE_DD_STOP);
+   AssertTrue(id + "-order", StringFormat("DD_REDUCE (%s) sebelum DD_STOP (%s)", TimeToString(tReduce), TimeToString(tStop)),
+              tReduce > 0 && tStop >= tReduce);
+   // Risiko yang diharapkan per trade mengikuti alert REDUCE/RECOVERED terakhir sebelum trade dibuka.
+   int full = 0, fullBad = 0, half = 0, halfBad = 0, flips = 0;
+   for(int i = 0; i < rec.AlertCount(); i++)
+     {
+      AlertEvent a;
+      rec.AlertAt(i, a);
+      if(a.type == SDB_ALERT_TYPE_DD_REDUCE || a.type == SDB_ALERT_TYPE_DD_RECOVERED)
+         flips++;
+     }
+   for(int i = 0; i < rec.TradeCount(); i++)
+     {
+      TradeRecord t;
+      rec.TradeAt(i, t);
+      if(tStop > 0 && t.openedAt >= tStop)
+         continue;
+      bool reduced = false;
+      for(int k = 0; k < rec.AlertCount(); k++)
+        {
+         AlertEvent a;
+         rec.AlertAt(k, a);
+         if(a.time > t.openedAt)
+            break;
+         if(a.type == SDB_ALERT_TYPE_DD_REDUCE)
+            reduced = true;
+         else if(a.type == SDB_ALERT_TYPE_DD_RECOVERED)
+            reduced = false;
+        }
+      if(reduced)
+        {
+         half++;
+         if(t.riskPct > 0.5 + 1e-6 || t.riskPct < 0.4)
+            halfBad++;
+        }
+      else
+        {
+         full++;
+         if(t.riskPct > 1.0 + 1e-6 || t.riskPct < 0.8)
+            fullBad++;
+        }
+     }
+   AssertTrue(id + "-risk", StringFormat("risk_pct ~1%% tanpa flag (%d, salah %d), ~0.5%% dengan flag lot x 0.5 (%d, salah %d)",
+                                         full, fullBad, half, halfBad), full >= 1 && fullBad == 0 && half >= 1 && halfBad == 0);
+   // Histeresis (Req 3.5, EC-13): REDUCE hanya di dd >= InpDDReducePct, RECOVERED hanya di dd < ambang pulih.
+   double reducePct = CurrentInputs().ddReducePct;
+   double recoverPct = DdRecoverPct(reducePct);
+   int badFlip = 0;
+   for(int i = 0; i < rec.AlertCount(); i++)
+     {
+      AlertEvent a;
+      rec.AlertAt(i, a);
+      int p = StringFind(a.message, "drawdown ");
+      if(p < 0 || (a.type != SDB_ALERT_TYPE_DD_REDUCE && a.type != SDB_ALERT_TYPE_DD_RECOVERED))
+         continue;
+      double dd = StringToDouble(StringSubstr(a.message, p + 9, 8));
+      if((a.type == SDB_ALERT_TYPE_DD_REDUCE && dd < reducePct - 0.005) ||
+         (a.type == SDB_ALERT_TYPE_DD_RECOVERED && dd >= recoverPct + 0.005))
+         badFlip++;
+     }
+   AssertTrue(id + "-hysteresis", StringFormat("REDUCE di dd >= %.2f%%, RECOVERED di dd < %.2f%% (%d transisi, salah %d)",
+                                               reducePct, recoverPct, flips, badFlip), badFlip == 0);
+   AssertTrue(id + "-stopped", "STOPPED = 1 di akhir run", ScStoppedGv());
+   long closeSec = (rec.LastOpenWhileStopped() == 0) ? 0 : (long)(rec.LastOpenWhileStopped() - rec.FirstStoppedAt());
+   AssertTrue(id + "-closeall", StringFormat("posisi SDBot habis <= 10 detik simulasi setelah STOPPED (%I64d detik)", closeSec),
+              rec.FirstStoppedAt() > 0 && closeSec <= 10);
+   int after = 0;
+   AssertTrue(id + "-noentry", "semua percobaan sesudah DD_STOP ditolak STOPPED",
+              tStop > 0 && ScAllRejectedSince(rec, tStop + 1, SDB_REJECT_STAGE_STOPPED, after));
+   ScCheckSessions(id, rec, 1);
+  }
+
+// SC-03r (Req 5.4, 5.7): restart saat STOPPED tidak membuka STOPPED.
+void CheckSc03r(const string id, const CScenarioRecorder &rec)
+  {
+   datetime tStop = ScFirstAlert(rec, SDB_ALERT_TYPE_DD_STOP);
+   AssertTrue(id + "-restart", StringFormat("restart (%s) sesudah DD_STOP (%s)", TimeToString(rec.RestartAt()), TimeToString(tStop)),
+              tStop > 0 && rec.RestartAt() > tStop);
+   AssertTrue(id + "-stopped", "STOPPED tetap 1 setelah restart", ScStoppedGv());
+   int after = 0;
+   bool rejected = ScAllRejectedSince(rec, rec.RestartAt(), SDB_REJECT_STAGE_STOPPED, after);
+   AssertTrue(id + "-noentry", StringFormat("semua percobaan sesudah restart ditolak STOPPED (%d)", after), rejected);
+   ScCheckSessions(id, rec, 2);
+   long first = (rec.SessionCount() > 0) ? rec.SessionAt(0) : 0;
+   long sameRun = ScDbCount("SELECT COUNT(*) FROM sessions WHERE run_key=" + IntegerToString(first) +
+                            " AND id IN (" + rec.SessionIdList() + ")");
+   AssertTrue(id + "-runkey", StringFormat("kedua sesi satu run (%I64d/2)", sameRun), sameRun == 2);
+  }
+
+// SC-07 (Req 7.1–7.5, 8.3): penarikan tercatat tepat sekali dan menggeser puncak tanpa mengubah level DD.
+void CheckSc07(const string id, const CScenarioRecorder &rec)
+  {
+   double w = rec.WithdrawAmount();
+   AssertTrue(id + "-withdraw", StringFormat("harness menarik saldo (%.2f)", w), w > 0.0);
+   BalanceOpRecord b;
+   bool have = rec.BalanceOpAt(0, b);
+   AssertTrue(id + "-once", StringFormat("tepat 1 operasi saldo (deposit awal tidak dihitung): %d, amount %.2f, jenis %s",
+                                         rec.BalanceOpCount(), have ? b.amount : 0.0, have ? b.opType : ""),
+              rec.BalanceOpCount() == 1 && have && MathAbs(b.amount + w) < 0.01 && b.opType == SDB_BALANCE_OP_TYPE_BALANCE);
+   AssertTrue(id + "-peak", StringFormat("puncak sesudah = sebelum - penarikan (%.2f -> %.2f, selisih %.2f)",
+                                         rec.PeakBefore(), rec.PeakAfter(), rec.PeakBefore() - rec.PeakAfter()),
+              MathAbs(rec.PeakBefore() - rec.PeakAfter() - w) < 0.01);
+   AssertTrue(id + "-level", StringFormat("level DD tidak berubah (%d -> %d)", rec.LevelBefore(), rec.LevelAfter()),
+              rec.LevelBefore() >= 0 && rec.LevelBefore() == rec.LevelAfter());
+   int alerts = 0;
+   for(int i = 0; i < rec.AlertCount(); i++)
+     {
+      AlertEvent a;
+      rec.AlertAt(i, a);
+      if(a.type == SDB_ALERT_TYPE_BALANCE_OP)
+         alerts++;
+     }
+   AssertTrue(id + "-alert", StringFormat("alert BALANCE_OP tepat sekali (%d)", alerts), alerts == 1);
+   ScCheckSessions(id, rec, 1);
+   long first = (rec.SessionCount() > 0) ? rec.SessionAt(0) : 0;
+   long rows = ScDbCount("SELECT COUNT(*) FROM balance_ops WHERE run_key = (SELECT run_key FROM sessions WHERE id=" +
+                         IntegerToString(first) + ")");
+   AssertTrue(id + "-db", StringFormat("1 baris balance_ops untuk run_key run ini (%I64d)", rows), rows == 1);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
    if(id == "SC-00")
       CheckSc00(id, rec);
+   else if(id == "SC-02")
+      CheckSc02(id, rec);
+   else if(id == "SC-03")
+      CheckSc03(id, rec);
+   else if(id == "SC-03r")
+      CheckSc03r(id, rec);
+   else if(id == "SC-05")
+      CheckSc05(id, rec);
+   else if(id == "SC-07")
+      CheckSc07(id, rec);
    else if(id == "SC-06")
       CheckSc06(id, rec);
    else if(id == "SC-08")

@@ -23,6 +23,10 @@ input group "Risiko"
 input double                 InpRiskPerTradePct       = SDB_DEF_RISK_PER_TRADE_PCT; // Risiko per trade (% balance, maks 1)
 input double                 InpMaxOpenRiskPct        = SDB_DEF_MAX_OPEN_RISK_PCT;  // Total risiko posisi terbuka (%)
 input double                 InpDailyLossPct          = SDB_DEF_DAILY_LOSS_PCT;     // Batas rugi harian (% balance awal hari)
+input int                    InpMaxPosForexMajor      = SDB_DEF_MAX_POS_FOREX_MAJOR; // Maks posisi SDBot forex major di akun
+input int                    InpMaxPosForexCross      = SDB_DEF_MAX_POS_FOREX_CROSS; // Maks posisi SDBot forex cross di akun
+input int                    InpMaxPosCommodity       = SDB_DEF_MAX_POS_COMMODITY;   // Maks posisi SDBot komoditas di akun
+input int                    InpMaxPosCrypto          = SDB_DEF_MAX_POS_CRYPTO;      // Maks posisi SDBot crypto di akun
 input double                 InpDDReducePct           = SDB_DEF_DD_REDUCE_PCT;      // Drawdown: lot x 0.5 (%)
 input double                 InpDDStopPct             = SDB_DEF_DD_STOP_PCT;        // Drawdown: close all + STOPPED (%)
 input bool                   InpResetEmergencyStop    = false;                      // Buka STOPPED (ubah false -> true sekali)
@@ -51,6 +55,10 @@ InputValues CurrentInputs()
    v.partialPct = InpPartialPct;
    v.trailAtrPeriod = InpTrailATRPeriod;
    v.trailAtrMult = InpTrailATRMult;
+   v.maxPosForexMajor = InpMaxPosForexMajor;
+   v.maxPosForexCross = InpMaxPosForexCross;
+   v.maxPosCommodity = InpMaxPosCommodity;
+   v.maxPosCrypto = InpMaxPosCrypto;
    return v;
   }
 
@@ -61,7 +69,8 @@ string CurrentInputsJson()
    string k[] = {"InpMagicNumber", "InpTradingStyle", "InpSymbolSuffix", "InpAllowLiveTrading", "InpLogLevel",
                  "InpRiskPerTradePct", "InpMaxOpenRiskPct", "InpDailyLossPct", "InpDDReducePct", "InpDDStopPct",
                  "InpResetEmergencyStop", "InpBreakevenR", "InpBreakevenBufferPoints", "InpPartialR",
-                 "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult"};
+                 "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult", "InpMaxPosForexMajor",
+                 "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -81,6 +90,10 @@ string CurrentInputsJson()
    v[14] = JsonNum(InpPartialPct);
    v[15] = JsonNum(InpTrailATRPeriod);
    v[16] = JsonNum(InpTrailATRMult);
+   v[17] = JsonNum(InpMaxPosForexMajor);
+   v[18] = JsonNum(InpMaxPosForexCross);
+   v[19] = JsonNum(InpMaxPosCommodity);
+   v[20] = JsonNum(InpMaxPosCrypto);
    return CanonicalJson(k, v);
   }
 
@@ -97,6 +110,7 @@ SdbAppConfig CurrentAppConfig(const ENUM_SDB_APP_MODE mode, const string eaVersi
    c.inputsJson = CurrentInputsJson();
    c.eaVersion = eaVersion;
    c.dbTarget = SdbDbTargetForRuntime();
+   c.resetEmergencyStop = InpResetEmergencyStop;
    return c;
   }
 

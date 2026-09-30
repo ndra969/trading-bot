@@ -36,6 +36,30 @@
 #define SDB_AMBIGUOUS_LOOKBACK_SEC    300      // cari posisi/deal dengan ID permintaan sejauh ini ke belakang
 #define SDB_ACCOUNT_SNAPSHOT_SEC      60
 
+//--- Risk management (spec 05 design §5; angka dari PRD §Risk management kecuali disebut)
+#define SDB_DD_INFO_PCT                  5.0
+#define SDB_DD_RECOVER_PCT               8.0     // flag lot x 0.5 dicabut di bawah ini
+#define SDB_DD_RECOVER_RATIO             0.8     // = 8 / 10 PRD; ambang pulih bila InpDDReducePct < 10 (histeresis)
+#define SDB_MARGIN_ALERT_PCT             300.0
+#define SDB_MARGIN_BLOCK_PCT             200.0
+#define SDB_NO_SL_RISK_PCT               1.0     // posisi SDBot tanpa SL (PC-09)
+#define SDB_CLOSE_ALL_RETRY_SEC          5
+#define SDB_CLOSE_ALL_CLOSED_MARKET_SEC  60      // PC-09
+#define SDB_CLOSE_ALL_ALERT_FAILS        3
+#define SDB_CLOSE_ALL_ALERT_REPEAT_SEC   900
+#define SDB_BALANCE_SCAN_SEC             10
+#define SDB_CAS_RETRY                    5
+#define SDB_RISK_EPS                     1e-9    // toleransi perbandingan persen risiko
+// Batas posisi per kategori aset (PC-10), default dari config/active_symbols.yaml bot Python.
+#define SDB_DEF_MAX_POS_FOREX_MAJOR      5
+#define SDB_DEF_MAX_POS_FOREX_CROSS      3
+#define SDB_DEF_MAX_POS_COMMODITY        1
+#define SDB_DEF_MAX_POS_CRYPTO           1
+#define SDB_MAX_POS_PER_CLASS            20
+#define SDB_MAX_POS_OTHER_CLASS          1       // simbol yang kategorinya tidak dikenali (EC-25)
+#define SDB_COMMODITY_CURRENCIES         "XAU,XAG,XPT,XPD"
+#define SDB_CRYPTO_CURRENCIES            "BTC,ETH,LTC,XRP,BCH,SOL,ADA,DOT,DOGE,BNB"
+
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
 #define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama

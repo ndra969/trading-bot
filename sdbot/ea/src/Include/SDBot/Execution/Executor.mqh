@@ -13,6 +13,7 @@
 #include <SDBot/Core/Utils.mqh>
 #include <SDBot/Account/Account.mqh>
 #include <SDBot/Execution/ExecutionRules.mqh>
+#include <SDBot/Risk/RiskMath.mqh>
 
 class CExecutor
   {
@@ -272,6 +273,30 @@ private:
       return true;
      }
 
+   // Tutup satu posisi apa pun magic/simbolnya (hanya untuk CloseAllSdbot). true = tertutup atau sudah hilang.
+   bool CloseAnyPosition(const ulong ticket)
+     {
+      for(int attempt = 1; ; attempt++)
+        {
+         if(!PositionSelectByTicket(ticket))
+            return true;
+         m_sendCount++;
+         m_trade.PositionClose(ticket);
+         uint rc = m_trade.ResultRetcode();
+         ENUM_SDB_NEXT_STEP step = NextStep(ClassifyRetcode(rc), attempt, false);
+         if(step == SDB_STEP_SUCCEED || step == SDB_STEP_GONE)
+            return true;
+         if(step != SDB_STEP_RETRY)
+           {
+            LogError("Execution", StringFormat("close all: posisi %I64u gagal ditutup | retcode=%u %s",
+                                               ticket, rc, m_trade.ResultRetcodeDescription()));
+            return false;
+           }
+         Sleep(SDB_RETRY_DELAY_MS);
+        }
+      return false;
+     }
+
 public:
                      CExecutor(void) : m_magic(0), m_acc(NULL), m_state(NULL), m_sink(NULL), m_sendCount(0), m_memCounter(0) {}
 
@@ -431,6 +456,93 @@ public:
      }
 
    long SendCount() const { return m_sendCount; }
+
+
+   // Margin level (%) setelah order ini, dari OrderCheck (spec 05 Req 2.6). 0 = tidak diketahui.
+   double MarginLevelAfter(const OrderRequest &req)
+     {
+      MqlTick tick;
+      if(!SymbolInfoTick(m_symbol, tick))
+         return 0.0;
+      MqlTradeRequest rq;
+      MqlTradeCheckResult cr;
+      ZeroMemory(rq);
+      ZeroMemory(cr);
+      rq.action = TRADE_ACTION_DEAL;
+      rq.symbol = m_symbol;
+      rq.magic = (ulong)m_magic;
+      rq.volume = req.volume;
+      rq.type = req.isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+      rq.price = req.isBuy ? tick.ask : tick.bid;
+      // Tanpa SL/TP: margin tidak bergantung padanya, dan stop yang terlalu dekat membuat OrderCheck gagal
+      // sehingga margin level 0 -> MARGIN_LOW palsu (ditemukan SC-06). Stop divalidasi OpenMarket.
+      rq.deviation = SDB_MAX_DEVIATION_POINTS;
+      rq.type_filling = PickFillingMode(SymbolInfoInteger(m_symbol, SYMBOL_FILLING_MODE));
+      if(!OrderCheck(rq, cr) && cr.margin_level <= 0.0)
+        {
+         LogWarn("Execution", StringFormat("OrderCheck margin gagal | retcode=%u %s", cr.retcode, cr.comment));
+         return 0.0;
+        }
+      return cr.margin_level;
+     }
+
+   // Pasar simbol buka untuk menutup posisi sekarang: mode trading tidak DISABLED dan dalam sesi trade.
+   bool CloseAllowedNow(const string symbol)
+     {
+      if((ENUM_SYMBOL_TRADE_MODE)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE) == SYMBOL_TRADE_MODE_DISABLED)
+         return false;
+      MqlDateTime now;
+      TimeToStruct(TimeTradeServer(), now);
+      int from[], to[];
+      datetime f, t;
+      for(uint i = 0; SymbolInfoSessionTrade(symbol, (ENUM_DAY_OF_WEEK)now.day_of_week, i, f, t); i++)
+        {
+         int n = ArraySize(from);
+         ArrayResize(from, n + 1);
+         ArrayResize(to, n + 1);
+         from[n] = (int)((long)f % 86400);
+         to[n] = ((long)t >= 86400) ? 86400 : (int)((long)t % 86400);
+        }
+      return InTradeSession(now.hour * 3600 + now.min * 60 + now.sec, from, to);
+     }
+
+   // Satu-satunya operasi lintas simbol dan magic (spec 05 Req 5.8, R2-1/PC-02): tutup semua posisi
+   // SDBot di akun. Tanpa alert per posisi; CRiskMonitor yang memutuskan alert CLOSE_ALL_FAILED.
+   CloseAllResult CloseAllSdbot()
+     {
+      CloseAllResult r;
+      ZeroMemory(r);
+      ulong tickets[];
+      string symbols[];
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+        {
+         ulong ticket = PositionGetTicket(i);
+         if(ticket == 0 || !IsSdbotMagic(PositionGetInteger(POSITION_MAGIC)))
+            continue;
+         int n = ArraySize(tickets);
+         ArrayResize(tickets, n + 1);
+         ArrayResize(symbols, n + 1);
+         tickets[n] = ticket;
+         symbols[n] = PositionGetString(POSITION_SYMBOL);
+        }
+      r.total = ArraySize(tickets);
+      for(int i = 0; i < r.total; i++)
+        {
+         if(!CloseAllowedNow(symbols[i]))
+           {
+            r.closedMarket++;
+            continue;
+           }
+         if(CloseAnyPosition(tickets[i]))
+            r.closed++;
+         else
+            r.failed++;
+        }
+      if(r.total > 0)
+         LogWarn("Execution", StringFormat("close all SDBot | total=%d tutup=%d gagal=%d pasar_tutup=%d",
+                                           r.total, r.closed, r.failed, r.closedMarket));
+      return r;
+     }
   };
 
 #endif // SDB_EXECUTION_EXECUTOR_MQH

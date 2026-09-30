@@ -1,0 +1,13 @@
+; SC-05: risiko 0.001% dengan SL 2000 point -> lot < 0.01 -> semua entry LOT_BELOW_MIN.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpRiskPerTradePct=0.001
+HarnessScenario=SC-05
+HarnessEveryBars=20
+HarnessDirection=2
+HarnessSlPoints=2000
+HarnessTpPoints=2000
+HarnessMaxOpen=1
+HarnessFixedLot=0
+HarnessRestartAtBar=0

@@ -11,7 +11,7 @@ Fase 1 selesai jika fondasi pengaman EA terbukti bekerja di Strategy Tester: val
 
 Di luar Fase 1: notifikasi Telegram dan push HP (Fase 2), analisis dan entry dari sinyal (Fase 3), filter berita/sesi/spread/eksposur (Fase 4), modul Control dan tabel backoffice (B1+). Di Fase 1, entry hanya berasal dari harness uji di Strategy Tester.
 
-Konteks tetap: day trading (H4/H1/M15), EURUSDc, GBPUSDc, EURJPYc, GBPJPYc, akun cent Exness mode hedging, mata uang USC.
+Konteks tetap: day trading (H4/H1/M15), simbol aktif bot Python versi cent (12 simbol, PC-10; semula EURUSDc, GBPUSDc, EURJPYc, GBPJPYc), akun cent Exness mode hedging, mata uang USC.
 
 ## 2. Aktor
 

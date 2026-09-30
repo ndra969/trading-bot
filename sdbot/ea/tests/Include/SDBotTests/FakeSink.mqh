@@ -36,6 +36,14 @@ public:
 
    int  CountAccount() const { return ArraySize(m_accounts); }
    int  CountAlert() const   { return ArraySize(m_alerts); }
+   int  CountAlertType(const string type) const
+     {
+      int n = 0;
+      for(int i = 0; i < ArraySize(m_alerts); i++)
+         if(m_alerts[i].type == type)
+            n++;
+      return n;
+     }
 
    bool LastAlert(AlertEvent &out) const
      {

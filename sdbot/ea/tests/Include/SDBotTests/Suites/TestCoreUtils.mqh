@@ -110,6 +110,19 @@ void RunTestCoreUtilsInputs()
    AssertTrue("TC-IR-01", "mode harness: 2026091900 lolos, 2026091899 ditolak, 2026091901 tetap lolos",
               harnessOk && belowRejected && normalOk);
 
+   // Batas posisi per kategori aset (spec 05 Req 2.8, PC-10): default dari bot Python, batas 1-20.
+   v = DefaultInputValues();
+   bool defaultsOk = v.maxPosForexMajor == 5 && v.maxPosForexCross == 3 && v.maxPosCommodity == 1 &&
+                     v.maxPosCrypto == 1 && CuValidate(v, err);
+   v.maxPosForexMajor = 0;
+   v.maxPosForexCross = 21;
+   v.maxPosCommodity = 0;
+   v.maxPosCrypto = 21;
+   ok = CuValidate(v, err);
+   AssertTrue("TC-CU-08e", "batas posisi per kategori: default 5/3/1/1 lolos; 0 dan 21 ditolak dengan nama input",
+              defaultsOk && !ok && CuContains(err, "InpMaxPosForexMajor") && CuContains(err, "InpMaxPosForexCross") &&
+              CuContains(err, "InpMaxPosCommodity") && CuContains(err, "InpMaxPosCrypto"));
+
    v = DefaultInputValues();
    v.trailAtrPeriod = 1;
    v.trailAtrMult = 0.0;

@@ -1,0 +1,13 @@
+; SC-07: entry tiap 20 bar (risiko 0.5%, SL/TP 200 point), tarik 20% balance di bar >= 30 saat tanpa posisi.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-07
+HarnessEveryBars=20
+HarnessDirection=2
+HarnessSlPoints=200
+HarnessTpPoints=200
+HarnessMaxOpen=1
+HarnessFixedLot=0
+HarnessWithdrawAtBar=30
+HarnessWithdrawPct=20

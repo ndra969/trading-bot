@@ -95,6 +95,42 @@ enum ENUM_SDB_APP_MODE
    SDB_APP_UNITTEST = 2        // suite TestApp
   };
 
+// Risk management (spec 05 design §4.1, §5).
+enum ENUM_SDB_DD_LEVEL
+  {
+   SDB_DD_NORMAL = 0,
+   SDB_DD_INFO = 1,
+   SDB_DD_REDUCE = 2,          // lot x 0.5
+   SDB_DD_STOP = 3             // STOPPED; hanya reset manual yang mengembalikannya
+  };
+
+enum ENUM_SDB_LOT_FLAG
+  {
+   SDB_LOT_OK = 0,
+   SDB_LOT_BELOW_MIN = 1,
+   SDB_LOT_CAPPED_MAX = 2,
+   SDB_LOT_INVALID = 3         // nilai uang per lot <= 0
+  };
+
+// Kategori aset untuk batas posisi per kategori (spec 05 Req 2.8, PC-10).
+enum ENUM_SDB_ASSET_CLASS
+  {
+   SDB_CLASS_FOREX_MAJOR = 0,  // pasangan dengan USD
+   SDB_CLASS_FOREX_CROSS = 1,  // dua mata uang fiat tanpa USD
+   SDB_CLASS_COMMODITY = 2,    // XAU, XAG, ...
+   SDB_CLASS_CRYPTO = 3,
+   SDB_CLASS_OTHER = 4         // tidak dikenali (indeks, dll.)
+  };
+
+// Hasil satu putaran close all (Req 5.8). closedMarket = dilewati karena pasar simbolnya tutup.
+struct CloseAllResult
+  {
+   int               total;
+   int               closed;
+   int               failed;
+   int               closedMarket;
+  };
+
 // Permintaan market order ke CExecutor. SL dan TP harga absolut.
 struct OrderRequest
   {

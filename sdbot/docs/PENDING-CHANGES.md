@@ -83,6 +83,29 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Alasan: di tester, position ID dan deal ticket mulai dari angka kecil yang sama di setiap run dengan login yang sama, sehingga `ON CONFLICT DO NOTHING` membuang semua baris run berikutnya tanpa error.
     - Backoffice dan query analisis wajib memakai `login + run_key + position_id` sebagai kunci posisi.
 
+### PC-09: Detail risk management yang tidak diatur PRD
+- Status: Open
+- Tanggal disetujui: 2026-09-30
+- Dokumen: PRD-EA §Risk management
+- Sumber: spec `ea-05-risk` requirements, keputusan 1–3
+- Perubahan:
+    - Pre-trade check urutannya: boleh trading → STOPPED → pause harian → risiko per trade → total risiko terbuka → eksposur mata uang → margin. Langkah "risiko per trade" menolak order yang risikonya (volume, entry, SL) melebihi risiko efektif per trade, dengan alasan tolak baru `RISK_PER_TRADE` (`enums.md`).
+    - Close all saat STOPPED: percobaan saat pasar tutup (tiap 60 detik) tidak dihitung gagal; Critical `CLOSE_ALL_FAILED` hanya setelah 3 gagal berturut-turut saat pasar buka, lalu paling sering tiap 15 menit.
+    - Posisi SDBot tanpa SL dihitung berisiko 1% balance di total risiko terbuka, dengan log WARN.
+    - Operasi saldo yang sudah ada saat status bersama belum ada (akun baru, GV dihapus, awal run tester) dianggap sudah diproses.
+    - Ambang kembali normal dari lot × 0.5 = min(8%, `InpDDReducePct` × 0.8), agar histeresis tetap ada bila batas REDUCE disetel di bawah 8% (temuan SC-03; default PRD tetap 8%). Menunggu konfirmasi user.
+
+### PC-10: Simbol mengikuti bot Python, preset per simbol, batas posisi per kategori
+- Status: Open
+- Tanggal disetujui: 2026-09-30
+- Dokumen: PRD-EA §Temuan review dan keputusan (pair), §Risk management, §Parameter input EA, §Instalasi; RULES §Struktur folder (Presets)
+- Sumber: permintaan user 2026-09-30; `config/active_symbols.yaml` bot Python; spec `ea-05-risk` kriteria 2.8
+- Perubahan:
+    - Simbol SDBot = simbol aktif bot Python, versi cent Exness (akhiran `c`): forex major EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD; forex cross EURJPY, GBPJPY; komoditas XAUUSD, XAGUSD; crypto BTCUSD. Menggantikan keputusan 4 pair (EURUSD, GBPUSD, EURJPY, GBPJPY). Ketersediaan NZDUSDc di akun perlu dicek.
+    - Magic per simbol (blok PC-02): 01 EURUSD, 02 GBPUSD, 03 EURJPY, 04 GBPJPY (tetap), 05 USDJPY, 06 USDCHF, 07 AUDUSD, 08 USDCAD, 09 NZDUSD, 10 XAUUSD, 11 XAGUSD, 12 BTCUSD.
+    - Setting berbeda per kategori lewat preset `.set` per simbol (`SDBot_DAY_<SIMBOL>c.set`) dengan input EA yang sama. Nilai awal per kategori diambil dari config bot Python saat spec pemiliknya dibuat (preset di spec 07, filter sesi/spread di Fase 4). BE/partial/trailing tetap berbasis R dan ATR sesuai PRD.
+    - Risk management: batas posisi SDBot per kategori aset di akun (forex major 5, forex cross 3, komoditas 1, crypto 1; input `InpMaxPos*`), langkah pre-trade check setelah total risiko terbuka, alasan tolak `CLASS_POSITION_LIMIT`. Kategori ditentukan dari mata uang base/quote simbol.
+
 ## Done
 
 (belum ada)

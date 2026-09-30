@@ -50,7 +50,7 @@ void RunTestCodec()
    for(int i = 0; i < StringLen(json); i++)
       if(StringGetCharacter(json, i) == ':')
          keys++;
-   AssertIntEq("TC-SU-04c", "JSON input berisi 17 input", keys, 17);
+   AssertIntEq("TC-SU-04c", "JSON input berisi 21 input (17 + batas per kategori spec 05)", keys, 21);
 
    TfEndSuite();
   }

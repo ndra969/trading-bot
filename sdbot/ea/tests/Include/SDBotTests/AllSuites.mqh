@@ -18,6 +18,9 @@
 #include <SDBotTests/Suites/TestLogger.mqh>
 #include <SDBotTests/Suites/TestExecution.mqh>
 #include <SDBotTests/Suites/TestApp.mqh>
+#include <SDBotTests/Suites/TestRiskMath.mqh>
+#include <SDBotTests/Suites/TestRiskState.mqh>
+#include <SDBotTests/Suites/TestRisk.mqh>
 
 void RunAllSuites()
   {
@@ -33,6 +36,9 @@ void RunAllSuites()
    RunTestLogger();
    RunTestExecution();
    RunTestApp();
+   RunTestRiskMath();
+   RunTestRiskState();
+   RunTestRisk();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

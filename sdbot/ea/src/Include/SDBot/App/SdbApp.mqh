@@ -12,6 +12,8 @@
 #include <SDBot/Account/Account.mqh>
 #include <SDBot/Storage/Logger.mqh>
 #include <SDBot/Execution/Executor.mqh>
+#include <SDBot/Risk/RiskManager.mqh>
+#include <SDBot/Risk/RiskMonitor.mqh>
 #include <SDBot/App/TeeSink.mqh>
 
 #define SDB_GV_PREFIX_UNITTEST "SDBTEST"
@@ -26,6 +28,10 @@ private:
    CAccount          m_account;
    CState            m_state;
    CExecutor         m_executor;
+   CRiskState        m_riskState;
+   CRiskManager      m_riskManager;
+   CRiskMonitor      m_riskMonitor;
+   bool              m_riskReady;
    bool              m_storageOpened;
    bool              m_stateReady;
    bool              m_timerSet;
@@ -41,6 +47,26 @@ private:
       string prefix = (m_cfg.mode == SDB_APP_UNITTEST) ? SDB_GV_PREFIX_UNITTEST : SDB_GV_PREFIX;
       m_stateReady = m_state.Init(prefix, m_account.Login());
       m_lastSnapshot = TimeLocal();   // Validate() baru saja mengirim snapshot
+      if(!m_stateReady)
+         return;
+      // Status risiko bersama (spec 05): baseline, reset input, operasi saldo tertunda, lalu snapshot
+      // langsung dengan puncak yang benar (Req 3.8), karena snapshot Validate() dibuat sebelum puncak diketahui.
+      m_riskReady = m_riskState.Init(GetPointer(m_state), m_cfg.inputs.magic, AccountInfoDouble(ACCOUNT_EQUITY),
+                                     AccountInfoDouble(ACCOUNT_BALANCE), TimeTradeServer());
+      if(m_riskReady)
+        {
+         m_riskMonitor.OnStateReady(m_cfg.resetEmergencyStop);
+         SendSnapshot();
+        }
+     }
+
+   void SendSnapshot()
+     {
+      AccountSnapshot s = m_account.Snapshot();
+      if(m_riskReady)
+         s.peakEquity = m_riskState.PeakEquity();
+      m_sink.OnAccount(s);
+      m_lastSnapshot = TimeLocal();
      }
 
    // Nama GV run_key tester: tester mengosongkan GV di setiap run, jadi GV ini menandai run yang
@@ -91,7 +117,7 @@ private:
      }
 
 public:
-                     CSdbApp(void) : m_sink(NULL), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
+                     CSdbApp(void) : m_sink(NULL), m_riskReady(false), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
                      m_deinitDone(false), m_lastSnapshot(0), m_lastTouch(0) {}
 
    // Urutan init (Req 6.1). observer: perekam harness / sink uji, menerima event di samping Logger.
@@ -99,6 +125,7 @@ public:
    int OnInit(const SdbAppConfig &cfg, ISdbEventSink *observer = NULL)
      {
       m_sink = NULL;
+      m_riskReady = false;
       m_storageOpened = false;
       m_stateReady = false;
       m_timerSet = false;
@@ -117,8 +144,11 @@ public:
       m_account.Init(m_sink, _Symbol, cfg.symbolSuffix, cfg.allowLive, cfg.inputs.magic);
       if(m_account.Validate() == SDB_VAL_REJECTED)
          return INIT_FAILED;   // OnDeinit(REASON_INITFAILED) menutup sesi dan menyimpan alert
-      EnsureState();
       m_executor.Init(cfg.inputs.magic, _Symbol, GetPointer(m_account), GetPointer(m_state), m_sink, cfg.eaVersion);
+      // Langkah 6 (spec 05): modul risiko dipasang sebelum status bersama agar OnStateReady bisa jalan.
+      m_riskManager.Init(_Symbol, GetPointer(m_riskState), GetPointer(m_executor), GetPointer(m_account), cfg.inputs);
+      m_riskMonitor.Init(_Symbol, cfg.inputs.magic, GetPointer(m_riskState), GetPointer(m_executor), m_sink, cfg);
+      EnsureState();
       if(!EventSetTimer(SDB_TIMER_SEC))
         {
          LogCritical("App", "timer tidak bisa dipasang | " + ErrText(GetLastError()));
@@ -138,7 +168,7 @@ public:
          return;
      }
 
-   // Akun → state → risk monitor (spec 05) → snapshot → touch GV → flush (Req 6.3, 6.5).
+   // Akun → state → risk monitor (spec 05 Req 3.1) → snapshot → touch GV → flush (spec 04 Req 6.3, 6.5).
    void OnTimer()
      {
       if(!m_storageOpened || m_deinitDone)
@@ -153,11 +183,10 @@ public:
          return;
         }
       EnsureState();
+      if(m_riskReady)
+         m_riskMonitor.Run();
       if(m_account.State() == SDB_VAL_PASSED && TimeLocal() - m_lastSnapshot >= SDB_ACCOUNT_SNAPSHOT_SEC)
-        {
-         m_sink.OnAccount(m_account.Snapshot());
-         m_lastSnapshot = TimeLocal();
-        }
+         SendSnapshot();
       if(m_stateReady && TimeLocal() - m_lastTouch >= SDB_GV_TOUCH_SEC)
         {
          m_state.TouchAll();
@@ -194,6 +223,8 @@ public:
    CExecutor *Executor() { return GetPointer(m_executor); }
    CAccount  *Account()  { return GetPointer(m_account); }
    CLogger   *Logger()   { return GetPointer(m_logger); }
+   CRiskManager *RiskManager() { return GetPointer(m_riskManager); }
+   CRiskState   *RiskState()   { return GetPointer(m_riskState); }
   };
 
 #endif // SDB_APP_SDBAPP_MQH

@@ -8,7 +8,7 @@ YAML config, pip values and strategy weights **do not apply here**.
 **Status**: planning done, no code yet. Start at EA roadmap Fase 1 (foundation).
 
 **Decided (2026-09-28, PRD-EA "Temuan review dan keputusan")**: day trading
-(H4/H1/M15) · EURUSD, GBPUSD, EURJPY, GBPJPY · entry Market (default) + Limit
+(H4/H1/M15) · simbol = simbol aktif bot Python (12 simbol forex/komoditas/crypto, PC-10; semula 4 pair) · entry Market (default) + Limit
 option, Adaptive only if backtests prove it · Exness cent, USC, hedging
 (`SymbolSuffix = c`); EA refuses netting accounts.
 

@@ -16,14 +16,24 @@ private:
    AlertEvent        m_alerts[];
    datetime          m_snapshotTimes[];
    OrderResult       m_opens[];
+   datetime          m_openTimes[];
    long              m_sessions[];
    long              m_posBeforeRestart[];
    long              m_posAfterRestart[];
+   datetime          m_firstStoppedAt;     // sampel timer pertama dengan STOPPED aktif
+   datetime          m_lastOpenWhileStopped; // sampel terakhir STOPPED dengan posisi SDBot masih ada
+   datetime          m_restartAt;
+   BalanceOpRecord   m_balanceOps[];
+   double            m_withdrawAmount;     // SC-07: penarikan harness, puncak dan level DD sebelum/sesudah diproses
+   double            m_peakBefore;
+   int               m_levelBefore;
+   double            m_peakAfter;
+   int               m_levelAfter;
+   bool              m_afterSampled;
    long              m_sends;           // jumlah OrderSend dari semua CExecutor (termasuk sebelum restart)
    int               m_deals;
    int               m_positionEvents;
    int               m_closures;
-   int               m_balanceOps;
 
    static void PushLong(long &arr[], const long v)
      {
@@ -33,7 +43,7 @@ private:
      }
 
 public:
-                     CScenarioRecorder(void) : m_sends(0), m_deals(0), m_positionEvents(0), m_closures(0), m_balanceOps(0) {}
+                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_sends(0), m_deals(0), m_positionEvents(0), m_closures(0) {}
 
    //--- ISdbEventSink
    // Jam timer (TimeLocal), bukan a.time: a.time = waktu tick terakhir, yang tertinggal dari jadwal
@@ -59,16 +69,62 @@ public:
    void OnDeal(const DealRecord &d)             { m_deals++; }
    void OnPositionEvent(const PositionEvent &e) { m_positionEvents++; }
    void OnClosure(const ClosureRecord &c)       { m_closures++; }
-   void OnBalanceOp(const BalanceOpRecord &b)   { m_balanceOps++; }
+   void OnBalanceOp(const BalanceOpRecord &b)
+     {
+      int n = ArraySize(m_balanceOps);
+      ArrayResize(m_balanceOps, n + 1);
+      m_balanceOps[n] = b;
+     }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
 
    //--- Catatan dari harness
-   void AddOpenResult(const OrderResult &r)
+   void AddOpenResult(const OrderResult &r, const datetime time)
      {
       int n = ArraySize(m_opens);
       ArrayResize(m_opens, n + 1);
+      ArrayResize(m_openTimes, n + 1);
       m_opens[n] = r;
+      m_openTimes[n] = time;
      }
+   void NoteStoppedSample(const datetime t, const int sdbotPositions)
+     {
+      if(m_firstStoppedAt == 0)
+         m_firstStoppedAt = t;
+      if(sdbotPositions > 0)
+         m_lastOpenWhileStopped = t;
+     }
+   void NoteRestart(const datetime t)              { m_restartAt = t; }
+   void NoteWithdraw(const double amount, const double peak, const int level)
+     {
+      m_withdrawAmount = amount;
+      m_peakBefore = peak;
+      m_levelBefore = level;
+     }
+   // Dipanggil harness setiap timer; mengambil sampel sekali, tepat setelah operasi saldo pertama tercatat.
+   void NoteAfterBalanceOp(const double peak, const int level)
+     {
+      if(m_afterSampled || ArraySize(m_balanceOps) == 0)
+         return;
+      m_afterSampled = true;
+      m_peakAfter = peak;
+      m_levelAfter = level;
+     }
+   int    BalanceOpCount() const                   { return ArraySize(m_balanceOps); }
+   bool   BalanceOpAt(const int i, BalanceOpRecord &b) const
+     {
+      if(i < 0 || i >= ArraySize(m_balanceOps))
+         return false;
+      b = m_balanceOps[i];
+      return true;
+     }
+   double WithdrawAmount() const { return m_withdrawAmount; }
+   double PeakBefore() const     { return m_peakBefore; }
+   int    LevelBefore() const    { return m_levelBefore; }
+   double PeakAfter() const      { return m_peakAfter; }
+   int    LevelAfter() const     { return m_levelAfter; }
+   datetime FirstStoppedAt() const                 { return m_firstStoppedAt; }
+   datetime LastOpenWhileStopped() const           { return m_lastOpenWhileStopped; }
+   datetime RestartAt() const                      { return m_restartAt; }
    void AddSession(const long sessionId)           { PushLong(m_sessions, sessionId); }
    void AddSends(const long n)                     { m_sends += n; }
    void AddPositionBeforeRestart(const long id)    { PushLong(m_posBeforeRestart, id); }
@@ -101,6 +157,7 @@ public:
       r = m_opens[i];
       return true;
      }
+   datetime OpenTimeAt(const int i) const   { return m_openTimes[i]; }
    int  OpenOkCount() const
      {
       int n = 0;
