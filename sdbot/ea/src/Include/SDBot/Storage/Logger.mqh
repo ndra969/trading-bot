@@ -15,16 +15,7 @@
 #include <SDBot/Storage/MigrationRunner.mqh>
 #include <SDBot/Storage/Migrations.mqh>
 
-//--- Pemilihan file (Req 1).
-ENUM_SDB_DB_TARGET SdbDbTargetForRuntime()
-  {
-   if(MQLInfoInteger(MQL_OPTIMIZATION))
-      return SDB_DB_NONE;
-   if(MQLInfoInteger(MQL_TESTER))
-      return SDB_DB_TESTER;
-   return SDB_DB_LIVE;
-  }
-
+//--- Pemilihan file (Req 1). Target runtime: SdbDbTargetForRuntime() di Core/Utils.mqh.
 string SdbDbFileFor(const ENUM_SDB_DB_TARGET target)
   {
    switch(target)

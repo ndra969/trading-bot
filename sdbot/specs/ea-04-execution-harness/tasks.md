@@ -31,10 +31,11 @@ TDD: suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`, skenario lewat `run-ea-tes
   - _Requirements: 1.3, 1.6, 1.7, 2.1–2.5, 3.1–3.4, 4.1, 4.3, 4.4, 4.6, 4.7, 5.3_
   - Hasil (2026-09-29): `Execution/Executor.mqh` dikompilasi lewat suite `TestExecution` (belum ada pemakai lain): build 0/0, unit 198/198. Perilaku broker baru diuji di task 5–7. Tambahan: `CState::IsReady()` agar penghitung ID tidak ditulis ke GV sebelum state di-init (cadangan: penghitung memori + ERROR throttled). Modify/close yang diulang memeriksa dulu apakah kiriman sebelumnya ternyata sudah diterapkan (SL sudah sama, volume sudah berkurang, posisi sudah tertutup) → `OK`. Log `CTrade` dimatikan (`LOG_LEVEL_NO`) agar semua log lewat `Utils.mqh`.
 
-- [ ] 5. `CTeeSink` dan `CSdbApp`
+- [x] 5. `CTeeSink` dan `CSdbApp`
   - Red: suite `TestApp` TC-APP-01..07 terhadap stub `CSdbApp`
   - Green: `App/TeeSink.mqh`, `App/SdbApp.mqh` (urutan init §4.4, urutan event §4.5, snapshot akun 60 detik, `OnDeinit` aman dipanggil dua kali); `Inputs.mqh` + `CurrentAppConfig(mode, eaVersion)`
   - _Requirements: 1.7, 6.1–6.5, 7.3_ · _Tests: TC-APP-01..07_
+  - Hasil (2026-09-30): suite `App` 14/14, unit 212/212, build 0/0 (3 target). Suite App hanya jalan di Strategy Tester (runner `RunUnitTestsEA`); di script chart live suite dilewati dengan INFO karena memasang timer dan mengirim order. Tambahan di luar katalog: TC-APP-07b (snapshot ke observer dan DB) dan TC-APP-08a..f, jalur broker `CExecutor` sungguhan di tester (buy lot minimum terisi dengan risiko > 0, komentar ter-parse, baris `trades`, modify lebih buruk `SKIPPED` / lebih baik `OK` / tiket asing `GONE`, partial seluruh volume `SKIPPED`, close `OK` lalu `GONE`, SL 3 point `SL_TOO_CLOSE` tanpa kiriman). Penyimpangan design: `SdbDbTargetForRuntime()` dipindah dari `Storage/Logger.mqh` ke `Core/Utils.mqh`, karena `CurrentAppConfig` di Core tidak boleh meng-include Storage. Mode `UNITTEST` memakai prefix GV `SDBTEST` dan tidak memanggil `ExpertRemove`.
 
 - [ ] 6. Harness, perekam, dan skenario SC-06
   - `tests/Include/SDBotTests/ScenarioRecorder.mqh`, `Scenarios.mqh` (`CheckScenario`, ID tak dikenal → FAIL), `tests/Experts/SDBotTests/SDBotHarness.mq5` (cek tester, jadwal entry, restart, hasil lewat `TfBeginRun`/`TfEndRun`)

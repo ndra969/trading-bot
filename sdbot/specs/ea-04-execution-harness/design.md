@@ -273,6 +273,10 @@ Input: tidak ada input baru di EA utama. Input harness hanya ada di `SDBotHarnes
 | TC-APP-05 | suffix salah | `INIT_FAILED`; setelah `OnDeinit(REASON_INITFAILED)` alert `ACCOUNT_REJECTED` tersimpan | 6.2 |
 | TC-APP-06 | executor saat akun ditolak | `OpenMarket` → `NOT_TRADABLE`, `SendCount() = 0` | 1.7 |
 | TC-APP-07 | observer terpasang | snapshot akun dan alert sampai ke observer dan ke DB, alert milik Logger tidak ganda | 7.6 |
+| TC-APP-07b | observer terpasang, akun lolos | snapshot akun ≥ 1 di observer, 1 baris `accounts` | 6.5, 7.6 |
+| TC-APP-08a..f | jalur broker `CExecutor` di tester: buy lot minimum, modify lebih buruk/lebih baik/tiket asing, partial seluruh volume, close dua kali, SL 3 point | terisi dengan risiko > 0; komentar ter-parse; 1 baris `trades`; `SKIPPED`/`OK`/`GONE`; `SKIPPED`; `OK` lalu `GONE`; `SL_TOO_CLOSE` tanpa kiriman | 1.4, 3.1, 4.2, 4.4, 4.5, 5.1 |
+
+Suite TestApp hanya jalan di Strategy Tester (`RunUnitTestsEA`); di script chart live suite ini dilewati.
 
 **InputRules** (suite CoreUtils, tambahan): TC-IR-xx magic 2026091900 ditolak tanpa `allowHarnessMagic`, diterima dengan flag.
 

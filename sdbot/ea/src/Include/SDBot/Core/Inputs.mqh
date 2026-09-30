@@ -84,4 +84,20 @@ string CurrentInputsJson()
    return CanonicalJson(k, v);
   }
 
+// Konfigurasi CSdbApp dari input (spec 04 design §4.4). Uji membangun SdbAppConfig sendiri.
+SdbAppConfig CurrentAppConfig(const ENUM_SDB_APP_MODE mode, const string eaVersion)
+  {
+   SdbAppConfig c;
+   c.mode = mode;
+   c.inputs = CurrentInputs();
+   c.symbolSuffix = InpSymbolSuffix;
+   c.allowLive = InpAllowLiveTrading;
+   c.logLevel = InpLogLevel;
+   c.style = InpTradingStyle;
+   c.inputsJson = CurrentInputsJson();
+   c.eaVersion = eaVersion;
+   c.dbTarget = SdbDbTargetForRuntime();
+   return c;
+  }
+
 #endif // SDB_CORE_INPUTS_MQH

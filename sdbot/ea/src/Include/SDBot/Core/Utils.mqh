@@ -168,6 +168,16 @@ int RoundUtcOffset(const long serverMinusGmtSec)
    return (int)(MathRound(serverMinusGmtSec / 900.0) * 900);
   }
 
+// File DB menurut lingkungan (spec 03 Req 1): optimasi tidak menulis DB, tester memakai file sendiri.
+ENUM_SDB_DB_TARGET SdbDbTargetForRuntime()
+  {
+   if(MQLInfoInteger(MQL_OPTIMIZATION))
+      return SDB_DB_NONE;
+   if(MQLInfoInteger(MQL_TESTER))
+      return SDB_DB_TESTER;
+   return SDB_DB_LIVE;
+  }
+
 datetime ServerToUtc(const datetime serverTime, const int offsetSec)
   {
    return serverTime - offsetSec;
