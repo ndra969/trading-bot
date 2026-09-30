@@ -1,0 +1,13 @@
+; SC-08: entry tiap 10 bar, maks 2 posisi, restart di bar 50. SL/TP 500 point agar posisi
+; sebelum restart masih terbuka saat restart.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-08
+HarnessEveryBars=10
+HarnessDirection=2
+HarnessSlPoints=500
+HarnessTpPoints=500
+HarnessMaxOpen=2
+HarnessFixedLot=0.01
+HarnessRestartAtBar=50

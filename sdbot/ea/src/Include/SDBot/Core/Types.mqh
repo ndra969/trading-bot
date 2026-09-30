@@ -152,6 +152,7 @@ struct AccountSnapshot
 struct SessionInfo
   {
    long              login;
+   long              runKey;          // SDB_RUN_KEY_LIVE, SDB_RUN_KEY_NEW, atau run_key run tester yang sedang jalan
    long              magic;
    string            symbol;
    string            mode;            // SDB_SESSION_MODE_*

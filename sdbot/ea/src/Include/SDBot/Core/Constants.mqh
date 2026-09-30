@@ -36,6 +36,11 @@
 #define SDB_AMBIGUOUS_LOOKBACK_SEC    300      // cari posisi/deal dengan ID permintaan sejauh ini ke belakang
 #define SDB_ACCOUNT_SNAPSHOT_SEC      60
 
+//--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
+#define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
+#define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama
+#define SDB_GV_RUN_KEY                "RUN_KEY"
+
 // Default input dari PRD. Satu sumber untuk Inputs.mqh dan DefaultInputValues().
 #define SDB_DEF_MAGIC                 2026091901
 #define SDB_DEF_RISK_PER_TRADE_PCT    0.5

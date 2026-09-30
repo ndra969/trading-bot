@@ -1,6 +1,6 @@
 # Implementation plan — 04 Eksekusi, orkestrasi, dan harness
 
-Status: Approved (2026-09-29)
+Status: Done (2026-09-30), validasi manual MC-EX-01..02 tertunda
 Requirements: [requirements.md](requirements.md) · Design: [design.md](design.md)
 
 TDD: suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`, skenario lewat `run-ea-tests.ps1 -Scenario SC-xx`. Setiap task: Red (tes + stub → FAIL) → Green (ALL PASS, compile 0/0) → catat baris "Hasil" → commit. Versi EA naik ke 1.03 di task 7.
@@ -37,18 +37,20 @@ TDD: suite MQL5 lewat `tools/run-ea-tests.ps1 -Unit`, skenario lewat `run-ea-tes
   - _Requirements: 1.7, 6.1–6.5, 7.3_ · _Tests: TC-APP-01..07_
   - Hasil (2026-09-30): suite `App` 14/14, unit 212/212, build 0/0 (3 target). Suite App hanya jalan di Strategy Tester (runner `RunUnitTestsEA`); di script chart live suite dilewati dengan INFO karena memasang timer dan mengirim order. Tambahan di luar katalog: TC-APP-07b (snapshot ke observer dan DB) dan TC-APP-08a..f, jalur broker `CExecutor` sungguhan di tester (buy lot minimum terisi dengan risiko > 0, komentar ter-parse, baris `trades`, modify lebih buruk `SKIPPED` / lebih baik `OK` / tiket asing `GONE`, partial seluruh volume `SKIPPED`, close `OK` lalu `GONE`, SL 3 point `SL_TOO_CLOSE` tanpa kiriman). Penyimpangan design: `SdbDbTargetForRuntime()` dipindah dari `Storage/Logger.mqh` ke `Core/Utils.mqh`, karena `CurrentAppConfig` di Core tidak boleh meng-include Storage. Mode `UNITTEST` memakai prefix GV `SDBTEST` dan tidak memanggil `ExpertRemove`.
 
-- [ ] 6. Harness, perekam, dan skenario SC-06
+- [x] 6. Harness, perekam, dan skenario SC-06
   - `tests/Include/SDBotTests/ScenarioRecorder.mqh`, `Scenarios.mqh` (`CheckScenario`, ID tak dikenal → FAIL), `tests/Experts/SDBotTests/SDBotHarness.mq5` (cek tester, jadwal entry, restart, hasil lewat `TfBeginRun`/`TfEndRun`)
   - `tests/scenarios/SC-06_stops.ini/.set`
   - Red: SC-06 dijalankan dengan `HarnessScenario=SC-99` → FAIL "skenario tidak dikenal" (bukti 7.7); lalu SC-06 sebelum `CheckScenario` SC-06 diisi → FAIL
   - Green: `run-ea-tests.ps1 -Scenario SC-06` PASS
   - _Requirements: 1.4, 7.1, 7.2, 7.4, 7.6, 7.7_ · _Tests: SC-06_
+  - Hasil (2026-09-30): Red digabung jadi satu run: SC-06 dijalankan saat `CheckScenario` hanya punya cabang "tidak dikenal" → `FAIL SC-06 skenario tidak dikenal harness` (jalur kode yang sama dengan SC-99, jadi sekaligus bukti 7.7; runner menolak `-Scenario SC-99` karena tidak ada file `.ini`-nya). Green: SC-06 5/5 (46 percobaan entry, semuanya `SL_TOO_CLOSE`, 0 `OrderSend`, 1 sesi TESTER, 0 baris `trades` untuk sesi itu), build 0/0 (4 target). Skenario memakai tanggal tetap 2026.09.21–26 dan model 1 (OHLC M1) agar hasilnya bisa diulang. Tambahan: pemeriksa mewajibkan ≥ 3 percobaan agar skenario tanpa entry tidak lulus kosong. `SendCount` dijumlahkan perekam dari semua `CExecutor` (bertahan melewati restart). Versi harness `1.03`.
 
-- [ ] 7. `SDBot.mq5` v1.03, skenario SC-00 dan SC-08
+- [x] 7. `SDBot.mq5` v1.03, skenario SC-00 dan SC-08
   - `SDBot.mq5`: hanya meneruskan event ke `CSdbApp` (`CurrentAppConfig(SDB_APP_LIVE, "1.03")`)
   - `tests/scenarios/SC-00_smoke.ini/.set`, `SC-08_restart.ini/.set`; `CheckScenario` SC-00 dan SC-08 (termasuk pemeriksaan `sdbot_tester.sqlite` per ID sesi)
   - Verifikasi: build 0/0, `run-ea-tests.ps1 -All` (unit + SC-00, SC-06, SC-08) PASS; `sdbot/README.md` diperbarui (status v1.03, input harness, cara menjalankan skenario)
   - _Requirements: 2.1, 3.1, 5.1, 5.3, 6.1, 6.5–6.7, 7.5_ · _Tests: SC-00, SC-08_
+  - Hasil (2026-09-30): Red: SC-00 dan SC-08 FAIL "skenario tidak dikenal", lalu dengan pemeriksa terisi SC-00 FAIL `dbtrades` (db=0, ok=12) dan SC-08 FAIL `dbtrades` (db=0, ok=6). Penyebabnya: position ID tester berulang di setiap run, dan `ON CONFLICT (login, position_id) DO NOTHING` membuang baris run kedua dan seterusnya. Diputuskan user: skema v2 `run_key` (design §9.7, PC-08): migrasi `0002_run_key`, `SessionInfo.runKey`, `CLogger` (SQL, bind `?80`, `FindInitialSl`), `CSdbApp` (GV `SDB_<login>_RUN_KEY`); pytest TS-20..24 Red 5 FAIL → Green, TC-DB-23..25 Red (semua tulis Logger gagal) → Green. Temuan lain: jeda snapshot 59/31 detik ternyata artefak pengukuran (`AccountSnapshot.time` = waktu tick terakhir), sehingga perekam kini memakai jam timer. Bug `OnInit` ulang pada objek global yang sama (ganti timeframe) dibuktikan TC-APP-04b (Red FAIL → Green). Akhir: build 0/0 (4 target), `run-ea-tests.ps1 -All` exit 0: unit 216/216, SC-00 8/8, SC-06 5/5, SC-08 8/8; pytest `sdbot/tools` 36/36, `schema.py check` OK (data versi 2). DB tester yang sudah ada termigrasi ke v2 dan baris lamanya diisi `run_key`. `CHANGELOG.md` dan `docs/flows/` belum ada di repo; tidak dibuat di spec ini.
 
 ## Validasi manual (di luar tasks)
 

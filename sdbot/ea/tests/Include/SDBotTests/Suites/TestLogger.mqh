@@ -51,9 +51,10 @@ long TlInt(const string sql)
    return v;
   }
 
-SessionInfo TlSession(const string inputsJson)
+SessionInfo TlSession(const string inputsJson, const long runKey = SDB_RUN_KEY_LIVE)
   {
    SessionInfo s;
+   s.runKey = runKey;
    s.login = TL_LOGIN;
    s.magic = SDB_MAGIC_HARNESS;
    s.symbol = "EURUSDc";
@@ -188,6 +189,59 @@ bool TlCapturedAtMostOnce(const string text)
       if(StringFind(SdbLogCaptured(i), text) >= 0)
          n++;
    return n <= 1;
+  }
+
+// Satu "run" backtest: sesi dengan run_key tertentu, satu posisi, deal, dan operasi saldo bernomor sama.
+long TlRun(const long runKey, const double sl, long &runKeyOut, double &slFound)
+  {
+   CLogger r;
+   r.Init(NULL, "EURUSDc", SDB_MAGIC_HARNESS, "1.03");
+   r.SetUtcOffsetForTest(TL_OFFSET);
+   r.Open(SDB_DB_UNITTEST);
+   long id = r.BeginSession(TlSession("{}", runKey));
+   r.OnTradeOpened(TlTrade(600, sl));
+   r.OnDeal(TlDeal(601, 600));
+   BalanceOpRecord b;
+   b.dealTicket = 602;
+   b.time = TL_SERVER_T;
+   b.opType = SDB_BALANCE_OP_TYPE_BALANCE;
+   b.amount = 10000;
+   b.comment = "";
+   r.OnBalanceOp(b);
+   r.Flush();
+   runKeyOut = r.RunKey();
+   if(!r.FindInitialSl(TL_LOGIN, 600, slFound))
+      slFound = 0.0;
+   r.EndSession(REASON_REMOVE);
+   r.Close();
+   return id;
+  }
+
+// TC-DB-23..25 (spec 04, PC-08): di tester ID MT5 berulang di setiap run; run_key memisahkannya.
+void RunTestLoggerRunKey()
+  {
+   long key1, key2, key3;
+   double sl1, sl2, sl3;
+   long id1 = TlRun(SDB_RUN_KEY_NEW, 1.091, key1, sl1);
+   long id2 = TlRun(SDB_RUN_KEY_NEW, 1.092, key2, sl2);
+   long id3 = TlRun(key1, 1.093, key3, sl3);   // restart harness di tengah run pertama
+   AssertTrue("TC-DB-23", "run baru: run_key = ID sesi sendiri; posisi, deal, saldo bernomor sama tersimpan per run",
+              id1 > 0 && key1 == id1 && key2 == id2 && key1 != key2 &&
+              TlInt("SELECT run_key FROM sessions WHERE id=" + IntegerToString(id2)) == id2 &&
+              TlCount("trades", "position_id=600") == 2 && TlCount("deals", "deal_ticket=601") == 2 &&
+              TlCount("balance_ops", "deal_ticket=602") == 2);
+   AssertTrue("TC-DB-24", "run_key lama dipakai ulang: tetap idempoten, FindInitialSl membaca run sendiri",
+              key3 == key1 && TlInt("SELECT run_key FROM sessions WHERE id=" + IntegerToString(id3)) == key1 &&
+              TlCount("trades", "position_id=600 AND run_key=" + IntegerToString(key1)) == 1 &&
+              MathAbs(sl1 - 1.091) < 1e-9 && MathAbs(sl2 - 1.092) < 1e-9 && MathAbs(sl3 - 1.091) < 1e-9);
+   long keyL1, keyL2;
+   double slL1, slL2;
+   long idL1 = TlRun(SDB_RUN_KEY_LIVE, 1.094, keyL1, slL1);
+   long idL2 = TlRun(SDB_RUN_KEY_LIVE, 1.095, keyL2, slL2);   // restart EA live: posisi yang sama
+   AssertTrue("TC-DB-25", "live (run_key 0) lintas restart: 1 baris per posisi, SL awal dari sesi pertama",
+              keyL1 == 0 && keyL2 == 0 && idL2 > idL1 &&
+              TlCount("sessions", "run_key=0 AND id IN (" + IntegerToString(idL1) + "," + IntegerToString(idL2) + ")") == 2 &&
+              TlCount("trades", "position_id=600 AND run_key=0") == 1 && MathAbs(slL2 - 1.094) < 1e-9);
   }
 
 void RunTestLogger()
@@ -379,6 +433,8 @@ void RunTestLogger()
    AssertTrue("TC-DB-22", "Close: flush terakhir dan sesi diakhiri; setelah Close tidak menulis",
               TlCount("trades", "position_id=400") == 1 && TlCount("sessions", "ended_at IS NOT NULL AND end_reason='PROGRAM'") == 1 &&
               !lg.IsWritable());
+
+   RunTestLoggerRunKey();
 
    // TC-DB-02 / TC-DB-03 lewat Open: buka ulang tanpa migrasi ganda; DB lebih baru -> tidak menulis
    CLogger again;

@@ -72,6 +72,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - `OrderCheck` wajib sebelum setiap `OrderSend`; deviasi maksimum 10 point (konstanta); modify dan close ikut diulang maksimal 3 kali seperti open.
     - Alasan tolak baru di `reject_stage`: `INVALID_STOPS`, `INVALID_VOLUME`.
 
+### PC-08: run_key memisahkan run backtest (skema v2)
+- Status: Open
+- Tanggal disetujui: 2026-09-30
+- Dokumen: PRD-EA §Data dan database; PRD-Backoffice §Database dan kontrak data
+- Sumber: spec `ea-04-execution-harness` task 7 (temuan SC-00: baris `trades` run kedua dan seterusnya hilang di `sdbot_tester.sqlite`), keputusan user 2026-09-30
+- Perubahan:
+    - Migrasi `0002_run_key`: kolom `run_key INTEGER NOT NULL DEFAULT 0` di `sessions`, `trades`, `deals`, `closures`, `balance_ops`, `position_events`. Kunci unik menjadi `(login, run_key, position_id)` untuk `trades`/`closures` dan `(login, run_key, deal_ticket)` untuk `deals`/`balance_ops`. View `v_trade_results` menggabungkan dengan `run_key` dan menampilkannya.
+    - `run_key` = 0 di live (posisi tetap unik per login lintas restart EA). Di Strategy Tester = ID sesi pertama run; disimpan di Global Variable tester `SDB_<login>_RUN_KEY` agar restart di tengah run memakai run yang sama.
+    - Alasan: di tester, position ID dan deal ticket mulai dari angka kecil yang sama di setiap run dengan login yang sama, sehingga `ON CONFLICT DO NOTHING` membuang semua baris run berikutnya tanpa error.
+    - Backoffice dan query analisis wajib memakai `login + run_key + position_id` sebagai kunci posisi.
+
 ## Done
 
 (belum ada)

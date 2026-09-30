@@ -97,6 +97,7 @@ enum ENUM_SDB_QUEUE_KIND
 // Parameter penanda NULL di SQL: ?90 = SDB_NULL_DOUBLE, ?91 = SDB_NULL_LONG (dipakai lewat NULLIF).
 #define SDB_BIND_NULL_DOUBLE 89
 #define SDB_BIND_NULL_LONG   90
+#define SDB_BIND_RUN_KEY     79   // ?80 di SQL: run_key sesi (spec 04, PC-08)
 
 struct SdbQueuedEvent
   {
@@ -133,6 +134,7 @@ private:
 
    long              m_login;
    long              m_sessionId;
+   long              m_runKey;        // 0 live; ID sesi pertama run di tester
    bool              m_haveSession;
    SessionInfo       m_session;
    bool              m_haveAccount;
@@ -358,32 +360,32 @@ private:
                    "peak_equity = excluded.peak_equity, server_utc_offset_sec = excluded.server_utc_offset_sec, "
                    "updated_at = excluded.updated_at";
          case SDB_Q_TRADE:
-            return "INSERT INTO trades (session_id, login, position_id, magic, symbol, direction, source, volume_initial, "
+            return "INSERT INTO trades (session_id, login, run_key, position_id, magic, symbol, direction, source, volume_initial, "
                    "price_requested, price_open, slippage_points, spread_points, sl_initial, tp_initial, risk_money, risk_pct, "
                    "signal_id, ea_version, opened_at) "
-                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULLIF(?9, ?90), ?10, NULLIF(?11, ?91), NULLIF(?12, ?91), ?13, ?14, "
+                   "VALUES (?1, ?2, ?80, ?3, ?4, ?5, ?6, ?7, ?8, NULLIF(?9, ?90), ?10, NULLIF(?11, ?91), NULLIF(?12, ?91), ?13, ?14, "
                    "NULLIF(?15, ?90), NULLIF(?16, ?90), NULLIF(?17, ?91), ?18, ?19) "
-                   "ON CONFLICT (login, position_id) DO NOTHING";
+                   "ON CONFLICT (login, run_key, position_id) DO NOTHING";
          case SDB_Q_DEAL:
-            return "INSERT INTO deals (session_id, login, deal_ticket, position_id, magic, symbol, time, entry, deal_type, "
+            return "INSERT INTO deals (session_id, login, run_key, deal_ticket, position_id, magic, symbol, time, entry, deal_type, "
                    "volume, price, reason, profit, commission, swap, fee) "
-                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) "
-                   "ON CONFLICT (login, deal_ticket) DO NOTHING";
+                   "VALUES (?1, ?2, ?80, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) "
+                   "ON CONFLICT (login, run_key, deal_ticket) DO NOTHING";
          case SDB_Q_POSITION:
-            return "INSERT INTO position_events (session_id, login, position_id, time, type, sl_old, sl_new, volume, price, "
+            return "INSERT INTO position_events (session_id, login, run_key, position_id, time, type, sl_old, sl_new, volume, price, "
                    "spread_points, detail) "
-                   "VALUES (?1, ?2, ?3, ?4, ?5, NULLIF(?6, ?90), NULLIF(?7, ?90), ?8, ?9, ?10, NULLIF(?11, ''))";
+                   "VALUES (?1, ?2, ?80, ?3, ?4, ?5, NULLIF(?6, ?90), NULLIF(?7, ?90), ?8, ?9, ?10, NULLIF(?11, ''))";
          case SDB_Q_CLOSURE:
-            return "INSERT INTO closures (session_id, login, position_id, magic, symbol, closed_at, reason, level_price, "
+            return "INSERT INTO closures (session_id, login, run_key, position_id, magic, symbol, closed_at, reason, level_price, "
                    "price_close, slippage_points, volume_total, profit, commission, swap, fee, net_profit, r_result, mfe_r, "
                    "mae_r, holding_sec, be_activated, partial_done, trail_activated) "
-                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULLIF(?8, ?90), ?9, NULLIF(?10, ?91), ?11, ?12, ?13, ?14, ?15, ?16, "
+                   "VALUES (?1, ?2, ?80, ?3, ?4, ?5, ?6, ?7, NULLIF(?8, ?90), ?9, NULLIF(?10, ?91), ?11, ?12, ?13, ?14, ?15, ?16, "
                    "NULLIF(?17, ?90), NULLIF(?18, ?90), NULLIF(?19, ?90), ?20, ?21, ?22, ?23) "
-                   "ON CONFLICT (login, position_id) DO NOTHING";
+                   "ON CONFLICT (login, run_key, position_id) DO NOTHING";
          case SDB_Q_BALANCE:
-            return "INSERT INTO balance_ops (login, deal_ticket, time, op_type, amount, comment) "
-                   "VALUES (?1, ?2, ?3, ?4, ?5, NULLIF(?6, '')) "
-                   "ON CONFLICT (login, deal_ticket) DO NOTHING";
+            return "INSERT INTO balance_ops (login, run_key, deal_ticket, time, op_type, amount, comment) "
+                   "VALUES (?1, ?80, ?2, ?3, ?4, ?5, NULLIF(?6, '')) "
+                   "ON CONFLICT (login, run_key, deal_ticket) DO NOTHING";
          case SDB_Q_ALERT:
             return "INSERT INTO alerts (session_id, login, magic, symbol, time, type, severity, message, status, attempts) "
                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0)";
@@ -430,7 +432,7 @@ private:
                  DatabaseBind(st, 12, e.trade.slInitial) && DatabaseBind(st, 13, e.trade.tpInitial) &&
                  DatabaseBind(st, 14, e.trade.riskMoney) && DatabaseBind(st, 15, e.trade.riskPct) &&
                  DatabaseBind(st, 16, e.trade.signalId) && DatabaseBind(st, 17, e.trade.eaVersion) &&
-                 DatabaseBind(st, 18, Utc(e.trade.openedAt)) &&
+                 DatabaseBind(st, 18, Utc(e.trade.openedAt)) && DatabaseBind(st, SDB_BIND_RUN_KEY, m_runKey) &&
                  DatabaseBind(st, SDB_BIND_NULL_DOUBLE, SDB_NULL_DOUBLE) && DatabaseBind(st, SDB_BIND_NULL_LONG, SDB_NULL_LONG);
             return ok;
          case SDB_Q_DEAL:
@@ -441,7 +443,8 @@ private:
                  DatabaseBind(st, 8, e.deal.dealType) && DatabaseBind(st, 9, e.deal.volume) &&
                  DatabaseBind(st, 10, e.deal.price) && DatabaseBind(st, 11, e.deal.reason) &&
                  DatabaseBind(st, 12, e.deal.profit) && DatabaseBind(st, 13, e.deal.commission) &&
-                 DatabaseBind(st, 14, e.deal.swap) && DatabaseBind(st, 15, e.deal.fee);
+                 DatabaseBind(st, 14, e.deal.swap) && DatabaseBind(st, 15, e.deal.fee) &&
+                 DatabaseBind(st, SDB_BIND_RUN_KEY, m_runKey);
             return ok;
          case SDB_Q_POSITION:
             ok = DatabaseBind(st, 0, m_sessionId) && DatabaseBind(st, 1, e.login) &&
@@ -449,7 +452,8 @@ private:
                  DatabaseBind(st, 4, e.position.type) && DatabaseBind(st, 5, e.position.slOld) &&
                  DatabaseBind(st, 6, e.position.slNew) && DatabaseBind(st, 7, e.position.volume) &&
                  DatabaseBind(st, 8, e.position.price) && DatabaseBind(st, 9, e.position.spreadPoints) &&
-                 DatabaseBind(st, 10, e.position.detail) && DatabaseBind(st, SDB_BIND_NULL_DOUBLE, SDB_NULL_DOUBLE);
+                 DatabaseBind(st, 10, e.position.detail) && DatabaseBind(st, SDB_BIND_NULL_DOUBLE, SDB_NULL_DOUBLE) &&
+                 DatabaseBind(st, SDB_BIND_RUN_KEY, m_runKey);
             return ok;
          case SDB_Q_CLOSURE:
             ok = DatabaseBind(st, 0, m_sessionId) && DatabaseBind(st, 1, e.login) &&
@@ -463,13 +467,14 @@ private:
                  DatabaseBind(st, 16, e.closure.rResult) && DatabaseBind(st, 17, e.closure.mfeR) &&
                  DatabaseBind(st, 18, e.closure.maeR) && DatabaseBind(st, 19, e.closure.holdingSec) &&
                  DatabaseBind(st, 20, (int)e.closure.beActivated) && DatabaseBind(st, 21, (int)e.closure.partialDone) &&
-                 DatabaseBind(st, 22, (int)e.closure.trailActivated) &&
+                 DatabaseBind(st, 22, (int)e.closure.trailActivated) && DatabaseBind(st, SDB_BIND_RUN_KEY, m_runKey) &&
                  DatabaseBind(st, SDB_BIND_NULL_DOUBLE, SDB_NULL_DOUBLE) && DatabaseBind(st, SDB_BIND_NULL_LONG, SDB_NULL_LONG);
             return ok;
          case SDB_Q_BALANCE:
             ok = DatabaseBind(st, 0, e.login) && DatabaseBind(st, 1, e.balance.dealTicket) &&
                  DatabaseBind(st, 2, Utc(e.balance.time)) && DatabaseBind(st, 3, e.balance.opType) &&
-                 DatabaseBind(st, 4, e.balance.amount) && DatabaseBind(st, 5, e.balance.comment);
+                 DatabaseBind(st, 4, e.balance.amount) && DatabaseBind(st, 5, e.balance.comment) &&
+                 DatabaseBind(st, SDB_BIND_RUN_KEY, m_runKey);
             return ok;
          case SDB_Q_ALERT:
             ok = DatabaseBind(st, 0, m_sessionId) && DatabaseBind(st, 1, e.login) &&
@@ -523,11 +528,14 @@ private:
       return true;
      }
 
+   // run_key SDB_RUN_KEY_NEW = sesi pertama run tester: run_key diisi ID sesi ini, lalu dipakai
+   // semua baris dan sesi berikutnya dalam run yang sama (spec 04, PC-08).
    long InsertSession(const SessionInfo &s)
      {
+      bool newRun = (s.runKey == SDB_RUN_KEY_NEW);
       int st = DatabasePrepare(m_db, "INSERT INTO sessions (login, magic, symbol, mode, ea_version, input_hash, inputs_json, "
-                                     "started_at, tester_from, tester_to, tester_model) "
-                                     "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULLIF(?9, 0), NULLIF(?10, 0), NULLIF(?11, '')) "
+                                     "started_at, tester_from, tester_to, tester_model, run_key) "
+                                     "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULLIF(?9, 0), NULLIF(?10, 0), NULLIF(?11, ''), ?12) "
                                      "RETURNING id");
       if(st == INVALID_HANDLE)
         {
@@ -540,17 +548,25 @@ private:
       if(DatabaseBind(st, 0, s.login) && DatabaseBind(st, 1, s.magic) && DatabaseBind(st, 2, s.symbol) &&
          DatabaseBind(st, 3, s.mode) && DatabaseBind(st, 4, s.eaVersion) && DatabaseBind(st, 5, Sha256Hex(s.inputsJson)) &&
          DatabaseBind(st, 6, s.inputsJson) && DatabaseBind(st, 7, Utc(s.startedAt)) && DatabaseBind(st, 8, from) &&
-         DatabaseBind(st, 9, to) && DatabaseBind(st, 10, s.testerModel) && DatabaseRead(st))
+         DatabaseBind(st, 9, to) && DatabaseBind(st, 10, s.testerModel) &&
+         DatabaseBind(st, 11, newRun ? (long)SDB_RUN_KEY_LIVE : s.runKey) && DatabaseRead(st))
          DatabaseColumnLong(st, 0, id);
       else
          LogError("Storage", "sesi tidak bisa dicatat | " + ErrText(GetLastError()));
       DatabaseFinalize(st);
+      m_runKey = newRun ? id : s.runKey;
+      if(newRun && id > 0)
+        {
+         if(!DatabaseExecute(m_db, "UPDATE sessions SET run_key = id WHERE id = " + IntegerToString(id)))
+            LogError("Storage", "run_key sesi tidak tersimpan | " + ErrText(GetLastError()));
+         m_session.runKey = id;   // buka ulang file memakai run yang sama
+        }
       return id;
      }
 
 public:
                      CLogger(void) : m_alertSink(NULL), m_magic(0), m_target(SDB_DB_NONE), m_db(INVALID_HANDLE),
-                     m_disabled(true), m_capacity(SDB_DB_QUEUE_MAX), m_dropped(0), m_login(0), m_sessionId(0),
+                     m_disabled(true), m_capacity(SDB_DB_QUEUE_MAX), m_dropped(0), m_login(0), m_sessionId(0), m_runKey(0),
                      m_haveSession(false), m_haveAccount(false), m_failSince(0), m_unavailAlerted(false),
                      m_lastReopen(0), m_offset(0), m_nowOverride(0), m_offsetOverridden(false), m_offsetOverride(0)
      {
@@ -677,6 +693,7 @@ public:
      }
 
    long SessionId() const    { return m_sessionId; }
+   long RunKey() const       { return m_runKey; }
    int  QueueSize() const    { return ArraySize(m_queue); }
    int  DroppedCount() const { return m_dropped; }
 
@@ -766,10 +783,10 @@ public:
       sl = 0.0;
       if(!IsWritable())
          return false;
-      int st = DatabasePrepare(m_db, "SELECT sl_initial FROM trades WHERE login = ?1 AND position_id = ?2");
+      int st = DatabasePrepare(m_db, "SELECT sl_initial FROM trades WHERE login = ?1 AND position_id = ?2 AND run_key = ?3");
       if(st == INVALID_HANDLE)
          return false;
-      bool found = DatabaseBind(st, 0, login) && DatabaseBind(st, 1, (long)positionId) && DatabaseRead(st) &&
+      bool found = DatabaseBind(st, 0, login) && DatabaseBind(st, 1, (long)positionId) && DatabaseBind(st, 2, m_runKey) && DatabaseRead(st) &&
                    DatabaseColumnDouble(st, 0, sl);
       DatabaseFinalize(st);
       return found;

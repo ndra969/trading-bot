@@ -1,6 +1,6 @@
 # Requirements — 04 Eksekusi, orkestrasi, dan harness
 
-Status: Approved (2026-09-29)
+Status: Done (2026-09-30)
 Use case: UC-07 (kirim order), UC-08 ([overview](../fase-1-overview.md))
 Asal: ea-foundation R6, R4.4 (komentar), R19.3–19.4, design `CSdbApp` dan harness
 Butuh: spec 02 (akun, state, event sink), spec 03 (`CLogger`, sesi, `SchemaEnums.mqh`)

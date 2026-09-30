@@ -138,6 +138,16 @@ void RunTestAppLifecycle()
    app.OnDeinit(REASON_REMOVE);
    AssertTrue("TC-APP-04", "OnDeinit dua kali: tidak crash, semua sesi berakhir, Logger tertutup",
               TaCount("sessions", "ended_at IS NULL") == 0 && !app.Logger().IsWritable());
+
+   // Ganti timeframe chart: MT5 memanggil OnDeinit lalu OnInit pada objek global yang sama.
+   long sessionsBefore = TaCount("sessions");
+   r = app.OnInit(TaConfig());
+   app.OnTimer();
+   bool reopened = app.Logger().IsWritable();
+   app.OnDeinit(REASON_CHARTCHANGE);
+   AssertTrue("TC-APP-04b", "OnInit ulang pada objek yang sama: sukses, DB terbuka lagi, sesi baru juga diakhiri",
+              r == INIT_SUCCEEDED && reopened && TaCount("sessions") == sessionsBefore + 1 &&
+              TaCount("sessions", "ended_at IS NULL") == 0);
    delete app;
 
    CFakeSink fake;

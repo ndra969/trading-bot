@@ -74,7 +74,7 @@ def test_ts07_bad_file_name_is_rejected(tmp_path: Path):
 
 def test_load_migrations_reads_versions_names_and_checksums(real_schema_dir: Path):
     migs = schema.load_migrations(real_schema_dir / "migrations" / "data")
-    assert [m.version for m in migs] == [1]
+    assert [m.version for m in migs] == list(range(1, len(migs) + 1))
     assert migs[0].name == "initial"
     assert len(migs[0].sha256) == 64
     assert migs[0].statements

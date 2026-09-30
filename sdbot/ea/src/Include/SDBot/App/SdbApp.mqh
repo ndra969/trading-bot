@@ -43,6 +43,23 @@ private:
       m_lastSnapshot = TimeLocal();   // Validate() baru saja mengirim snapshot
      }
 
+   // Nama GV run_key tester: tester mengosongkan GV di setiap run, jadi GV ini menandai run yang
+   // sedang jalan dan bertahan saat restart harness (spec 04, PC-08).
+   string RunKeyGvName(const long login) const
+     {
+      string prefix = (m_cfg.mode == SDB_APP_UNITTEST) ? SDB_GV_PREFIX_UNITTEST : SDB_GV_PREFIX;
+      return prefix + "_" + IntegerToString(login) + "_" + SDB_GV_RUN_KEY;
+     }
+
+   // Live: 0 (posisi unik per login lintas restart). Tester: run_key run ini, atau NEW di init pertama.
+   long RunKeyFor(const long login) const
+     {
+      if(m_cfg.dbTarget == SDB_DB_LIVE)
+         return SDB_RUN_KEY_LIVE;
+      string gv = RunKeyGvName(login);
+      return GlobalVariableCheck(gv) ? (long)GlobalVariableGet(gv) : SDB_RUN_KEY_NEW;
+     }
+
    void OpenStorage(ISdbEventSink *observer)
      {
       m_logger.Init(observer, _Symbol, m_cfg.inputs.magic, m_cfg.eaVersion);
@@ -58,6 +75,7 @@ private:
       bool tester = (bool)MQLInfoInteger(MQL_TESTER);
       SessionInfo s;
       s.login = AccountInfoInteger(ACCOUNT_LOGIN);
+      s.runKey = RunKeyFor(s.login);
       s.magic = m_cfg.inputs.magic;
       s.symbol = _Symbol;
       s.mode = tester ? SDB_SESSION_MODE_TESTER : SDB_SESSION_MODE_LIVE;
@@ -68,6 +86,8 @@ private:
       s.testerTo = 0;
       s.testerModel = "";
       m_logger.BeginSession(s);
+      if(s.runKey == SDB_RUN_KEY_NEW && m_logger.RunKey() > 0)
+         GlobalVariableSet(RunKeyGvName(s.login), (double)m_logger.RunKey());
      }
 
 public:
@@ -75,8 +95,16 @@ public:
                      m_deinitDone(false), m_lastSnapshot(0), m_lastTouch(0) {}
 
    // Urutan init (Req 6.1). observer: perekam harness / sink uji, menerima event di samping Logger.
+   // Ganti timeframe/simbol chart memanggil OnDeinit lalu OnInit pada objek global yang sama.
    int OnInit(const SdbAppConfig &cfg, ISdbEventSink *observer = NULL)
      {
+      m_sink = NULL;
+      m_storageOpened = false;
+      m_stateReady = false;
+      m_timerSet = false;
+      m_deinitDone = false;
+      m_lastSnapshot = 0;
+      m_lastTouch = 0;
       m_cfg = cfg;
       SdbSetLogLevel(cfg.logLevel);
       string errors;

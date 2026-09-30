@@ -38,6 +38,6 @@ Aturan:
 
 - Semua waktu UTC epoch detik. `accounts.server_utc_offset_sec` menyimpan selisih waktu server. Di `sdbot_tester.sqlite`, waktu adalah waktu server tester (di tester `TimeGMT() == TimeTradeServer()`).
 - Ticket dan ID MT5 disimpan `INTEGER` 64-bit.
-- `trades`, `deals`, `closures`, `balance_ops` unik per `login` + ID MT5; penulisan ulang yang sama tidak membuat baris ganda.
+- `trades`, `deals`, `closures`, `balance_ops` unik per `login` + `run_key` + ID MT5; penulisan ulang yang sama tidak membuat baris ganda. `run_key` = 0 di live; di tester = ID sesi pertama run (position ID dan deal ticket tester mulai dari angka yang sama di setiap run). `sessions` dan `position_events` juga membawa `run_key`. Gabungkan tabel dengan `login + run_key + position_id` (skema v2, PC-08).
 - `sdbot.sqlite` hanya berisi data live. Backtest menulis `sdbot_tester.sqlite`; optimasi tidak menulis DB.
 - Tanpa foreign key: DB adalah log dan tidak boleh menolak baris.

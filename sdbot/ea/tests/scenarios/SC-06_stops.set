@@ -1,0 +1,12 @@
+; SC-06: entry tiap 10 bar dengan SL 3 point (di bawah spread + stops level).
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-06
+HarnessEveryBars=10
+HarnessDirection=2
+HarnessSlPoints=3
+HarnessTpPoints=200
+HarnessMaxOpen=1
+HarnessFixedLot=0.01
+HarnessRestartAtBar=0

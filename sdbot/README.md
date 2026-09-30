@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.02** (spec 01–03 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi). Belum ada logika trading.
+Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.03** (spec 01–04 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario). Belum ada logika trading: EA utama tidak membuka posisi apa pun.
 
 ## Konfigurasi dan tuning
 
@@ -22,7 +22,9 @@ PRD mengganti konfigurasi YAML bot Python dengan **input EA** yang disimpan seba
 | Setting dari panel backoffice (Fase B5) | tabel `settings` di `sdbot_control.sqlite` | Admin lewat panel | Siklus timer berikutnya; **hanya boleh lebih ketat** dari input MT5 |
 | File database EA | `sdbot.sqlite` (live), `sdbot_tester.sqlite` (Strategy Tester), `sdbot_unittest.sqlite` (unit test) di folder Common MT5 (`%APPDATA%\MetaQuotes\Terminal\Common\Files`). Optimasi tidak menulis DB. Konstanta `SDB_DB_*` di `Constants.mqh`: busy timeout 500 ms, antrean 2000 event, alert DB tidak bisa ditulis setelah 300 detik, buka ulang tiap 60 detik | EA sendiri; skema hanya lewat `tools/schema.py` | Migrasi diterapkan otomatis saat EA start |
 | Skema dan enum DB | `shared/schema/` (`migrations/data/*.sql`, `enums.md`); file hasil generate `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, `data_db.sql`, fixture | Developer lewat `schema.py new/build`, dicek pre-commit | Versi EA berikutnya |
-| Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal (puncak equity, STOPPED, pause harian, …) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
+| Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal (puncak equity, STOPPED, pause harian, penghitung ID permintaan `<magic>_REQ_COUNTER`, …; di tester juga `RUN_KEY`) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
+| Konstanta eksekusi | `Constants.mqh`: ulang maksimal 3x dengan jeda 500 ms, deviasi 10 point, cari order ambigu 300 detik ke belakang, snapshot akun tiap 60 detik | Developer | Versi EA berikutnya |
+| Skenario uji harness | `ea/tests/scenarios/SC-nn_<nama>.ini` (simbol, periode, model, tanggal) + `.set` bernama sama (input EA dan input harness) | Developer | Dibaca `run-ea-tests.ps1 -Scenario SC-nn` |
 | Path mesin untuk alat build/uji | `tools/mt5-paths.local.json` (contoh: `tools/mt5-paths.example.json`) | Developer, **tidak di-commit** | Dibaca setiap kali skrip `tools/` jalan |
 
 Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya. Sebelum spec itu selesai, file dan input tersebut belum ada.
@@ -57,7 +59,7 @@ Parameter strategi lainnya (bias HTF, deteksi zona, buffer SL, nilai skor per ko
 ### Alur tuning
 
 1. Ubah nilai input di Strategy Tester (tab Inputs), atau jalankan **optimasi** dengan rentang nilai. Metrik optimasi SDBot adalah expectancy per trade dalam R ÷ max drawdown (`OnTester`).
-2. Bandingkan hasil backtest di `sdbot_tester.sqlite`: setiap run tercatat di tabel `sessions` bersama `input_hash` dan nilai input lengkap (`inputs_json`), jadi hasil bisa dikelompokkan per setelan. Query siap pakai ada di `tools/queries/` (spec 07).
+2. Bandingkan hasil backtest di `sdbot_tester.sqlite`: setiap run tercatat di tabel `sessions` bersama `input_hash` dan nilai input lengkap (`inputs_json`), jadi hasil bisa dikelompokkan per setelan. Karena position ID dan deal ticket di tester mulai dari angka yang sama di setiap run, baris `trades`/`deals`/`closures`/`balance_ops`/`position_events` dibedakan per run lewat kolom `run_key` (ID sesi pertama run; di live selalu 0); gabungkan tabel dengan `login + run_key + position_id`. Query siap pakai ada di `tools/queries/` (spec 07).
 3. Nilai yang terbukti lebih baik (backtest + forward test sesuai PRD) disimpan ke preset `ea/src/Presets/SDBot_DAY_<PAIR>c.set` dan di-commit.
 4. Jika yang berubah adalah **default** di `Inputs.mqh` atau konstanta di `Constants.mqh`, perubahannya juga dicatat di `docs/PENDING-CHANGES.md` agar PRD ikut diperbarui (skill `sdbot-docs-sync`).
 5. Di akun live, perubahan setting yang sifatnya mengetatkan (misalnya menurunkan risiko) bisa lewat panel backoffice tanpa membuka MT5 (Fase B5).
@@ -73,5 +75,22 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `run-ea-tests.ps1 [-Unit] [-Scenario SC-xx] [-All]` | Compile lalu jalankan unit test/skenario di Strategy Tester terminal uji; exit 0 = semua lulus |
 | `uv run python tools/schema.py new data "<deskripsi>"` | Buat file migrasi baru bernomor berikutnya |
 | `uv run python tools/schema.py build` / `check` / `release` / `status <file>` | Bangun file hasil generate dari migrasi; cek konsistensi (juga dijalankan pre-commit); tandai migrasi sudah rilis; lihat versi skema sebuah file DB |
+
+### Harness skenario
+
+`tests/Experts/SDBotTests/SDBotHarness.mq5` memakai `CSdbApp` yang sama dengan EA utama, ditambah entry terjadwal, simulasi restart, dan pemeriksa skenario. Harness hanya jalan di Strategy Tester (di chart live gagal init dengan CRITICAL), dan wajib memakai magic cadangan `2026091900`. Input tambahannya (hanya ada di harness):
+
+| Input | Isi |
+|---|---|
+| `InpTestRunId` | ID run, diisi runner |
+| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-06`, `SC-08`); ID lain = FAIL |
+| `HarnessEveryBars` | entry setiap N bar chart |
+| `HarnessDirection` | 0 BUY, 1 SELL, 2 bergantian |
+| `HarnessSlPoints` / `HarnessTpPoints` | jarak SL/TP dari harga (point) |
+| `HarnessMaxOpen` | posisi sendiri maksimum |
+| `HarnessFixedLot` | lot tetap (lot sizing mulai spec 05) |
+| `HarnessRestartAtBar` | bar tempat orkestrasi dibuat ulang (0 = tanpa restart) |
+
+Menjalankan: `powershell -ExecutionPolicy Bypass -File tools/run-ea-tests.ps1 -Scenario SC-00,SC-08` (atau `-All` untuk unit + semua skenario). Skenario baru = pasangan `.ini`/`.set` di `ea/tests/scenarios/` plus cabang `CheckScenario` di `ea/tests/Include/SDBotTests/Scenarios.mqh`.
 
 Terminal uji di mesin ini adalah instalasi "Broker A". Terminal "Broker B" dipakai bot Python dan tidak disentuh alat-alat ini.

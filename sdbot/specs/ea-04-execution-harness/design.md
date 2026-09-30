@@ -1,6 +1,6 @@
 # Design — 04 Eksekusi, orkestrasi, dan harness
 
-Status: Approved (2026-09-29)
+Status: Done (2026-09-30), dengan tambahan keputusan 7 (skema v2 `run_key`)
 Requirements: [requirements.md](requirements.md)
 
 ## 1. Overview
@@ -273,10 +273,13 @@ Input: tidak ada input baru di EA utama. Input harness hanya ada di `SDBotHarnes
 | TC-APP-05 | suffix salah | `INIT_FAILED`; setelah `OnDeinit(REASON_INITFAILED)` alert `ACCOUNT_REJECTED` tersimpan | 6.2 |
 | TC-APP-06 | executor saat akun ditolak | `OpenMarket` → `NOT_TRADABLE`, `SendCount() = 0` | 1.7 |
 | TC-APP-07 | observer terpasang | snapshot akun dan alert sampai ke observer dan ke DB, alert milik Logger tidak ganda | 7.6 |
+| TC-APP-04b | `OnInit` ulang pada objek yang sama setelah `OnDeinit` (ganti timeframe chart) | `INIT_SUCCEEDED`, DB terbuka lagi, sesi baru juga diakhiri | 6.1, 6.4 |
 | TC-APP-07b | observer terpasang, akun lolos | snapshot akun ≥ 1 di observer, 1 baris `accounts` | 6.5, 7.6 |
 | TC-APP-08a..f | jalur broker `CExecutor` di tester: buy lot minimum, modify lebih buruk/lebih baik/tiket asing, partial seluruh volume, close dua kali, SL 3 point | terisi dengan risiko > 0; komentar ter-parse; 1 baris `trades`; `SKIPPED`/`OK`/`GONE`; `SKIPPED`; `OK` lalu `GONE`; `SL_TOO_CLOSE` tanpa kiriman | 1.4, 3.1, 4.2, 4.4, 4.5, 5.1 |
 
 Suite TestApp hanya jalan di Strategy Tester (`RunUnitTestsEA`); di script chart live suite ini dilewati.
+
+**Logger** (suite Logger, tambahan skema v2): TC-DB-23 dua run baru dengan position ID, deal ticket, dan ticket saldo yang sama → baris terpisah, `run_key` = ID sesi sendiri; TC-DB-24 `run_key` lama dipakai ulang (restart) → tetap idempoten, `FindInitialSl` membaca run sendiri; TC-DB-25 live `run_key` 0 lintas restart → 1 baris per posisi. Pytest TS-20..24 (`tools/tests/test_schema_run_key.py`): kolom `run_key` NOT NULL DEFAULT 0, kunci unik per run, view menggabungkan closure run yang sama.
 
 **InputRules** (suite CoreUtils, tambahan): TC-IR-xx magic 2026091900 ditolak tanpa `allowHarnessMagic`, diterima dengan flag.
 
@@ -286,7 +289,7 @@ Suite TestApp hanya jalan di Strategy Tester (`RunUnitTestsEA`); di script chart
 |---|---|---|---|---|
 | SC-00 smoke | EURUSDc M15 1 minggu, entry tiap 20 bar bergantian BUY/SELL, lot 0.01, SL 200, TP 200 point, maks 1 posisi | posisi dibuka dan tertutup di SL/TP | ≥ 3 order berhasil; tiap `TradeRecord` punya SL, TP, harga isi, `riskMoney > 0`; komentar setiap posisi bisa di-parse dan SL-nya sama dengan `sl_initial`; ID permintaan unik; baris `trades` untuk sesi ini = jumlah order berhasil; `sessions.mode = TESTER`; snapshot akun ≥ 1 per 60 detik simulasi | 2.1, 3.1, 5.1, 6.1, 6.5 |
 | SC-06 stops | SL 3 point | harness mencoba entry | semua ditolak `SL_TOO_CLOSE`; `SendCount() = 0`; 0 baris `trades` untuk sesi ini | 1.4 |
-| SC-08 restart | seperti SC-00, entry tiap 10 bar, maks 2 posisi, restart di bar 50 | orkestrasi dibuat ulang | 2 sesi tercatat, sesi pertama berakhir `PROGRAM`; posisi terbuka sebelum restart masih ada sesudahnya; ID permintaan setelah restart tidak mengulang ID sebelumnya; tidak ada alert error | 5.3, 7.5, EC-14 |
+| SC-08 restart | seperti SC-00, entry tiap 10 bar, maks 2 posisi, SL/TP 500 point, restart di bar 50 | orkestrasi dibuat ulang | 2 sesi tercatat dengan `run_key` sama (ID sesi pertama), sesi pertama berakhir `PROGRAM`; posisi terbuka sebelum restart masih ada sesudahnya; ID permintaan setelah restart tidak mengulang ID sebelumnya; tidak ada alert error | 5.3, 7.5, EC-14 |
 
 **Manual**
 
@@ -319,3 +322,5 @@ Retcode ambigu (EC-01, EC-13), requote (EC-02, EC-03), dan partial fill (EC-06) 
 4. **Deviasi maksimum 10 point** sebagai konstanta. PRD tidak mengaturnya; nilai ini bisa jadi input di Fase 3 bila data slippage menuntut.
 5. **`SdbAppConfig` sebagai pintu konfigurasi `CSdbApp`**, bukan membaca `Inp*` langsung, agar orkestrasi bisa diuji di suite unit (TestApp).
 6. **Modify/close ikut diulang ≤ 3 kali** (Req 4.6) dengan aturan `NextStep` yang sama seperti open.
+7. **[Disetujui 2026-09-30, PC-08] Skema v2 `run_key`.** SC-00 menemukan bahwa di `sdbot_tester.sqlite` position ID dan deal ticket mulai dari angka yang sama di setiap run dengan login yang sama, sehingga `ON CONFLICT (login, position_id) DO NOTHING` membuang semua baris run kedua dan seterusnya tanpa error. Migrasi `0002_run_key` menambah `run_key` (0 di live, ID sesi pertama run di tester) di `sessions`, `trades`, `deals`, `closures`, `balance_ops`, `position_events`; kunci unik menjadi `(login, run_key, <ID MT5>)`. `CSdbApp` menyimpan `run_key` tester di GV `SDB_<login>_RUN_KEY` (tester mengosongkan GV tiap run), jadi restart harness tetap di run yang sama. `SessionInfo.runKey`: `SDB_RUN_KEY_LIVE` (0), `SDB_RUN_KEY_NEW` (−1, Logger mengisi ID sesi sendiri), atau `run_key` run yang berjalan. `CLogger::FindInitialSl` memfilter `run_key`. Alternatif yang ditolak: file tester dikosongkan tiap run (histori backtest hilang), file per run (backoffice harus membaca banyak file).
+8. **`CSdbApp::OnInit` me-reset semua flag**, karena MT5 memanggil `OnDeinit` lalu `OnInit` pada objek global yang sama saat timeframe/simbol chart diganti (TC-APP-04b).

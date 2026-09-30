@@ -40,21 +40,23 @@ CREATE TABLE alerts (
   sent_at     INTEGER
 );
 
-CREATE TABLE balance_ops (
+CREATE TABLE "balance_ops" (
   id           INTEGER PRIMARY KEY,
   login        INTEGER NOT NULL,
+  run_key      INTEGER NOT NULL DEFAULT 0,
   deal_ticket  INTEGER NOT NULL,
   time         INTEGER NOT NULL,
   op_type      TEXT    NOT NULL CHECK (op_type IN ('BALANCE','CREDIT')),
   amount       REAL    NOT NULL,
   comment      TEXT,
-  UNIQUE (login, deal_ticket)
+  UNIQUE (login, run_key, deal_ticket)
 );
 
-CREATE TABLE closures (
+CREATE TABLE "closures" (
   id               INTEGER PRIMARY KEY,
   session_id       INTEGER NOT NULL,
   login            INTEGER NOT NULL,
+  run_key          INTEGER NOT NULL DEFAULT 0,
   position_id      INTEGER NOT NULL,
   magic            INTEGER NOT NULL,
   symbol           TEXT    NOT NULL,
@@ -76,13 +78,14 @@ CREATE TABLE closures (
   be_activated     INTEGER NOT NULL CHECK (be_activated IN (0,1)),
   partial_done     INTEGER NOT NULL CHECK (partial_done IN (0,1)),
   trail_activated  INTEGER NOT NULL CHECK (trail_activated IN (0,1)),
-  UNIQUE (login, position_id)
+  UNIQUE (login, run_key, position_id)
 );
 
-CREATE TABLE deals (
+CREATE TABLE "deals" (
   id           INTEGER PRIMARY KEY,
   session_id   INTEGER NOT NULL,
   login        INTEGER NOT NULL,
+  run_key      INTEGER NOT NULL DEFAULT 0,
   deal_ticket  INTEGER NOT NULL,
   position_id  INTEGER NOT NULL,
   magic        INTEGER NOT NULL,
@@ -97,7 +100,7 @@ CREATE TABLE deals (
   commission   REAL    NOT NULL,
   swap         REAL    NOT NULL,
   fee          REAL    NOT NULL,
-  UNIQUE (login, deal_ticket)
+  UNIQUE (login, run_key, deal_ticket)
 );
 
 CREATE TABLE position_events (
@@ -113,7 +116,7 @@ CREATE TABLE position_events (
   price          REAL    NOT NULL,
   spread_points  INTEGER NOT NULL,
   detail         TEXT
-);
+, run_key INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE sessions (
   id              INTEGER PRIMARY KEY,
@@ -130,7 +133,7 @@ CREATE TABLE sessions (
   tester_from     INTEGER,
   tester_to       INTEGER,
   tester_model    TEXT
-);
+, run_key INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE signal_scores (
   signal_id  INTEGER NOT NULL,
@@ -158,10 +161,11 @@ CREATE TABLE signals (
   context_json   TEXT
 );
 
-CREATE TABLE trades (
+CREATE TABLE "trades" (
   id               INTEGER PRIMARY KEY,
   session_id       INTEGER NOT NULL,
   login            INTEGER NOT NULL,
+  run_key          INTEGER NOT NULL DEFAULT 0,
   position_id      INTEGER NOT NULL,
   magic            INTEGER NOT NULL,
   symbol           TEXT    NOT NULL,
@@ -179,16 +183,16 @@ CREATE TABLE trades (
   signal_id        INTEGER,
   ea_version       TEXT    NOT NULL,
   opened_at        INTEGER NOT NULL,
-  UNIQUE (login, position_id)
+  UNIQUE (login, run_key, position_id)
 );
 
 CREATE INDEX ix_alerts_status_time ON alerts (status, time);
 
 CREATE INDEX ix_closures_login_closed ON closures (login, closed_at);
 
-CREATE INDEX ix_deals_position ON deals (login, position_id);
+CREATE INDEX ix_deals_position ON deals (login, run_key, position_id);
 
-CREATE INDEX ix_pos_events_position ON position_events (login, position_id);
+CREATE INDEX ix_pos_events_run_position ON position_events (login, run_key, position_id);
 
 CREATE INDEX ix_sessions_login_started ON sessions (login, started_at);
 
@@ -199,9 +203,9 @@ CREATE INDEX ix_signals_stage ON signals (reject_stage, time);
 CREATE INDEX ix_trades_login_opened ON trades (login, opened_at);
 
 CREATE VIEW v_trade_results AS
-SELECT t.login, t.position_id, t.symbol, t.direction, t.magic, t.ea_version, t.session_id,
+SELECT t.login, t.run_key, t.position_id, t.symbol, t.direction, t.magic, t.ea_version, t.session_id,
        t.opened_at, c.closed_at, c.reason, t.volume_initial, t.price_open, c.price_close,
        t.risk_money, c.net_profit, c.r_result, c.mfe_r, c.mae_r, c.holding_sec,
        c.be_activated, c.partial_done, c.trail_activated, t.signal_id
 FROM trades t
-LEFT JOIN closures c ON c.login = t.login AND c.position_id = t.position_id;
+LEFT JOIN closures c ON c.login = t.login AND c.run_key = t.run_key AND c.position_id = t.position_id;
