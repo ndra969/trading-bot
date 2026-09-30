@@ -28,6 +28,7 @@ private:
    string            m_eaVersion;
    long              m_sendCount;
    long              m_memCounter;    // cadangan bila GV penghitung gagal ditulis
+   uint              m_forceRc;       // hook uji: != 0 -> modify/close tidak dikirim, retcode ini dipakai
 
    void SendAlert(const string type, const string message)
      {
@@ -245,10 +246,13 @@ private:
      }
 
    // Satu langkah retry bersama untuk modify/close (Req 4.6). true = berhenti dengan hasil di out.
+   uint LastRetcode() { return (m_forceRc != 0) ? m_forceRc : m_trade.ResultRetcode(); }
+
+   // alertOnFail = false: pemanggil (manajer posisi, spec 06 Req 5.3) yang memutuskan alert setelah retry-nya sendiri.
    bool HandleRetcode(const int attempt, const string op, const string alertType, const ulong positionId,
-                      ENUM_SDB_EXEC &out, string &why)
+                      const bool alertOnFail, ENUM_SDB_EXEC &out, string &why)
      {
-      uint rc = m_trade.ResultRetcode();
+      uint rc = LastRetcode();
       ENUM_SDB_NEXT_STEP step = NextStep(ClassifyRetcode(rc), attempt, false);
       if(step == SDB_STEP_SUCCEED)
         {
@@ -260,7 +264,7 @@ private:
          out = SDB_EXEC_GONE;
          return true;
         }
-      why = StringFormat("%s retcode=%u %s", op, rc, m_trade.ResultRetcodeDescription());
+      why = StringFormat("%s retcode=%u %s", op, rc, (m_forceRc != 0) ? "(uji)" : m_trade.ResultRetcodeDescription());
       if(step == SDB_STEP_RETRY)
         {
          LogWarn("Execution", why + " | ulang ke-" + IntegerToString(attempt) + " pos=" + IntegerToString((long)positionId));
@@ -268,7 +272,8 @@ private:
          return false;
         }
       LogError("Execution", why + " | menyerah pos=" + IntegerToString((long)positionId));
-      SendAlert(alertType, StringFormat("%s gagal untuk posisi %I64d: %s", op, (long)positionId, why));
+      if(alertOnFail)
+         SendAlert(alertType, StringFormat("%s gagal untuk posisi %I64d: %s", op, (long)positionId, why));
       out = SDB_EXEC_FAILED;
       return true;
      }
@@ -298,7 +303,7 @@ private:
      }
 
 public:
-                     CExecutor(void) : m_magic(0), m_acc(NULL), m_state(NULL), m_sink(NULL), m_sendCount(0), m_memCounter(0) {}
+                     CExecutor(void) : m_magic(0), m_acc(NULL), m_state(NULL), m_sink(NULL), m_sendCount(0), m_memCounter(0), m_forceRc(0) {}
 
    bool Init(const long magic, const string symbol, CAccount *acc, CState *state, ISdbEventSink *sink, const string eaVersion)
      {
@@ -372,7 +377,7 @@ public:
      }
 
    // SL hanya membaik (Req 4.2); "tidak ada perubahan" = berhasil (4.3); posisi hilang = GONE (4.4).
-   ENUM_SDB_EXEC ModifySl(const ulong positionId, const double newSl, string &why)
+   ENUM_SDB_EXEC ModifySl(const ulong positionId, const double newSl, string &why, const bool alertOnFail = true)
      {
       why = "";
       int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
@@ -393,15 +398,16 @@ public:
             return SDB_EXEC_SKIPPED;
            }
          m_sendCount++;
-         m_trade.PositionModify(positionId, target, PositionGetDouble(POSITION_TP));
+         if(m_forceRc == 0)
+            m_trade.PositionModify(positionId, target, PositionGetDouble(POSITION_TP));
          ENUM_SDB_EXEC out;
-         if(HandleRetcode(attempt, "modify SL", SDB_ALERT_TYPE_MODIFY_FAILED, positionId, out, why))
+         if(HandleRetcode(attempt, "modify SL", SDB_ALERT_TYPE_MODIFY_FAILED, positionId, alertOnFail, out, why))
             return out;
         }
       return SDB_EXEC_FAILED;
      }
 
-   ENUM_SDB_EXEC ClosePartial(const ulong positionId, const double volume, string &why)
+   ENUM_SDB_EXEC ClosePartial(const ulong positionId, const double volume, string &why, const bool alertOnFail = true)
      {
       why = "";
       double startVol = -1.0;
@@ -421,9 +427,10 @@ public:
             return SDB_EXEC_SKIPPED;
            }
          m_sendCount++;
-         m_trade.PositionClosePartial(positionId, volume);
+         if(m_forceRc == 0)
+            m_trade.PositionClosePartial(positionId, volume);
          ENUM_SDB_EXEC out;
-         if(HandleRetcode(attempt, "tutup sebagian", SDB_ALERT_TYPE_ORDER_FAILED, positionId, out, why))
+         if(HandleRetcode(attempt, "tutup sebagian", SDB_ALERT_TYPE_ORDER_FAILED, positionId, alertOnFail, out, why))
             return out;
         }
       return SDB_EXEC_FAILED;
@@ -439,7 +446,7 @@ public:
          m_sendCount++;
          m_trade.PositionClose(positionId);
          ENUM_SDB_EXEC out;
-         if(HandleRetcode(attempt, "tutup posisi", SDB_ALERT_TYPE_ORDER_FAILED, positionId, out, why))
+         if(HandleRetcode(attempt, "tutup posisi", SDB_ALERT_TYPE_ORDER_FAILED, positionId, true, out, why))
             return out;
         }
       return SDB_EXEC_FAILED;
@@ -456,6 +463,9 @@ public:
      }
 
    long SendCount() const { return m_sendCount; }
+
+   //--- Hook uji: penolakan broker tidak bisa dipicu di tester (stops level 0); modify/close tidak dikirim.
+   void SetForceRetcodeForTest(const uint rc) { m_forceRc = rc; }
 
 
    // Margin level (%) setelah order ini, dari OrderCheck (spec 05 Req 2.6). 0 = tidak diketahui.

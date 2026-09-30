@@ -23,6 +23,8 @@ private:
    datetime          m_firstStoppedAt;     // sampel timer pertama dengan STOPPED aktif
    datetime          m_lastOpenWhileStopped; // sampel terakhir STOPPED dengan posisi SDBot masih ada
    datetime          m_restartAt;
+   datetime          m_reattachAt;
+   long              m_restartPosition;
    BalanceOpRecord   m_balanceOps[];
    double            m_withdrawAmount;     // SC-07: penarikan harness, puncak dan level DD sebelum/sesudah diproses
    double            m_peakBefore;
@@ -31,9 +33,9 @@ private:
    int               m_levelAfter;
    bool              m_afterSampled;
    long              m_sends;           // jumlah OrderSend dari semua CExecutor (termasuk sebelum restart)
-   int               m_deals;
-   int               m_positionEvents;
-   int               m_closures;
+   DealRecord        m_dealRecs[];
+   PositionEvent     m_events[];
+   ClosureRecord     m_closureRecs[];
 
    static void PushLong(long &arr[], const long v)
      {
@@ -43,7 +45,7 @@ private:
      }
 
 public:
-                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_sends(0), m_deals(0), m_positionEvents(0), m_closures(0) {}
+                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_reattachAt(0), m_restartPosition(0), m_sends(0) {}
 
    //--- ISdbEventSink
    // Jam timer (TimeLocal), bukan a.time: a.time = waktu tick terakhir, yang tertinggal dari jadwal
@@ -66,9 +68,24 @@ public:
       ArrayResize(m_alerts, n + 1);
       m_alerts[n] = a;
      }
-   void OnDeal(const DealRecord &d)             { m_deals++; }
-   void OnPositionEvent(const PositionEvent &e) { m_positionEvents++; }
-   void OnClosure(const ClosureRecord &c)       { m_closures++; }
+   void OnDeal(const DealRecord &d)
+     {
+      int n = ArraySize(m_dealRecs);
+      ArrayResize(m_dealRecs, n + 1);
+      m_dealRecs[n] = d;
+     }
+   void OnPositionEvent(const PositionEvent &e)
+     {
+      int n = ArraySize(m_events);
+      ArrayResize(m_events, n + 1);
+      m_events[n] = e;
+     }
+   void OnClosure(const ClosureRecord &c)
+     {
+      int n = ArraySize(m_closureRecs);
+      ArrayResize(m_closureRecs, n + 1);
+      m_closureRecs[n] = c;
+     }
    void OnBalanceOp(const BalanceOpRecord &b)
      {
       int n = ArraySize(m_balanceOps);
@@ -94,6 +111,10 @@ public:
          m_lastOpenWhileStopped = t;
      }
    void NoteRestart(const datetime t)              { m_restartAt = t; }
+   void NoteReattach(const datetime t)             { m_reattachAt = t; }
+   datetime ReattachAt() const                     { return m_reattachAt; }
+   void NoteRestartPosition(const long id)         { m_restartPosition = id; }
+   long RestartPosition() const                    { return m_restartPosition; }
    void NoteWithdraw(const double amount, const double peak, const int level)
      {
       m_withdrawAmount = amount;
@@ -137,6 +158,52 @@ public:
       if(i < 0 || i >= ArraySize(m_trades))
          return false;
       t = m_trades[i];
+      return true;
+     }
+   int  DealCount() const                   { return ArraySize(m_dealRecs); }
+   bool DealAt(const int i, DealRecord &d) const
+     {
+      if(i < 0 || i >= ArraySize(m_dealRecs))
+         return false;
+      d = m_dealRecs[i];
+      return true;
+     }
+   long LastPartialPosition() const
+     {
+      for(int i = ArraySize(m_events) - 1; i >= 0; i--)
+         if(m_events[i].type == SDB_POSITION_EVENT_PARTIAL)
+            return m_events[i].positionId;
+      return 0;
+     }
+   bool WasOpenBeforeRestart(const long id) const
+     {
+      for(int i = 0; i < ArraySize(m_posBeforeRestart); i++)
+         if(m_posBeforeRestart[i] == id)
+            return true;
+      return false;
+     }
+   // Posisi yang pertama kali melakukan partial; 0 = belum ada.
+   long FirstPartialPosition() const
+     {
+      for(int i = 0; i < ArraySize(m_events); i++)
+         if(m_events[i].type == SDB_POSITION_EVENT_PARTIAL)
+            return m_events[i].positionId;
+      return 0;
+     }
+   int  EventCount() const                  { return ArraySize(m_events); }
+   bool EventAt(const int i, PositionEvent &e) const
+     {
+      if(i < 0 || i >= ArraySize(m_events))
+         return false;
+      e = m_events[i];
+      return true;
+     }
+   int  ClosureCount() const                { return ArraySize(m_closureRecs); }
+   bool ClosureAt(const int i, ClosureRecord &c) const
+     {
+      if(i < 0 || i >= ArraySize(m_closureRecs))
+         return false;
+      c = m_closureRecs[i];
       return true;
      }
    int  AlertCount() const                  { return ArraySize(m_alerts); }

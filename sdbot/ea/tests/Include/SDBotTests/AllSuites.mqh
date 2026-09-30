@@ -21,6 +21,9 @@
 #include <SDBotTests/Suites/TestRiskMath.mqh>
 #include <SDBotTests/Suites/TestRiskState.mqh>
 #include <SDBotTests/Suites/TestRisk.mqh>
+#include <SDBotTests/Suites/TestPositionMath.mqh>
+#include <SDBotTests/Suites/TestClosure.mqh>
+#include <SDBotTests/Suites/TestPosition.mqh>
 
 void RunAllSuites()
   {
@@ -39,6 +42,9 @@ void RunAllSuites()
    RunTestRiskMath();
    RunTestRiskState();
    RunTestRisk();
+   RunTestPositionMath();
+   RunTestClosure();
+   RunTestPosition();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

@@ -93,7 +93,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Close all saat STOPPED: percobaan saat pasar tutup (tiap 60 detik) tidak dihitung gagal; Critical `CLOSE_ALL_FAILED` hanya setelah 3 gagal berturut-turut saat pasar buka, lalu paling sering tiap 15 menit.
     - Posisi SDBot tanpa SL dihitung berisiko 1% balance di total risiko terbuka, dengan log WARN.
     - Operasi saldo yang sudah ada saat status bersama belum ada (akun baru, GV dihapus, awal run tester) dianggap sudah diproses.
-    - Ambang kembali normal dari lot × 0.5 = min(8%, `InpDDReducePct` × 0.8), agar histeresis tetap ada bila batas REDUCE disetel di bawah 8% (temuan SC-03; default PRD tetap 8%). Menunggu konfirmasi user.
+    - Ambang kembali normal dari lot × 0.5 = min(8%, `InpDDReducePct` × 0.8), agar histeresis tetap ada bila batas REDUCE disetel di bawah 8% (temuan SC-03; default PRD tetap 8%). Disetujui 2026-09-30.
 
 ### PC-10: Simbol mengikuti bot Python, preset per simbol, batas posisi per kategori
 - Status: Open
@@ -105,6 +105,18 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Magic per simbol (blok PC-02): 01 EURUSD, 02 GBPUSD, 03 EURJPY, 04 GBPJPY (tetap), 05 USDJPY, 06 USDCHF, 07 AUDUSD, 08 USDCAD, 09 NZDUSD, 10 XAUUSD, 11 XAGUSD, 12 BTCUSD.
     - Setting berbeda per kategori lewat preset `.set` per simbol (`SDBot_DAY_<SIMBOL>c.set`) dengan input EA yang sama. Nilai awal per kategori diambil dari config bot Python saat spec pemiliknya dibuat (preset di spec 07, filter sesi/spread di Fase 4). BE/partial/trailing tetap berbasis R dan ATR sesuai PRD.
     - Risk management: batas posisi SDBot per kategori aset di akun (forex major 5, forex cross 3, komoditas 1, crypto 1; input `InpMaxPos*`), langkah pre-trade check setelah total risiko terbuka, alasan tolak `CLASS_POSITION_LIMIT`. Kategori ditentukan dari mata uang base/quote simbol.
+
+### PC-11: Detail manajemen posisi dan closure
+- Status: Open
+- Tanggal disetujui: 2026-09-30
+- Dokumen: PRD-EA §Position management, §Notifikasi
+- Sumber: spec `ea-06-position` requirements, keputusan 1–4
+- Perubahan:
+    - Posisi milik instance ditentukan dari deal pembukanya (magic + simbol), bukan dari deal penutup; closure dari close all lintas instance tercatat oleh pemilik dengan alasan `EA_CLOSE`.
+    - Titik BE = harga buka ± (spread + komisi pulang-pergi dalam point + `InpBreakevenBufferPoints`).
+    - Modifikasi/partial gagal: dicoba ulang tiap 30 detik maksimal 3 kali per aksi, lalu satu event `MODIFY_FAILED` + satu alert Medium, berhenti sampai kondisi posisi berubah.
+    - SL yang dihapus manual dipasang kembali (SL awal bila valid, atau SL valid terdekat) + alert High; gagal 3x → Critical.
+    - Alasan tutup dibedakan `SL` / `BE_STOP` / `TRAIL_STOP` dari level pemicu SL; MFE/MAE dari bar M1 saat posisi tutup.
 
 ## Done
 

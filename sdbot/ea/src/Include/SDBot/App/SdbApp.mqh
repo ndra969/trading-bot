@@ -14,6 +14,9 @@
 #include <SDBot/Execution/Executor.mqh>
 #include <SDBot/Risk/RiskManager.mqh>
 #include <SDBot/Risk/RiskMonitor.mqh>
+#include <SDBot/Position/PositionManager.mqh>
+#include <SDBot/Position/ClosureTracker.mqh>
+#include <SDBot/Position/Reconciler.mqh>
 #include <SDBot/App/TeeSink.mqh>
 
 #define SDB_GV_PREFIX_UNITTEST "SDBTEST"
@@ -32,6 +35,11 @@ private:
    CRiskManager      m_riskManager;
    CRiskMonitor      m_riskMonitor;
    bool              m_riskReady;
+   CPositionCache    m_posCache;
+   CPositionManager  m_posManager;
+   CClosureTracker   m_closureTracker;
+   CReconciler       m_reconciler;
+   int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
    bool              m_storageOpened;
    bool              m_stateReady;
    bool              m_timerSet;
@@ -58,6 +66,27 @@ private:
          m_riskMonitor.OnStateReady(m_cfg.resetEmergencyStop);
          SendSnapshot();
         }
+      m_reconciler.Run();   // spec 06 Req 7.1, 7.2: butuh GV LAST_DEAL per magic dari status bersama
+     }
+
+   // Modul posisi (spec 06 design §4.8). Handle ATR dibuat sekali di init, dilepas di OnDeinit.
+   bool InitPositions(const SdbAppConfig &cfg)
+     {
+      ENUM_TIMEFRAMES htf, mtf, ltf;
+      StyleTimeframes(cfg.style, htf, mtf, ltf);
+      m_atrHandle = iATR(_Symbol, ltf, cfg.inputs.trailAtrPeriod);
+      if(m_atrHandle == INVALID_HANDLE)
+        {
+         LogCritical("App", "handle ATR trailing tidak bisa dibuat | " + ErrText(GetLastError()));
+         return false;
+        }
+      m_posCache.Init(cfg.inputs.magic, _Symbol, m_sink);
+      m_posManager.Init(_Symbol, cfg.inputs.magic, cfg.inputs, ltf, m_atrHandle, GetPointer(m_executor), GetPointer(m_account),
+                        GetPointer(m_posCache), m_sink);
+      m_closureTracker.Init(cfg.inputs.magic, _Symbol, GetPointer(m_posCache), GetPointer(m_state), m_sink,
+                            cfg.inputs.breakevenBufferPoints);
+      m_reconciler.Init(cfg.inputs.magic, _Symbol, GetPointer(m_posCache), GetPointer(m_closureTracker), m_sink, cfg.eaVersion);
+      return true;
      }
 
    void SendSnapshot()
@@ -117,7 +146,7 @@ private:
      }
 
 public:
-                     CSdbApp(void) : m_sink(NULL), m_riskReady(false), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
+                     CSdbApp(void) : m_sink(NULL), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
                      m_deinitDone(false), m_lastSnapshot(0), m_lastTouch(0) {}
 
    // Urutan init (Req 6.1). observer: perekam harness / sink uji, menerima event di samping Logger.
@@ -148,6 +177,8 @@ public:
       // Langkah 6 (spec 05): modul risiko dipasang sebelum status bersama agar OnStateReady bisa jalan.
       m_riskManager.Init(_Symbol, GetPointer(m_riskState), GetPointer(m_executor), GetPointer(m_account), cfg.inputs);
       m_riskMonitor.Init(_Symbol, cfg.inputs.magic, GetPointer(m_riskState), GetPointer(m_executor), m_sink, cfg);
+      if(!InitPositions(cfg))
+         return INIT_FAILED;
       EnsureState();
       if(!EventSetTimer(SDB_TIMER_SEC))
         {
@@ -161,11 +192,12 @@ public:
       return INIT_SUCCEEDED;
      }
 
-   // Posisi dikelola mulai spec 06; sampai akun lolos, tick diabaikan.
+   // Manajemen posisi per tick (spec 06); sampai akun lolos dan status siap, tick diabaikan.
    void OnTick()
      {
-      if(m_account.State() != SDB_VAL_PASSED)
+      if(m_account.State() != SDB_VAL_PASSED || !m_stateReady || m_deinitDone)
          return;
+      m_posManager.OnTick();
      }
 
    // Akun → state → risk monitor (spec 05 Req 3.1) → snapshot → touch GV → flush (spec 04 Req 6.3, 6.5).
@@ -195,9 +227,11 @@ public:
       m_logger.Flush();
      }
 
-   // Pencatatan deal dan closure mulai spec 06.
+   // Deal dan closure posisi instance (spec 06 Req 6); sebelum status siap, rekonsiliasi yang menangkapnya.
    void OnTradeTransaction(const MqlTradeTransaction &t, const MqlTradeRequest &rq, const MqlTradeResult &rs)
      {
+      if(m_stateReady && !m_deinitDone)
+         m_closureTracker.OnTransaction(t);
      }
 
    // Metrik optimasi mulai spec 07.
@@ -213,6 +247,9 @@ public:
          EventKillTimer();
       m_timerSet = false;
       LogInfo("App", "SDBot berhenti | reason=" + IntegerToString(reason) + " (" + SdbDeinitReasonText(reason) + ")");
+      if(m_atrHandle != INVALID_HANDLE)
+         IndicatorRelease(m_atrHandle);
+      m_atrHandle = INVALID_HANDLE;
       if(m_storageOpened)
         {
          m_logger.EndSession(reason);

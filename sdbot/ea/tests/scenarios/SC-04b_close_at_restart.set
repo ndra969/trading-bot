@@ -1,0 +1,13 @@
+; SC-04b: entry tiap 10 bar, SL/TP 200 point; di bar 100 app dilepas 40 bar ("EA mati"), posisi ditutup broker.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-04b
+HarnessEveryBars=10
+HarnessDirection=2
+HarnessSlPoints=200
+HarnessTpPoints=200
+HarnessMaxOpen=1
+HarnessFixedLot=0
+HarnessRestartAtBar=100
+HarnessDetachBars=40

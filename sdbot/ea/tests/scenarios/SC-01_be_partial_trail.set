@@ -1,0 +1,11 @@
+; SC-01: entry tiap 20 bar bergantian, risiko 0.5%, SL 200 / TP 1000 point; BE 1R, partial 1.5R 50%, trailing ATR(14) x2.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-01
+HarnessEveryBars=20
+HarnessDirection=2
+HarnessSlPoints=200
+HarnessTpPoints=1000
+HarnessMaxOpen=1
+HarnessFixedLot=0

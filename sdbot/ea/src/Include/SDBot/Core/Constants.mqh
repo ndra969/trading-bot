@@ -60,6 +60,13 @@
 #define SDB_COMMODITY_CURRENCIES         "XAU,XAG,XPT,XPD"
 #define SDB_CRYPTO_CURRENCIES            "BTC,ETH,LTC,XRP,BCH,SOL,ADA,DOT,DOGE,BNB"
 
+//--- Manajemen posisi (spec 06 design §5; angka PRD kecuali disebut)
+#define SDB_MIN_SL_STEP_POINTS           5       // geser SL minimal 5 point (PRD)
+#define SDB_MODIFY_COOLDOWN_SEC          30      // retry modify tiap 30 detik (PRD)
+#define SDB_MODIFY_MAX_ATTEMPTS          3       // lalu alert (PRD)
+#define SDB_RECONCILE_LOOKBACK_DAYS      30      // scan history tanpa GV LAST_DEAL
+#define SDB_CLOSE_REASON_TOLERANCE_PTS   2       // toleransi BE_STOP di atas InpBreakevenBufferPoints
+
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
 #define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama

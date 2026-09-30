@@ -1,0 +1,11 @@
+; SC-01b: seperti SC-01 dengan lot tetap 0.01: partial selalu dilewati (PARTIAL_SKIPPED).
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-01b
+HarnessEveryBars=20
+HarnessDirection=2
+HarnessSlPoints=200
+HarnessTpPoints=1000
+HarnessMaxOpen=1
+HarnessFixedLot=0.01

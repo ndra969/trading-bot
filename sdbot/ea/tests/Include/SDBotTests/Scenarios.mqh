@@ -436,11 +436,303 @@ void CheckSc07(const string id, const CScenarioRecorder &rec)
    AssertTrue(id + "-db", StringFormat("1 baris balance_ops untuk run_key run ini (%I64d)", rows), rows == 1);
   }
 
+//--- Skenario posisi spec 06
+
+bool ScTradeIsBuy(const CScenarioRecorder &rec, const long positionId, bool &isBuy)
+  {
+   for(int i = 0; i < rec.TradeCount(); i++)
+     {
+      TradeRecord t;
+      rec.TradeAt(i, t);
+      if(t.positionId == positionId)
+        {
+         isBuy = (t.direction == SDB_DIRECTION_BUY);
+         return true;
+        }
+     }
+   return false;
+  }
+
+int ScEventCount(const CScenarioRecorder &rec, const long positionId, const string type)
+  {
+   int n = 0;
+   for(int i = 0; i < rec.EventCount(); i++)
+     {
+      PositionEvent e;
+      rec.EventAt(i, e);
+      if(e.positionId == positionId && e.type == type)
+         n++;
+     }
+   return n;
+  }
+
+// Posisi mengalami BE, PARTIAL, dan TRAILING; TRAILING tidak pernah mendahului BE (PRD: trailing setelah BE).
+// PARTIAL boleh sebelum BE (harga melompat 1R dan 1.5R dalam satu tick, EC-02) atau sesudah trailing.
+bool ScHasBePartialTrail(const CScenarioRecorder &rec, const long positionId)
+  {
+   int be = -1, partial = -1, trail = -1;
+   for(int i = 0; i < rec.EventCount(); i++)
+     {
+      PositionEvent e;
+      rec.EventAt(i, e);
+      if(e.positionId != positionId)
+         continue;
+      if(e.type == SDB_POSITION_EVENT_BE && be < 0)
+         be = i;
+      else if(e.type == SDB_POSITION_EVENT_PARTIAL && partial < 0)
+         partial = i;
+      else if(e.type == SDB_POSITION_EVENT_TRAILING && trail < 0)
+         trail = i;
+     }
+   return be >= 0 && partial >= 0 && trail > be;
+  }
+
+// SL di event BE/TRAILING tidak pernah memburuk (Req 5.2).
+bool ScSlNeverWorse(const CScenarioRecorder &rec, const long positionId, const bool isBuy)
+  {
+   double last = 0.0;
+   for(int i = 0; i < rec.EventCount(); i++)
+     {
+      PositionEvent e;
+      rec.EventAt(i, e);
+      if(e.positionId != positionId || (e.type != SDB_POSITION_EVENT_BE && e.type != SDB_POSITION_EVENT_TRAILING))
+         continue;
+      if(last > 0.0 && (isBuy ? e.slNew < last : e.slNew > last))
+         return false;
+      last = e.slNew;
+     }
+   return true;
+  }
+
+int ScClosureCount(const CScenarioRecorder &rec, const long positionId, ClosureRecord &last)
+  {
+   int n = 0;
+   for(int i = 0; i < rec.ClosureCount(); i++)
+     {
+      ClosureRecord c;
+      rec.ClosureAt(i, c);
+      if(c.positionId == positionId)
+        {
+         n++;
+         last = c;
+        }
+     }
+   return n;
+  }
+
+// Tester menutup posisi yang tersisa di akhir run setelah tick terakhir (alasan CLIENT) tanpa OnTradeTransaction;
+// penutupan itu bukan perilaku EA dan tidak punya closure.
+bool ScClosedByTesterEnd(const long positionId)
+  {
+   if(!HistorySelectByPosition((ulong)positionId))
+      return false;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+     {
+      ulong d = HistoryDealGetTicket(i);
+      if(HistoryDealGetInteger(d, DEAL_ENTRY) != DEAL_ENTRY_IN && (datetime)HistoryDealGetInteger(d, DEAL_TIME) > TimeCurrent())
+         return true;
+     }
+   return false;
+  }
+
+// Deal trading di history tester untuk posisi yang dibuka harness.
+int ScHistoryDealsOfTrades(const CScenarioRecorder &rec)
+  {
+   if(!HistorySelect(0, TimeCurrent() + 60))
+      return -1;
+   int n = 0;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+     {
+      ulong d = HistoryDealGetTicket(i);
+      long type = HistoryDealGetInteger(d, DEAL_TYPE);
+      bool isBuy;
+      if((type == DEAL_TYPE_BUY || type == DEAL_TYPE_SELL) && ScTradeIsBuy(rec, HistoryDealGetInteger(d, DEAL_POSITION_ID), isBuy))
+         n++;
+     }
+   return n;
+  }
+
+// SC-01 (Req 2–6): BE -> PARTIAL -> TRAILING, sekali per posisi, SL tidak memburuk, closure lengkap.
+void CheckSc01(const string id, const CScenarioRecorder &rec)
+  {
+   int ordered = 0, dupBe = 0, dupPartial = 0, worse = 0, closed = 0, badClosure = 0, beOrTrail = 0;
+   string firstBad = "";
+   for(int i = 0; i < rec.TradeCount(); i++)
+     {
+      TradeRecord t;
+      rec.TradeAt(i, t);
+      bool isBuy = (t.direction == SDB_DIRECTION_BUY);
+      if(ScHasBePartialTrail(rec, t.positionId))
+         ordered++;
+      if(ScEventCount(rec, t.positionId, SDB_POSITION_EVENT_BE) > 1)
+         dupBe++;
+      if(ScEventCount(rec, t.positionId, SDB_POSITION_EVENT_PARTIAL) > 1)
+         dupPartial++;
+      if(!ScSlNeverWorse(rec, t.positionId, isBuy))
+         worse++;
+      if(PositionSelectByTicket((ulong)t.positionId) || ScClosedByTesterEnd(t.positionId))
+         continue;
+      closed++;
+      ClosureRecord c;
+      int nc = ScClosureCount(rec, t.positionId, c);
+      bool ok = nc == 1 && c.reason != "" && c.rResult != SDB_NULL_DOUBLE &&
+                (c.mfeR == SDB_NULL_DOUBLE || c.mfeR + 0.05 >= c.rResult);
+      if(!ok)
+        {
+         badClosure++;
+         if(firstBad == "")
+            firstBad = StringFormat("pos %I64d closure=%d alasan=%s R=%.2f MFE=%.2f", t.positionId, nc, c.reason, c.rResult, c.mfeR);
+        }
+      if(nc == 1 && (c.reason == SDB_CLOSE_REASON_BE_STOP || c.reason == SDB_CLOSE_REASON_TRAIL_STOP))
+         beOrTrail++;
+     }
+   AssertTrue(id + "-sequence", StringFormat("posisi dengan BE, PARTIAL, dan TRAILING (trailing sesudah BE): %d dari %d", ordered, rec.TradeCount()),
+              ordered >= 1);
+   AssertTrue(id + "-once", StringFormat("BE dan PARTIAL maksimal sekali per posisi (ganda BE %d, PARTIAL %d)", dupBe, dupPartial),
+              dupBe == 0 && dupPartial == 0);
+   AssertTrue(id + "-neverworse", StringFormat("SL di event BE/TRAILING tidak pernah memburuk (%d posisi melanggar)", worse), worse == 0);
+   AssertTrue(id + "-closures", StringFormat("tiap posisi tutup punya tepat satu closure lengkap, MFE >= R hasil (%d tutup, salah %d) %s",
+                                             closed, badClosure, firstBad), closed >= 3 && badClosure == 0);
+   AssertTrue(id + "-leak", StringFormat("ada closure BE_STOP atau TRAIL_STOP (%d)", beOrTrail), beOrTrail >= 1);
+   int hist = ScHistoryDealsOfTrades(rec);
+   AssertTrue(id + "-deals", StringFormat("deal tercatat = deal posisi harness di history (%d vs %d)", rec.DealCount(), hist),
+              hist > 0 && rec.DealCount() == hist);
+   ScCheckSessions(id, rec, 1);
+  }
+
+// SC-01b (Req 3.2, EC-04): lot 0.01 -> PARTIAL_SKIPPED sekali per posisi, tidak pernah PARTIAL, BE tetap jalan.
+void CheckSc01b(const string id, const CScenarioRecorder &rec)
+  {
+   int skippedPos = 0, dupSkip = 0, partials = 0, bes = 0;
+   for(int i = 0; i < rec.TradeCount(); i++)
+     {
+      TradeRecord t;
+      rec.TradeAt(i, t);
+      int s = ScEventCount(rec, t.positionId, SDB_POSITION_EVENT_PARTIAL_SKIPPED);
+      if(s >= 1)
+         skippedPos++;
+      if(s > 1)
+         dupSkip++;
+      partials += ScEventCount(rec, t.positionId, SDB_POSITION_EVENT_PARTIAL);
+      bes += ScEventCount(rec, t.positionId, SDB_POSITION_EVENT_BE);
+     }
+   AssertTrue(id + "-skipped", StringFormat("PARTIAL_SKIPPED tepat sekali per posisi yang mencapai 1.5R (%d posisi, ganda %d)",
+                                            skippedPos, dupSkip), skippedPos >= 1 && dupSkip == 0);
+   AssertTrue(id + "-nopartial", StringFormat("tidak ada PARTIAL (%d)", partials), partials == 0);
+   AssertTrue(id + "-be", StringFormat("BE tetap terjadi (%d)", bes), bes >= 1);
+   ScCheckSessions(id, rec, 1);
+  }
+
+int ScEventCountSince(const CScenarioRecorder &rec, const long positionId, const string type, const datetime from)
+  {
+   int n = 0;
+   for(int i = 0; i < rec.EventCount(); i++)
+     {
+      PositionEvent e;
+      rec.EventAt(i, e);
+      if(e.positionId == positionId && e.type == type && e.time >= from)
+         n++;
+     }
+   return n;
+  }
+
+long ScFirstRunKeySql(const CScenarioRecorder &rec)
+  {
+   return (rec.SessionCount() > 0) ? rec.SessionAt(0) : 0;
+  }
+
+// SC-04 (Req 7.1, 7.3, EC-19): restart saat posisi sudah BE + PARTIAL.
+void CheckSc04(const string id, const CScenarioRecorder &rec)
+  {
+   long p = rec.RestartPosition();
+   datetime r = rec.RestartAt();
+   AssertTrue(id + "-restart", StringFormat("restart (%s) saat pos %I64d sudah PARTIAL dan masih terbuka", TimeToString(r), p),
+              p > 0 && r > 0 && rec.WasOpenBeforeRestart(p) && ScEventCount(rec, p, SDB_POSITION_EVENT_PARTIAL) >= 1);
+   int be = ScEventCountSince(rec, p, SDB_POSITION_EVENT_BE, r);
+   int partial = ScEventCountSince(rec, p, SDB_POSITION_EVENT_PARTIAL, r);
+   AssertTrue(id + "-nodouble", StringFormat("sesudah restart tidak ada BE (%d) atau PARTIAL (%d) kedua untuk pos %I64d", be, partial, p),
+              be == 0 && partial == 0);
+   int reconciled = 0;
+   for(int i = 0; i < rec.TradeCount(); i++)
+     {
+      TradeRecord t;
+      rec.TradeAt(i, t);
+      if(t.positionId == p && t.source == SDB_TRADE_SOURCE_RECONCILED)
+         reconciled++;
+     }
+   long rows = ScDbCount("SELECT COUNT(*) FROM trades WHERE position_id=" + IntegerToString(p) +
+                         " AND run_key=(SELECT run_key FROM sessions WHERE id=" + IntegerToString(ScFirstRunKeySql(rec)) + ")");
+   AssertTrue(id + "-reconciled", StringFormat("TradeRecord RECONCILED dikirim (%d), baris trades tetap 1 (%I64d)", reconciled, rows),
+              reconciled == 1 && rows == 1);
+   ClosureRecord c;
+   int closures = ScClosureCount(rec, p, c);
+   bool managed = ScEventCountSince(rec, p, SDB_POSITION_EVENT_TRAILING, r) > 0 || closures == 1;
+   AssertTrue(id + "-managed", StringFormat("pos %I64d tetap dikelola sesudah restart (trailing atau closure; closure %d, alasan %s)",
+                                            p, closures, closures > 0 ? c.reason : "-"),
+              managed && (closures == 1 || PositionSelectByTicket((ulong)p) || ScClosedByTesterEnd(p)));
+   ScCheckSessions(id, rec, 2);
+  }
+
+// SC-04b (Req 7.2, EC-09, EC-16): posisi yang ditutup broker saat EA "mati" tercatat tepat sekali saat init ulang.
+void CheckSc04b(const string id, const CScenarioRecorder &rec)
+  {
+   datetime from = rec.RestartAt(), to = rec.ReattachAt();
+   AssertTrue(id + "-detach", StringFormat("app dilepas %s - %s", TimeToString(from), TimeToString(to)), from > 0 && to > from);
+   int closedWhileAway = 0, bad = 0;
+   string firstBad = "";
+   for(int i = 0; i < rec.TradeCount(); i++)
+     {
+      TradeRecord t;
+      rec.TradeAt(i, t);
+      if(t.source != SDB_TRADE_SOURCE_EA || !HistorySelectByPosition((ulong)t.positionId))
+         continue;
+      datetime closeTime = 0;
+      for(int k = 0; k < HistoryDealsTotal(); k++)
+        {
+         ulong d = HistoryDealGetTicket(k);
+         if(HistoryDealGetInteger(d, DEAL_ENTRY) == DEAL_ENTRY_OUT)
+            closeTime = (datetime)HistoryDealGetInteger(d, DEAL_TIME);
+        }
+      if(closeTime < from || closeTime > to)
+         continue;
+      closedWhileAway++;
+      ClosureRecord c;
+      int nc = ScClosureCount(rec, t.positionId, c);
+      int deals = 0;
+      for(int k = 0; k < rec.DealCount(); k++)
+        {
+         DealRecord d;
+         rec.DealAt(k, d);
+         if(d.positionId == t.positionId)
+            deals++;
+        }
+      long rows = ScDbCount("SELECT COUNT(*) FROM closures WHERE position_id=" + IntegerToString(t.positionId) +
+                            " AND run_key=(SELECT run_key FROM sessions WHERE id=" + IntegerToString(ScFirstRunKeySql(rec)) + ")");
+      if(nc != 1 || deals != 2 || rows != 1)
+        {
+         bad++;
+         if(firstBad == "")
+            firstBad = StringFormat("pos %I64d closure=%d deal=%d db=%I64d", t.positionId, nc, deals, rows);
+        }
+     }
+   AssertTrue(id + "-closed", StringFormat("ada posisi yang ditutup broker saat app dilepas (%d)", closedWhileAway), closedWhileAway >= 1);
+   AssertTrue(id + "-once", StringFormat("tiap posisi itu: 1 closure, 2 deal, 1 baris closures (salah %d) %s", bad, firstBad), bad == 0);
+   ScCheckSessions(id, rec, 2);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
    if(id == "SC-00")
       CheckSc00(id, rec);
+   else if(id == "SC-01")
+      CheckSc01(id, rec);
+   else if(id == "SC-01b")
+      CheckSc01b(id, rec);
+   else if(id == "SC-04")
+      CheckSc04(id, rec);
+   else if(id == "SC-04b")
+      CheckSc04b(id, rec);
    else if(id == "SC-02")
       CheckSc02(id, rec);
    else if(id == "SC-03")

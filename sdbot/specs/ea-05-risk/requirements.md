@@ -97,7 +97,7 @@ Selesai jika suite `RiskMath` dan `RiskState` ALL PASS, skenario SC-02, SC-03, S
 
 ### Requirement 6: Status bersama antar-instance
 
-**User story:** Sebagai trader, saya ingin empat pair di satu akun tunduk pada batas akun yang sama.
+**User story:** Sebagai trader, saya ingin semua simbol SDBot di satu akun (12 simbol, PC-10) tunduk pada batas akun yang sama.
 
 #### Acceptance criteria
 

@@ -122,6 +122,52 @@ enum ENUM_SDB_ASSET_CLASS
    SDB_CLASS_OTHER = 4         // tidak dikenali (indeks, dll.)
   };
 
+// Manajemen posisi (spec 06 design §4.3, §5).
+enum ENUM_SDB_SL_SOURCE
+  {
+   SDB_SL_SRC_NONE = 0,        // tidak diketahui: BE dan partial dilewati (Req 1.3)
+   SDB_SL_SRC_COMMENT = 1,     // komentar SDB|<SL>|<ID>
+   SDB_SL_SRC_ORDER = 2,       // ORDER_SL order pembuka di history
+   SDB_SL_SRC_DB = 3           // tabel trades lewat event sink
+  };
+
+enum ENUM_SDB_POS_ACTION
+  {
+   SDB_ACT_BE = 0,
+   SDB_ACT_TRAIL = 1,
+   SDB_ACT_PARTIAL = 2,
+   SDB_ACT_RESTORE = 3,
+   SDB_ACT_COUNT = 4
+  };
+
+// Nilai mahal per posisi yang tidak berubah selama posisi terbuka, plus penghitung retry per aksi.
+struct PositionCacheEntry
+  {
+   ulong             positionId;
+   bool              owned;
+   bool              isBuy;
+   double            entry;
+   datetime          entryTime;
+   double            initialSl;
+   ENUM_SDB_SL_SOURCE slSource;
+   double            initialVolume;
+   double            riskMoney;       // SDB_NULL_DOUBLE bila SL awal tidak diketahui
+   double            commission;      // komisi pulang-pergi (uang, positif) untuk titik BE
+   string            symbol;
+   double            beSl;            // titik BE yang dipasang; 0 = belum
+   bool              beDone;
+   bool              partialDone;
+   bool              trailDone;
+   bool              slUnknownLogged;
+   bool              partialSkippedLogged;
+   datetime          lastTrailEventBar;
+   int               fails[SDB_ACT_COUNT];
+   datetime          lastFail[SDB_ACT_COUNT];
+   double            failKeySl[SDB_ACT_COUNT];   // SL saat gagal; berubah -> penghitung di-reset (Req 5.3)
+   double            failKeyVol[SDB_ACT_COUNT];
+   bool              failAlerted[SDB_ACT_COUNT];
+  };
+
 // Hasil satu putaran close all (Req 5.8). closedMarket = dilewati karena pasar simbolnya tutup.
 struct CloseAllResult
   {

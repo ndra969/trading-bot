@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.04** (spec 01–05 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori). Belum ada logika entry: EA utama tidak membuka posisi apa pun.
+Status: Fase 1 (fondasi) sedang dibangun, versi EA **1.05** (spec 01–06 selesai: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart). Belum ada logika entry: EA utama tidak membuka posisi apa pun.
 
 ## Konfigurasi dan tuning
 
@@ -22,8 +22,8 @@ PRD mengganti konfigurasi YAML bot Python dengan **input EA** yang disimpan seba
 | Setting dari panel backoffice (Fase B5) | tabel `settings` di `sdbot_control.sqlite` | Admin lewat panel | Siklus timer berikutnya; **hanya boleh lebih ketat** dari input MT5 |
 | File database EA | `sdbot.sqlite` (live), `sdbot_tester.sqlite` (Strategy Tester), `sdbot_unittest.sqlite` (unit test) di folder Common MT5 (`%APPDATA%\MetaQuotes\Terminal\Common\Files`). Optimasi tidak menulis DB. Konstanta `SDB_DB_*` di `Constants.mqh`: busy timeout 500 ms, antrean 2000 event, alert DB tidak bisa ditulis setelah 300 detik, buka ulang tiap 60 detik | EA sendiri; skema hanya lewat `tools/schema.py` | Migrasi diterapkan otomatis saat EA start |
 | Skema dan enum DB | `shared/schema/` (`migrations/data/*.sql`, `enums.md`); file hasil generate `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, `data_db.sql`, fixture | Developer lewat `schema.py new/build`, dicek pre-commit | Versi EA berikutnya |
-| Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal: `PEAK_EQUITY`, `STOPPED`, `DAILY_PAUSE`, `LOT_REDUCED`, `DD_LEVEL`, `DAY_START_BAL`/`DAY_START_DATE`, `LAST_BAL_DEAL`/`LAST_BAL_TIME`, `MARGIN_LOW`, `CLOSE_ALL_ALERT_AT`, per instance `<magic>_RESET_SEEN` dan `<magic>_REQ_COUNTER`; di tester juga `RUN_KEY`. Satu set per akun, dibagi semua instance (compare-and-set) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
-| Konstanta eksekusi | `Constants.mqh`: ulang maksimal 3x dengan jeda 500 ms, deviasi 10 point, cari order ambigu 300 detik ke belakang, snapshot akun tiap 60 detik | Developer | Versi EA berikutnya |
+| Status runtime (bukan konfigurasi) | Global Variables `SDB_<login>_*` di terminal: `PEAK_EQUITY`, `STOPPED`, `DAILY_PAUSE`, `LOT_REDUCED`, `DD_LEVEL`, `DAY_START_BAL`/`DAY_START_DATE`, `LAST_BAL_DEAL`/`LAST_BAL_TIME`, `MARGIN_LOW`, `CLOSE_ALL_ALERT_AT`, per instance `<magic>_RESET_SEEN`, `<magic>_REQ_COUNTER`, `<magic>_LAST_DEAL`/`<magic>_LAST_DEAL_TIME` (deal terakhir yang dicatat); di tester juga `RUN_KEY`. Satu set per akun, dibagi semua instance (compare-and-set) | EA sendiri | Jangan diedit; buka STOPPED hanya lewat `InpResetEmergencyStop` |
+| Konstanta eksekusi dan posisi | `Constants.mqh`: ulang maksimal 3x dengan jeda 500 ms, deviasi 10 point, cari order ambigu 300 detik ke belakang, snapshot akun tiap 60 detik; posisi: geser SL minimal 5 point, retry modify tiap 30 detik maks 3 lalu alert, rekonsiliasi 30 hari tanpa GV, toleransi BE_STOP buffer + 2 point | Developer | Versi EA berikutnya |
 | Skenario uji harness | `ea/tests/scenarios/SC-nn_<nama>.ini` (simbol, periode, model, tanggal) + `.set` bernama sama (input EA dan input harness) | Developer | Dibaca `run-ea-tests.ps1 -Scenario SC-nn` |
 | Path mesin untuk alat build/uji | `tools/mt5-paths.local.json` (contoh: `tools/mt5-paths.example.json`) | Developer, **tidak di-commit** | Dibaca setiap kali skrip `tools/` jalan |
 
@@ -84,7 +84,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | Input | Isi |
 |---|---|
 | `InpTestRunId` | ID run, diisi runner |
-| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-02`, `SC-03`, `SC-03r`, `SC-05`, `SC-06`, `SC-07`, `SC-08`); ID lain = FAIL |
+| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`); ID lain = FAIL |
 | `HarnessEveryBars` | entry setiap N bar chart |
 | `HarnessDirection` | 0 BUY, 1 SELL, 2 bergantian |
 | `HarnessSlPoints` / `HarnessTpPoints` | jarak SL/TP dari harga (point) |
@@ -92,6 +92,8 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `HarnessFixedLot` | lot tetap; 0 = lot dari risiko (`CalcVolume`). Selalu lewat pre-trade check |
 | `HarnessRestartAtBar` | bar tempat orkestrasi dibuat ulang (0 = tanpa restart) |
 | `HarnessRestartBarsAfterStop` | restart N bar setelah STOPPED pertama terlihat (0 = tidak) |
+| `HarnessRestartAfterPartial` | restart di bar ke-N setelah partial, hanya bila posisinya masih terbuka (0 = tidak) |
+| `HarnessDetachBars` | saat restart, app dilepas N bar dulu (simulasi EA mati; posisi tetap di broker) |
 | `HarnessWithdrawAtBar` / `HarnessWithdrawPct` | tarik saldo (`TesterWithdrawal`) di bar ini atau sesudahnya saat tanpa posisi; besar % balance |
 
 Menjalankan: `powershell -ExecutionPolicy Bypass -File tools/run-ea-tests.ps1 -Scenario SC-00,SC-08` (atau `-All` untuk unit + semua skenario). Skenario baru = pasangan `.ini`/`.set` di `ea/tests/scenarios/` plus cabang `CheckScenario` di `ea/tests/Include/SDBotTests/Scenarios.mqh`.

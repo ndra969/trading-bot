@@ -1,16 +1,16 @@
 //+------------------------------------------------------------------+
 //| SDBot.mq5 — EA Supply & Demand + konfluensi (PRD-EA).
-//| v1.04 (spec 05): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
+//| v1.05 (spec 06): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
 //| yang memegang validasi input dan akun, state bersama, pencatatan
-//| SQLite, CExecutor, dan risk management (lot, pre-trade check, monitor
-//| drawdown/rugi harian/margin, emergency stop). Belum ada logika entry:
+//| SQLite, CExecutor, risk management (spec 05), dan manajemen posisi
+//| (BE, partial, trailing ATR, closure, rekonsiliasi). Belum ada logika entry:
 //| EA ini tidak membuka posisi sebelum Fase 3 (spec 04 Req 6.7).
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.04"
-#property description "SDBot EA v1.04 (spec 05): risk management (lot, pre-trade check, drawdown, rugi harian, emergency stop). Tidak membuka posisi apa pun."
+#property version   "1.05"
+#property description "SDBot EA v1.05 (spec 06): risk management + manajemen posisi (BE, partial, trailing, closure). Tidak membuka posisi apa pun."
 
-#define SDB_EA_VERSION "1.04"   // sama dengan #property version
+#define SDB_EA_VERSION "1.05"   // sama dengan #property version
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>

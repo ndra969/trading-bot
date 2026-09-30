@@ -1,0 +1,12 @@
+; SC-04: seperti SC-01, restart di bar pertama setelah partial saat posisi masih terbuka (sudah BE + PARTIAL).
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-04
+HarnessEveryBars=20
+HarnessDirection=2
+HarnessSlPoints=200
+HarnessTpPoints=1000
+HarnessMaxOpen=1
+HarnessFixedLot=0
+HarnessRestartAfterPartial=1

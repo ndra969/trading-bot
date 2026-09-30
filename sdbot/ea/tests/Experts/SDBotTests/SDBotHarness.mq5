@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.04"
+#property version   "1.05"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.04"
+#define SDB_HARNESS_EA_VERSION "1.05"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
@@ -35,6 +35,8 @@ input int                    HarnessMaxOpen      = 1;          // posisi sendiri
 input double                 HarnessFixedLot     = 0.0;        // lot tetap; 0 = CalcVolume (spec 05). Tetap lewat pre-trade check
 input int                    HarnessRestartAtBar = 0;          // 0 = tanpa restart
 input int                    HarnessRestartBarsAfterStop = 0;  // restart N bar setelah STOPPED pertama terlihat (0 = tidak)
+input int                    HarnessRestartAfterPartial = 0;   // restart di bar ke-N setelah partial (1 = bar pertama sesudahnya; 0 = tidak, SC-04)
+input int                    HarnessDetachBars    = 0;         // saat restart, app dilepas N bar dulu ("EA mati", SC-04b)
 input int                    HarnessWithdrawAtBar = 0;         // tarik saldo di bar ini atau sesudahnya saat tanpa posisi (0 = tidak)
 input double                 HarnessWithdrawPct   = 20.0;      // besar penarikan (% balance)
 
@@ -46,6 +48,10 @@ int               g_bar = 0;
 int               g_entries = 0;
 int               g_stopBar = 0;          // bar saat STOPPED pertama terlihat
 bool              g_withdrawn = false;
+int               g_partialBar = 0;       // bar saat PARTIAL terakhir tercatat
+long              g_partialPos = 0;       // posisi PARTIAL terakhir; restart hanya bila masih terbuka
+bool              g_partialRestartDone = false;
+int               g_reattachBar = 0;      // > 0: app dilepas sampai bar ini
 
 // Posisi sendiri (magic + simbol) untuk pemeriksaan restart.
 void RecordOwnPositions(const bool before)
@@ -88,8 +94,22 @@ void Restart()
    g_rec.NoteRestart(TimeCurrent());
    RecordOwnPositions(true);
    StopApp(REASON_PROGRAM);
+   if(HarnessDetachBars > 0)
+     {
+      g_reattachBar = g_bar + HarnessDetachBars;   // SC-04b: posisi tetap di broker, EA tidak ada
+      return;
+     }
    if(StartApp() != INIT_SUCCEEDED)
       LogError("Harness", "init ulang setelah restart gagal");
+   RecordOwnPositions(false);
+  }
+
+void Reattach()
+  {
+   g_reattachBar = 0;
+   g_rec.NoteReattach(TimeCurrent());
+   if(StartApp() != INIT_SUCCEEDED)
+      LogError("Harness", "init ulang setelah app dilepas gagal");
    RecordOwnPositions(false);
   }
 
@@ -151,18 +171,36 @@ int OnInit()
 
 void OnTick()
   {
-   if(g_app == NULL)
-      return;
-   g_app.OnTick();
+   if(g_app != NULL)
+      g_app.OnTick();
    datetime bar = iTime(_Symbol, _Period, 0);
    if(bar == 0 || bar == g_lastBar)
       return;
    g_lastBar = bar;
    g_bar++;
+   if(g_app == NULL)
+     {
+      if(g_reattachBar > 0 && g_bar >= g_reattachBar)
+         Reattach();
+      return;
+     }
+   long lastPartial = g_rec.LastPartialPosition();
+   if(lastPartial > 0 && lastPartial != g_partialPos)
+     {
+      g_partialPos = lastPartial;
+      g_partialBar = g_bar;
+     }
+   bool restartAfterPartial = HarnessRestartAfterPartial > 0 && !g_partialRestartDone && g_partialBar > 0 &&
+                              g_bar == g_partialBar + HarnessRestartAfterPartial - 1 && PositionSelectByTicket((ulong)g_partialPos);
+   if(restartAfterPartial)
+     {
+      g_partialRestartDone = true;
+      g_rec.NoteRestartPosition(g_partialPos);
+     }
    if(g_stopBar == 0 && g_app.RiskState().IsReady() && g_app.RiskState().IsStopped())
       g_stopBar = g_bar;
    bool restartAfterStop = HarnessRestartBarsAfterStop > 0 && g_stopBar > 0 && g_bar == g_stopBar + HarnessRestartBarsAfterStop;
-   if((HarnessRestartAtBar > 0 && g_bar == HarnessRestartAtBar) || restartAfterStop)
+   if((HarnessRestartAtBar > 0 && g_bar == HarnessRestartAtBar) || restartAfterStop || restartAfterPartial)
       Restart();
    if(g_app != NULL && HarnessEveryBars > 0 && g_bar % HarnessEveryBars == 0)
       TryEntry();
