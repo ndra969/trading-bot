@@ -2,7 +2,7 @@
 
 2026-09-21 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/0f8b5ef3-286a-4f3e-b62e-9781d632d0de (disalin ke repo 2026-09-28). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding.
+> Sumber: Claude Docs https://claude.ai/code/artifact/0f8b5ef3-286a-4f3e-b62e-9781d632d0de (disalin ke repo 2026-10-01). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -56,7 +56,7 @@ Skema kedua file didefinisikan sekali di `shared/schema/` dan menjadi kontrak an
 
 ### sdbot.sqlite (ditulis EA)
 
-Tabel dari PRD EA tetap dipakai: `accounts`, `signals`, `trades`, `position_events`, `closures`, `alerts`. Tambahan untuk backoffice:
+Tabel data EA (skema v2, DDL lengkap di `shared/schema/data_db.sql`): `sessions`, `accounts`, `signals` + `signal_scores`, `trades`, `deals`, `position_events`, `closures`, `b``al``ance_ops`, `alerts`, view `v_trade_results`, dan `schema_migrations`. Semua waktu UTC epoch detik. Kunci posisi = `login + run_key + position_id` (`run_key` 0 di live, ID sesi pertama run di backtest). Backoffice hanya membaca `sdbot.sqlite`, tidak pernah `sdbot_tester.sqlite`. Tambahan untuk backoffice:
 
 | Tabel | Isi | Frekuensi tulis |
 | --- | --- | --- |
@@ -74,11 +74,11 @@ Tabel dari PRD EA tetap dipakai: `accounts`, `signals`, `trades`, `position_even
 | `settings` | versi, target, key, value, dibuat, dibuat_oleh |
 | `admin_users` | username, hash password (argon2), dibuat |
 | `audit_log` | waktu, user, aksi, detail |
-| `schema_version` | versi skema |
+| `schema_``migrations` | migrasi yang sudah diterapkan |
 
 Aturan kontrak:
 
-- Setiap perubahan skema menaikkan `schema_version` dan diperbarui di `shared/schema/`, `Storage/Schema.mqh`, dan model Python dalam satu commit.
+- Skema hanya berubah lewat migrasi maju di `shared/schema/migrations/<db>/` (`tools/schema.py new` lalu `build`), dicatat di tabel `schema_migrations` tiap DB. `build` membangkitkan `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, snapshot, dan fixture; model dan repository Python ikut diperbarui dalam commit yang sama.
 - EA memeriksa versi skema kontrol saat start. Jika tidak cocok, EA mengabaikan perintah dan setting dari panel, lalu mengirim alert.
 - Beberapa instance EA menulis ke `sdbot.sqlite` yang sama dengan busy timeout 2 detik.
 - Waktu disimpan dalam UTC (epoch detik). Panel yang mengonversi ke zona waktu lokal.

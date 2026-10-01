@@ -2,7 +2,7 @@
 
 2026-09-21 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/af81a7e2-e640-4dc4-8f65-936acfc16525 (disalin ke repo 2026-09-28). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding.
+> Sumber: Claude Docs https://claude.ai/code/artifact/af81a7e2-e640-4dc4-8f65-936acfc16525 (disalin ke repo 2026-10-01). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Tujuan
 
@@ -96,6 +96,10 @@ Aturan folder:
 - `shared/schema/` adalah sumber kebenaran skema. EA dan API mengikutinya, bukan sebaliknya.
 - Kode backoffice tidak pernah mengimpor atau membaca file di `ea/`, dan sebaliknya. Keduanya hanya bertemu lewat `shared/`.
 - Diagram di `docs/flows/` diperbarui di commit yang sama dengan perubahan logikanya.
+- `ea/src/Include/SDBot/App/` adalah lapisan paling atas, hanya orkestrasi (`CSdbApp`, `CTeeSink`). `SDBot.mq5` hanya meneruskan event ke `CSdbApp`.
+- `shared/schema/` berisi `migrations/<db>/NNNN_*.sql`, `migrations.lock.json`, `enums.md`, snapshot `data_db.sql` (hasil generate), dan `fixtures/`.
+- `tools/` berisi `link-mt5.ps1`, `build-ea.ps1`, `run-ea-tests.ps1`, `lib/Mt5Paths.psm1`, `mt5-paths.example.json` (`mt5-paths.local.json` tidak di-commit), `schema.py`, `gen_presets.py`, dan `queries/`.
+- `ea/src/Presets/` berisi preset `SDBot_DAY_<SIMBOL>c.set` untuk 12 simbol bot Python, dibangkitkan `tools/gen_presets.py`; tidak diedit tangan.
 
 ## Menghubungkan repo ke MT5
 
@@ -120,6 +124,8 @@ Setelah terhubung:
 - Compile tetap lewat MetaEditor (F7). File `.ex5` hasil compile ikut muncul di repo, tetapi diabaikan git.
 - Jika punya lebih dari satu terminal MT5 (misalnya cent dan standar), jalankan skrip untuk setiap folder `<ID>`.
 - Folder `Include` dan `Experts` bawaan MT5 tidak disentuh, sehingga update MT5 tidak menghapus kode.
+- `link-mt5.ps1` juga membuat junction `Experts/SDBotTests`, `Include/SDBotTests`, dan `Scripts/SDBotTests` ke `ea/tests/`, serta `Presets/SDBot` ke `ea/src/Presets/`.
+- `build-ea.ps1` compile semua target EA dan uji dengan aturan 0 error dan 0 warning; `run-ea-tests.ps1` menjalankannya di Strategy Tester terminal uji yang terpisah dari terminal live.
 
 ## Lapisan dan aturan dependensi
 
@@ -148,6 +154,7 @@ flowchart TB
 
 | Modul | Boleh | Dilarang |
 | --- | --- | --- |
+| App | Memegang semua modul dan meneruskan OnInit, OnTick, OnTimer, OnTradeTransaction, OnTester, OnDeinit dalam urutan tetap | Mengambil keputusan trading sendiri |
 | Core | Tipe, konstanta, input, fungsi murni | Memanggil modul lain |
 | Analysis, Strategies | Membaca harga dan indikator, menghitung skor | Mengirim order, menulis DB, memanggil WebRequest |
 | Filters | Membaca kalender, sesi, spread | Mengubah posisi |
@@ -198,11 +205,12 @@ Aturan ini tidak boleh dilanggar walau untuk percobaan. Pelanggaran dianggap bug
 Order dan posisi:
 
 - [ ] Setiap order baru selalu membawa SL dan TP. Order tanpa SL ditolak di Executor.
-- [ ] Setiap order membawa `MagicNumber`, dan setiap loop posisi memfilter magic serta simbol.
+- [ ] Setiap order membawa MagicNumber, dan setiap loop posisi memfilter magic serta simbol. Pengecualian tertulis: emergency close (`CExecutor::CloseAllSdbot`) dan risiko terbuka akun memakai semua posisi bermagic di blok SDBot `2026091900`–`2026091999`; kepemilikan posisi untuk pencatatan closure diambil dari deal pembukanya.
 - [ ] Hasil `CTrade` selalu dicek lewat `ResultRetcode()`. Tidak ada order tanpa pengecekan hasil.
 - [ ] Lot dibulatkan ke bawah sesuai volume step. Lot di bawah minimum berarti tolak, tidak dibulatkan ke atas.
 - [ ] SL hanya boleh bergerak ke arah menguntungkan. Fungsi modify menolak SL yang lebih buruk.
 - [ ] SL dan TP yang dikirim selalu dinormalisasi (`NormalizeDouble` dengan digit simbol) dan dicek terhadap stops level serta freeze level.
+- [ ] `OrderCheck` dijalankan sebelum setiap `OrderSend`. Komentar order `SDB|<SL awal>|<ID permintaan>` mencegah order ganda setelah retcode ambigu. Retry hanya untuk retcode sementara, maksimal 3 kali, juga untuk modify dan close.
 
 Risiko:
 
@@ -255,8 +263,8 @@ MQL5 tidak punya framework unit test bawaan, jadi pengujian dibagi tiga lapis.
 
 | Lapis | Alat | Menguji |
 | --- | --- | --- |
-| Unit | Script di `tests/Scripts/SDBotTests/` dengan fungsi assert sederhana | Fungsi murni: lot, R, skor, pembulatan, validasi SL |
-| Skenario | Strategy Tester visual mode + file `.ini` di `tests/scenarios/` | Alur lengkap: BE, partial, trailing, limit risiko, restart |
+| Unit | Suite `.mqh` di `ea/tests/Include/SDBotTests/Suites/`, dijalankan `tools/run-ea-tests.ps1 -Unit` di Strategy Tester terminal uji (atau script `RunUnitTests` di chart) | Fungsi murni: lot, R, skor, pembulatan, validasi SL |
+| Skenario | Harness `SDBotHarness` + pasangan `.ini`/`.set` di `ea/``tests/scenarios/`, assert otomatis lewat `run-ea-tests.ps1 -Scenario SC-nn` | Alur lengkap: BE, partial, trailing, limit risiko, restart |
 | Performa | Backtest dan forward test sesuai PRD | Edge strategi, drawdown, slippage |
 
 Contoh script unit test:
@@ -284,6 +292,7 @@ Aturan:
 - Setiap bug yang ditemukan ditambah test yang mereproduksinya sebelum diperbaiki.
 - Skenario wajib dari PRD (restart, putus koneksi, rugi harian, DD 15%, lot minimum, close manual, Telegram gagal, akun real) dijalankan ulang sebelum setiap rilis.
 - Hasil backtest disimpan di `reports/` dengan nama `YYYYMMDD_versi_simbol_gaya.html`, tidak di-commit.
+- Pemeriksaan yang tidak bisa diotomatisasi dicatat di `ea/tests/manual-checklist.md` dan dicentang sebelum fase dinyatakan selesai.
 
 ## Aturan backoffice
 
@@ -310,7 +319,7 @@ Aturan:
 
 ### Kontrak lintas bagian
 
-- Perubahan skema: ubah `shared/schema/*.sql`, naikkan `schema_version`, lalu perbarui `Storage/Schema.mqh`, `Control/ControlReader.mqh`, repository API, dan fixture dalam satu PR.
+- Perubahan skema: `python sdbot/tools/schema.py new data "<deskripsi>"`, tulis SQL migrasi, `schema.py build` (menghasilkan `Storage/Migrations.mqh`, `Core/SchemaEnums.mqh`, snapshot, fixture), lalu commit (pre-commit menjalankan `schema.py check`). EA menerapkan migrasi sendiri saat start. Migrasi hanya maju; migrasi yang sudah rilis tidak boleh diedit. `Control/ControlReader.mqh` dan repository API diperbarui dalam PR yang sama.
 - Nama kolom dan nilai enum (status, jenis perintah, alasan tutup) mengikuti `shared/schema/enums.md` persis, huruf besar dan kecilnya.
 - Menambah jenis perintah baru butuh: enum di `shared`, handler di EA, validasi di API, tombol di panel, dan skenario uji.
 
@@ -331,6 +340,7 @@ Versi:
 - MINOR naik untuk fitur baru atau perubahan logika, MAJOR untuk perubahan yang memengaruhi posisi terbuka atau skema DB.
 - Setiap rilis dicatat di `CHANGELOG.md` dengan bagian EA dan Backoffice terpisah, plus hasil backtest ringkas untuk rilis EA.
 - Versi EA ikut dicatat di tabel `trades` agar hasil bisa dibandingkan per versi di panel.
+- MAJOR minimal 1, karena MetaEditor memberi warning 68 untuk versi `0.x` dan aturan compile adalah 0 warning. Fase 1 memakai `1.00`–`1.06` (naik `0.01` per spec); `2.00` setelah validasi Fase 6.
 
 Rahasia:
 
@@ -372,12 +382,12 @@ File preset pribadi yang berisi token disimpan dengan akhiran `.local.set` agar 
 
 Satu fitur atau perbaikan dianggap selesai hanya jika semua poin ini terpenuhi:
 
-- [ ] EA: compile 0 error, 0 warning, dan unit test fungsi murni ALL PASS
+- [ ] EA: compile 0 error, 0 warning (`build-ea.ps1`), dan `run-ea-tests.ps1 -All` (unit test + skenario) PASS
 - [ ] API: `ruff`, `mypy`, dan `pytest` lulus
 - [ ] Panel: `pnpm lint`, `pnpm typecheck`, dan `pnpm build` lulus
 - [ ] Tidak melanggar aturan dependensi, aturan backoffice, dan aturan wajib keamanan trading
 - [ ] Skenario terkait dijalankan (Strategy Tester visual mode untuk EA, skenario integrasi untuk backoffice) dan hasilnya sesuai PRD
-- [ ] Jika skema berubah: `shared/schema/`, EA, API, fixture, dan tipe panel diperbarui bersamaan
+- [ ] Jika skema berubah: migrasi baru lewat `tools/schema.py` (`build` dan `check` lulus), EA, API, fixture, dan tipe panel diperbarui bersamaan
 - [ ] Input atau setting baru ditambahkan di `Core/Inputs.mqh`, PRD terkait, dan file `.set` contoh
 - [ ] Diagram di `docs/flows/`, PRD, dan `CHANGELOG.md` diperbarui
 

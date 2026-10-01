@@ -4,8 +4,12 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+(tidak ada)
+
+## Done
+
 ### PC-01: Skema data baru menggantikan tabel PRD
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40, PRD-Backoffice rev 14)
 - Tanggal disetujui: 2026-09-29
 - Dokumen: PRD-EA §Data dan database; PRD-Backoffice §Arsitektur integrasi, §Database dan kontrak data
 - Sumber: spec `ea-03-storage-migrations` design §2–§3, keputusan §9.1
@@ -16,7 +20,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Tabel ringkas di PRD-EA diganti tabel versi baru (nama tabel + isi utama); DDL lengkap dirujuk ke `shared/schema/data_db.sql`.
 
 ### PC-02: Blok magic SDBot
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40, RULES rev 19)
 - Tanggal disetujui: 2026-09-29
 - Dokumen: PRD-EA §Parameter input EA, §Risk management, §Instalasi 5; RULES §Aturan wajib keamanan trading
 - Sumber: spec `ea-05-risk` keputusan R2-1, spec `ea-02-core-account` kriteria 1.6
@@ -26,14 +30,14 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - RULES: "setiap loop posisi memfilter magic serta simbol" tetap berlaku, dengan pengecualian tertulis untuk emergency close dan perhitungan risiko terbuka akun.
 
 ### PC-03: Skema versi EA
-- Status: Open
+- Status: Done (2026-10-01, RULES rev 19)
 - Tanggal disetujui: 2026-09-29 (dipaksa compiler, temuan spike spec 01)
 - Dokumen: RULES §Git, versi, dan rahasia
 - Sumber: spec `ea-01-tooling` design §8
 - Perubahan: format `MAJOR.MINOR` dengan MAJOR ≥ 1, karena MetaEditor memberi warning 68 untuk versi `0.x` dan aturan compile adalah 0 warning. Fase 1 memakai `1.00`–`1.06` (naik `0.01` per spec), `2.00` setelah validasi Fase 6.
 
 ### PC-04: Migrasi skema lewat skrip
-- Status: Open
+- Status: Done (2026-10-01, RULES rev 19)
 - Tanggal disetujui: 2026-09-29
 - Dokumen: RULES §Struktur folder repo, §Kontrak lintas bagian, §Definition of done
 - Sumber: spec `ea-03-storage-migrations` Req 4–6
@@ -43,7 +47,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Kalimat lama "ubah `shared/schema/*.sql`, naikkan `schema_version`" diganti alur di atas.
 
 ### PC-05: Alat build dan uji
-- Status: Open
+- Status: Done (2026-10-01, RULES rev 19)
 - Tanggal disetujui: 2026-09-29
 - Dokumen: RULES §Struktur folder repo, §Menghubungkan repo ke MT5, §Testing
 - Sumber: spec `ea-01-tooling` (approved)
@@ -53,7 +57,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Unit test ditulis sebagai suite `.mqh` di `ea/tests/Include/SDBotTests/Suites/`, dijalankan otomatis oleh `run-ea-tests.ps1` di Strategy Tester terminal uji (terpisah dari terminal live), atau manual lewat script `RunUnitTests`.
 
 ### PC-06: Telegram memakai bot yang sama dengan bot Python
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40)
 - Tanggal disetujui: 2026-09-29
 - Dokumen: PRD-EA §Notifikasi, §Instalasi dan pemasangan 4
 - Sumber: permintaan user 2026-09-29; catatan Fase 2 di `sdbot/specs/README.md`
@@ -62,7 +66,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - §Notifikasi: format pesan mengikuti bot Python (emoji per level, HTML, start/stop, heartbeat tanpa bunyi, laporan harian) dengan penanda `SDBot` + pair + tipe akun di setiap pesan; batas kirim Telegram dibagi dengan bot Python.
 
 ### PC-07: Lapisan App, komentar order, dan aturan eksekusi
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40, RULES rev 19)
 - Tanggal disetujui: 2026-09-29
 - Dokumen: RULES §Struktur folder repo (tabel lapisan), §Aturan wajib keamanan trading; PRD-EA §Eksekusi order
 - Sumber: spec `ea-04-execution-harness` design §9
@@ -73,7 +77,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Alasan tolak baru di `reject_stage`: `INVALID_STOPS`, `INVALID_VOLUME`.
 
 ### PC-08: run_key memisahkan run backtest (skema v2)
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40, PRD-Backoffice rev 14)
 - Tanggal disetujui: 2026-09-30
 - Dokumen: PRD-EA §Data dan database; PRD-Backoffice §Database dan kontrak data
 - Sumber: spec `ea-04-execution-harness` task 7 (temuan SC-00: baris `trades` run kedua dan seterusnya hilang di `sdbot_tester.sqlite`), keputusan user 2026-09-30
@@ -84,7 +88,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Backoffice dan query analisis wajib memakai `login + run_key + position_id` sebagai kunci posisi.
 
 ### PC-09: Detail risk management yang tidak diatur PRD
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40)
 - Tanggal disetujui: 2026-09-30
 - Dokumen: PRD-EA §Risk management
 - Sumber: spec `ea-05-risk` requirements, keputusan 1–3
@@ -96,7 +100,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Ambang kembali normal dari lot × 0.5 = min(8%, `InpDDReducePct` × 0.8), agar histeresis tetap ada bila batas REDUCE disetel di bawah 8% (temuan SC-03; default PRD tetap 8%). Disetujui 2026-09-30.
 
 ### PC-10: Simbol mengikuti bot Python, preset per simbol, batas posisi per kategori
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40, RULES rev 19)
 - Tanggal disetujui: 2026-09-30
 - Dokumen: PRD-EA §Temuan review dan keputusan (pair), §Risk management, §Parameter input EA, §Instalasi; RULES §Struktur folder (Presets)
 - Sumber: permintaan user 2026-09-30; `config/active_symbols.yaml` bot Python; spec `ea-05-risk` kriteria 2.8
@@ -107,7 +111,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Risk management: batas posisi SDBot per kategori aset di akun (forex major 5, forex cross 3, komoditas 1, crypto 1; input `InpMaxPos*`), langkah pre-trade check setelah total risiko terbuka, alasan tolak `CLASS_POSITION_LIMIT`. Kategori ditentukan dari mata uang base/quote simbol.
 
 ### PC-11: Detail manajemen posisi dan closure
-- Status: Open
+- Status: Done (2026-10-01, PRD-EA rev 40)
 - Tanggal disetujui: 2026-09-30
 - Dokumen: PRD-EA §Position management, §Notifikasi
 - Sumber: spec `ea-06-position` requirements, keputusan 1–4
@@ -118,6 +122,14 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - SL yang dihapus manual dipasang kembali (SL awal bila valid, atau SL valid terdekat) + alert High; gagal 3x → Critical.
     - Alasan tutup dibedakan `SL` / `BE_STOP` / `TRAIL_STOP` dari level pemicu SL; MFE/MAE dari bar M1 saat posisi tutup.
 
-## Done
-
-(belum ada)
+### PC-12: Preset Fase 1, metrik optimasi, penanda preset
+- Status: Done (2026-10-01, PRD-EA rev 40)
+- Tanggal disetujui: 2026-10-01
+- Dokumen: PRD-EA §Parameter input EA, §Instalasi 5, §Pengujian dan kriteria penerimaan
+- Sumber: spec `ea-07-integration` requirements, keputusan 1–5
+- Perubahan:
+    - Preset `SDBot_DAY_<SIMBOL>c.set` untuk 12 simbol PC-10; isi Fase 1 sama untuk semua simbol kecuali magic dan komentar kategori; nilai per kategori dari bot Python dicantumkan sebagai komentar referensi sampai inputnya ada (Fase 3–4). `InpAllowLiveTrading = false` di preset.
+    - Risiko per trade tetap 0.5% (PRD), bukan 0.1% bot Python.
+    - Metrik `OnTester` = expectancy R per trade ÷ max drawdown relatif equity (%), 0 bila trade dengan R < 30 atau drawdown 0.
+    - Input baru `InpPresetTag` (simbol preset; kosong = tidak dicek): WARN sekali bila berbeda dengan simbol chart.
+    - Versi EA `1.06` = Fase 1 selesai.

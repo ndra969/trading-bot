@@ -2,7 +2,7 @@
 
 2026-09-19 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-09-28). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding.
+> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-01). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -187,6 +187,9 @@ Kebutuhan:
 - Filling mode dideteksi otomatis dari `SYMBOL_FILLING_MODE`.
 - SL dan TP selalu dikirim bersama order, sehingga posisi terlindungi walau EA mati.
 - Setelah terisi, risiko aktual dihitung ulang dari harga isi asli dan disimpan di log.
+- `CExecutor` adalah satu-satunya pintu ke broker. `OrderCheck` dijalankan sebelum setiap `OrderSend`; deviasi maksimum 10 point; modify dan close juga diulang maksimal 3 kali untuk retcode sementara.
+- Komentar order `SDB|<SL awal>|<ID permintaan>`: ID 4 karakter unik per permintaan. Setelah retcode ambigu (timeout), EA mencari posisi atau deal dengan ID itu dulu, sehingga order yang ternyata terisi tidak dikirim dua kali.
+- Alasan tolak memakai kode `enums.md`, termasuk `INVALID_STOPS` (SL/TP kosong atau di sisi salah) dan `INVALID_VOLUME`.
 
 ## Position management
 
@@ -223,6 +226,11 @@ Kebutuhan:
 - Modifikasi dikirim hanya jika perubahan SL ≥ langkah minimum (default 5 point) dan menghormati stops level serta freeze level.
 - Gagal modifikasi: retry maksimal 3x dengan cooldown 30 detik, lalu alert.
 - Posisi yang ditutup dari luar (manual, stop out) dideteksi lewat `OnTradeTransaction` dengan `DEAL_REASON`, lalu dicatat.
+- Titik BE = harga buka ± (spread + komisi pulang-pergi dalam point + `BreakevenBufferPoints`).
+- Posisi milik instance ditentukan dari deal pembukanya (magic + simbol). Posisi yang ditutup close all dari instance lain tetap dicatat pemiliknya dengan alasan `EA_CLOSE`.
+- Setelah 3 percobaan modifikasi atau partial yang gagal: satu event `MODIFY_FAILED` dan satu alert Medium, lalu berhenti sampai SL atau volume posisi berubah.
+- SL yang dihapus manual dipasang kembali (SL awal bila masih valid, atau SL valid terdekat) dengan alert High; gagal 3 kali = alert Critical.
+- Alasan tutup dibedakan `SL`, `BE_STOP`, dan `TRAIL_STOP` dari level pemicu SL. MFE dan MAE dalam R dihitung dari bar M1 saat posisi tutup.
 
 ## Risk management
 
@@ -238,6 +246,7 @@ Satu set angka berlaku untuk semua modul. Drawdown dihitung dari puncak equity, 
 | Drawdown 5% | Info | Tanpa tindakan |
 | Drawdown 10% | Lot × 0.5 | Otomatis kembali normal di bawah 8% |
 | Drawdown 15% | Close all + STOPPED | Butuh reset manual via input |
+| Posisi per kategori aset | Forex major 5, cross 3, komoditas 1, crypto 1 | Posisi SDBot di akun; kategori dari mata uang simbol |
 
 ```mermaid
 flowchart TB
@@ -254,8 +263,13 @@ Kebutuhan:
 
 - Monitor berjalan terus di `OnTimer`, terpisah dari logika entry, tidak hanya saat ada sinyal.
 - Puncak equity, status STOPPED, dan pause disimpan di Global Variables agar bertahan saat restart dan dibaca semua EA di akun yang sama.
-- Close all mencoba ulang tiap 5 detik sampai berhasil atau pasar tutup, dengan alert Critical.
-- Pre-trade check berurutan: STOPPED/pause, risiko per trade, total risiko terbuka, eksposur mata uang, margin.
+- Close all dicoba tiap 5 detik saat pasar buka dan tiap 60 detik saat pasar tutup; percobaan saat pasar tutup tidak dihitung gagal. Alert Critical `CLOSE_ALL_FAILED` setelah 3 gagal berturut-turut saat pasar buka, lalu paling sering tiap 15 menit.
+- Pre-trade check berurutan: boleh trading, STOPPED, pause harian, risiko per trade (`RISK_PER_TRADE`), total risiko terbuka, batas posisi per kategori aset (`CLASS_POSITION_LIMIT`), eksposur mata uang, margin.
+- Blok magic SDBot `2026091901`–`2026091999`, satu nomor per simbol (`2026091900` untuk harness uji). Emergency stop menutup semua posisi SDBot di simbol mana pun, dan total risiko terbuka dihitung atas semua posisi SDBot di akun.
+- Batas posisi SDBot per kategori aset di akun: forex major 5, forex cross 3, komoditas 1, crypto 1 (input `MaxPos*`). Kategori ditentukan dari mata uang base dan quote simbol.
+- Posisi SDBot tanpa SL dihitung berisiko 1% balance di total risiko terbuka.
+- Lot × 0.5 dicabut saat drawdown di bawah min(8%, `DDReducePct` × 0.8), agar flag tidak berkedip bila `DDReducePct` disetel di bawah 8%.
+- Deposit dan penarikan menggeser puncak equity dan balance awal hari sebesar nominalnya. Saat status bersama baru dibuat (akun baru, Global Variables dihapus, awal run tester), operasi saldo lama dianggap sudah diproses.
 
 ## Notifikasi
 
@@ -293,6 +307,8 @@ Kebutuhan:
 - Format pesan HTML mode untuk menghindari gagal kirim karena karakter khusus Markdown.
 - Kuota non-Critical 20 pesan per jam. Pesan non-Critical yang lebih tua dari 30 menit dibuang.
 - Token dan chat ID disimpan sebagai input EA, tidak ditulis di kode.
+- Telegram memakai bot dan chat yang sama dengan bot Python. Format mengikuti bot Python: emoji per level, HTML, pesan start dan stop, heartbeat tanpa bunyi, laporan harian. Setiap pesan diawali penanda `SDBot` + simbol + tipe akun + versi EA, dan batas kirim Telegram dibagi dengan bot Python.
+- Event posisi: BE (`BE_MOVED`) dan partial (`PARTIAL_CLOSED`) Info; SL dipasang kembali (`SL_RESTORED`) High; posisi tetap tanpa SL setelah 3 gagal (`SL_MISSING`) Critical.
 
 ## Data dan database
 
@@ -300,12 +316,17 @@ Database memakai SQLite bawaan MQL5 di folder Common, satu file untuk semua EA, 
 
 | Tabel | Isi utama |
 | --- | --- |
-| `accounts` | login, server, tipe (demo/real/cent), mata uang akun, balance, equity, puncak equity, updated_at |
-| `signals` | waktu, simbol, arah, gaya, skor per komponen, skor total, spread saat sinyal (point), status (dieksekusi/ditolak), alasan tolak |
-| `trades` | ticket, magic, simbol, arah, lot, harga diminta, harga isi, slippage entry (point), spread saat entry (point), SL, TP, risiko uang, signal_id |
-| `position_events` | ticket, waktu, jenis (BE, partial, trailing, modify_gagal), SL lama, SL baru, volume, spread saat event |
-| `closures` | ticket, waktu, alasan (SL/TP/manual/stop out), harga SL/TP, harga isi exit, slippage exit (point), profit bersih, komisi, swap, R hasil |
-| `alerts` | waktu, jenis, severity, pesan, status kirim |
+| `sessions` | login, magic, simbol, mode (LIVE/TESTER), versi EA, `input_hash` + `inputs_json`, mulai, akhir + alasan, rentang tester, `run_key` |
+| `accounts` | login, server, tipe (demo/real/cent), margin mode, mata uang, leverage, balance, equity, puncak equity, selisih waktu server, updated_at |
+| `signals` + `signal_scores` | waktu, simbol, arah, gaya, zona, skor total dan skor per komponen, spread (point), status, alasan tolak |
+| `trades` | `run_key`, `position_id`, magic, simbol, arah, sumber (EA/RECONCILED), volume awal, harga diminta dan isi, slippage dan spread (point), SL/TP awal, risiko uang dan %, signal_id, versi EA |
+| `deals` | setiap deal posisi: tiket, entry (IN/OUT/INOUT/OUT_BY), tipe, volume, harga, alasan deal, profit, komisi, swap, fee |
+| `position_events` | BE, PARTIAL, PARTIAL_SKIPPED, TRAILING, MODIFY_FAILED, SL_RESTORED: SL lama/baru, volume, harga, spread |
+| `closures` | alasan (TP/SL/BE_STOP/TRAIL_STOP/MANUAL/STOP_OUT/EA_CLOSE/ROLLOVER/OTHER), harga level dan isi, slippage exit, volume, profit, komisi, swap, fee, net, R hasil, MFE/MAE dalam R, lama posisi, flag BE/partial/trailing |
+| `balance_ops` | deposit, penarikan, kredit: tiket deal, waktu, jenis, nominal |
+| `alerts` | waktu, tipe, severity, pesan, status kirim, attempts, sent_at |
+| `v_trade_results` | view trades + closures per posisi |
+| `schema_migrations` | migrasi yang sudah diterapkan (menggantikan `schema_version`) |
 
 Kebutuhan:
 
@@ -317,6 +338,10 @@ Kebutuhan:
 - Tabel `signals` menyimpan sinyal yang ditolak juga, untuk menganalisis filter mana yang paling sering memblokir.
 - Kolom `R hasil` di `closures` menjadi dasar metrik expectancy dan sudah termasuk efek spread, slippage, dan komisi.
 - Tabel tambahan untuk backoffice (instance, snapshot, hasil perintah) dijelaskan di PRD Backoffice. Skema resmi ada di shared/schema/ pada repo.
+- Semua waktu disimpan UTC (epoch detik); `accounts.server_utc_offset_sec` menyimpan selisih waktu server.
+- Backtest menulis file terpisah `sdbot_tester.sqlite`; optimasi tidak menulis DB; backoffice hanya membaca `sdbot.sqlite`.
+- Kolom `run_key` memisahkan run backtest: 0 di live, ID sesi pertama run di tester (posisi dan deal tester bernomor sama di setiap run). Kunci posisi = `login + run_key + position_id`.
+- Skema hanya berubah lewat migrasi maju di `shared/schema/migrations/` (`tools/schema.py`), diterapkan EA sendiri saat start. DDL lengkap: `shared/schema/data_db.sql`.
 
 ## Parameter input EA
 
@@ -324,10 +349,11 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 
 | Grup | Input | Default |
 | --- | --- | --- |
-| Umum | `MagicNumber` | 20260919 |
+| Umum | `MagicNumber` | 2026091901 (blok 2026091901–2026091999, satu nomor per simbol; 2026091900 untuk harness uji) |
 | Umum | `TradingStyle` | Day trading |
 | Umum | `SymbolSuffix` | kosong |
 | Umum | `AllowLiveTrading` | false |
+| Umum | PresetTag | kosong (preset mengisi simbolnya; beda dengan simbol chart = WARN) |
 | Entry | `EntryMode` | Market |
 | Entry | `MinConfluenceScore` | 65 |
 | Entry | `MinRR` | 2.0 |
@@ -337,6 +363,7 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Filter | `TradingSessions` | London + New York |
 | Risiko | `RiskPerTradePct` | 0.5 |
 | Risiko | `MaxOpenRiskPct` | 3.0 |
+| Risiko | MaxPosForexMajor / ForexCross / Commodity / Crypto | 5 / 3 / 1 / 1 posisi SDBot per kategori aset di akun |
 | Risiko | `DailyLossPct` | 3.0 |
 | Risiko | `DDReducePct` / `DDStopPct` | 10 / 15 |
 | Risiko | `ResetEmergencyStop` | false |
@@ -347,6 +374,8 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Notifikasi | `HeartbeatMinutes` | 60 |
 
 Input tambahan untuk integrasi backoffice: `InpEnableBackoffice` (default true) dan `InpControlPollSeconds` (default 2). Nilai input MT5 menjadi batas atas untuk setting yang diubah dari admin panel; panel hanya boleh membuat EA lebih ketat.
+
+Preset siap pakai ada untuk 12 simbol bot Python: `SDBot_DAY_<SIMBOL>c.set`, dibangkitkan `tools/gen_presets.py`. Di Fase 1 isinya sama untuk semua simbol kecuali `MagicNumber` dan `PresetTag`; nilai per kategori dari bot Python (spread maks, sesi, jarak SL) dicatat sebagai komentar sampai inputnya ada di Fase 3–4. Preset memakai `AllowLiveTrading = false` dan risiko 0.5% per trade.
 
 Filter berita memakai kalender ekonomi bawaan MT5 (`CalendarValueHistory`), tanpa sumber eksternal. Di Strategy Tester, filter berita memakai file CSV kalender historis karena fungsi kalender tidak tersedia di tester.
 
@@ -387,10 +416,9 @@ Buka tab Notifications, centang Enable Push Notifications, lalu isi MetaQuotes I
 
 ### 4. Siapkan bot Telegram
 
-1. Chat @BotFather di Telegram, kirim `/newbot`, ikuti langkahnya, lalu simpan token yang diberikan.
-2. Kirim satu pesan apa saja ke bot baru tersebut.
-3. Buka `https://api.telegram.org/bot<TOKEN>/getUpdates` di browser dan salin angka `chat.id`.
-4. Token dan chat ID diisi di input EA, tidak pernah ditulis di kode.
+1. Tidak membuat bot baru: SDBot memakai bot dan chat Telegram yang sama dengan bot Python.
+2. Salin nilai `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` dari `.env` bot Python ke input `TelegramToken` dan `TelegramChatID`, di salinan pribadi preset `*.local.set`.
+3. File `*.local.set` tidak pernah di-commit; token dan chat ID tidak pernah ditulis di kode atau preset repo.
 
 ### 5. Pasang EA ke chart
 
@@ -402,6 +430,8 @@ Buka tab Notifications, centang Enable Push Notifications, lalu isi MetaQuotes I
 6. Ikon topi di pojok kanan atas chart berwarna biru berarti EA aktif.
 
 Satu EA per chart simbol, masing-masing dengan `MagicNumber` berbeda. Status risiko tetap dihitung per akun lewat Global Variables.
+
+Muat preset `SDBot_DAY_<SIMBOL>c.set` yang sesuai simbol chart: `MagicNumber` dan `PresetTag` sudah benar (01 EURUSD, 02 GBPUSD, 03 EURJPY, 04 GBPJPY, 05 USDJPY, 06 USDCHF, 07 AUDUSD, 08 USDCAD, 09 NZDUSD, 10 XAUUSD, 11 XAGUSD, 12 BTCUSD). EA memberi WARN bila preset dimuat di chart simbol lain.
 
 ### 6. Cek berjalan normal
 
@@ -479,6 +509,8 @@ Skenario uji fungsi wajib:
 
 Metrik custom di `OnTester` untuk optimasi: expectancy per trade dalam R dibagi max drawdown.
 
+Expectancy dihitung dari R hasil closure; drawdown = max drawdown relatif equity (%). Metrik bernilai 0 bila trade dengan R kurang dari 30 atau drawdown 0, agar pass dengan sedikit trade tidak terpilih. Optimasi tidak menulis DB.
+
 ## Roadmap
 
 Pengembangan dimulai dari fondasi pengaman, lalu strategi ditambah bertahap agar setiap lapisan bisa diukur kontribusinya.
@@ -523,6 +555,6 @@ Keputusan yang diambil pada 28 September 2026:
 | Keputusan | Hasil | Catatan |
 | --- | --- | --- |
 | Gaya trading pertama | Day trading (HTF H4, MTF H1, LTF M15) | Gaya lain menyusul setelah day trading lolos validasi |
-| Simbol awal | EURUSD, GBPUSD, EURJPY, GBPJPY | Di akun cent Exness memakai akhiran `c` (`SymbolSuffix = c`). `MaxSpreadPoints` disetel per simbol dari data spread di log |
+| Simbol awal | Simbol aktif bot Python, versi cent: EURUSD, GBPUSD, USDJPY, USDCHF, AUDUSD, USDCAD, NZDUSD, EURJPY, GBPJPY, XAUUSD, XAGUSD, BTCUSD (semula 4 pair; diubah 2026-09-30) | Di akun cent Exness memakai akhiran `c` (`SymbolSuffix = c`). `MaxSpreadPoints` disetel per simbol dari data spread di log |
 | Mode entry | Market saat trigger (default), Limit sebagai opsi input | Mode Adaptive jadi kandidat fase 5–6: market jika R:R di harga saat ini ≥ `MinRR`, jika tidak pasang limit di harga yang membuat R:R = `MinRR` dan hangus setelah N bar. Dipakai hanya jika backtest dan forward test membuktikan lebih baik |
 | Broker dan tipe akun | Exness, akun cent, server Exness-MT5Real20, mata uang USC, mode margin hedging | Dicek langsung dari terminal (`ACCOUNT_MARGIN_MODE = RETAIL_HEDGING`). EA menolak jalan di akun netting |
