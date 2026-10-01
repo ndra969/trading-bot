@@ -1,0 +1,11 @@
+; SC-09: entry tiap 2 bar agar >= 30 trade (metrik tidak 0), SL divariasikan 2 nilai = 2 pass.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=2
+HarnessScenario=SC-09
+HarnessEveryBars=2
+HarnessDirection=2
+HarnessSlPoints=100||100||50||150||Y
+HarnessTpPoints=150
+HarnessMaxOpen=1
+HarnessFixedLot=0

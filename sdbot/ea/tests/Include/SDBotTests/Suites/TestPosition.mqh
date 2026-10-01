@@ -132,6 +132,20 @@ void RunTestPositionOnce(CTrkRig &r)
               cl.reason == SDB_CLOSE_REASON_EA_CLOSE && cl.rResult != SDB_NULL_DOUBLE && cache.Count() == 0);
   }
 
+// TC-IN-06 (spec 07 Req 1.1, EC-06): R closure dijumlahkan di memori; R kosong tidak dihitung.
+void RunTestPositionMetric(CTrkRig &r)
+  {
+   CPositionCache cache;
+   cache.Init(r.inputs.magic, _Symbol, GetPointer(r.sink));
+   CClosureTracker t;
+   t.Init(r.inputs.magic, _Symbol, GetPointer(cache), GetPointer(r.st), GetPointer(r.sink), r.inputs.breakevenBufferPoints);
+   t.NoteResult(2.0);
+   t.NoteResult(SDB_NULL_DOUBLE);
+   t.NoteResult(-1.0);
+   AssertTrue("TC-IN-06", StringFormat("R 2.0, NULL, -1.0 -> total %.2f dari %d trade", t.TotalR(), t.TradesWithR()),
+              MathAbs(t.TotalR() - 1.0) < 1e-12 && t.TradesWithR() == 2);
+  }
+
 void RunTestPosition()
   {
    TfBeginSuite("Position");
@@ -153,6 +167,7 @@ void RunTestPosition()
       RunTestPositionCache(r);
       RunTestPositionOwnership(r);
       RunTestPositionOnce(r);
+      RunTestPositionMetric(r);
      }
    SdbLogCaptureStop();
    GlobalVariablesDeleteAll(prefix);

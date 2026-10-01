@@ -36,6 +36,7 @@ SdbAppConfig TaConfig()
    c.logLevel = SDB_LOG_INFO;
    c.dbTarget = SDB_DB_UNITTEST;
    c.resetEmergencyStop = false;
+   c.presetTag = "";
    return c;
   }
 

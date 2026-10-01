@@ -1,0 +1,26 @@
+; SDBot preset XAUUSDc - kategori komoditas (PC-10). Dibangkitkan tools/gen_presets.py, jangan diedit tangan.
+; Akun cent Exness: ubah InpAllowLiveTrading=true dengan sadar sebelum dipasang (default aman: false).
+; Jangan isi token/chat ID Telegram di file ini; pakai salinan pribadi *.local.set yang tidak di-commit.
+; Referensi bot Python (belum ada inputnya, Fase 3-4): spread maks 50 pip (0.1); sesi London + New York; SL default 350 pip.
+InpMagicNumber=2026091910
+InpPresetTag=XAUUSDc
+InpTradingStyle=1
+InpSymbolSuffix=c
+InpAllowLiveTrading=false
+InpLogLevel=1
+InpRiskPerTradePct=0.5
+InpMaxOpenRiskPct=3.0
+InpMaxPosForexMajor=5
+InpMaxPosForexCross=3
+InpMaxPosCommodity=1
+InpMaxPosCrypto=1
+InpDailyLossPct=3.0
+InpDDReducePct=10.0
+InpDDStopPct=15.0
+InpResetEmergencyStop=false
+InpBreakevenR=1.0
+InpBreakevenBufferPoints=2
+InpPartialR=1.5
+InpPartialPct=50.0
+InpTrailATRPeriod=14
+InpTrailATRMult=2.0

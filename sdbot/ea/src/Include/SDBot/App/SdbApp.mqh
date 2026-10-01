@@ -18,6 +18,7 @@
 #include <SDBot/Position/ClosureTracker.mqh>
 #include <SDBot/Position/Reconciler.mqh>
 #include <SDBot/App/TeeSink.mqh>
+#include <SDBot/App/TesterMetric.mqh>
 
 #define SDB_GV_PREFIX_UNITTEST "SDBTEST"
 
@@ -170,6 +171,8 @@ public:
          return INIT_PARAMETERS_INCORRECT;
         }
       OpenStorage(observer);
+      if(!PresetMatchesSymbol(cfg.presetTag, _Symbol))
+         LogWarn("App", "preset " + cfg.presetTag + " dimuat di chart " + _Symbol + ": magic dan setelan mungkin milik simbol lain");
       m_account.Init(m_sink, _Symbol, cfg.symbolSuffix, cfg.allowLive, cfg.inputs.magic);
       if(m_account.Validate() == SDB_VAL_REJECTED)
          return INIT_FAILED;   // OnDeinit(REASON_INITFAILED) menutup sesi dan menyimpan alert
@@ -234,8 +237,12 @@ public:
          m_closureTracker.OnTransaction(t);
      }
 
-   // Metrik optimasi mulai spec 07.
-   double OnTester() { return 0.0; }
+   // Metrik optimasi PRD (spec 07 Req 1): expectancy R per trade / max DD relatif equity.
+   double OnTester()
+     {
+      return TesterMetric(m_closureTracker.TotalR(), m_closureTracker.TradesWithR(),
+                          TesterStatistics(STAT_EQUITY_DDREL_PERCENT), SDB_TESTER_MIN_TRADES);
+     }
 
    // Aman dipanggil dua kali dan setelah init gagal (Req 6.2, 6.4).
    void OnDeinit(const int reason)

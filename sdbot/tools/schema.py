@@ -473,8 +473,11 @@ def write_fixture(path: Path, migrations: list[Migration], seed: dict[int, str] 
                 "INSERT INTO schema_migrations VALUES (?, ?, ?, 0, 'schema.py')",
                 (m.version, m.name, m.sha256),
             )
+        # Blok data contoh untuk migrasi yang belum ada (misalnya proyek tiruan di uji) dilewati.
+        latest = migrations[-1].version if migrations else 0
         for v in sorted(seed or {}):
-            conn.executescript(seed[v])
+            if v <= latest:
+                conn.executescript(seed[v])
     finally:
         conn.close()
 

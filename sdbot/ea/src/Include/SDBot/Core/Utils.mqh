@@ -168,6 +168,12 @@ int RoundUtcOffset(const long serverMinusGmtSec)
    return (int)(MathRound(serverMinusGmtSec / 900.0) * 900);
   }
 
+// Preset dimuat di chart yang benar (spec 07 Req 2.6). Tag kosong = tidak dicek.
+bool PresetMatchesSymbol(const string tag, const string symbol)
+  {
+   return tag == "" || tag == symbol;
+  }
+
 // File DB menurut lingkungan (spec 03 Req 1): optimasi tidak menulis DB, tester memakai file sendiri.
 ENUM_SDB_DB_TARGET SdbDbTargetForRuntime()
   {

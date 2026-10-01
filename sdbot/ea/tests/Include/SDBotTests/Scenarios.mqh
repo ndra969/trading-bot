@@ -739,6 +739,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec)
       CheckSc03(id, rec);
    else if(id == "SC-03r")
       CheckSc03r(id, rec);
+   else if(id == "SC-09")
+      TfInfo("SC-09 (optimasi) diperiksa runner lewat laporan optimasi dan file DB, bukan oleh harness");
    else if(id == "SC-05")
       CheckSc05(id, rec);
    else if(id == "SC-07")

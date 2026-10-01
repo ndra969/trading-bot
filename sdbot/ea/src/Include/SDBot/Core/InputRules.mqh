@@ -42,6 +42,7 @@ struct SdbAppConfig
    string                 eaVersion;
    ENUM_SDB_DB_TARGET     dbTarget;
    bool                   resetEmergencyStop;   // InpResetEmergencyStop (spec 05 Req 5.5)
+   string                 presetTag;            // InpPresetTag (spec 07 Req 2.6)
   };
 
 InputValues DefaultInputValues()

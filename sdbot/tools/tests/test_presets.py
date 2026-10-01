@@ -1,0 +1,76 @@
+"""Preset SDBot per simbol (spec 07 Req 2, PC-10, PC-12): TP-01..05."""
+
+import re
+from pathlib import Path
+
+import gen_presets
+
+PRESETS = Path(__file__).resolve().parents[2] / "ea" / "src" / "Presets"
+
+EXPECTED_MAGIC = {
+    "EURUSD": 2026091901,
+    "GBPUSD": 2026091902,
+    "EURJPY": 2026091903,
+    "GBPJPY": 2026091904,
+    "USDJPY": 2026091905,
+    "USDCHF": 2026091906,
+    "AUDUSD": 2026091907,
+    "USDCAD": 2026091908,
+    "NZDUSD": 2026091909,
+    "XAUUSD": 2026091910,
+    "XAGUSD": 2026091911,
+    "BTCUSD": 2026091912,
+}
+SECRET_KEY = re.compile(r"token|chatid|metaquotes|password|secret", re.IGNORECASE)
+
+
+def _read(symbol: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in (PRESETS / f"SDBot_DAY_{symbol}c.set").read_text(encoding="ascii").splitlines():
+        line = line.strip()
+        if line and not line.startswith(";") and "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    return values
+
+
+def test_tp01_one_preset_per_python_bot_symbol():
+    names = sorted(
+        p.name for p in PRESETS.glob("SDBot_DAY_*.set") if not p.name.endswith(".local.set")
+    )
+    assert names == sorted(f"SDBot_DAY_{s}c.set" for s in EXPECTED_MAGIC)
+
+
+def test_tp02_magic_matches_pc10_and_is_unique():
+    magics = {s: int(_read(s)["InpMagicNumber"]) for s in EXPECTED_MAGIC}
+    assert magics == EXPECTED_MAGIC
+    assert len(set(magics.values())) == len(magics)
+
+
+def test_tp03_safe_defaults_suffix_and_tag():
+    for symbol in EXPECTED_MAGIC:
+        v = _read(symbol)
+        assert v["InpAllowLiveTrading"] == "false", symbol
+        assert v["InpSymbolSuffix"] == "c", symbol
+        assert v["InpPresetTag"] == f"{symbol}c", symbol
+        assert v["InpRiskPerTradePct"] == "0.5", symbol
+
+
+def test_tp04_ascii_and_no_secret_values():
+    for path in PRESETS.glob("SDBot_DAY_*.set"):
+        raw = path.read_bytes()
+        assert all(b < 128 for b in raw), f"{path.name} bukan ASCII"
+        for line in raw.decode("ascii").splitlines():
+            if line.strip().startswith(";") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            assert not (
+                SECRET_KEY.search(key) and value.strip()
+            ), f"{path.name}: {key} berisi nilai"
+
+
+def test_tp05_files_equal_generator_output():
+    for symbol in EXPECTED_MAGIC:
+        expected = gen_presets.render(symbol)
+        actual = (PRESETS / f"SDBot_DAY_{symbol}c.set").read_text(encoding="ascii")
+        assert actual == expected, f"{symbol}: jalankan `uv run python sdbot/tools/gen_presets.py`"

@@ -23,6 +23,8 @@ private:
    ISdbEventSink    *m_sink;
    CNullSink         m_nullSink;
    int               m_bufferPts;
+   double            m_totalR;
+   int               m_tradesWithR;
 
    string LastDealName() const     { return IntegerToString(m_magic) + "_LAST_DEAL"; }
    string LastDealTimeName() const { return IntegerToString(m_magic) + "_LAST_DEAL_TIME"; }
@@ -113,6 +115,7 @@ private:
       c.trailActivated = e.trailDone || c.reason == SDB_CLOSE_REASON_TRAIL_STOP;
       c.beActivated = e.beDone || c.trailActivated || c.reason == SDB_CLOSE_REASON_BE_STOP;
       m_sink.OnClosure(c);
+      NoteResult(c.rResult);
       m_cache.Remove(positionId);
       LogInfo("Position", StringFormat("posisi tutup | pos=%I64u alasan=%s net=%.2f R=%s", positionId, c.reason, c.netProfit,
                                        c.rResult == SDB_NULL_DOUBLE ? "?" : DoubleToString(c.rResult, 2)));
@@ -120,7 +123,7 @@ private:
      }
 
 public:
-                     CClosureTracker(void) : m_magic(0), m_cache(NULL), m_state(NULL), m_sink(NULL), m_bufferPts(0) {}
+                     CClosureTracker(void) : m_magic(0), m_cache(NULL), m_state(NULL), m_sink(NULL), m_bufferPts(0), m_totalR(0.0), m_tradesWithR(0) {}
 
    void Init(const long magic, const string symbol, CPositionCache *cache, CState *state, ISdbEventSink *sink, const int bufferPts)
      {
@@ -131,6 +134,17 @@ public:
       m_sink = (sink == NULL) ? GetPointer(m_nullSink) : sink;
       m_bufferPts = bufferPts;
      }
+
+   // Metrik OnTester (spec 07 Req 1.1, EC-06): R closure yang diketahui, di memori selama run.
+   void NoteResult(const double rResult)
+     {
+      if(rResult == SDB_NULL_DOUBLE)
+         return;
+      m_totalR += rResult;
+      m_tradesWithR++;
+     }
+   double TotalR() const      { return m_totalR; }
+   int    TradesWithR() const { return m_tradesWithR; }
 
    ulong LastDeal() { return (m_state != NULL && m_state.IsReady()) ? (ulong)m_state.Get(LastDealName(), 0.0) : 0; }
    datetime LastDealTime() { return (m_state != NULL && m_state.IsReady()) ? (datetime)(long)m_state.Get(LastDealTimeName(), 0.0) : 0; }

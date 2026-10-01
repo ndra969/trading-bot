@@ -24,6 +24,8 @@
 #include <SDBotTests/Suites/TestPositionMath.mqh>
 #include <SDBotTests/Suites/TestClosure.mqh>
 #include <SDBotTests/Suites/TestPosition.mqh>
+#include <SDBotTests/Suites/TestIntegration.mqh>
+#include <SDBotTests/Suites/TestPresets.mqh>
 
 void RunAllSuites()
   {
@@ -45,6 +47,8 @@ void RunAllSuites()
    RunTestPositionMath();
    RunTestClosure();
    RunTestPosition();
+   RunTestIntegration();
+   RunTestPresets();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

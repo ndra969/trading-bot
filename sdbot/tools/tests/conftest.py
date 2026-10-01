@@ -23,10 +23,16 @@ def project(tmp_path: Path, real_schema_dir: Path) -> Path:
     schema = root / "shared" / "schema"
     (schema / "migrations" / "data").mkdir(parents=True)
     shutil.copy(real_schema_dir / "enums.md", schema / "enums.md")
-    for name in ("0001_initial.sql", "seed_sample.sql"):
-        shutil.copy(
-            real_schema_dir / "migrations" / "data" / name, schema / "migrations" / "data" / name
-        )
+    shutil.copy(
+        real_schema_dir / "migrations" / "data" / "0001_initial.sql",
+        schema / "migrations" / "data" / "0001_initial.sql",
+    )
+    # Proyek tiruan hanya punya migrasi 0001 (uji membuat 0002 sendiri), jadi hanya blok seed v1 yang ikut.
+    seed = (real_schema_dir / "migrations" / "data" / "seed_sample.sql").read_text(encoding="utf-8")
+    cut = seed.find("-- @version 2")
+    (schema / "migrations" / "data" / "seed_sample.sql").write_text(
+        seed if cut < 0 else seed[:cut], encoding="utf-8"
+    )
     (root / "ea" / "src" / "Include" / "SDBot" / "Storage").mkdir(parents=True)
     (root / "ea" / "src" / "Include" / "SDBot" / "Core").mkdir(parents=True)
     return root

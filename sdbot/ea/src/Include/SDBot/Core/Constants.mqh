@@ -66,6 +66,7 @@
 #define SDB_MODIFY_MAX_ATTEMPTS          3       // lalu alert (PRD)
 #define SDB_RECONCILE_LOOKBACK_DAYS      30      // scan history tanpa GV LAST_DEAL
 #define SDB_CLOSE_REASON_TOLERANCE_PTS   2       // toleransi BE_STOP di atas InpBreakevenBufferPoints
+#define SDB_TESTER_MIN_TRADES            30      // metrik OnTester 0 di bawah ini (spec 07)
 
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart

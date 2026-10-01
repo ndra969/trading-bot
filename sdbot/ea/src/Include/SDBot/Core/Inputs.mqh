@@ -18,6 +18,7 @@ input ENUM_SDB_TRADING_STYLE InpTradingStyle          = SDB_STYLE_DAY;          
 input string                 InpSymbolSuffix          = "";                         // Akhiran simbol broker (akun cent Exness: c)
 input bool                   InpAllowLiveTrading      = false;                      // Izinkan akun real/cent
 input ENUM_SDB_LOG_LEVEL     InpLogLevel              = SDB_LOG_INFO;               // Level log terminal
+input string                 InpPresetTag             = "";                         // Simbol preset (diisi file .set; kosong = tidak dicek)
 
 input group "Risiko"
 input double                 InpRiskPerTradePct       = SDB_DEF_RISK_PER_TRADE_PCT; // Risiko per trade (% balance, maks 1)
@@ -70,7 +71,7 @@ string CurrentInputsJson()
                  "InpRiskPerTradePct", "InpMaxOpenRiskPct", "InpDailyLossPct", "InpDDReducePct", "InpDDStopPct",
                  "InpResetEmergencyStop", "InpBreakevenR", "InpBreakevenBufferPoints", "InpPartialR",
                  "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult", "InpMaxPosForexMajor",
-                 "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto"};
+                 "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto", "InpPresetTag"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -94,6 +95,7 @@ string CurrentInputsJson()
    v[18] = JsonNum(InpMaxPosForexCross);
    v[19] = JsonNum(InpMaxPosCommodity);
    v[20] = JsonNum(InpMaxPosCrypto);
+   v[21] = JsonStr(InpPresetTag);
    return CanonicalJson(k, v);
   }
 
@@ -111,6 +113,7 @@ SdbAppConfig CurrentAppConfig(const ENUM_SDB_APP_MODE mode, const string eaVersi
    c.eaVersion = eaVersion;
    c.dbTarget = SdbDbTargetForRuntime();
    c.resetEmergencyStop = InpResetEmergencyStop;
+   c.presetTag = InpPresetTag;
    return c;
   }
 

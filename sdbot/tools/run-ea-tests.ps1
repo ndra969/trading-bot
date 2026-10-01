@@ -94,6 +94,52 @@ function Read-ScenarioIni([string]$path) {
     return $keys
 }
 
+function Get-DbStamp([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return 'tidak ada' }
+    $f = Get-Item -LiteralPath $path
+    return '{0} byte, {1:o}' -f $f.Length, $f.LastWriteTimeUtc
+}
+
+# Optimasi (spec 07 SC-09): pass berjalan di agen tester, jadi yang diperiksa runner adalah laporan
+# optimasi dan file DB tester, bukan file hasil harness. Kode kembali sama dengan skenario biasa.
+function Test-OptimizationRun($r, [string]$reportBase, [string]$dbPath, [string]$dbBefore, [int]$secs) {
+    $checks = @()
+    $dbAfter = Get-DbStamp $dbPath
+    $checks += [pscustomobject]@{ Id = "$($r.Id)-db"; Ok = ($dbAfter -eq $dbBefore); Text = "file DB tester tidak berubah (sebelum: $dbBefore; sesudah: $dbAfter)" }
+    $report = @('.xml', '.htm', '.html') | ForEach-Object { "$reportBase$_" } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    $rows = @()
+    if ($report) {
+        $text = [IO.File]::ReadAllText($report)
+        $rowMatches = [regex]::Matches($text, '(?s)<Row[^>]*>(.*?)</Row>')
+        foreach ($m in $rowMatches) {
+            $cells = @([regex]::Matches($m.Groups[1].Value, '(?s)<Data[^>]*>(.*?)</Data>') | ForEach-Object { $_.Groups[1].Value.Trim() })
+            if ($cells.Count -gt 0) { $rows += , $cells }
+        }
+    }
+    $checks += [pscustomobject]@{ Id = "$($r.Id)-report"; Ok = [bool]$report; Text = "laporan optimasi dibuat ($report)" }
+    $resultIdx = if ($rows.Count -gt 0) { [array]::IndexOf($rows[0], 'Result') } else { -1 }
+    $passes = @($rows | Select-Object -Skip 1)
+    $numeric = @($passes | Where-Object { $resultIdx -ge 0 -and $_.Count -gt $resultIdx -and ($_[$resultIdx] -as [double]) -ne $null })
+    $values = ($numeric | ForEach-Object { $_[$resultIdx] }) -join ', '
+    $nonZero = @($numeric | Where-Object { [double]$_[$resultIdx] -ne 0 })
+    $checks += [pscustomobject]@{ Id = "$($r.Id)-passes"; Ok = ($passes.Count -ge 2 -and $numeric.Count -eq $passes.Count); Text = "laporan berisi >= 2 pass dengan hasil custom terisi ($($passes.Count) pass; Result: $values)" }
+    # Result 0 bisa berarti trade < 30 (aturan metrik); minimal satu pass harus membuktikan metrik benar-benar dihitung.
+    $checks += [pscustomobject]@{ Id = "$($r.Id)-metric"; Ok = ($nonZero.Count -ge 1); Text = "minimal satu pass dengan metrik custom != 0 ($($nonZero.Count))" }
+    if ($resultIdx -lt 0 -and $rows.Count -gt 0) { Write-Host ("    INFO header laporan: " + ($rows[0] -join ' | ')) }
+    $fail = 0
+    $lines = @()
+    foreach ($c in $checks) {
+        $line = $(if ($c.Ok) { "PASS $($c.Id) $($c.Text)" } else { $fail++; "FAIL $($c.Id) $($c.Text)" })
+        $lines += $line
+        if (-not $c.Ok) { Write-Host "    $line" }
+    }
+    Set-Content -LiteralPath (Join-Path $script:tmp "last-$($r.Id).txt") -Value $lines -Encoding UTF8
+    if ($report) { Copy-Item -LiteralPath $report -Destination (Join-Path $script:tmp ("last-$($r.Id)-report" + [IO.Path]::GetExtension($report))) -Force; Remove-Item -LiteralPath $report -Force }
+    Write-Run ("{0} {1}: pass={2} fail={3} ({4} detik, optimasi)" -f $(if ($fail -eq 0) { 'LULUS' } else { 'GAGAL' }), $r.Id, ($checks.Count - $fail), $fail, $secs)
+    if ($fail -gt 0) { return 1 }
+    return 0
+}
+
 function Invoke-TesterRun($r) {
     $runId = New-RunId $r.Id
     $resultFile = Join-Path $script:cfg.CommonFilesDir "sdbot_test_$runId.txt"
@@ -120,6 +166,14 @@ function Invoke-TesterRun($r) {
             $setLines = @(Get-Content -LiteralPath $r.Set -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*InpTestRunId\s*=' })
         }
     }
+    $isOpt = ($r.Kind -eq 'scenario') -and $tester.Contains('Optimization') -and ($tester['Optimization'] -ne '0')
+    $reportBase = Join-Path $script:cfg.TestDataDir "sdbot_opt_$runId"
+    $dbPath = Join-Path $script:cfg.CommonFilesDir 'sdbot_tester.sqlite'
+    $dbBefore = Get-DbStamp $dbPath
+    if ($isOpt) {
+        $tester['Report'] = "sdbot_opt_$runId"   # relatif ke folder data terminal uji
+        $tester['ReplaceReport'] = '1'
+    }
     $tester['ExpertParameters'] = "$runId.set"
     $tester['ShutdownTerminal'] = '1'
     $setLines += "InpTestRunId=$runId"
@@ -129,6 +183,16 @@ function Invoke-TesterRun($r) {
     $ini = @('[Experts]', 'Enabled=0', 'AllowLiveTrading=0', 'AllowDllImport=0', '[Tester]')
     foreach ($k in $tester.Keys) { $ini += "$k=$($tester[$k])" }
     Set-Content -LiteralPath $iniPath -Value $ini -Encoding Unicode
+
+    # Sandbox MQL5 tidak bisa membaca MQL5\Presets: preset disalin ke Common\Files untuk suite TestPresets (spec 07).
+    $presetCopy = Join-Path $script:cfg.CommonFilesDir 'sdbot_presets'
+    if ($r.Kind -eq 'unit') {
+        if (Test-Path -LiteralPath $presetCopy) { Remove-Item -LiteralPath $presetCopy -Recurse -Force }
+        New-Item -ItemType Directory -Path $presetCopy | Out-Null
+        Get-ChildItem -LiteralPath (Join-Path $script:repoEa 'src\Presets') -Filter '*.set' -File |
+            Where-Object { $_.Name -notlike '*.local.set' } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $presetCopy }
+    }
 
     Write-Run ("mulai {0} (run {1}, {2} {3} {4}..{5}, batas {6} detik)" -f $r.Id, $runId, $tester['Symbol'], $tester['Period'], $tester['FromDate'], $tester['ToDate'], $script:timeoutSec)
     $start = Get-Date
@@ -145,6 +209,7 @@ function Invoke-TesterRun($r) {
     finally {
         Remove-Item -LiteralPath $setPath -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $iniPath -Force -ErrorAction SilentlyContinue
+        if ($r.Kind -eq 'unit') { Remove-Item -LiteralPath $presetCopy -Recurse -Force -ErrorAction SilentlyContinue }
     }
     $secs = [int]((Get-Date) - $start).TotalSeconds
 
@@ -154,6 +219,10 @@ function Invoke-TesterRun($r) {
         $left = @(Get-TestTerminalProcesses).Count
         Write-Run "TIMEOUT $($r.Id) setelah $($script:timeoutSec) detik; proses terminal uji tersisa: $left"
         return 3
+    }
+    if ($isOpt) {
+        Remove-Item -LiteralPath $resultFile -Force -ErrorAction SilentlyContinue
+        return Test-OptimizationRun $r $reportBase $dbPath $dbBefore $secs
     }
     if (-not (Test-Path -LiteralPath $resultFile)) {
         Write-Run "GAGAL $($r.Id): file hasil tidak dibuat ($secs detik). Dari log terminal:"
@@ -215,11 +284,13 @@ function Invoke-Main {
         }
     }
     $summary = @()
+    $allStart = Get-Date
     foreach ($r in $script:runs) {
         $code = Invoke-TesterRun $r
         $summary += [pscustomobject]@{ Run = $r.Id; Code = $code }
     }
     Write-Host ''
+    Write-Run ("durasi total {0:mm\:ss} untuk {1} run" -f ((Get-Date) - $allStart), $summary.Count)
     foreach ($s in $summary) {
         $label = switch ($s.Code) { 0 { 'PASS' } 1 { 'FAIL' } 2 { 'ENV ' } 3 { 'TIME' } }
         Write-Run ("{0} {1}" -f $label, $s.Run)

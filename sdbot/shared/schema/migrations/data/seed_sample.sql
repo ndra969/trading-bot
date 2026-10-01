@@ -67,3 +67,40 @@ INSERT INTO alerts (session_id, login, magic, symbol, time, type, severity, mess
 VALUES (1, 12345, 2026091901, 'EURUSDc', 1790640005, 'CONN_UP', 'INFO', 'Koneksi terminal pulih', 'SENT', 1, 1790640006),
        (2, 12345, 2026091903, 'EURJPYc', 1790700000, 'BALANCE_OP', 'INFO', 'Penarikan -20000 USC', 'PENDING', 0, NULL),
        (2, 12345, 2026091903, 'EURJPYc', 1790701000, 'DD_REDUCE', 'HIGH', 'Drawdown 10%: lot x 0.5', 'FAILED', 3, NULL);
+
+-- @version 2
+
+-- Dua run backtest (sdbot_tester.sqlite) dengan login tester yang sama dan position_id kecil yang
+-- berulang: run_key = id sesi pertama run memisahkannya (PC-08). Run 3: posisi 2 BE-stop dengan
+-- MFE 1.1R (kebocoran BE), posisi 3 kena SL; run 4: posisi 2 kena TP.
+INSERT INTO sessions (id, login, magic, symbol, mode, ea_version, input_hash, inputs_json, started_at, ended_at, end_reason,
+                      tester_from, tester_to, tester_model, run_key)
+VALUES (3, 12345, 2026091900, 'EURUSDc', 'TESTER', '1.06', 'hash-b', '{"InpRiskPerTradePct":0.5}', 1790800000, 1790900000, 'REMOVE',
+        1788000000, 1790000000, NULL, 3),
+       (4, 12345, 2026091900, 'EURUSDc', 'TESTER', '1.06', 'hash-c', '{"InpRiskPerTradePct":1.0}', 1790900100, 1791000000, 'REMOVE',
+        1788000000, 1790000000, NULL, 4);
+
+INSERT INTO trades (session_id, login, run_key, position_id, magic, symbol, direction, source, volume_initial, price_requested,
+                    price_open, slippage_points, spread_points, sl_initial, tp_initial, risk_money, risk_pct, signal_id, ea_version, opened_at)
+VALUES (3, 12345, 3, 2, 2026091900, 'EURUSDc', 'BUY', 'EA', 0.25, 1.10000, 1.10000, 0, 8, 1.09800, 1.11000, 50.0, 0.5, NULL, '1.06', 1788100000),
+       (3, 12345, 3, 3, 2026091900, 'EURUSDc', 'SELL', 'EA', 0.25, 1.10500, 1.10500, 0, 8, 1.10700, 1.09500, 50.0, 0.5, NULL, '1.06', 1788200000),
+       (4, 12345, 4, 2, 2026091900, 'EURUSDc', 'BUY', 'EA', 0.50, 1.10000, 1.10001, -1, 8, 1.09800, 1.11000, 100.0, 1.0, NULL, '1.06', 1788100000);
+
+INSERT INTO deals (session_id, login, run_key, deal_ticket, position_id, magic, symbol, time, entry, deal_type, volume, price, reason,
+                   profit, commission, swap, fee)
+VALUES (3, 12345, 3, 2, 2, 2026091900, 'EURUSDc', 1788100000, 'IN',  'BUY',  0.25, 1.10000, 'EXPERT', 0, 0, 0, 0),
+       (3, 12345, 3, 3, 2, 2026091900, 'EURUSDc', 1788110000, 'OUT', 'SELL', 0.25, 1.10010, 'SL', 2.5, 0, 0, 0),
+       (3, 12345, 3, 4, 3, 2026091900, 'EURUSDc', 1788200000, 'IN',  'SELL', 0.25, 1.10500, 'EXPERT', 0, 0, 0, 0),
+       (3, 12345, 3, 5, 3, 2026091900, 'EURUSDc', 1788210000, 'OUT', 'BUY',  0.25, 1.10700, 'SL', -50, 0, 0, 0),
+       (4, 12345, 4, 2, 2, 2026091900, 'EURUSDc', 1788100000, 'IN',  'BUY',  0.50, 1.10001, 'EXPERT', 0, 0, 0, 0),
+       (4, 12345, 4, 3, 2, 2026091900, 'EURUSDc', 1788150000, 'OUT', 'SELL', 0.50, 1.11000, 'TP', 499.5, 0, 0, 0);
+
+INSERT INTO closures (session_id, login, run_key, position_id, magic, symbol, closed_at, reason, level_price, price_close, slippage_points,
+                      volume_total, profit, commission, swap, fee, net_profit, r_result, mfe_r, mae_r, holding_sec,
+                      be_activated, partial_done, trail_activated)
+VALUES (3, 12345, 3, 2, 2026091900, 'EURUSDc', 1788110000, 'BE_STOP', 1.10010, 1.10010, 0, 0.25, 2.5, 0, 0, 0, 2.5, 0.05, 1.1, 0.2, 10000, 1, 0, 0),
+       (3, 12345, 3, 3, 2026091900, 'EURUSDc', 1788210000, 'SL', 1.10700, 1.10700, 0, 0.25, -50, 0, 0, 0, -50, -1.0, 0.05, 1.0, 10000, 0, 0, 0),
+       (4, 12345, 4, 2, 2026091900, 'EURUSDc', 1788150000, 'TP', 1.11000, 1.11000, 0, 0.50, 499.5, 0, 0, 0, 499.5, 4.995, 5.0, 0.1, 50000, 1, 0, 0);
+
+INSERT INTO balance_ops (login, run_key, deal_ticket, time, op_type, amount, comment)
+VALUES (12345, 3, 1, 1788000000, 'BALANCE', 10000.0, 'deposit awal tester');
