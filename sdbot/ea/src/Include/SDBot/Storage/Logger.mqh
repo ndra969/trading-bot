@@ -87,7 +87,8 @@ enum ENUM_SDB_QUEUE_KIND
    SDB_Q_CLOSURE = 4,
    SDB_Q_BALANCE = 5,
    SDB_Q_ALERT = 6,
-   SDB_Q_KINDS = 7
+   SDB_Q_ALERT_STATUS = 7,   // hasil kirim notifikasi (spec 08)
+   SDB_Q_KINDS = 8
   };
 
 #define SDB_Q_PRIO_KEEP     0   // trade, deal, closure, operasi saldo, alert Critical
@@ -111,12 +112,14 @@ struct SdbQueuedEvent
    ClosureRecord     closure;
    BalanceOpRecord   balance;
    AlertEvent        alert;
+   AlertStatus       status;
   };
 
 class CLogger : public ISdbEventSink
   {
 private:
-   ISdbEventSink    *m_alertSink;     // penerima alert milik Logger sendiri (FakeSink di uji, Notifier di Fase 2)
+   ISdbEventSink    *m_alertSink;     // penerima alert milik Logger sendiri (FakeSink di uji, tee di App)
+   bool              m_routed;        // m_alertSink = router (tee berisi Logger): jangan simpan dua kali
    string            m_symbol;
    long              m_magic;
    string            m_eaVersion;
@@ -159,21 +162,6 @@ private:
      }
 
    long Utc(const datetime serverTime) const { return (long)ServerToUtc(serverTime, m_offset); }
-
-   //--- Alert milik Logger: diteruskan ke penerima dan ikut disimpan di tabel alerts.
-   void RaiseAlert(const string type, const ENUM_SDB_SEVERITY severity, const string message)
-     {
-      AlertEvent a;
-      a.type = type;
-      a.severity = severity;
-      a.message = message;
-      a.symbol = m_symbol;
-      a.magic = m_magic;
-      a.time = TimeCurrent();
-      if(m_alertSink != NULL)
-         m_alertSink.OnAlert(a);
-      OnAlert(a);
-     }
 
    //--- Antrean
    bool DropOne()
@@ -387,8 +375,11 @@ private:
                    "VALUES (?1, ?80, ?2, ?3, ?4, ?5, NULLIF(?6, '')) "
                    "ON CONFLICT (login, run_key, deal_ticket) DO NOTHING";
          case SDB_Q_ALERT:
-            return "INSERT INTO alerts (session_id, login, magic, symbol, time, type, severity, message, status, attempts) "
-                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0)";
+            return "INSERT INTO alerts (session_id, login, magic, symbol, time, type, severity, message, status, attempts, notify_key) "
+                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, NULLIF(?10, ''))";
+         case SDB_Q_ALERT_STATUS:
+            return "UPDATE alerts SET status = ?1, attempts = ?2, sent_at = NULLIF(?3, 0), status_reason = NULLIF(?4, '') "
+                   "WHERE login = ?5 AND notify_key = ?6";
          default:
             return "";
         }
@@ -481,7 +472,12 @@ private:
                  DatabaseBind(st, 2, e.alert.magic) && DatabaseBind(st, 3, e.alert.symbol) &&
                  DatabaseBind(st, 4, Utc(e.alert.time)) && DatabaseBind(st, 5, e.alert.type) &&
                  DatabaseBind(st, 6, SdbSeverityText(e.alert.severity)) && DatabaseBind(st, 7, e.alert.message) &&
-                 DatabaseBind(st, 8, SDB_ALERT_STATUS_PENDING);
+                 DatabaseBind(st, 8, SDB_ALERT_STATUS_PENDING) && DatabaseBind(st, 9, e.alert.key);
+            return ok;
+         case SDB_Q_ALERT_STATUS:
+            ok = DatabaseBind(st, 0, e.status.status) && DatabaseBind(st, 1, (long)e.status.attempts) &&
+                 DatabaseBind(st, 2, e.status.sentAt == 0 ? (long)0 : Utc(e.status.sentAt)) && DatabaseBind(st, 3, e.status.reason) &&
+                 DatabaseBind(st, 4, e.login) && DatabaseBind(st, 5, e.status.key);
             return ok;
         }
       return false;
@@ -528,6 +524,43 @@ private:
       return true;
      }
 
+   bool ExecOwn(const string sql)
+     {
+      int st = DatabasePrepare(m_db, sql);
+      if(st == INVALID_HANDLE)
+         return false;
+      string err;
+      bool ok = DatabaseBind(st, 0, m_symbol) && Step(st, err);
+      DatabaseFinalize(st);
+      return ok;
+     }
+
+   int ReadPendingCritical(const string own, AlertEvent &critical[])
+     {
+      int st = DatabasePrepare(m_db, "SELECT type, message, time, notify_key FROM alerts WHERE " + own + " ORDER BY id");
+      if(st == INVALID_HANDLE || !DatabaseBind(st, 0, m_symbol))
+         return 0;
+      int offset = UtcOffset();
+      while(DatabaseRead(st))
+        {
+         AlertEvent a;
+         long timeUtc = 0;
+         DatabaseColumnText(st, 0, a.type);
+         DatabaseColumnText(st, 1, a.message);
+         DatabaseColumnLong(st, 2, timeUtc);
+         DatabaseColumnText(st, 3, a.key);
+         a.severity = SDB_SEV_CRITICAL;
+         a.symbol = m_symbol;
+         a.magic = m_magic;
+         a.time = (datetime)(timeUtc + offset);
+         int n = ArraySize(critical);
+         ArrayResize(critical, n + 1);
+         critical[n] = a;
+        }
+      DatabaseFinalize(st);
+      return ArraySize(critical);
+     }
+
    // run_key SDB_RUN_KEY_NEW = sesi pertama run tester: run_key diisi ID sesi ini, lalu dipakai
    // semua baris dan sesi berikutnya dalam run yang sama (spec 04, PC-08).
    long InsertSession(const SessionInfo &s)
@@ -565,7 +598,7 @@ private:
      }
 
 public:
-                     CLogger(void) : m_alertSink(NULL), m_magic(0), m_target(SDB_DB_NONE), m_db(INVALID_HANDLE),
+                     CLogger(void) : m_alertSink(NULL), m_routed(false), m_magic(0), m_target(SDB_DB_NONE), m_db(INVALID_HANDLE),
                      m_disabled(true), m_capacity(SDB_DB_QUEUE_MAX), m_dropped(0), m_login(0), m_sessionId(0), m_runKey(0),
                      m_haveSession(false), m_haveAccount(false), m_failSince(0), m_unavailAlerted(false),
                      m_lastReopen(0), m_offset(0), m_nowOverride(0), m_offsetOverridden(false), m_offsetOverride(0)
@@ -576,10 +609,27 @@ public:
 
                     ~CLogger(void) { CloseDb(); }
 
+   //--- Alert milik Logger: diteruskan ke penerima dan ikut disimpan di tabel alerts.
+   void RaiseAlert(const string type, const ENUM_SDB_SEVERITY severity, const string message)
+     {
+      AlertEvent a;
+      a.type = type;
+      a.severity = severity;
+      a.message = message;
+      a.symbol = m_symbol;
+      a.magic = m_magic;
+      a.time = TimeCurrent();
+      if(m_alertSink != NULL)
+         m_alertSink.OnAlert(a);
+      if(!m_routed)
+         OnAlert(a);
+     }
+
    // alertSink menerima alert milik Logger (DB_*, MIGRATION_FAILED); NULL = hanya disimpan di DB.
    void Init(ISdbEventSink *alertSink, const string symbol, const long magic, const string eaVersion)
      {
       m_alertSink = alertSink;
+      m_routed = false;
       m_symbol = symbol;
       m_magic = magic;
       m_eaVersion = eaVersion;
@@ -775,6 +825,48 @@ public:
       e.login = m_login;
       e.alert = a;
       Enqueue(e);
+     }
+
+   // Status kirim notifikasi untuk baris dengan notify_key yang sama; insert dan update satu flush berurutan.
+   void OnAlertStatus(const AlertStatus &s)
+     {
+      if(StringLen(s.key) == 0)
+         return;
+      SdbQueuedEvent e;
+      e.kind = SDB_Q_ALERT_STATUS;
+      e.priority = SDB_Q_PRIO_NORMAL;
+      e.login = m_login;
+      e.status = s;
+      Enqueue(e);
+     }
+
+   // Alert milik Logger dan runner migrasi lewat router (tee: Logger + Notifier + observer); Logger
+   // menyimpannya saat tee memanggil OnAlert, bukan dari RaiseAlert (spec 08 design §3.7).
+   void SetRouter(ISdbEventSink *router)
+     {
+      m_alertSink = router;
+      m_routed = (router != NULL);
+     }
+
+   // Init (Req 6.1, 6.2): PENDING milik instance dari sesi lain -> STALE (> 30 menit) atau RESTART
+   // (non-Critical); Critical muda dikembalikan untuk diantrekan ulang notifier. Langsung ke DB.
+   int TakeRestartAlerts(const long nowUtc, AlertEvent &critical[])
+     {
+      ArrayFree(critical);
+      if(!IsWritable() || m_login <= 0)
+         return 0;
+      string own = StringFormat("login = %I64d AND magic = %I64d AND symbol = ?1 AND status = '%s' AND session_id <> %I64d",
+                                m_login, m_magic, SDB_ALERT_STATUS_PENDING, m_sessionId);
+      bool ok = ExecOwn("UPDATE alerts SET status = '" + SDB_ALERT_STATUS_SKIPPED + "', status_reason = '" +
+                        SDB_ALERT_STATUS_REASON_STALE + "' WHERE " + own + " AND time < " + IntegerToString(nowUtc - SDB_NT_STALE_SEC)) &&
+                ExecOwn("UPDATE alerts SET status = '" + SDB_ALERT_STATUS_SKIPPED + "', status_reason = '" +
+                        SDB_ALERT_STATUS_REASON_RESTART + "' WHERE " + own + " AND severity <> '" + SDB_SEVERITY_CRITICAL + "'");
+      if(!ok)
+        {
+         LogWarn("Storage", "alert tertunda sesi lalu tidak bisa diperiksa | " + ErrText(GetLastError()));
+         return 0;
+        }
+      return ReadPendingCritical(own, critical);
      }
 
    // Dibaca langsung dari DB, bukan antrean (Req 9.3).

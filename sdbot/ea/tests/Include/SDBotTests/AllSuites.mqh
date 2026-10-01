@@ -26,6 +26,9 @@
 #include <SDBotTests/Suites/TestPosition.mqh>
 #include <SDBotTests/Suites/TestIntegration.mqh>
 #include <SDBotTests/Suites/TestPresets.mqh>
+#include <SDBotTests/Suites/TestNotifyRules.mqh>
+#include <SDBotTests/Suites/TestNotifyFormat.mqh>
+#include <SDBotTests/Suites/TestNotifier.mqh>
 
 void RunAllSuites()
   {
@@ -49,6 +52,9 @@ void RunAllSuites()
    RunTestPosition();
    RunTestIntegration();
    RunTestPresets();
+   RunTestNotifyRules();
+   RunTestNotifyFormat();
+   RunTestNotifier();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

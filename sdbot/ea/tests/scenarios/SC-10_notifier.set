@@ -1,0 +1,18 @@
+; SC-10: setup drawdown SC-03 (lot x 0.5 di 1%, STOP di 2%, risiko 1%) dengan SL/TP 100 point agar ada
+; posisi profit dan rugi, transport palsu (TEST_FAIL selalu gagal sementara), dan burst alert di bar 20.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpRiskPerTradePct=1.0
+InpDDReducePct=1.0
+InpDDStopPct=2.0
+HarnessScenario=SC-10
+HarnessEveryBars=4
+HarnessDirection=2
+HarnessSlPoints=100
+HarnessTpPoints=100
+HarnessMaxOpen=1
+HarnessFixedLot=0
+HarnessTransportScript=OK
+HarnessTransportFailType=TEST_FAIL
+HarnessAlertBurstAtBar=20

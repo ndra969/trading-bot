@@ -68,6 +68,19 @@
 #define SDB_CLOSE_REASON_TOLERANCE_PTS   2       // toleransi BE_STOP di atas InpBreakevenBufferPoints
 #define SDB_TESTER_MIN_TRADES            30      // metrik OnTester 0 di bawah ini (spec 07)
 
+//--- Notifier (spec 08 design §4.2; PRD §Notifikasi kecuali disebut)
+#define SDB_NT_COOLDOWN_SEC           300      // Medium (PRD) dan Info (PC-13) per tipe
+#define SDB_NT_QUOTA_PER_HOUR         20       // non-Critical per jam server, per akun (PC-13)
+#define SDB_NT_STALE_SEC              1800     // non-Critical lebih tua dari ini dibuang
+#define SDB_NT_QUEUE_MAX              100      // PC-13
+#define SDB_NT_MAX_PER_TIMER          2        // WebRequest blocking: batasi kiriman per siklus (PC-13)
+#define SDB_NT_MAX_ATTEMPTS           3
+#define SDB_NT_MAX_LEN                4096     // batas pesan Telegram
+#define SDB_NT_DRAIN_MS               3000     // kirim Critical tersisa saat deinit
+#define SDB_NT_QUOTA_HOUR_FACTOR      1000     // GV NT_QUOTA = jam x 1000 + jumlah
+#define SDB_GV_NT_QUOTA               "NT_QUOTA"
+#define SDB_GV_NT_CD_PREFIX           "NT_CD_"
+
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
 #define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama

@@ -10,6 +10,7 @@
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/TestDb.mqh>
 #include <SDBotTests/FakeSink.mqh>
+#include <SDBotTests/FakeTransport.mqh>
 #include <SDBot/App/SdbApp.mqh>
 
 void TaDeleteDb()
@@ -178,9 +179,12 @@ void RunTestAppLifecycle()
    AssertTrue("TC-APP-05", "suffix salah: INIT_FAILED, alert ACCOUNT_REJECTED tersimpan, sesi berakhir INITFAILED",
               r == INIT_FAILED && TaCount("alerts", "type='ACCOUNT_REJECTED'") == 1 &&
               TaCount("sessions", "end_reason='INITFAILED'") >= 1);
+   // Sejak spec 08 tabel alerts juga berisi TRADE_OPENED/TRADE_CLOSED dari TC-APP-08.
    AssertTrue("TC-APP-07", "observer menerima alert tepat sekali, DB juga sekali",
               hasAlert && alert.type == SDB_ALERT_TYPE_ACCOUNT_REJECTED && fake.CountAlert() == 1 &&
-              TaCount("alerts") == 1);
+              TaCount("alerts", "type='ACCOUNT_REJECTED'") == 1 && TaCount("alerts", "type NOT LIKE 'TRADE_%' AND type <> 'ACCOUNT_REJECTED'") == 0);
+   AssertTrue("TC-APP-12", "posisi TC-APP-08: TRADE_OPENED dan TRADE_CLOSED tercatat dan terkirim (spec 08 Req 1.2, 1.3)",
+              TaCount("alerts", "type='TRADE_OPENED' AND status='SENT'") == 1 && TaCount("alerts", "type='TRADE_CLOSED' AND status='SENT'") == 1);
 
    CFakeSink fake2;
    app = new CSdbApp;
@@ -205,6 +209,53 @@ void RunTestAppLifecycle()
    AssertTrue("TC-APP-07b", "observer menerima snapshot akun, DB juga", fake2.CountAccount() >= 1 && TaCount("accounts") == 1);
   }
 
+// TC-APP-09..11 (spec 08 Req 1.1, 6.3, 6.4, 7.2): notifier terpasang di tee kecuali tanpa DB (optimasi).
+void RunTestAppNotifier()
+  {
+   CFakeTransport tr;
+   CSdbApp *app = new CSdbApp;
+   int r = app.OnInit(TaConfig(), NULL, GetPointer(tr));
+   AlertEvent a;
+   a.type = "TEST_APP";
+   a.severity = SDB_SEV_INFO;
+   a.message = "uji notifier app";
+   a.symbol = _Symbol;
+   a.magic = TaConfig().inputs.magic;
+   a.time = TimeCurrent();
+   app.Sink().OnAlert(a);
+   app.OnTimer();
+   SdbOutMessage m;
+   bool sent = tr.FirstIndexOf("TEST_APP") >= 0 && tr.At(tr.FirstIndexOf("TEST_APP"), m);
+   AssertTrue("TC-APP-09", "alert lewat sink app: terkirim ke transport (tag TESTER), status SENT di DB",
+              r == INIT_SUCCEEDED && app.NotifierActive() && sent && StringFind(m.text, " TESTER ") > 0 &&
+              TaCount("alerts", "type='TEST_APP' AND status='SENT' AND notify_key IS NOT NULL") == 1);
+   app.OnDeinit(REASON_REMOVE);
+   delete app;
+
+   CFakeTransport tr2;
+   SdbAppConfig c = TaConfig();
+   c.dbTarget = SDB_DB_NONE;
+   app = new CSdbApp;
+   app.OnInit(c, NULL, GetPointer(tr2));
+   app.Sink().OnAlert(a);
+   app.OnTimer();
+   bool active = app.NotifierActive();
+   app.OnDeinit(REASON_REMOVE);
+   delete app;
+   AssertTrue("TC-APP-10", "tanpa DB (optimasi): notifier tidak terpasang, tidak ada kiriman", !active && tr2.Count() == 0);
+
+   CFakeTransport tr3;
+   c = TaConfig();
+   c.symbolSuffix = "zz";
+   app = new CSdbApp;
+   r = app.OnInit(c, NULL, GetPointer(tr3));
+   app.OnDeinit(REASON_INITFAILED);
+   delete app;
+   AssertTrue("TC-APP-11", "init gagal: ACCOUNT_REJECTED Critical dikirim saat deinit, status SENT",
+              r == INIT_FAILED && tr3.CountType("ACCOUNT_REJECTED") == 1 &&
+              TaCount("alerts", "type='ACCOUNT_REJECTED' AND status='SENT'") == 1);
+  }
+
 void RunTestApp()
   {
    TfBeginSuite("App");
@@ -218,6 +269,8 @@ void RunTestApp()
    TaDeleteDb();
    RunTestAppInit();
    RunTestAppLifecycle();
+   TaDeleteDb();
+   RunTestAppNotifier();
    TaDeleteDb();
    SdbLogCaptureStop();
    TfEndSuite();

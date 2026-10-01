@@ -1,14 +1,17 @@
 # Init dan deinit
 
-`SDBot.mq5` hanya meneruskan event ke `CSdbApp` (spec 04). Harness uji memakai `CSdbApp` yang sama.
+`SDBot.mq5` hanya meneruskan event ke `CSdbApp` (spec 04). Harness uji memakai `CSdbApp` yang sama. Tanpa DB (optimasi) notifier tidak dipasang (spec 08).
 
 ```mermaid
 flowchart TB
     A([OnInit]) --> R[reset flag: init ulang pada objek yang sama saat ganti timeframe]
     R --> V{ValidateInputValues}
     V -->|gagal| P([INIT_PARAMETERS_INCORRECT])
-    V -->|lolos| S[CLogger: buka DB live/tester/none, migrasi, sesi baru + run_key]
-    S --> T{InpPresetTag cocok dengan simbol chart?}
+    V -->|lolos| NT[tee: Logger + Notifier + observer; router alert Logger ke tee]
+    NT --> S[CLogger: buka DB live/tester/none, migrasi, sesi baru + run_key]
+    S --> RQ[TakeRestartAlerts: PENDING lama STALE/RESTART, Critical muda diantrekan ulang]
+    RQ --> T
+    T{InpPresetTag cocok dengan simbol chart?}
     T -->|tidak| W[WARN sekali]
     T -->|ya| AC
     W --> AC{CAccount::Validate}
@@ -29,5 +32,5 @@ flowchart TB
 flowchart LR
     D([OnDeinit]) --> X{sudah deinit?}
     X -->|ya| Z([selesai])
-    X -->|tidak| K[EventKillTimer] --> L[log alasan] --> I[IndicatorRelease ATR] --> ES[EndSession alasan] --> C[CLogger.Close: flush terakhir] --> Z
+    X -->|tidak| K[EventKillTimer] --> L[log alasan] --> I[IndicatorRelease ATR] --> DR[CNotifier.DrainCritical maks 3 detik] --> ES[EndSession alasan] --> C[CLogger.Close: flush terakhir] --> Z
 ```

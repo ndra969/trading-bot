@@ -31,11 +31,22 @@ Urutan ini dipilih agar setiap spec bisa diuji penuh saat selesai: framework uji
 
 Pelajaran dari bot Python yang memengaruhi spec ini: [python-bot-lessons.md](python-bot-lessons.md).
 
+## Fase 2 — Notifikasi
+
+Use case, pembagian spec, arsitektur bersama, dan strategi uji: [fase-2-overview.md](fase-2-overview.md).
+
+| # | Spec | Isi | Butuh | Bukti selesai | Status |
+|---|---|---|---|---|---|
+| 8 | [ea-08-notifier-core](ea-08-notifier-core/) | `CNotifier` sebagai sink: aturan kirim, antrean prioritas, format pesan, event trade, status `alerts`, transport log di tester | 1–7 | suite NotifyRules ALL PASS, SC-10 PASS | **Done** 2026-10-01 (v1.07; MC-NT-01 manual tertunda; PC-13) |
+| 9 | ea-09-notifier-telegram | Transport Telegram, rate limit bersama, push HP, heartbeat, laporan harian, start/stop, skrip `.local.set`, DoD Fase 2 | 8 | suite TelegramRules ALL PASS, SC-11 PASS, MC Telegram dicek | Belum dimulai |
+
+Versi EA: 08 = `1.07`, 09 = `1.08` (Fase 2 selesai).
+
 ## Fase berikutnya
 
 Spec detail (requirements, design, tasks) dibuat saat fase sebelumnya selesai. Catatan awal di bawah memastikan hal penting dari PRD dan dari bot Python tidak hilang, dan Fase 1 sudah menyiapkan tempatnya.
 
-### Fase 2 — Notifikasi (spec `ea-08-notifier-telegram`)
+### Fase 2 — Notifikasi (spec `ea-08-notifier-core`, `ea-09-notifier-telegram`)
 
 Isi PRD: `CNotifier` satu pintu, Telegram lewat `WebRequest` dari antrean di `OnTimer` (tidak pernah di tengah proses order), push HP (`SendNotification`) bila Telegram gagal 3x untuk Critical, heartbeat tiap 60 menit, HTML mode, kuota non-Critical 20/jam, pesan non-Critical > 30 menit dibuang, Critical tanpa limit, cooldown per tipe, token dan chat ID hanya di input.
 
@@ -61,7 +72,7 @@ Edge case yang wajib masuk requirements:
 - Restart EA: pesan `PENDING` di DB yang lebih tua dari 30 menit ditandai `SKIPPED`, bukan dikirim terlambat.
 - Mode ditandai di setiap pesan (akun cent/real, versi EA) agar pesan dari akun uji tidak tertukar.
 
-### Fase 3 — Strategi inti (spec `ea-09`–`ea-11`: analisis MTF + zona, trigger PA, sinyal + entry)
+### Fase 3 — Strategi inti (spec `ea-10`–`ea-12`: analisis MTF + zona, trigger PA, sinyal + entry)
 
 Isi PRD: bias HTF sebagai gerbang wajib, zona S&D dari Fractals berjeda di MTF (Fresh/Tested/Invalid/Used, maks 100 bar, satu zona satu entry), trigger PA di LTF, skor 100 poin, entry market (default) atau limit, TP ke zona lawan lalu cek R:R ≥ 2.
 
@@ -93,7 +104,7 @@ Aturan dari RULES dan pelajaran bot Python: tidak ada angka ajaib di kode. Setia
 
 "Perlu keputusan" berarti PRD belum menentukan angkanya. Nilainya diputuskan bersama Anda di requirements spec Fase 3, lalu dicatat di `docs/PENDING-CHANGES.md`.
 
-### Fase 4 — Filter (spec `ea-12-filters-news`)
+### Fase 4 — Filter (spec `ea-13-filters-news`)
 
 Isi PRD: filter berita memakai kalender bawaan MT5 (`CalendarValueHistory`) ±30 menit berita high impact; di Strategy Tester memakai CSV kalender historis di Common/Files (dibuat script `ExportCalendar`); filter sesi London + New York; filter spread per simbol; eksposur maks 2 posisi searah per mata uang.
 

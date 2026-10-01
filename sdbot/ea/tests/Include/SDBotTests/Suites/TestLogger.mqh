@@ -11,6 +11,7 @@
 #include <SDBotTests/TestDb.mqh>
 #include <SDBotTests/FakeSink.mqh>
 #include <SDBot/Storage/Logger.mqh>
+#include <SDBot/App/TeeSink.mqh>
 
 #define TL_LOGIN    1234567
 #define TL_OFFSET   10800                        // server UTC+3
@@ -244,6 +245,101 @@ void RunTestLoggerRunKey()
               TlCount("trades", "position_id=600 AND run_key=0") == 1 && MathAbs(slL2 - 1.094) < 1e-9);
   }
 
+AlertEvent TlAlert(const string type, const ENUM_SDB_SEVERITY sev, const string key)
+  {
+   AlertEvent a;
+   a.type = type;
+   a.severity = sev;
+   a.message = "uji " + type;
+   a.symbol = "EURUSDc";
+   a.magic = SDB_MAGIC_HARNESS;
+   a.time = TL_SERVER_T;
+   a.key = key;
+   return a;
+  }
+
+AlertStatus TlStatus(const string key, const string status, const int attempts, const datetime sentAt, const string reason)
+  {
+   AlertStatus s;
+   s.key = key;
+   s.status = status;
+   s.attempts = attempts;
+   s.sentAt = sentAt;
+   s.reason = reason;
+   return s;
+  }
+
+// Baris PENDING sesi lalu, ditulis langsung seperti sisa EA yang mati (TC-LG-32).
+void TlPendingRow(const int db, const string key, const string severity, const long timeUtc, const long magic)
+  {
+   TdbExec(db, StringFormat("INSERT INTO alerts (session_id, login, magic, symbol, time, type, severity, message, status, attempts, "
+                            "notify_key) VALUES (999, %d, %I64d, 'EURUSDc', %I64d, 'DD_STOP', '%s', 'sisa', 'PENDING', 0, '%s')",
+                            TL_LOGIN, magic, timeUtc, severity, key));
+  }
+
+string TlAlertCol(const string key, const string col)
+  {
+   return TlText("SELECT COALESCE(" + col + ", '') FROM alerts WHERE notify_key='" + key + "'");
+  }
+
+// TC-LG-30..33 (spec 08): notify_key, status kirim, pesan tertunda saat restart, router alert.
+void RunTestLoggerNotify()
+  {
+   TlDeleteFiles();
+   CLogger lg;
+   lg.Init(NULL, "EURUSDc", SDB_MAGIC_HARNESS, "1.07");
+   lg.SetUtcOffsetForTest(TL_OFFSET);
+   lg.Open(SDB_DB_UNITTEST);
+   lg.BeginSession(TlSession("{}"));
+   lg.OnAlert(TlAlert("CONN_DOWN", SDB_SEV_MEDIUM, "k-30"));
+   lg.OnAlertStatus(TlStatus("k-30", "SENT", 1, TL_SERVER_T + 5, ""));
+   lg.Flush();
+   long utc = (long)TL_SERVER_T - TL_OFFSET;
+   AssertTrue("TC-LG-30", "alert + status satu flush: SENT, attempts, sent_at UTC, notify_key",
+              TlAlertCol("k-30", "status") == "SENT" && TlInt("SELECT attempts FROM alerts WHERE notify_key='k-30'") == 1 &&
+              TlInt("SELECT sent_at FROM alerts WHERE notify_key='k-30'") == utc + 5 && TlAlertCol("k-30", "status_reason") == "");
+
+   lg.OnAlert(TlAlert("MARGIN_OK", SDB_SEV_INFO, "k-31"));
+   lg.Flush();
+   lg.OnAlertStatus(TlStatus("k-31", "SKIPPED", 0, 0, "QUOTA"));
+   lg.Flush();
+   AssertTrue("TC-LG-31", "status di flush berikutnya: SKIPPED QUOTA, sent_at NULL",
+              TlAlertCol("k-31", "status") == "SKIPPED" && TlAlertCol("k-31", "status_reason") == "QUOTA" &&
+              TlCount("alerts", "notify_key='k-31' AND sent_at IS NULL") == 1);
+
+   long now = 1790000000;
+   int db = TlPeek();
+   TlPendingRow(db, "r1", "INFO", now - 2400, SDB_MAGIC_HARNESS);
+   TlPendingRow(db, "r2", "INFO", now - 300, SDB_MAGIC_HARNESS);
+   TlPendingRow(db, "r3", "CRITICAL", now - 300, SDB_MAGIC_HARNESS);
+   TlPendingRow(db, "r4", "CRITICAL", now - 2400, SDB_MAGIC_HARNESS);
+   TlPendingRow(db, "r5", "INFO", now - 300, SDB_MAGIC_HARNESS + 1);
+   DatabaseClose(db);
+   AlertEvent back[];
+   int n = lg.TakeRestartAlerts(now, back);
+   AssertTrue("TC-LG-32", "restart: tua STALE, Info muda RESTART, Critical muda dikembalikan, instance lain utuh",
+              n == 1 && ArraySize(back) == 1 && back[0].key == "r3" && back[0].severity == SDB_SEV_CRITICAL &&
+              back[0].time == (datetime)(now - 300 + TL_OFFSET) && TlAlertCol("r1", "status_reason") == "STALE" &&
+              TlAlertCol("r2", "status_reason") == "RESTART" && TlAlertCol("r3", "status") == "PENDING" &&
+              TlAlertCol("r4", "status_reason") == "STALE" && TlAlertCol("r5", "status") == "PENDING");
+
+   CFakeSink obs;
+   CTeeSink tee;
+   tee.Add(GetPointer(lg));
+   tee.Add(GetPointer(obs));
+   tee.SetKeyPrefix("LG");
+   lg.SetRouter(GetPointer(tee));
+   long before = TlCount("alerts");
+   lg.RaiseAlert(SDB_ALERT_TYPE_DB_RECOVERED, SDB_SEV_INFO, "uji router");
+   lg.Flush();
+   AlertEvent got;
+   AssertTrue("TC-LG-33", "router: alert Logger sampai sekali ke router dan satu baris DB dengan key",
+              obs.CountAlert() == 1 && obs.LastAlert(got) && got.key == "LG-1" && TlCount("alerts") == before + 1 &&
+              TlCount("alerts", "notify_key='LG-1'") == 1);
+   lg.EndSession(REASON_PROGRAM);
+   lg.Close();
+  }
+
 void RunTestLogger()
   {
    TfBeginSuite("Logger");
@@ -457,6 +553,7 @@ void RunTestLogger()
               hasAlert && alert.type == SDB_ALERT_TYPE_DB_NEWER_SCHEMA);
    old.Close();
 
+   RunTestLoggerNotify();
    TlDeleteFiles();
    SdbLogCaptureStop();
    TfEndSuite();

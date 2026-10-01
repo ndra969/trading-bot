@@ -104,3 +104,19 @@ VALUES (3, 12345, 3, 2, 2026091900, 'EURUSDc', 1788110000, 'BE_STOP', 1.10010, 1
 
 INSERT INTO balance_ops (login, run_key, deal_ticket, time, op_type, amount, comment)
 VALUES (12345, 3, 1, 1788000000, 'BALANCE', 10000.0, 'deposit awal tester');
+
+-- @version 3
+
+-- Notifier (spec 08, PC-13): status kirim per notify_key, event trade ikut tercatat, alasan SKIPPED.
+INSERT INTO alerts (session_id, login, magic, symbol, time, type, severity, message, status, attempts, sent_at,
+                    notify_key, status_reason)
+VALUES (2, 12345, 2026091903, 'EURJPYc', 1790702000, 'TRADE_OPENED', 'INFO', 'BUY 0.10 @ 161.234', 'SENT', 1, 1790702001,
+        '2026091903-1790690000-12345-1', NULL),
+       (2, 12345, 2026091903, 'EURJPYc', 1790712000, 'TRADE_CLOSED', 'INFO', 'TP net 41.20 USC R 2.06', 'SENT', 1, 1790712002,
+        '2026091903-1790690000-12345-2', NULL),
+       (2, 12345, 2026091903, 'EURJPYc', 1790713000, 'CONN_DOWN', 'MEDIUM', 'Koneksi terputus 300 detik', 'SKIPPED', 0, NULL,
+        '2026091903-1790690000-12345-3', 'COOLDOWN'),
+       (2, 12345, 2026091903, 'EURJPYc', 1790714000, 'MARGIN_OK', 'INFO', 'Margin level kembali di atas 300%', 'SKIPPED', 0, NULL,
+        '2026091903-1790690000-12345-4', 'QUOTA'),
+       (2, 12345, 2026091903, 'EURJPYc', 1790715000, 'ORDER_FAILED', 'MEDIUM', 'retcode 10006', 'FAILED', 3, NULL,
+        '2026091903-1790690000-12345-5', 'TRANSPORT_TEMP');

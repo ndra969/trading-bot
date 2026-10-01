@@ -4,12 +4,12 @@
 
 #include <SDBot/Storage/MigrationSource.mqh>
 
-#define SDB_SCHEMA_LATEST 2
+#define SDB_SCHEMA_LATEST 3
 
 class CSdbDataMigrations : public ISdbMigrationSource
   {
 public:
-   int    Count()              { return 2; }
+   int    Count()              { return 3; }
    int    Version(const int i) { return i + 1; }
    string Name(const int i)
      {
@@ -17,6 +17,7 @@ public:
         {
          case 0: return "initial";
          case 1: return "run_key";
+         case 2: return "alert_notify";
         }
       return "";
      }
@@ -26,6 +27,7 @@ public:
         {
          case 0: return "77d01d0c2ffd5cff11891823fcdf5c730af39f460b67bc1242e47d9fa1a06fe8";
          case 1: return "0537621d99d4de54936c28ba2cd4de6e5974d702fa1383e61f5e09d372eb36e6";
+         case 2: return "3a35561380ac55de9695d078d276eac62ebe7d371de60b9cbcfc250014ee114f";
         }
       return "";
      }
@@ -347,6 +349,13 @@ public:
                       "FROM trades t\n" +
                       "LEFT JOIN closures c ON c.login = t.login AND c.run_key = t.run_key AND c.position_id = t.position_id";
             return 27;
+         case 2:
+            ArrayResize(out, 4);
+            out[0] = "ALTER TABLE alerts ADD COLUMN notify_key TEXT";
+            out[1] = "ALTER TABLE alerts ADD COLUMN status_reason TEXT";
+            out[2] = "UPDATE alerts SET notify_key = 'row-' || id WHERE notify_key IS NULL";
+            out[3] = "CREATE INDEX ix_alerts_login_key ON alerts (login, notify_key)";
+            return 4;
         }
       return 0;
      }

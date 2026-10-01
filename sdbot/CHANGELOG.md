@@ -4,6 +4,17 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.07 — 2026-10-01 — spec 08 notifier core
+
+- `CNotifier` (lapisan Notify) sebagai sink di `CTeeSink`: semua alert Fase 1 plus pesan posisi dibuka/ditutup (`TRADE_OPENED`, `TRADE_CLOSED`), tanpa mengubah modul penghasilnya.
+- Aturan kirim PRD: Critical lebih dulu tanpa limit; Medium dan Info cooldown 5 menit per tipe (per akun untuk tipe akun, lewat Global Variables); kuota non-Critical 20 per jam server per akun; pesan non-Critical > 30 menit dibuang; maks 2 kiriman per `OnTimer`, retry 3x, jeda sesuai permintaan transport, antrean maks 100.
+- Format gaya bot Python: emoji per level, penanda `SDBot` + simbol + akun (`TESTER` di tester) + versi, HTML ter-escape, harga sesuai digit simbol, potong 4096 karakter tanpa merusak tag.
+- Status kirim di tabel `alerts` lewat Logger (skema v3: `notify_key`, `status_reason`); restart menandai pesan tertunda dan mengirim ulang Critical muda; deinit mengirim Critical tersisa.
+- Pesan masih dicetak ke log Experts/tester (transport log); Telegram dan push HP di spec 09. Keputusan PC-13.
+- Skenario SC-10 (transport palsu): event trade, prioritas Critical, cooldown, kuota, retry, status DB, hanya dari timer, maks 2 per siklus.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-01): build 0 error / 0 warning (4 target); unit 403/403 di 24 suite; 14 skenario PASS (SC-00..SC-10); durasi total 2 menit 9 detik. pytest `sdbot/tools` 57/57, `schema.py check` OK (data versi 3).
+
 ### 1.06 — 2026-10-01 — Fase 1 selesai (spec 07 integration)
 
 - Metrik `OnTester` PRD: expectancy R per trade ÷ max drawdown relatif equity; 0 bila trade dengan R < 30 atau DD 0.

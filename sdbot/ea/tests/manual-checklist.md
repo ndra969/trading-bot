@@ -25,6 +25,7 @@ Versi EA saat checklist dibuat: 1.06 (Fase 1 selesai). Terminal live: akun cent 
 | MC-IN-01 | spec 07 | Muat setiap preset lewat Inputs → Load di satu chart | File terbaca, nilai sesuai; preset simbol lain di chart ini → WARN `InpPresetTag` | | | |
 | MC-IN-02 | spec 07 | Cek simbol NZDUSDc tersedia di akun cent | Ada di Market Watch; bila tidak, catat di kolom Catatan | | | |
 | PRD-08 | PRD uji fungsi wajib | Akun real dengan `AllowLiveTrading = false` | EA menolak jalan (= MC-01) | | | |
+| MC-NT-01 | spec 08 | EA v1.07 di chart EURUSDc akun cent 1 jam | Pesan notifier di log Experts berformat spec 08 design §4.4 (penanda `SDBot` · simbol · `CENT` · versi), baris `alerts` berstatus `SENT` dengan `notify_key` | | | |
 
 ## Fase 3: setelah ada entry dari sinyal
 

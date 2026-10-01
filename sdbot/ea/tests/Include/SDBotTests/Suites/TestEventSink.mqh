@@ -8,6 +8,7 @@
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/FakeSink.mqh>
 #include <SDBot/Core/EventSink.mqh>
+#include <SDBot/App/TeeSink.mqh>
 
 void RunTestEventSink()
   {
@@ -50,6 +51,50 @@ void RunTestEventSink()
    double sl = 123.0;
    bool found = ns.FindInitialSl(12345, 1, sl);
    AssertTrue("TC-LG-03a", "CNullSink.FindInitialSl false dan sl 0", !found && sl == 0.0);
+
+   // TC-ES-10 (spec 08 Req 5.1): tee memberi key unik pada alert tanpa key, sama untuk semua sink.
+   CFakeSink a1, a2, a3;
+   CTeeSink tee;
+   tee.Add(GetPointer(a1));
+   tee.Add(GetPointer(a2));
+   tee.Add(GetPointer(a3));
+   tee.SetKeyPrefix("2026091901-100-7");
+   AlertEvent noKey;   // seperti modul Fase 1: key tidak diisi (string NULL)
+   noKey.type = "CONN_DOWN";
+   noKey.severity = SDB_SEV_MEDIUM;
+   noKey.message = "terputus";
+   tee.OnAlert(noKey);
+   tee.OnAlert(noKey);
+   AlertEvent g1, g2, g3;
+   bool all3 = a1.CountAlert() == 2 && a2.CountAlert() == 2 && a3.CountAlert() == 2;
+   AssertTrue("TC-ES-10a", "ketiga sink menerima dua alert", all3);
+   a1.LastAlert(g1);
+   a2.LastAlert(g2);
+   a3.LastAlert(g3);
+   AssertTrue("TC-ES-10b", "key sama di semua sink dan berprefix", g1.key != "" && g1.key == g2.key && g2.key == g3.key &&
+              StringFind(g1.key, "2026091901-100-7-") == 0);
+   AlertEvent first;
+   a1.AlertAt(0, first);
+   AssertTrue("TC-ES-10c", "key unik per alert", first.key != "" && first.key != g1.key);
+
+   // TC-ES-11 (Req 6.2): alert yang sudah punya key (requeue) tidak diganti.
+   AlertEvent keyed = alert;
+   keyed.key = "row-42";
+   tee.OnAlert(keyed);
+   a2.LastAlert(g2);
+   AssertStrEq("TC-ES-11", "key asal dipertahankan", g2.key, "row-42");
+
+   // TC-ES-12 (Req 5.3): status kirim diteruskan ke semua sink.
+   AlertStatus st;
+   st.key = "row-42";
+   st.status = "SENT";
+   st.attempts = 1;
+   st.sentAt = D'2026.10.01 10:00:00';
+   st.reason = "";
+   tee.OnAlertStatus(st);
+   AlertStatus gs;
+   AssertTrue("TC-ES-12", "status sampai ke sink dengan key yang sama",
+              a1.CountStatus() == 1 && a3.CountStatus() == 1 && a3.LastStatus(gs) && gs.key == "row-42" && gs.status == "SENT");
 
    TfEndSuite();
   }

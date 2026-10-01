@@ -163,7 +163,7 @@ def test_ts16_64bit_position_id_round_trip(real_schema_dir: Path):
 
 def test_seed_blocks_are_split_per_version(real_schema_dir: Path):
     blocks = schema.load_seed(real_schema_dir / "migrations" / "data" / "seed_sample.sql")
-    assert set(blocks) == {1, 2}
+    assert set(blocks) == {1, 2, 3}
     conn = _apply_initial(real_schema_dir)
     conn.executescript(blocks[1])
     assert conn.execute("SELECT COUNT(*) FROM closures").fetchone()[0] == 4

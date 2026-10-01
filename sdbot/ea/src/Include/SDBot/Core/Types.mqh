@@ -246,7 +246,7 @@ struct SessionInfo
    string            testerModel;
   };
 
-// Alert untuk tabel alerts; dikirim Notifier di Fase 2. type = kode stabil dari enums.md.
+// Alert untuk tabel alerts; dikirim Notifier (spec 08). type = kode stabil dari enums.md.
 struct AlertEvent
   {
    string            type;
@@ -255,6 +255,82 @@ struct AlertEvent
    string            symbol;
    long              magic;
    datetime          time;
+   string            key;             // notify_key (spec 08): diisi CTeeSink bila kosong
+  };
+
+// Hasil kirim notifikasi untuk baris alerts dengan notify_key yang sama (spec 08 Req 5).
+struct AlertStatus
+  {
+   string            key;
+   string            status;          // SDB_ALERT_STATUS_*
+   int               attempts;
+   datetime          sentAt;          // 0 = NULL (waktu server)
+   string            reason;          // SDB_ALERT_STATUS_REASON_*, "" = NULL
+  };
+
+//--- Notifier (spec 08 design §4.1)
+enum ENUM_SDB_NT_LEVEL
+  {
+   SDB_NT_INFO = 0,
+   SDB_NT_SUCCESS = 1,
+   SDB_NT_MEDIUM = 2,
+   SDB_NT_HIGH = 3,
+   SDB_NT_CRITICAL = 4
+  };
+
+enum ENUM_SDB_NT_SCOPE
+  {
+   SDB_NT_SCOPE_INSTANCE = 0,
+   SDB_NT_SCOPE_ACCOUNT = 1
+  };
+
+enum ENUM_SDB_SEND_CODE
+  {
+   SDB_SEND_OK = 0,
+   SDB_SEND_TEMP = 1,         // gagal sementara: coba lagi siklus berikutnya
+   SDB_SEND_LIMITED = 2,      // dibatasi: tunggu retryAfterSec
+   SDB_SEND_PERMANENT = 3     // tidak akan berhasil bila diulang
+  };
+
+enum ENUM_SDB_NT_NEXT
+  {
+   SDB_NT_DONE_SENT = 0,
+   SDB_NT_RETRY = 1,
+   SDB_NT_WAIT = 2,
+   SDB_NT_DONE_FAILED = 3
+  };
+
+struct SdbNtContext
+  {
+   string            symbol;
+   string            accountTag;      // CENT, REAL, DEMO, TESTER
+   string            eaVersion;
+   string            currency;
+   int               digits;
+  };
+
+struct SdbOutMessage
+  {
+   string            key;
+   string            type;
+   string            text;            // HTML Telegram, sudah dipotong ke batas
+   bool              silent;
+   ENUM_SDB_SEVERITY severity;
+  };
+
+struct SdbSendResult
+  {
+   ENUM_SDB_SEND_CODE code;
+   int               retryAfterSec;
+   string            error;
+  };
+
+struct SdbNtItem
+  {
+   SdbOutMessage     msg;
+   long              queuedAt;        // waktu notifier saat masuk antrean (bukan AlertEvent.time)
+   int               attempts;
+   long              notBefore;       // 0 = siap
   };
 
 // Struct event berikut mengikuti kolom tabel di shared/schema/data_db.sql. Kolom teks enum

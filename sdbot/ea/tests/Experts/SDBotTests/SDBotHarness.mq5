@@ -6,15 +6,16 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.06"
+#property version   "1.07"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.06"
+#define SDB_HARNESS_EA_VERSION "1.07"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/ScenarioRecorder.mqh>
+#include <SDBotTests/FakeTransport.mqh>
 #include <SDBotTests/Scenarios.mqh>
 
 enum ENUM_HARNESS_DIRECTION
@@ -39,9 +40,14 @@ input int                    HarnessRestartAfterPartial = 0;   // restart di bar
 input int                    HarnessDetachBars    = 0;         // saat restart, app dilepas N bar dulu ("EA mati", SC-04b)
 input int                    HarnessWithdrawAtBar = 0;         // tarik saldo di bar ini atau sesudahnya saat tanpa posisi (0 = tidak)
 input double                 HarnessWithdrawPct   = 20.0;      // besar penarikan (% balance)
+input string                 HarnessTransportScript   = "";    // skrip CFakeTransport ("" = transport log biasa), SC-10
+input string                 HarnessTransportFailType = "";    // tipe yang selalu gagal sementara di transport palsu
+input int                    HarnessAlertBurstAtBar   = 0;     // kirim burst alert uji di bar ini (0 = tidak)
 
 CSdbApp          *g_app = NULL;
 CScenarioRecorder g_rec;
+CFakeTransport    g_tr;
+long              g_timerCycle = 0;
 bool              g_runStarted = false;
 datetime          g_lastBar = 0;
 int               g_bar = 0;
@@ -72,7 +78,8 @@ void RecordOwnPositions(const bool before)
 int StartApp()
   {
    g_app = new CSdbApp;
-   int r = g_app.OnInit(CurrentAppConfig(SDB_APP_HARNESS, SDB_HARNESS_EA_VERSION), GetPointer(g_rec));
+   ISdbTransport *tr = (HarnessTransportScript != "") ? GetPointer(g_tr) : NULL;   // NULL = transport log (skenario lain)
+   int r = g_app.OnInit(CurrentAppConfig(SDB_APP_HARNESS, SDB_HARNESS_EA_VERSION), GetPointer(g_rec), tr);
    if(g_app.Logger().SessionId() > 0)
       g_rec.AddSession(g_app.Logger().SessionId());
    return r;
@@ -82,7 +89,9 @@ void StopApp(const int reason)
   {
    if(g_app == NULL)
       return;
+   g_tr.SetPhase("DEINIT");
    g_app.OnDeinit(reason);
+   g_rec.SetNotifyQueueAtStop(g_app.Notifier().QueueSize());
    g_rec.AddSends(g_app.Executor().SendCount());
    delete g_app;
    g_app = NULL;
@@ -166,10 +175,48 @@ int OnInit()
      }
    TfBeginRun(InpTestRunId);
    g_runStarted = true;
+   g_tr.Script(HarnessTransportScript);
+   g_tr.FailType(HarnessTransportFailType);
    return StartApp();
   }
 
 void OnTick()
+  {
+   g_tr.SetPhase("TICK");
+   HarnessTick();
+   g_tr.SetPhase("");
+  }
+
+// Burst alert uji (SC-10): 2x Medium untuk cooldown (sebelum kuota habis), satu tipe yang selalu gagal,
+// lalu 25 Info berbeda tipe agar kuota 20 per jam terlampaui.
+void AlertBurst()
+  {
+   AlertEvent a;
+   a.symbol = _Symbol;
+   a.magic = CurrentInputs().magic;
+   a.time = TimeCurrent();
+   a.type = SDB_ALERT_TYPE_ORDER_FAILED;
+   a.severity = SDB_SEV_MEDIUM;
+   a.message = "uji burst ORDER_FAILED pertama";
+   g_app.Sink().OnAlert(a);
+   a.message = "uji burst ORDER_FAILED kedua";
+   g_app.Sink().OnAlert(a);
+   a.severity = SDB_SEV_INFO;
+   if(HarnessTransportFailType != "")
+     {
+      a.type = HarnessTransportFailType;
+      a.message = "uji burst gagal sementara";
+      g_app.Sink().OnAlert(a);
+     }
+   for(int i = 1; i <= 25; i++)
+     {
+      a.type = StringFormat("TEST_BURST_%02d", i);
+      a.message = "uji burst kuota " + IntegerToString(i);
+      g_app.Sink().OnAlert(a);
+     }
+  }
+
+void HarnessTick()
   {
    if(g_app != NULL)
       g_app.OnTick();
@@ -206,6 +253,8 @@ void OnTick()
       TryEntry();
    if(g_app != NULL)
       TryWithdraw();
+   if(g_app != NULL && HarnessAlertBurstAtBar > 0 && g_bar == HarnessAlertBurstAtBar)
+      AlertBurst();
   }
 
 // Penarikan saldo terjadwal (spec 05 Req 8.3, SC-07): saat tanpa posisi, agar puncak tidak ikut
@@ -236,7 +285,10 @@ void OnTimer()
   {
    if(g_app == NULL)
       return;
+   g_tr.SetPhase("TIMER");
+   g_tr.SetCycle(++g_timerCycle);
    g_app.OnTimer();
+   g_tr.SetPhase("");
    if(!g_app.RiskState().IsReady())
       return;
    if(g_app.RiskState().IsStopped())
@@ -247,8 +299,10 @@ void OnTimer()
 
 void OnTradeTransaction(const MqlTradeTransaction &t, const MqlTradeRequest &rq, const MqlTradeResult &rs)
   {
+   g_tr.SetPhase("TRADE");
    if(g_app != NULL)
       g_app.OnTradeTransaction(t, rq, rs);
+   g_tr.SetPhase("");
   }
 
 double OnTester()
@@ -262,7 +316,7 @@ void OnDeinit(const int reason)
    StopApp(reason);
    if(!g_runStarted)
       return;
-   CheckScenario(HarnessScenario, g_rec);
+   CheckScenario(HarnessScenario, g_rec, g_tr);
    TfEndRun();
    g_runStarted = false;
   }

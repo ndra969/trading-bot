@@ -26,12 +26,14 @@ private:
    datetime          m_reattachAt;
    long              m_restartPosition;
    BalanceOpRecord   m_balanceOps[];
+   AlertStatus       m_statuses[];
    double            m_withdrawAmount;     // SC-07: penarikan harness, puncak dan level DD sebelum/sesudah diproses
    double            m_peakBefore;
    int               m_levelBefore;
    double            m_peakAfter;
    int               m_levelAfter;
    bool              m_afterSampled;
+   int               m_notifyQueueAtStop;   // antrean notifier setelah deinit (SC-10)
    long              m_sends;           // jumlah OrderSend dari semua CExecutor (termasuk sebelum restart)
    DealRecord        m_dealRecs[];
    PositionEvent     m_events[];
@@ -45,7 +47,7 @@ private:
      }
 
 public:
-                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_reattachAt(0), m_restartPosition(0), m_sends(0) {}
+                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_reattachAt(0), m_restartPosition(0), m_notifyQueueAtStop(-1), m_sends(0) {}
 
    //--- ISdbEventSink
    // Jam timer (TimeLocal), bukan a.time: a.time = waktu tick terakhir, yang tertinggal dari jadwal
@@ -91,6 +93,12 @@ public:
       int n = ArraySize(m_balanceOps);
       ArrayResize(m_balanceOps, n + 1);
       m_balanceOps[n] = b;
+     }
+   void OnAlertStatus(const AlertStatus &s)
+     {
+      int n = ArraySize(m_statuses);
+      ArrayResize(m_statuses, n + 1);
+      m_statuses[n] = s;
      }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
 
@@ -247,6 +255,9 @@ public:
      }
 
    // "1,2,3" untuk klausa SQL IN; "0" bila belum ada sesi (tidak cocok dengan id mana pun).
+   void SetNotifyQueueAtStop(const int n)   { m_notifyQueueAtStop = n; }
+   int  NotifyQueueAtStop() const           { return m_notifyQueueAtStop; }
+
    string SessionIdList() const
      {
       string s = "";

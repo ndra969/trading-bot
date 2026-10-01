@@ -1,66 +1,62 @@
 //+------------------------------------------------------------------+
-//| TeeSink.mqh — CTeeSink: meneruskan setiap event ke dua sink (Logger
-//| dan perekam harness), tanpa mengubah penulisan ke DB (spec 04 Req 7.6).
+//| TeeSink.mqh — CTeeSink: meneruskan setiap event ke beberapa sink
+//| (Logger, Notifier, perekam harness) tanpa mengubah penulisan ke DB
+//| (spec 04 Req 7.6). Alert tanpa key diberi notify_key di sini agar
+//| Logger dan Notifier merujuk baris alerts yang sama (spec 08 Req 5.1).
 //+------------------------------------------------------------------+
 #ifndef SDB_APP_TEESINK_MQH
 #define SDB_APP_TEESINK_MQH
 
 #include <SDBot/Core/EventSink.mqh>
 
+#define SDB_TEE_MAX_SINKS 4
+
 class CTeeSink : public ISdbEventSink
   {
 private:
-   ISdbEventSink    *m_primary;     // Logger: sumber FindInitialSl
-   ISdbEventSink    *m_secondary;
+   ISdbEventSink    *m_sinks[SDB_TEE_MAX_SINKS];   // sink pertama = Logger: sumber FindInitialSl
+   int               m_count;
+   string            m_keyPrefix;
+   long              m_seq;
 
 public:
-                     CTeeSink(void) : m_primary(NULL), m_secondary(NULL) {}
+                     CTeeSink(void) : m_count(0), m_keyPrefix("0"), m_seq(0) {}
 
-   void Init(ISdbEventSink *primary, ISdbEventSink *secondary)
+   void Clear() { m_count = 0; }
+
+   bool Add(ISdbEventSink *sink)
      {
-      m_primary = primary;
-      m_secondary = secondary;
+      if(sink == NULL || m_count >= SDB_TEE_MAX_SINKS)
+         return false;
+      m_sinks[m_count++] = sink;
+      return true;
      }
 
-   void OnAccount(const AccountSnapshot &a)
-     {
-      if(m_primary != NULL)   m_primary.OnAccount(a);
-      if(m_secondary != NULL) m_secondary.OnAccount(a);
-     }
-   void OnTradeOpened(const TradeRecord &t)
-     {
-      if(m_primary != NULL)   m_primary.OnTradeOpened(t);
-      if(m_secondary != NULL) m_secondary.OnTradeOpened(t);
-     }
-   void OnDeal(const DealRecord &d)
-     {
-      if(m_primary != NULL)   m_primary.OnDeal(d);
-      if(m_secondary != NULL) m_secondary.OnDeal(d);
-     }
-   void OnPositionEvent(const PositionEvent &e)
-     {
-      if(m_primary != NULL)   m_primary.OnPositionEvent(e);
-      if(m_secondary != NULL) m_secondary.OnPositionEvent(e);
-     }
-   void OnClosure(const ClosureRecord &c)
-     {
-      if(m_primary != NULL)   m_primary.OnClosure(c);
-      if(m_secondary != NULL) m_secondary.OnClosure(c);
-     }
-   void OnBalanceOp(const BalanceOpRecord &b)
-     {
-      if(m_primary != NULL)   m_primary.OnBalanceOp(b);
-      if(m_secondary != NULL) m_secondary.OnBalanceOp(b);
-     }
+   // "<magic>-<waktu init>-<tick>": unik per instance lintas restart (design §3.2).
+   void   SetKeyPrefix(const string prefix) { m_keyPrefix = prefix; m_seq = 0; }
+   string NextKey()                         { m_seq++; return m_keyPrefix + "-" + IntegerToString(m_seq); }
+
+   void OnAccount(const AccountSnapshot &a)     { for(int i = 0; i < m_count; i++) m_sinks[i].OnAccount(a); }
+   void OnTradeOpened(const TradeRecord &t)     { for(int i = 0; i < m_count; i++) m_sinks[i].OnTradeOpened(t); }
+   void OnDeal(const DealRecord &d)             { for(int i = 0; i < m_count; i++) m_sinks[i].OnDeal(d); }
+   void OnPositionEvent(const PositionEvent &e) { for(int i = 0; i < m_count; i++) m_sinks[i].OnPositionEvent(e); }
+   void OnClosure(const ClosureRecord &c)       { for(int i = 0; i < m_count; i++) m_sinks[i].OnClosure(c); }
+   void OnBalanceOp(const BalanceOpRecord &b)   { for(int i = 0; i < m_count; i++) m_sinks[i].OnBalanceOp(b); }
+   void OnAlertStatus(const AlertStatus &s)     { for(int i = 0; i < m_count; i++) m_sinks[i].OnAlertStatus(s); }
+
    void OnAlert(const AlertEvent &a)
      {
-      if(m_primary != NULL)   m_primary.OnAlert(a);
-      if(m_secondary != NULL) m_secondary.OnAlert(a);
+      AlertEvent k = a;
+      if(StringLen(k.key) == 0)   // modul tidak mengisi key: string NULL, bukan "" (NULL != "" di MQL5)
+         k.key = NextKey();
+      for(int i = 0; i < m_count; i++)
+         m_sinks[i].OnAlert(k);
      }
+
    bool FindInitialSl(const long login, const ulong positionId, double &sl)
      {
       sl = 0.0;
-      return m_primary != NULL && m_primary.FindInitialSl(login, positionId, sl);
+      return m_count > 0 && m_sinks[0].FindInitialSl(login, positionId, sl);
      }
   };
 

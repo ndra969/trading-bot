@@ -4,7 +4,18 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
-(tidak ada)
+### PC-13: Aturan notifier dan status alert (skema v3)
+- Status: Open
+- Tanggal disetujui: 2026-10-01
+- Dokumen: PRD-EA §Notifikasi, §Data dan database; PRD-Backoffice §Database dan kontrak data
+- Sumber: spec `ea-08-notifier-core` requirements, keputusan 1–10
+- Perubahan:
+    - §Notifikasi, tabel event: Info dari alert memakai cooldown 5 menit per tipe (sama dengan Medium); event trade (buka, tutup, BE, partial) tanpa cooldown. Posisi tutup profit = SUCCESS ✅, rugi atau impas = Info.
+    - Cooldown tipe lingkup akun (`CONN_*`, `DD_*`, `DAILY_LOSS`, `MARGIN_*`, `BALANCE_OP`, `STATE_RESET`, `EMERGENCY_RESET`) dan kuota non-Critical 20 pesan berlaku per akun untuk semua instance SDBot (Global Variables, compare-and-set); kuota dihitung per jam server berjalan; event trade ikut kuota. Pesan yang ditahan tidak diringkas, cukup tercatat `SKIPPED` dengan alasan.
+    - Umur pesan, cooldown, dan kuota memakai waktu server berjalan (`TimeTradeServer()`), agar tetap berjalan saat pasar tutup.
+    - Antrean notifikasi maksimal 100 (non-Critical tertua digeser), maksimal 2 pesan per siklus `OnTimer`, retry 3 kali untuk gagal sementara.
+    - Restart: baris `PENDING` milik instance > 30 menit menjadi `SKIPPED`; Critical ≤ 30 menit dikirim ulang (bisa dobel bila EA crash setelah kirim); non-Critical muda `SKIPPED`. Saat deinit, Critical di antrean dikirim (maks 3 detik).
+    - §Data: migrasi `0003` menambah kolom `alerts.notify_key` (kunci notifikasi untuk pembaruan status) dan `alerts.status_reason` (`COOLDOWN`, `QUOTA`, `STALE`, `OVERFLOW`, `RESTART`, kode error transport). Event trade juga tercatat di `alerts` (tipe `TRADE_OPENED`, `TRADE_CLOSED`).
 
 ## Done
 

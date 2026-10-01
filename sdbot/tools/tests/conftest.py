@@ -16,13 +16,21 @@ def real_schema_dir() -> Path:
     return SDBOT_DIR / "shared" / "schema"
 
 
+V1_LATER_COLUMNS = ("`alerts.status_reason`",)
+
+
 @pytest.fixture
 def project(tmp_path: Path, real_schema_dir: Path) -> Path:
     """Salinan sdbot/ minimal: shared/schema (enums, migrasi, seed) + folder tujuan generate."""
     root = tmp_path / "sdbot"
     schema = root / "shared" / "schema"
     (schema / "migrations" / "data").mkdir(parents=True)
-    shutil.copy(real_schema_dir / "enums.md", schema / "enums.md")
+    # Enum untuk kolom yang baru ada setelah 0001 (mis. alerts.status_reason, v3) tidak ikut.
+    enums = (real_schema_dir / "enums.md").read_text(encoding="utf-8").splitlines(keepends=True)
+    (schema / "enums.md").write_text(
+        "".join(line for line in enums if not any(c in line for c in V1_LATER_COLUMNS)),
+        encoding="utf-8",
+    )
     shutil.copy(
         real_schema_dir / "migrations" / "data" / "0001_initial.sql",
         schema / "migrations" / "data" / "0001_initial.sql",

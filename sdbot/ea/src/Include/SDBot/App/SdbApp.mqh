@@ -18,6 +18,7 @@
 #include <SDBot/Position/ClosureTracker.mqh>
 #include <SDBot/Position/Reconciler.mqh>
 #include <SDBot/App/TeeSink.mqh>
+#include <SDBot/Notify/Notifier.mqh>
 #include <SDBot/App/TesterMetric.mqh>
 
 #define SDB_GV_PREFIX_UNITTEST "SDBTEST"
@@ -28,7 +29,11 @@ private:
    SdbAppConfig      m_cfg;
    CLogger           m_logger;
    CTeeSink          m_tee;
-   ISdbEventSink    *m_sink;          // Logger, atau tee(Logger, observer) di harness/uji
+   ISdbEventSink    *m_sink;          // tee(Logger, Notifier, observer harness/uji)
+   CNotifier         m_notifier;
+   CLogTransport     m_logTransport;   // live sebelum spec 09 dan tester (spec 08 Req 7.1, 7.3)
+   ISdbTransport    *m_transport;
+   bool              m_notifyOn;       // false tanpa DB (optimasi, Req 7.2)
    CAccount          m_account;
    CState            m_state;
    CExecutor         m_executor;
@@ -58,6 +63,11 @@ private:
       m_lastSnapshot = TimeLocal();   // Validate() baru saja mengirim snapshot
       if(!m_stateReady)
          return;
+      if(m_notifyOn)
+        {
+         m_notifier.SetState(GetPointer(m_state));   // cooldown dan kuota akun di GV (spec 08 Req 2.5, 2.6)
+         m_notifier.SetContext(NotifyContext());
+        }
       // Status risiko bersama (spec 05): baseline, reset input, operasi saldo tertunda, lalu snapshot
       // langsung dengan puncak yang benar (Req 3.8), karena snapshot Validate() dibuat sebelum puncak diketahui.
       m_riskReady = m_riskState.Init(GetPointer(m_state), m_cfg.inputs.magic, AccountInfoDouble(ACCOUNT_EQUITY),
@@ -116,18 +126,46 @@ private:
       return GlobalVariableCheck(gv) ? (long)GlobalVariableGet(gv) : SDB_RUN_KEY_NEW;
      }
 
+   // Penanda pesan (spec 08 Req 4.1): TESTER di Strategy Tester agar tidak tertukar dengan akun sungguhan.
+   SdbNtContext NotifyContext() const
+     {
+      SdbNtContext c;
+      c.symbol = _Symbol;
+      c.eaVersion = m_cfg.eaVersion;
+      c.currency = AccountInfoString(ACCOUNT_CURRENCY);
+      c.digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+      c.accountTag = MQLInfoInteger(MQL_TESTER) ? "TESTER"
+                     : SdbAccountTypeText(AccountTypeOf((ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE), c.currency));
+      return c;
+     }
+
+   // Tee = Logger (+ Notifier) (+ observer). Notifier dipasang sebelum Logger.Open agar alert migrasi ikut
+   // terkirim, dan Logger mengirim alertnya sendiri lewat tee (spec 08 design §3.8).
+   void BuildSinks(ISdbEventSink *observer)
+     {
+      string keyPrefix = StringFormat("%I64d-%I64d-%u", m_cfg.inputs.magic, (long)TimeLocal(), GetTickCount() % 100000);
+      m_tee.Clear();
+      m_tee.Add(GetPointer(m_logger));
+      m_notifyOn = (m_cfg.dbTarget != SDB_DB_NONE);
+      if(m_notifyOn)
+        {
+         m_notifier.Init(GetPointer(m_logger), m_transport, NotifyContext());
+         m_notifier.SetKeyPrefix(keyPrefix);
+         m_tee.Add(GetPointer(m_notifier));
+        }
+      if(observer != NULL)
+         m_tee.Add(observer);
+      m_tee.SetKeyPrefix(keyPrefix);
+      m_logger.SetRouter(GetPointer(m_tee));
+      m_sink = GetPointer(m_tee);
+     }
+
    void OpenStorage(ISdbEventSink *observer)
      {
-      m_logger.Init(observer, _Symbol, m_cfg.inputs.magic, m_cfg.eaVersion);
+      m_logger.Init(NULL, _Symbol, m_cfg.inputs.magic, m_cfg.eaVersion);
+      BuildSinks(observer);
       m_logger.Open(m_cfg.dbTarget);   // gagal buka tidak menggagalkan init (spec 03 Req 2.2)
       m_storageOpened = true;
-      if(observer == NULL)
-         m_sink = GetPointer(m_logger);
-      else
-        {
-         m_tee.Init(GetPointer(m_logger), observer);
-         m_sink = GetPointer(m_tee);
-        }
       bool tester = (bool)MQLInfoInteger(MQL_TESTER);
       SessionInfo s;
       s.login = AccountInfoInteger(ACCOUNT_LOGIN);
@@ -144,17 +182,33 @@ private:
       m_logger.BeginSession(s);
       if(s.runKey == SDB_RUN_KEY_NEW && m_logger.RunKey() > 0)
          GlobalVariableSet(RunKeyGvName(s.login), (double)m_logger.RunKey());
+      RequeuePending();
+     }
+
+   // Pesan instance dari sesi lalu (spec 08 Req 6.1, 6.2): Critical muda dikirim ulang.
+   void RequeuePending()
+     {
+      if(!m_notifyOn)
+         return;
+      AlertEvent back[];
+      int n = m_logger.TakeRestartAlerts((long)TimeGMT(), back);
+      for(int i = 0; i < n; i++)
+         m_notifier.Requeue(back[i]);
+      if(n > 0)
+         LogInfo("App", IntegerToString(n) + " alert Critical dari sesi lalu diantrekan ulang");
      }
 
 public:
-                     CSdbApp(void) : m_sink(NULL), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
+                     CSdbApp(void) : m_sink(NULL), m_transport(NULL), m_notifyOn(false), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
                      m_deinitDone(false), m_lastSnapshot(0), m_lastTouch(0) {}
 
    // Urutan init (Req 6.1). observer: perekam harness / sink uji, menerima event di samping Logger.
    // Ganti timeframe/simbol chart memanggil OnDeinit lalu OnInit pada objek global yang sama.
-   int OnInit(const SdbAppConfig &cfg, ISdbEventSink *observer = NULL)
+   int OnInit(const SdbAppConfig &cfg, ISdbEventSink *observer = NULL, ISdbTransport *transport = NULL)
      {
       m_sink = NULL;
+      m_transport = (transport != NULL) ? transport : GetPointer(m_logTransport);
+      m_notifyOn = false;
       m_riskReady = false;
       m_storageOpened = false;
       m_stateReady = false;
@@ -227,6 +281,8 @@ public:
          m_state.TouchAll();
          m_lastTouch = TimeLocal();
         }
+      if(m_notifyOn)
+         m_notifier.OnTimer();   // setelah risk monitor, sebelum flush agar status kirim ikut tersimpan (Req 3.3)
       m_logger.Flush();
      }
 
@@ -257,6 +313,8 @@ public:
       if(m_atrHandle != INVALID_HANDLE)
          IndicatorRelease(m_atrHandle);
       m_atrHandle = INVALID_HANDLE;
+      if(m_notifyOn)
+         m_notifier.DrainCritical(SDB_NT_DRAIN_MS);   // termasuk init gagal (Req 6.3, 6.4)
       if(m_storageOpened)
         {
          m_logger.EndSession(reason);
@@ -265,6 +323,9 @@ public:
      }
 
    CExecutor *Executor() { return GetPointer(m_executor); }
+   ISdbEventSink *Sink() { return m_sink; }
+   bool NotifierActive() const { return m_notifyOn; }
+   CNotifier *Notifier() { return GetPointer(m_notifier); }
    CAccount  *Account()  { return GetPointer(m_account); }
    CLogger   *Logger()   { return GetPointer(m_logger); }
    CRiskManager *RiskManager() { return GetPointer(m_riskManager); }

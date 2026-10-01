@@ -17,6 +17,7 @@ private:
    ClosureRecord     m_closures[];
    TradeRecord       m_trades[];
    PositionEvent     m_events[];
+   AlertStatus       m_statuses[];
 
 public:
    void OnAccount(const AccountSnapshot &a)
@@ -56,6 +57,12 @@ public:
       m_closures[n] = c;
      }
    void OnBalanceOp(const BalanceOpRecord &b)   { }
+   void OnAlertStatus(const AlertStatus &s)
+     {
+      int n = ArraySize(m_statuses);
+      ArrayResize(m_statuses, n + 1);
+      m_statuses[n] = s;
+     }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
 
    int  CountAccount() const { return ArraySize(m_accounts); }
@@ -64,6 +71,40 @@ public:
    int  CountClosure() const { return ArraySize(m_closures); }
    int  CountTrade() const   { return ArraySize(m_trades); }
    int  CountEvent() const   { return ArraySize(m_events); }
+   int  CountStatus() const  { return ArraySize(m_statuses); }
+   bool LastStatus(AlertStatus &out) const
+     {
+      int n = ArraySize(m_statuses);
+      if(n == 0)
+         return false;
+      out = m_statuses[n - 1];
+      return true;
+     }
+   bool StatusAt(const int i, AlertStatus &out) const
+     {
+      if(i < 0 || i >= ArraySize(m_statuses))
+         return false;
+      out = m_statuses[i];
+      return true;
+     }
+   // Status terakhir untuk key; false bila belum ada.
+   bool StatusOf(const string key, AlertStatus &out) const
+     {
+      for(int i = ArraySize(m_statuses) - 1; i >= 0; i--)
+         if(m_statuses[i].key == key)
+           {
+            out = m_statuses[i];
+            return true;
+           }
+      return false;
+     }
+   bool AlertAt(const int i, AlertEvent &out) const
+     {
+      if(i < 0 || i >= ArraySize(m_alerts))
+         return false;
+      out = m_alerts[i];
+      return true;
+     }
    bool LastClosure(ClosureRecord &out) const
      {
       int n = ArraySize(m_closures);
@@ -115,6 +156,7 @@ public:
       ArrayFree(m_closures);
       ArrayFree(m_trades);
       ArrayFree(m_events);
+      ArrayFree(m_statuses);
      }
   };
 

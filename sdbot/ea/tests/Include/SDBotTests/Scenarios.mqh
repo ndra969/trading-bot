@@ -10,6 +10,7 @@
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/TestDb.mqh>
 #include <SDBotTests/ScenarioRecorder.mqh>
+#include <SDBotTests/FakeTransport.mqh>
 #include <SDBot/Core/Constants.mqh>
 #include <SDBot/Core/SchemaEnums.mqh>
 #include <SDBot/Execution/ExecutionRules.mqh>
@@ -720,7 +721,119 @@ void CheckSc04b(const string id, const CScenarioRecorder &rec)
    ScCheckSessions(id, rec, 2);
   }
 
-void CheckScenario(const string id, const CScenarioRecorder &rec)
+// Baris alerts run ini (sesi yang direkam) dengan syarat tambahan.
+long ScAlertCount(const CScenarioRecorder &rec, const string where)
+  {
+   return ScDbCount("SELECT COUNT(*) FROM alerts WHERE session_id IN (" + rec.SessionIdList() + ")" + (where == "" ? "" : " AND " + where));
+  }
+
+// Pesan event trade terkirim memuat posisi dan arah dari rekaman (Req 1.2, 1.3).
+int ScBadTradeMessages(const CScenarioRecorder &rec, const CFakeTransport &tr, int &checked)
+  {
+   int bad = 0;
+   checked = 0;
+   for(int i = 0; i < tr.Count(); i++)
+     {
+      SdbOutMessage m;
+      tr.At(i, m);
+      if(tr.CodeAt(i) != SDB_SEND_OK || (m.type != SDB_ALERT_TYPE_TRADE_OPENED && m.type != SDB_ALERT_TYPE_TRADE_CLOSED))
+         continue;
+      checked++;
+      bool found = false;
+      for(int k = 0; k < rec.TradeCount() && !found; k++)
+        {
+         TradeRecord t;
+         rec.TradeAt(k, t);
+         found = StringFind(m.text, "<code>" + IntegerToString(t.positionId) + "</code>") > 0 &&
+                 StringFind(m.text, " " + t.direction + " <code>") > 0 && StringFind(m.text, " TESTER ") > 0;
+        }
+      if(!found || (m.type == SDB_ALERT_TYPE_TRADE_CLOSED && StringFind(m.text, " R <code>") < 0))
+         bad++;
+     }
+   return bad;
+  }
+
+// SC-10 (spec 08 Req 1–3, 5, 7.4, 7.5): notifier dari event nyata di tester dengan transport palsu.
+void CheckSc10(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
+  {
+   int closures = rec.ClosureCount();
+   long rowsOpen = ScAlertCount(rec, "type='TRADE_OPENED'");
+   long rowsClose = ScAlertCount(rec, "type='TRADE_CLOSED'");
+   int checked = 0;
+   int badMsg = ScBadTradeMessages(rec, tr, checked);
+   AssertTrue(id + "-trade", StringFormat("1 baris per trade (%d/%I64d) dan per closure (%d/%I64d); pesan terkirim memuat posisi dan arah (%d dicek, salah %d)",
+                                          rec.TradeCount(), rowsOpen, closures, rowsClose, checked, badMsg),
+              rec.TradeCount() >= 2 && rowsOpen == rec.TradeCount() && rowsClose == closures && closures >= 2 && checked >= 2 && badMsg == 0);
+
+   int stopIdx = tr.FirstIndexOf(SDB_ALERT_TYPE_DD_STOP);
+   datetime tStop = ScFirstAlert(rec, SDB_ALERT_TYPE_DD_STOP);
+   int jumped = 0;
+   for(int i = 0; i < stopIdx; i++)
+     {
+      SdbOutMessage m;
+      tr.At(i, m);
+      if(tr.TimeAt(i) >= tStop && m.severity != SDB_SEV_CRITICAL)
+         jumped++;
+     }
+   AssertTrue(id + "-critical", StringFormat("DD_STOP terkirim <= 1 detik setelah dibuat (%s -> %s), tidak didahului non-Critical (%d)",
+                                             TimeToString(tStop, TIME_SECONDS), TimeToString(tr.TimeAt(stopIdx), TIME_SECONDS), jumped),
+              stopIdx >= 0 && tStop > 0 && tr.TimeAt(stopIdx) - tStop <= 1 && jumped == 0);
+
+   AssertTrue(id + "-cooldown", StringFormat("ORDER_FAILED pertama SENT, kedua SKIPPED COOLDOWN (%I64d)", ScAlertCount(rec, "type='ORDER_FAILED' AND status_reason='COOLDOWN'")),
+              ScAlertCount(rec, "type='ORDER_FAILED' AND message LIKE 'uji burst%'") == 2 &&
+              ScAlertCount(rec, "type='ORDER_FAILED' AND message LIKE 'uji burst%' AND status='SKIPPED' AND status_reason='COOLDOWN'") == 1 &&
+              ScAlertCount(rec, "type='ORDER_FAILED' AND message LIKE 'uji burst%' AND status='SENT'") == 1);
+
+   int worstHour = 0;
+   for(int i = 0; i < tr.Count(); i++)
+     {
+      SdbOutMessage m;
+      tr.At(i, m);
+      if(m.severity == SDB_SEV_CRITICAL || tr.CodeAt(i) != SDB_SEND_OK)
+         continue;
+      int inHour = 0;
+      for(int k = 0; k < tr.Count(); k++)
+        {
+         SdbOutMessage o;
+         tr.At(k, o);
+         if(o.severity != SDB_SEV_CRITICAL && tr.CodeAt(k) == SDB_SEND_OK && (long)tr.TimeAt(k) / 3600 == (long)tr.TimeAt(i) / 3600)
+            inHour++;
+        }
+      worstHour = MathMax(worstHour, inHour);
+     }
+   long quota = ScAlertCount(rec, "status_reason='QUOTA'");
+   AssertTrue(id + "-quota", StringFormat("non-Critical terkirim per jam server maks %d (terbanyak %d), SKIPPED QUOTA %I64d", SDB_NT_QUOTA_PER_HOUR, worstHour, quota),
+              worstHour <= SDB_NT_QUOTA_PER_HOUR && quota >= 1);
+
+   AssertTrue(id + "-retry", StringFormat("TEST_FAIL: 3 percobaan lalu FAILED TRANSPORT_TEMP (kirim %d)", tr.CountType("TEST_FAIL")),
+              tr.CountType("TEST_FAIL") == SDB_NT_MAX_ATTEMPTS &&
+              ScAlertCount(rec, "type='TEST_FAIL' AND status='FAILED' AND attempts=3 AND status_reason='TRANSPORT_TEMP'") == 1);
+
+   long sent = ScAlertCount(rec, "status='SENT'");
+   long pending = ScAlertCount(rec, "status='PENDING'");
+   AssertTrue(id + "-status", StringFormat("baris SENT = kiriman OK (%I64d/%d); PENDING = sisa antrean saat berhenti (%I64d/%d); semua baris punya notify_key",
+                                           sent, tr.CountCode(SDB_SEND_OK), pending, rec.NotifyQueueAtStop()),
+              sent == tr.CountCode(SDB_SEND_OK) && pending == rec.NotifyQueueAtStop() && ScAlertCount(rec, "notify_key IS NULL") == 0);
+
+   AssertTrue(id + "-timer-only", StringFormat("tidak ada kiriman dari OnTick/OnTradeTransaction (%d)", tr.Violations()), tr.Violations() == 0);
+
+   int worstCycle = 0;
+   for(int i = 0; i < tr.Count(); i++)
+     {
+      if(tr.PhaseAt(i) != "TIMER")
+         continue;
+      int same = 0;
+      for(int k = 0; k < tr.Count(); k++)
+         if(tr.PhaseAt(k) == "TIMER" && tr.CycleAt(k) == tr.CycleAt(i))
+            same++;
+      worstCycle = MathMax(worstCycle, same);
+     }
+   AssertTrue(id + "-per-cycle", StringFormat("kiriman per siklus timer maks %d (terbanyak %d)", SDB_NT_MAX_PER_TIMER, worstCycle),
+              worstCycle >= 1 && worstCycle <= SDB_NT_MAX_PER_TIMER);
+   ScCheckSessions(id, rec, 1);
+  }
+
+void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
    if(id == "SC-00")
@@ -749,6 +862,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec)
       CheckSc06(id, rec);
    else if(id == "SC-08")
       CheckSc08(id, rec);
+   else if(id == "SC-10")
+      CheckSc10(id, rec, tr);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

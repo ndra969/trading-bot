@@ -38,7 +38,7 @@ CREATE TABLE alerts (
   status      TEXT    NOT NULL CHECK (status IN ('PENDING','SENT','FAILED','SKIPPED')),
   attempts    INTEGER NOT NULL DEFAULT 0,
   sent_at     INTEGER
-);
+, notify_key TEXT, status_reason TEXT);
 
 CREATE TABLE "balance_ops" (
   id           INTEGER PRIMARY KEY,
@@ -185,6 +185,8 @@ CREATE TABLE "trades" (
   opened_at        INTEGER NOT NULL,
   UNIQUE (login, run_key, position_id)
 );
+
+CREATE INDEX ix_alerts_login_key ON alerts (login, notify_key);
 
 CREATE INDEX ix_alerts_status_time ON alerts (status, time);
 

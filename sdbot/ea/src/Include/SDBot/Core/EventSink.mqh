@@ -1,7 +1,8 @@
 //+------------------------------------------------------------------+
 //| EventSink.mqh — pintu pencatatan event. Modul mengirim event ke
 //| interface ini dan tidak pernah memanggil Storage langsung (RULES:
-//| hanya Storage yang menulis DB). CLogger (spec 03) mengimplementasikannya.
+//| hanya Storage yang menulis DB). CLogger (spec 03) dan CNotifier (spec 08)
+//| mengimplementasikannya.
 //+------------------------------------------------------------------+
 #ifndef SDB_CORE_EVENTSINK_MQH
 #define SDB_CORE_EVENTSINK_MQH
@@ -17,6 +18,7 @@ interface ISdbEventSink
    void OnClosure(const ClosureRecord &c);
    void OnBalanceOp(const BalanceOpRecord &b);
    void OnAlert(const AlertEvent &a);
+   void OnAlertStatus(const AlertStatus &s);   // hasil kirim notifikasi (spec 08)
    bool FindInitialSl(const long login, const ulong positionId, double &sl);
   };
 
@@ -31,6 +33,7 @@ public:
    void OnClosure(const ClosureRecord &c)       { }
    void OnBalanceOp(const BalanceOpRecord &b)   { }
    void OnAlert(const AlertEvent &a)            { }
+   void OnAlertStatus(const AlertStatus &s)     { }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
   };
 

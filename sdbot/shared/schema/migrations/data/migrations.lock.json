@@ -8,5 +8,10 @@
     "name": "run_key",
     "sha256": "0537621d99d4de54936c28ba2cd4de6e5974d702fa1383e61f5e09d372eb36e6",
     "released": false
+  },
+  "3": {
+    "name": "alert_notify",
+    "sha256": "3a35561380ac55de9695d078d276eac62ebe7d371de60b9cbcfc250014ee114f",
+    "released": false
   }
 }
