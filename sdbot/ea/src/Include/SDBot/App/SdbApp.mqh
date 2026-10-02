@@ -19,6 +19,7 @@
 #include <SDBot/Position/Reconciler.mqh>
 #include <SDBot/Analysis/MarketStructure.mqh>
 #include <SDBot/Analysis/ZoneBook.mqh>
+#include <SDBot/Strategies/PaTrigger.mqh>
 #include <SDBot/App/TeeSink.mqh>
 #include <SDBot/Notify/Notifier.mqh>
 #include <SDBot/Notify/TelegramTransport.mqh>
@@ -52,6 +53,7 @@ private:
    CPositionManager  m_posManager;
    CMarketStructure  m_structure;      // bias HTF + struktur MTF (spec 10)
    CZoneBook         m_zones;          // zona S&D MTF (spec 11)
+   CPaTrigger        m_trigger;        // pola candle LTF (spec 12)
    CClosureTracker   m_closureTracker;
    CReconciler       m_reconciler;
    int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
@@ -130,6 +132,7 @@ private:
       zp.maxAge = cfg.inputs.maxZoneAgeBars;
       zp.strength = cfg.inputs.swingStrength;
       m_zones.Init(_Symbol, mtf, zp, cfg.inputs.magic);
+      m_trigger.Init(_Symbol, ltf);
      }
 
    void SendSnapshot()
@@ -335,6 +338,7 @@ public:
          return;
       m_structure.OnTick();   // hanya membaca harga: jalan walau akun belum PASSED (spec 10 design §8.3)
       m_zones.OnTick();       // penanda Used baru terbaca setelah status bersama siap (spec 11)
+      m_trigger.OnTick();     // pola bar LTF tertutup untuk kedua arah (spec 12)
       if(m_account.State() != SDB_VAL_PASSED || !m_stateReady)
          return;
       m_posManager.OnTick();
@@ -413,6 +417,7 @@ public:
    CExecutor *Executor() { return GetPointer(m_executor); }
    CMarketStructure *Structure() { return GetPointer(m_structure); }
    CZoneBook *Zones() { return GetPointer(m_zones); }
+   CPaTrigger *Trigger() { return GetPointer(m_trigger); }
    ISdbEventSink *Sink() { return m_sink; }
    bool NotifierActive() const { return m_notifyOn; }
    string TransportName() { return m_transport != NULL ? m_transport.Name() : ""; }

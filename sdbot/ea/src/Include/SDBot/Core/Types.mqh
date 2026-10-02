@@ -402,6 +402,15 @@ struct SdbZone
    bool              used;
   };
 
+// Trigger price action LTF (spec 12): kode = SDB_PA_PATTERN_*.
+struct SdbPattern
+  {
+   string            code;
+   ENUM_SDB_DIR      dir;
+   int               score;           // PRD: engulfing kuat 10, pin bar 7, terarah lain 3, tanpa pola 0
+   datetime          barTime;
+  };
+
 // Laporan harian (spec 09 design §4.1-4.2).
 #define SDB_DS_KIND_IN      0
 #define SDB_DS_KIND_OUT     1

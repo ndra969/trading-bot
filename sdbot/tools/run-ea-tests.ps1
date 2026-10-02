@@ -149,12 +149,16 @@ function Invoke-TesterRun($r) {
     $setPath = Join-Path $script:testerProfiles "$runId.set"
     $iniPath = Join-Path $script:tmp "$runId.ini"
 
+    # Run unit mulai di bar pertama; Sabtu/Minggu/Senin 00:00 pasar tutup sehingga
+    # suite yang membuka posisi gagal "market closed". Mundur ke Selasa..Jumat.
+    $unitFrom = (Get-Date).AddDays(-7)
+    while (@('Saturday', 'Sunday', 'Monday') -contains $unitFrom.DayOfWeek.ToString()) { $unitFrom = $unitFrom.AddDays(-1) }
     $tester = [ordered]@{
         Expert   = 'SDBotTests\RunUnitTestsEA.ex5'
         Symbol   = $script:cfg.TestSymbol
         Period   = 'M15'
         Model    = '2'
-        FromDate = (Get-Date).AddDays(-7).ToString('yyyy.MM.dd')
+        FromDate = $unitFrom.ToString('yyyy.MM.dd')
         ToDate   = (Get-Date).ToString('yyyy.MM.dd')
     }
     $setLines = @()

@@ -35,6 +35,8 @@
 #include <SDBotTests/Suites/TestMarketStructure.mqh>
 #include <SDBotTests/Suites/TestZones.mqh>
 #include <SDBotTests/Suites/TestZoneBook.mqh>
+#include <SDBotTests/Suites/TestPatterns.mqh>
+#include <SDBotTests/Suites/TestPaTrigger.mqh>
 
 void RunAllSuites()
   {
@@ -67,6 +69,8 @@ void RunAllSuites()
    RunTestMarketStructure();
    RunTestZones();
    RunTestZoneBook();
+   RunTestPatterns();
+   RunTestPaTrigger();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

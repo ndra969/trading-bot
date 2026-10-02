@@ -39,6 +39,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Peta zona dibangun ulang penuh dari histori setiap bar MTF baru (tidak dari DB); zona bertumpuk tidak digabung, pipeline memilih Fresh lalu terbaru.
     - Input baru: `ZoneMinWidthAtr` 0,3, `ZoneMaxWidthAtr` 2,0, `ZoneMinLegAtr` 1,5, `ZoneLegBars` 10; `MaxZoneAgeBars` 100 (sudah di PRD).
 
+### PC-18: Definisi trigger price action
+- Status: Open
+- Tanggal disetujui: 2026-10-03
+- Dokumen: PRD-EA §Pipeline analisis (trigger PA), §Skor konfluensi (kekuatan PA); PRD-Backoffice §Database (enum)
+- Sumber: spec `ea-12-pa-trigger` requirements (ukuran M15 12 simbol 2026-04..2026-10), keputusan 1–4
+- Perubahan:
+    - Trigger PA = pola terarah pertama yang cocok di bar LTF tertutup, urutan: bintang pagi/sore, engulfing kuat, pin bar, engulfing biasa, tweezer, outside bar terarah. Pola netral (inside bar, doji, harami) tidak pernah menjadi trigger.
+    - Definisi relatif ATR(14) LTF: engulfing kuat = badan menelan badan sebelumnya, badan ≥ 60% rentang dan ≥ 0,8 ATR, close melewati high/low sebelumnya; pin bar = badan ≤ 35% rentang, sumbu ≥ 2 × badan, ≥ 60% rentang, > 2 × sumbu lain, rentang ≥ 0,8 ATR; tweezer = selisih low/high ≤ 0,1 ATR; bintang = badan pertama > 0,5 ATR, badan tengah < 0,3 × badan pertama, bar ketiga close melewati titik tengah badan pertama. Ambang sebagai konstanta.
+    - Skor: engulfing kuat 10, pin bar 7, pola terarah lain 3 (PRD). Kode pola (enum `pa_pattern`): `STAR`, `ENGULF_STRONG`, `PIN`, `ENGULF`, `TWEEZER`, `OUTSIDE`, `NONE`.
+    - Tidak ada aturan khusus logam/crypto; sekitar 40% bar M15 punya pola terarah.
+
 ## Done
 
 ### PC-13: Aturan notifier dan status alert (skema v3)

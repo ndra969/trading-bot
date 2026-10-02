@@ -4,6 +4,15 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.11 — 2026-10-03 — spec 12 trigger price action
+
+- `PatternRules` (fungsi murni): enam pola candle terarah relatif ATR(14) LTF dan rentang bar, diperiksa dalam urutan bintang pagi/sore, engulfing kuat, pin bar, engulfing, tweezer, outside bar; pola pertama yang cocok menang. Pola netral (inside bar, doji, harami) tidak pernah menjadi trigger (python-bot-lessons §1). Skor kekuatan PA 10/7/3/0.
+- `CPaTrigger`: 45 bar M15 tertutup, dihitung sekali per bar baru, hasil BUY dan SELL; dipasang di `CSdbApp.OnTick` setelah zona, belum dipakai untuk entry.
+- Enum `pa_pattern` (kode stabil untuk konteks sinyal), ambang sebagai konstanta. Keputusan PC-18.
+- Alat uji: run unit `run-ea-tests.ps1` kini mulai di Selasa..Jumat (mulai di akhir pekan membuat uji pembuka posisi gagal "market closed"). Deskripsi `#property` EA sempat masih menulis v1.09 di rilis 1.10; diperbaiki.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-03): build 0 error / 0 warning (4 target); unit 531/531 di 31 suite; 19 skenario PASS (SC-00..SC-13x); durasi total 6 menit 10 detik. pytest `sdbot/tools` 67/67, `schema.py check` OK (data versi 3).
+
 ### 1.10 — 2026-10-02 — spec 11 zona S&D
 
 - `ZoneRules` (ATR Wilder, calon zona dari candle swing H1 dengan lebar 0,3–2,0 ATR dan gerak keluar ≥ 1,5 ATR dalam 10 bar, status, peta, zona disentuh, zona lawan, skor 30/15) dan `CZoneBook` (bangun ulang penuh tiap bar H1, penanda Used di Global Variable per magic).

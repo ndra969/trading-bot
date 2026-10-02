@@ -162,6 +162,15 @@
 #define SDB_ALERT_STATUS_REASON_PUSH_FAILED "PUSH_FAILED"
 #define SDB_ALERT_STATUS_REASON_PLAIN_TEXT "PLAIN_TEXT"
 
+// pa_pattern: signals.context_json
+#define SDB_PA_PATTERN_STAR "STAR"
+#define SDB_PA_PATTERN_ENGULF_STRONG "ENGULF_STRONG"
+#define SDB_PA_PATTERN_PIN "PIN"
+#define SDB_PA_PATTERN_ENGULF "ENGULF"
+#define SDB_PA_PATTERN_TWEEZER "TWEEZER"
+#define SDB_PA_PATTERN_OUTSIDE "OUTSIDE"
+#define SDB_PA_PATTERN_NONE "NONE"
+
 // deinit_reason: sessions.end_reason
 #define SDB_DEINIT_REASON_PROGRAM "PROGRAM"
 #define SDB_DEINIT_REASON_REMOVE "REMOVE"
@@ -214,6 +223,8 @@ bool SdbEnumIsValid(const string enumName, const string value)
       return value == "ACCOUNT_REJECTED" || value == "CONN_DOWN" || value == "CONN_UP" || value == "DB_UNAVAILABLE" || value == "DB_RECOVERED" || value == "DB_NEWER_SCHEMA" || value == "MIGRATION_FAILED" || value == "ORDER_FAILED" || value == "MODIFY_FAILED" || value == "DD_INFO" || value == "DD_REDUCE" || value == "DD_RECOVERED" || value == "DD_STOP" || value == "DAILY_LOSS" || value == "MARGIN_LOW" || value == "MARGIN_OK" || value == "CLOSE_ALL_FAILED" || value == "EMERGENCY_RESET" || value == "BALANCE_OP" || value == "STATE_RESET" || value == "SL_RESTORED" || value == "BE_MOVED" || value == "PARTIAL_CLOSED" || value == "SL_MISSING" || value == "TRADE_OPENED" || value == "TRADE_CLOSED" || value == "EA_START" || value == "EA_STOP" || value == "HEARTBEAT" || value == "DAILY_REPORT";
    if(enumName == "alert_status_reason")
       return value == "COOLDOWN" || value == "QUOTA" || value == "STALE" || value == "OVERFLOW" || value == "RESTART" || value == "TRANSPORT_TEMP" || value == "TRANSPORT_PERMANENT" || value == "TELEGRAM_OFF" || value == "PUSH_SENT" || value == "PUSH_FAILED" || value == "PLAIN_TEXT";
+   if(enumName == "pa_pattern")
+      return value == "STAR" || value == "ENGULF_STRONG" || value == "PIN" || value == "ENGULF" || value == "TWEEZER" || value == "OUTSIDE" || value == "NONE";
    if(enumName == "deinit_reason")
       return value == "PROGRAM" || value == "REMOVE" || value == "RECOMPILE" || value == "CHARTCHANGE" || value == "CHARTCLOSE" || value == "PARAMETERS" || value == "ACCOUNT" || value == "TEMPLATE" || value == "INITFAILED" || value == "CLOSE" || value == "OTHER";
    return false;

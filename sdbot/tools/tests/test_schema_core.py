@@ -167,3 +167,12 @@ def test_seed_blocks_are_split_per_version(real_schema_dir: Path):
     conn = _apply_initial(real_schema_dir)
     conn.executescript(blocks[1])
     assert conn.execute("SELECT COUNT(*) FROM closures").fetchone()[0] == 4
+
+
+def test_ts49_pa_pattern_enum(real_schema_dir: Path):
+    """Spec 12: kode pola price action stabil untuk telemetri sinyal (PC-18)."""
+    enums = {e.name: e for e in schema.load_enums(real_schema_dir / "enums.md")}
+    pa = enums["pa_pattern"]
+    assert pa.values == ["STAR", "ENGULF_STRONG", "PIN", "ENGULF", "TWEEZER", "OUTSIDE", "NONE"]
+    assert not pa.has_check
+    assert pa.columns == ["signals.context_json"]

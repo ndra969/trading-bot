@@ -4,7 +4,8 @@
 flowchart TB
     T([OnTick]) --> AN[CMarketStructure.OnTick: hitung ulang HTF/MTF hanya bila bar baru tutup; lihat structure.md]
     AN --> ZN[CZoneBook.OnTick: bangun ulang peta zona bila bar H1 baru / penanda Used berubah; lihat zones.md]
-    ZN --> G{akun PASSED, status siap, CanTrade?}
+    ZN --> PA[CPaTrigger.OnTick: pola bar LTF tertutup untuk BUY dan SELL bila bar baru; lihat pa-trigger.md]
+    PA --> G{akun PASSED, status siap, CanTrade?}
     G -->|tidak| Z([selesai])
     G -->|ya| M[baca pasar sekali: bid/ask, spread, stops, ATR bar tutup]
     M --> L[tiket posisi magic + simbol dikumpulkan dulu]

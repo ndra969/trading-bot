@@ -1,13 +1,14 @@
-# Alur SDBot EA (v1.10)
+# Alur SDBot EA (v1.11)
 
 Diagram Mermaid alur utama EA, mengikuti kode di `ea/src/Include/SDBot/App/SdbApp.mqh` dan modul yang dipanggilnya. Diperbarui setiap spec yang mengubah alur (RULES §Definition of done).
 
 | File | Isi | Spec |
 |---|---|---|
 | [init.md](init.md) | `OnInit` / `OnDeinit` | 02–09 |
-| [tick.md](tick.md) | `OnTick`: analisis struktur dan zona, manajemen posisi | 06, 10, 11 |
+| [tick.md](tick.md) | `OnTick`: analisis struktur, zona, dan pola PA, manajemen posisi | 06, 10, 11, 12 |
 | [structure.md](structure.md) | `CMarketStructure`: bar per TF, swing, BOS, EMA, bias HTF | 10 |
 | [zones.md](zones.md) | `CZoneBook`: zona S&D H1, status, penanda Used | 11 |
+| [pa-trigger.md](pa-trigger.md) | `CPaTrigger`: pola candle terarah M15, urutan, skor | 12 |
 | [timer.md](timer.md) | `OnTimer` tiap detik | 02–09 |
 | [order-execution.md](order-execution.md) | lot, pre-trade check, `CExecutor::OpenMarket` | 04–05 |
 | [risk-monitor.md](risk-monitor.md) | `CRiskMonitor::Run` | 05 |

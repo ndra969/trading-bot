@@ -136,6 +136,19 @@
 #define SDB_ZONE_ATR_PERIOD           14
 #define SDB_GV_ZONE_USED              "ZU"     // GV "<magic>_ZU_<epoch swing>_<D|S>"
 
+//--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol
+#define SDB_PA_STAR_FIRST_BODY_ATR    0.5      // badan bar pertama bintang > 0,5 ATR
+#define SDB_PA_STAR_MID_RATIO         0.3      // badan bar tengah < 0,3 x badan pertama
+#define SDB_PA_STRONG_BODY_RANGE      0.6      // engulfing kuat: badan >= 60% rentang
+#define SDB_PA_STRONG_BODY_ATR        0.8      // engulfing kuat: badan >= 0,8 ATR
+#define SDB_PA_PIN_BODY_RANGE         0.35     // pin bar: badan <= 35% rentang
+#define SDB_PA_PIN_WICK_BODY          2.0      // sumbu >= 2 x badan
+#define SDB_PA_PIN_WICK_RANGE         0.6      // sumbu >= 60% rentang
+#define SDB_PA_PIN_WICK_OTHER         2.0      // sumbu > 2 x sumbu sisi lain
+#define SDB_PA_PIN_RANGE_ATR          0.8      // rentang pin bar >= 0,8 ATR
+#define SDB_PA_TWEEZER_ATR            0.1      // selisih low/high tweezer <= 0,1 ATR
+#define SDB_PA_BARS                   45       // 3 x ATR 14 + 3 bar pola
+
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
 #define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama
