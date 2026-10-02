@@ -25,16 +25,31 @@ private:
    int               m_codes[];
    long              m_cycles[];
 
+   bool              m_off;            // setelah CONFIG: seperti CTelegramTransport nonaktif
+
+   // Langkah: OK[:NOTE], TEMP[:detik jeda], LIMITED:detik, PERM, CONFIG (nonaktif, berikutnya PERMANENT TELEGRAM_OFF).
    SdbSendResult Parse(const string step)
      {
       SdbSendResult r;
       r.retryAfterSec = 0;
       r.error = step;
+      r.disable = false;
+      r.note = "";
       string parts[];
       StringSplit(step, ':', parts);
       string code = ArraySize(parts) > 0 ? parts[0] : "OK";
       if(code == "TEMP")
+        {
          r.code = SDB_SEND_TEMP;
+         r.retryAfterSec = ArraySize(parts) > 1 ? (int)StringToInteger(parts[1]) : 0;
+        }
+      else if(code == "CONFIG")
+        {
+         r.code = SDB_SEND_PERMANENT;
+         r.disable = true;
+         r.note = "TELEGRAM_OFF";
+         m_off = true;
+        }
       else if(code == "LIMITED")
         {
          r.code = SDB_SEND_LIMITED;
@@ -43,12 +58,15 @@ private:
       else if(code == "PERM")
          r.code = SDB_SEND_PERMANENT;
       else
+        {
          r.code = SDB_SEND_OK;
+         r.note = ArraySize(parts) > 1 ? parts[1] : "";
+        }
       return r;
      }
 
 public:
-                     CFakeTransport(void) : m_calls(0), m_failType(""), m_phase(""), m_cycle(0) { Script("OK"); }
+                     CFakeTransport(void) : m_calls(0), m_failType(""), m_phase(""), m_cycle(0), m_off(false) { Script("OK"); }
 
    void Script(const string script)
      {
@@ -63,7 +81,12 @@ public:
    SdbSendResult Send(const SdbOutMessage &m)
      {
       SdbSendResult r;
-      if(m_failType != "" && m.type == m_failType)
+      if(m_off)
+        {
+         r = Parse("PERM");
+         r.note = "TELEGRAM_OFF";
+        }
+      else if(m_failType != "" && m.type == m_failType)
          r = Parse("TEMP");
       else
          r = Parse(m_script[MathMin(m_calls, ArraySize(m_script) - 1)]);

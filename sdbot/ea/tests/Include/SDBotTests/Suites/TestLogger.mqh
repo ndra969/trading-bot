@@ -340,6 +340,39 @@ void RunTestLoggerNotify()
    lg.Close();
   }
 
+// TC-LG-34 (spec 09 Req 7.1): akhir sesi sebelumnya untuk pesan start.
+void RunTestLoggerPreviousSession()
+  {
+   TlDeleteFiles();
+   datetime endedAt;
+   string reason;
+   bool abnormal;
+   CLogger first;
+   first.Init(NULL, "EURUSDc", SDB_MAGIC_HARNESS, "1.08");
+   first.SetUtcOffsetForTest(TL_OFFSET);
+   first.Open(SDB_DB_UNITTEST);
+   first.BeginSession(TlSession("{}"));
+   bool none = !first.PreviousSessionEnd(endedAt, reason, abnormal);
+   first.EndSession(REASON_REMOVE);
+   first.Close();
+   CLogger second;
+   second.Init(NULL, "EURUSDc", SDB_MAGIC_HARNESS, "1.08");
+   second.SetUtcOffsetForTest(TL_OFFSET);
+   second.Open(SDB_DB_UNITTEST);
+   second.BeginSession(TlSession("{}"));
+   bool normal = second.PreviousSessionEnd(endedAt, reason, abnormal) && !abnormal && reason == "REMOVE" && endedAt > 0;
+   second.Close();   // tanpa EndSession: seperti EA yang crash
+   CLogger third;
+   third.Init(NULL, "EURUSDc", SDB_MAGIC_HARNESS, "1.08");
+   third.SetUtcOffsetForTest(TL_OFFSET);
+   third.Open(SDB_DB_UNITTEST);
+   third.BeginSession(TlSession("{}"));
+   bool crashed = third.PreviousSessionEnd(endedAt, reason, abnormal) && abnormal;
+   third.EndSession(REASON_REMOVE);
+   third.Close();
+   AssertTrue("TC-LG-34", "sesi lalu: tidak ada / berhenti normal dengan alasan / tidak ditutup normal", none && normal && crashed);
+  }
+
 void RunTestLogger()
   {
    TfBeginSuite("Logger");
@@ -554,6 +587,7 @@ void RunTestLogger()
    old.Close();
 
    RunTestLoggerNotify();
+   RunTestLoggerPreviousSession();
    TlDeleteFiles();
    SdbLogCaptureStop();
    TfEndSuite();

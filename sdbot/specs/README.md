@@ -38,9 +38,9 @@ Use case, pembagian spec, arsitektur bersama, dan strategi uji: [fase-2-overview
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
 | 8 | [ea-08-notifier-core](ea-08-notifier-core/) | `CNotifier` sebagai sink: aturan kirim, antrean prioritas, format pesan, event trade, status `alerts`, transport log di tester | 1–7 | suite NotifyRules ALL PASS, SC-10 PASS | **Done** 2026-10-01 (v1.07; MC-NT-01 manual tertunda; PC-13) |
-| 9 | ea-09-notifier-telegram | Transport Telegram, rate limit bersama, push HP, heartbeat, laporan harian, start/stop, skrip `.local.set`, DoD Fase 2 | 8 | suite TelegramRules ALL PASS, SC-11 PASS, MC Telegram dicek | Belum dimulai |
+| 9 | [ea-09-notifier-telegram](ea-09-notifier-telegram/) | Transport Telegram, rate limit bersama, push HP, heartbeat, laporan harian, start/stop, skrip `.local.set`, DoD Fase 2 | 8 | suite TelegramRules ALL PASS, SC-11 PASS, MC Telegram dicek | **Done** 2026-10-02 (Fase 2 selesai, v1.08; MC-TG-01..08 manual tertunda; PC-14) |
 
-Versi EA: 08 = `1.07`, 09 = `1.08` (Fase 2 selesai).
+Versi EA: 08 = `1.07`, 09 = `1.08` (Fase 2 selesai 2026-10-02).
 
 ## Fase berikutnya
 

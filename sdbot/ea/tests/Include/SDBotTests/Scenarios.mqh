@@ -833,6 +833,128 @@ void CheckSc10(const string id, const CScenarioRecorder &rec, const CFakeTranspo
    ScCheckSessions(id, rec, 1);
   }
 
+// Kolom angka semua baris hasil query DB tester (urut sesuai query). -1 = DB tidak terbaca.
+int ScDbLongs(const string sql, long &out[])
+  {
+   ArrayFree(out);
+   int db = DatabaseOpen(SDB_DB_FILE_TESTER, DATABASE_OPEN_READONLY | DATABASE_OPEN_COMMON);
+   if(db == INVALID_HANDLE)
+      return -1;
+   int st = DatabasePrepare(db, sql);
+   if(st != INVALID_HANDLE)
+     {
+      long v;
+      while(DatabaseRead(st))
+        {
+         DatabaseColumnLong(st, 0, v);
+         int n = ArraySize(out);
+         ArrayResize(out, n + 1);
+         out[n] = v;
+        }
+      DatabaseFinalize(st);
+     }
+   DatabaseClose(db);
+   return ArraySize(out);
+  }
+
+string ScDayText(const datetime t)
+  {
+   string d = TimeToString(t, TIME_DATE);
+   StringReplace(d, ".", "-");
+   return d;
+  }
+
+// Jumlah closure rekaman pada hari server itu (yyyy-mm-dd).
+int ScClosuresOn(const CScenarioRecorder &rec, const string day)
+  {
+   int n = 0;
+   for(int i = 0; i < rec.ClosureCount(); i++)
+     {
+      ClosureRecord c;
+      rec.ClosureAt(i, c);
+      if(ScDayText(c.closedAt) == day)
+         n++;
+     }
+   return n;
+  }
+
+// Laporan harian per hari: cocok dengan closure rekaman, sekali per hari, hanya hari beraktivitas, bukan hari terakhir run.
+void ScCheckReports(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr, string &lastDay)
+  {
+   int bad = 0, reports = 0;
+   string firstBad = "", seen = ",";
+   lastDay = ScDayText(TimeCurrent());
+   for(int i = 0; i < tr.Count(); i++)
+     {
+      SdbOutMessage m;
+      tr.At(i, m);
+      if(m.type != SDB_ALERT_TYPE_DAILY_REPORT)
+         continue;
+      reports++;
+      int p = StringFind(m.text, "Laporan harian ");
+      string day = (p >= 0) ? StringSubstr(m.text, p + 15, 10) : "?";
+      int closed = ScClosuresOn(rec, day);
+      bool ok = StringFind(seen, "," + day + ",") < 0 && closed > 0 &&
+                StringFind(m.text, "Posisi tutup <code>" + IntegerToString(closed) + "</code>") > 0;
+      seen += day + ",";
+      if(!ok && bad++ == 0)
+         firstBad = StringFormat("%s closure=%d", day, closed);
+     }
+   int missing = 0;
+   for(int i = 0; i < rec.ClosureCount(); i++)
+     {
+      ClosureRecord c;
+      rec.ClosureAt(i, c);
+      string day = ScDayText(c.closedAt);
+      if(day != lastDay && StringFind(seen, "," + day + ",") < 0 && missing++ == 0 && firstBad == "")
+         firstBad = "tanpa laporan " + day;
+     }
+   AssertTrue(id + "-report", StringFormat("1 laporan per hari dengan closure, jumlah posisi cocok (%d laporan, salah %d, hilang %d) %s",
+                                           reports, bad, missing, firstBad), reports >= 3 && bad == 0 && missing == 0);
+   AssertTrue(id + "-weekend", "tidak ada laporan 2026-09-19 dan 2026-09-20 (tanpa aktivitas)",
+              StringFind(seen, ",2026-09-19,") < 0 && StringFind(seen, ",2026-09-20,") < 0);
+   AssertTrue(id + "-friday", StringFormat("laporan Jumat 2026-09-18 terkirim walau tick baru ada Senin (closure Jumat %d)", ScClosuresOn(rec, "2026-09-18")),
+              ScClosuresOn(rec, "2026-09-18") > 0 && StringFind(seen, ",2026-09-18,") >= 0);
+  }
+
+// SC-11 (spec 09 Req 4–7, 8.1): heartbeat, laporan harian, start/stop, pemimpin setelah restart.
+void CheckSc11(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
+  {
+   long times[];
+   int hb = ScDbLongs("SELECT time FROM alerts WHERE type='HEARTBEAT' AND session_id IN (" + rec.SessionIdList() + ") ORDER BY time", times);
+   long minGap = LONG_MAX;
+   for(int i = 1; i < hb; i++)
+      minGap = MathMin(minGap, times[i] - times[i - 1]);
+   int loud = 0;
+   for(int i = 0; i < tr.Count(); i++)
+     {
+      SdbOutMessage m;
+      tr.At(i, m);
+      if((m.type == SDB_ALERT_TYPE_HEARTBEAT || m.type == SDB_ALERT_TYPE_EA_START || m.type == SDB_ALERT_TYPE_EA_STOP) && !m.silent)
+         loud++;
+     }
+   AssertTrue(id + "-heartbeat", StringFormat("heartbeat >= 3, jarak minimal 3600 detik lintas restart (%d, jarak terkecil %I64d), tanpa bunyi (berbunyi %d)",
+                                              hb, minGap, loud), hb >= 3 && minGap >= 3600 && loud == 0 && tr.CountType(SDB_ALERT_TYPE_HEARTBEAT) == hb);
+   string lastDay;
+   ScCheckReports(id, rec, tr, lastDay);
+   int secondStart = -1, starts = 0;
+   for(int i = 0; i < tr.Count(); i++)
+     {
+      SdbOutMessage m;
+      tr.At(i, m);
+      if(m.type == SDB_ALERT_TYPE_EA_START && ++starts == 2)
+         secondStart = i;
+     }
+   SdbOutMessage s2;
+   bool mentions = secondStart >= 0 && tr.At(secondStart, s2) && StringFind(s2.text, "Sesi lalu berhenti") > 0;
+   AssertTrue(id + "-startstop", StringFormat("2 start (yang kedua menyebut sesi lalu) dan 2 stop (start %d, stop %d)", starts, tr.CountType(SDB_ALERT_TYPE_EA_STOP)),
+              starts == 2 && tr.CountType(SDB_ALERT_TYPE_EA_STOP) == 2 && mentions);
+   long skipped = ScDbCount("SELECT COUNT(*) FROM alerts WHERE session_id IN (" + rec.SessionIdList() +
+                            ") AND type IN ('HEARTBEAT','DAILY_REPORT','EA_START','EA_STOP') AND status <> 'SENT'");
+   AssertTrue(id + "-never-skipped", StringFormat("heartbeat, laporan, start, stop semuanya SENT (bukan SENT: %I64d)", skipped), skipped == 0);
+   ScCheckSessions(id, rec, 2);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -864,6 +986,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc08(id, rec);
    else if(id == "SC-10")
       CheckSc10(id, rec, tr);
+   else if(id == "SC-11")
+      CheckSc11(id, rec, tr);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

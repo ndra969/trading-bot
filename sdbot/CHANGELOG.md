@@ -4,6 +4,17 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.08 — 2026-10-02 — Fase 2 selesai (spec 09 notifier Telegram)
+
+- `CTelegramTransport`: `sendMessage` lewat `WebRequest` (HTML, timeout 3 detik), klasifikasi respons, jarak 1 detik dan jeda 429 dibagi semua instance (GV `NT_TG_NEXT`), teks polos bila HTML ditolak, nonaktif sampai init ulang bila URL belum diizinkan / token / chat salah, maks 1 kiriman per 10 detik saat gagal sementara. Token tidak pernah ditulis ke log, DB, atau JSON input sesi.
+- Push HP (`SendNotification`) untuk Critical yang gagal di Telegram atau saat Telegram nonaktif, dibatasi 2/detik dan 10/menit.
+- Pemimpin per akun (lease GV) untuk heartbeat tanpa bunyi (`InpHeartbeatMinutes`, default 60) dan laporan harian dari history deal MT5 (hari tanpa aktivitas dilewati, hari yang terlewat dikirim kemudian); pesan start/stop per instance, start menyebut akhir sesi lalu.
+- Input `InpTelegramToken`, `InpTelegramChatID`, `InpHeartbeatMinutes`; preset repo memuatnya kosong; `tools/make_local_presets.py` membuat `*.local.set` dari `.env` bot Python.
+- `IsSdbotMagic` pindah ke `Core/Utils.mqh`; batas kirim saat deinit 2 detik (MT5 memotong `OnDeinit` di 2.5 detik). Keputusan PC-14.
+- Skenario SC-11: heartbeat, laporan harian per hari server (termasuk Jumat yang baru terkirim Senin di tester), start/stop, pemimpin setelah restart.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-02): build 0 error / 0 warning (4 target); unit 451/451 di 25 suite; 15 skenario PASS (SC-00..SC-11); durasi total 2 menit 24 detik. pytest `sdbot/tools` 64/64, `schema.py check` OK (data versi 3).
+
 ### 1.07 — 2026-10-01 — spec 08 notifier core
 
 - `CNotifier` (lapisan Notify) sebagai sink di `CTeeSink`: semua alert Fase 1 plus pesan posisi dibuka/ditutup (`TRADE_OPENED`, `TRADE_CLOSED`), tanpa mengubah modul penghasilnya.

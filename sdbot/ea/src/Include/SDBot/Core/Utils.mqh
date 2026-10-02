@@ -258,4 +258,11 @@ string Sha256Hex(const string text)
    return hex;
   }
 
+// Blok magic SDBot termasuk magic harness (keputusan R2-1). Di Core sejak spec 09 karena Risk
+// (risiko terbuka, close all) dan Notify (laporan harian) sama-sama memfilter posisi SDBot.
+bool IsSdbotMagic(const long magic)
+  {
+   return magic >= SDB_MAGIC_HARNESS && magic <= SDB_MAGIC_MAX;
+  }
+
 #endif // SDB_CORE_UTILS_MQH

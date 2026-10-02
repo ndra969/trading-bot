@@ -74,7 +74,7 @@ SYMBOLS: dict[str, tuple[int, str, str]] = {
     "BTCUSD": (2026091912, "crypto", "spread maks 1000 pip (1.0); sesi 24/7; SL default 1500 pip"),
 }
 
-# Input Fase 1 dengan default PRD (Core/Inputs.mqh). Enum ditulis sebagai angka seperti file .set MT5.
+# Input dengan default PRD (Core/Inputs.mqh). Enum ditulis sebagai angka seperti file .set MT5.
 COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpTradingStyle", "1"),  # SDB_STYLE_DAY
     ("InpSymbolSuffix", "c"),
@@ -96,6 +96,10 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpPartialPct", "50.0"),
     ("InpTrailATRPeriod", "14"),
     ("InpTrailATRMult", "2.0"),
+    # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
+    ("InpTelegramToken", ""),
+    ("InpTelegramChatID", ""),
+    ("InpHeartbeatMinutes", "60"),
 ]
 
 

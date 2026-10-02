@@ -182,7 +182,7 @@ void RunTestAppLifecycle()
    // Sejak spec 08 tabel alerts juga berisi TRADE_OPENED/TRADE_CLOSED dari TC-APP-08.
    AssertTrue("TC-APP-07", "observer menerima alert tepat sekali, DB juga sekali",
               hasAlert && alert.type == SDB_ALERT_TYPE_ACCOUNT_REJECTED && fake.CountAlert() == 1 &&
-              TaCount("alerts", "type='ACCOUNT_REJECTED'") == 1 && TaCount("alerts", "type NOT LIKE 'TRADE_%' AND type <> 'ACCOUNT_REJECTED'") == 0);
+              TaCount("alerts", "type='ACCOUNT_REJECTED'") == 1 && TaCount("alerts", "type NOT LIKE 'TRADE_%' AND type NOT LIKE 'EA_%' AND type <> 'ACCOUNT_REJECTED'") == 0);
    AssertTrue("TC-APP-12", "posisi TC-APP-08: TRADE_OPENED dan TRADE_CLOSED tercatat dan terkirim (spec 08 Req 1.2, 1.3)",
               TaCount("alerts", "type='TRADE_OPENED' AND status='SENT'") == 1 && TaCount("alerts", "type='TRADE_CLOSED' AND status='SENT'") == 1);
 
@@ -223,7 +223,8 @@ void RunTestAppNotifier()
    a.magic = TaConfig().inputs.magic;
    a.time = TimeCurrent();
    app.Sink().OnAlert(a);
-   app.OnTimer();
+   for(int i = 0; i < 3; i++)   // maks 2 per siklus; start dan closure rekonsiliasi antre lebih dulu (spec 09)
+      app.OnTimer();
    SdbOutMessage m;
    bool sent = tr.FirstIndexOf("TEST_APP") >= 0 && tr.At(tr.FirstIndexOf("TEST_APP"), m);
    AssertTrue("TC-APP-09", "alert lewat sink app: terkirim ke transport (tag TESTER), status SENT di DB",
@@ -254,6 +255,31 @@ void RunTestAppNotifier()
    AssertTrue("TC-APP-11", "init gagal: ACCOUNT_REJECTED Critical dikirim saat deinit, status SENT",
               r == INIT_FAILED && tr3.CountType("ACCOUNT_REJECTED") == 1 &&
               TaCount("alerts", "type='ACCOUNT_REJECTED' AND status='SENT'") == 1);
+
+   // TC-APP-13 (spec 09 Req 2.7): di tester transport log dipakai walau token terisi.
+   c = TaConfig();
+   c.telegramToken = "123:ABC";
+   c.telegramChatId = "-100";
+   app = new CSdbApp;
+   app.OnInit(c);
+   string transportName = app.TransportName();
+   app.OnDeinit(REASON_REMOVE);
+   delete app;
+   AssertStrEq("TC-APP-13", "Strategy Tester: transport LOG, bukan TELEGRAM", transportName, "LOG");
+
+   // TC-APP-14 (spec 09 Req 7.1, 7.2): init sukses -> EA_START; deinit -> EA_STOP, keduanya tanpa bunyi.
+   CFakeTransport tr4;
+   app = new CSdbApp;
+   r = app.OnInit(TaConfig(), NULL, GetPointer(tr4));
+   app.OnTimer();
+   int starts = tr4.CountType("EA_START");
+   app.OnDeinit(REASON_REMOVE);
+   delete app;
+   SdbOutMessage sm, tm;
+   bool silent = tr4.At(tr4.FirstIndexOf("EA_START"), sm) && sm.silent && tr4.At(tr4.FirstIndexOf("EA_STOP"), tm) && tm.silent &&
+                 StringFind(tm.text, "REMOVE") > 0 && StringFind(sm.text, "Sesi lalu") > 0;
+   AssertTrue("TC-APP-14", "start setelah init sukses, stop saat deinit, tanpa bunyi, start menyebut sesi lalu",
+              r == INIT_SUCCEEDED && starts == 1 && tr4.CountType("EA_STOP") == 1 && silent);
   }
 
 void RunTestApp()

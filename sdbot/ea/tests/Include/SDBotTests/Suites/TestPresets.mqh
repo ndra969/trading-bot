@@ -19,7 +19,8 @@ string TprKnownKeys()
    return ",InpMagicNumber,InpTradingStyle,InpSymbolSuffix,InpAllowLiveTrading,InpLogLevel,InpPresetTag,"
           "InpRiskPerTradePct,InpMaxOpenRiskPct,InpMaxPosForexMajor,InpMaxPosForexCross,InpMaxPosCommodity,"
           "InpMaxPosCrypto,InpDailyLossPct,InpDDReducePct,InpDDStopPct,InpResetEmergencyStop,InpBreakevenR,"
-          "InpBreakevenBufferPoints,InpPartialR,InpPartialPct,InpTrailATRPeriod,InpTrailATRMult,";
+          "InpBreakevenBufferPoints,InpPartialR,InpPartialPct,InpTrailATRPeriod,InpTrailATRMult,"
+          "InpTelegramToken,InpTelegramChatID,InpHeartbeatMinutes,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -40,6 +41,7 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpMaxPosForexCross")      v.maxPosForexCross = (int)StringToInteger(value);
    else if(key == "InpMaxPosCommodity")       v.maxPosCommodity = (int)StringToInteger(value);
    else if(key == "InpMaxPosCrypto")          v.maxPosCrypto = (int)StringToInteger(value);
+   else if(key == "InpHeartbeatMinutes")      v.heartbeatMinutes = (int)StringToInteger(value);
   }
 
 // "" = lolos; selain itu alasan gagal.
@@ -50,6 +52,7 @@ string TprCheckFile(const string name)
       return "tidak bisa dibuka " + IntegerToString(GetLastError());
    InputValues v = DefaultInputValues();
    string unknown = "";
+   int telegramKeys = 0;   // TC-PR-02 (spec 09 Req 1.8): token dan chat ID ada dan kosong, heartbeat ada
    while(!FileIsEnding(h))
      {
       string line = FileReadString(h);
@@ -61,11 +64,18 @@ string TprCheckFile(const string name)
       string key = StringSubstr(line, 0, eq);
       if(StringFind(TprKnownKeys(), "," + key + ",") < 0 && unknown == "")
          unknown = key;
+      string value = StringSubstr(line, eq + 1);
+      if((key == "InpTelegramToken" || key == "InpTelegramChatID") && value == "")
+         telegramKeys++;
+      if(key == "InpHeartbeatMinutes" && value == "60")
+         telegramKeys++;
       TprApply(v, key, StringSubstr(line, eq + 1));
      }
    FileClose(h);
    if(unknown != "")
       return "kunci bukan input EA: " + unknown;
+   if(telegramKeys != 3)
+      return "InpTelegramToken/InpTelegramChatID kosong dan InpHeartbeatMinutes=60 wajib ada (TC-PR-02)";
    string errors;
    return ValidateInputValues(v, false, errors) ? "" : errors;
   }

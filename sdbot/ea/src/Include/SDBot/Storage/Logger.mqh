@@ -827,6 +827,31 @@ public:
       Enqueue(e);
      }
 
+   // Sesi sebelum sesi ini untuk instance yang sama (login, magic, simbol), untuk pesan start (spec 09 Req 7.1).
+   // abnormal = ended_at kosong (EA crash / terminal mati paksa). endedAt dalam waktu server.
+   bool PreviousSessionEnd(datetime &endedAt, string &reason, bool &abnormal)
+     {
+      endedAt = 0;
+      reason = "";
+      abnormal = false;
+      if(!IsWritable() || m_sessionId == 0)
+         return false;
+      int st = DatabasePrepare(m_db, "SELECT COALESCE(ended_at, 0), COALESCE(end_reason, '') FROM sessions "
+                                     "WHERE login = ?1 AND magic = ?2 AND symbol = ?3 AND id < ?4 ORDER BY id DESC LIMIT 1");
+      if(st == INVALID_HANDLE)
+         return false;
+      long ended = 0;
+      bool found = DatabaseBind(st, 0, m_login) && DatabaseBind(st, 1, m_magic) && DatabaseBind(st, 2, m_symbol) &&
+                   DatabaseBind(st, 3, m_sessionId) && DatabaseRead(st) && DatabaseColumnLong(st, 0, ended) &&
+                   DatabaseColumnText(st, 1, reason);
+      DatabaseFinalize(st);
+      if(!found)
+         return false;
+      abnormal = (ended == 0);
+      endedAt = abnormal ? 0 : (datetime)(ended + UtcOffset());
+      return true;
+     }
+
    // Status kirim notifikasi untuk baris dengan notify_key yang sama; insert dan update satu flush berurutan.
    void OnAlertStatus(const AlertStatus &s)
      {

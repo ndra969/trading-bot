@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 2 (notifikasi) berjalan, versi EA **1.07**. Fase 1 (fondasi) **selesai** di 1.06 (spec 01–07: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart; metrik `OnTester`, preset 12 simbol, query analisis). Spec 08 (1.07): notifier dengan aturan kirim PRD (Critical lebih dulu, cooldown, kuota 20/jam per akun, pesan basi 30 menit), format pesan gaya bot Python, status kirim di tabel `alerts` (skema v3); pesan masih ke log Experts sampai Telegram di spec 09. Belum ada logika entry: EA utama tidak membuka posisi apa pun.
+Status: Fase 2 (notifikasi) **selesai**, versi EA **1.08**. Fase 1 (fondasi) **selesai** di 1.06 (spec 01–07: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart; metrik `OnTester`, preset 12 simbol, query analisis). Spec 08 (1.07): notifier dengan aturan kirim PRD (Critical lebih dulu, cooldown, kuota 20/jam per akun, pesan basi 30 menit), format pesan gaya bot Python, status kirim di tabel `alerts` (skema v3). Spec 09 (1.08): Telegram (bot dan chat bot Python), push HP untuk Critical, heartbeat dan laporan harian satu per akun, pesan start/stop, preset pribadi dari `.env`. Berikutnya Fase 3 (strategi inti). Belum ada logika entry: EA utama tidak membuka posisi apa pun.
 
 ## Konfigurasi dan tuning
 
@@ -52,8 +52,8 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Entry | `InpMinConfluenceScore` / `InpMinRR` / `InpMaxZoneAgeBars` | 65 / 2.0 / 100 | — | Fase 3 |
 | Filter | `InpMaxSpreadPoints` | per simbol (disetel dari data spread) | — | Fase 4 |
 | Filter | `InpNewsBlockMinutes` / `InpTradingSessions` | 30 / London + New York | — | Fase 4 |
-| Notifikasi | `InpTelegramToken` / `InpTelegramChatID` | kosong (isi di `*.local.set`) | — | Fase 2 |
-| Notifikasi | `InpHeartbeatMinutes` | 60 | — | Fase 2 |
+| Notifikasi | `InpTelegramToken` / `InpTelegramChatID` | kosong (isi di `*.local.set` lewat `tools/make_local_presets.py`); kosong = pesan hanya di log | — (tidak masuk `inputs_json`, hanya `InpTelegramConfigured`) | spec 09 |
+| Notifikasi | `InpHeartbeatMinutes` | 60 | 0 (mati) atau 5–1440 | spec 09 |
 | Backoffice | `InpEnableBackoffice` / `InpControlPollSeconds` | true / 2 | — | Fase B5 |
 
 Parameter strategi lainnya (bias HTF, deteksi zona, buffer SL, nilai skor per komponen, Fibonacci, trendline, RSI) belum final. Draf katalognya ada di [specs/README.md](specs/README.md#katalog-parameter-strategi-draf-difinalkan-di-spec-fase-3-dan-5), dan akan dipindahkan ke tabel ini saat spec Fase 3 dan 5 disetujui.
@@ -66,6 +66,16 @@ Parameter strategi lainnya (bias HTF, deteksi zona, buffer SL, nilai skor per ko
 4. Jika yang berubah adalah **default** di `Inputs.mqh` atau konstanta di `Constants.mqh`, perubahannya juga dicatat di `docs/PENDING-CHANGES.md` agar PRD ikut diperbarui (skill `sdbot-docs-sync`).
 5. Di akun live, perubahan setting yang sifatnya mengetatkan (misalnya menurunkan risiko) bisa lewat panel backoffice tanpa membuka MT5 (Fase B5).
 
+## Notifikasi Telegram
+
+SDBot memakai bot dan chat Telegram yang sama dengan bot Python (PC-06). Setiap pesan diawali penanda `SDBot` · simbol (atau `AKUN <login>` untuk heartbeat dan laporan harian) · `CENT`/`REAL`/`DEMO`/`TESTER` · versi.
+
+1. MT5: Tools > Options > Expert Advisors, centang Allow WebRequest dan tambahkan `https://api.telegram.org`. Tab Notifications: aktifkan push dan isi MetaQuotes ID (untuk Critical saat Telegram gagal).
+2. `uv run python sdbot/tools/make_local_presets.py` membuat `SDBot_DAY_<SIMBOL>c.local.set` dari `.env` bot Python. Muat file `.local.set` (bukan preset repo) di tab Inputs.
+3. Token kosong: EA jalan, pesan hanya di log Experts. URL belum diizinkan, token atau chat salah: Telegram nonaktif sampai EA di-init ulang, satu log CRITICAL dan satu push HP.
+
+Aturan kirim: Critical lebih dulu tanpa batas; Medium/Info cooldown 5 menit per tipe; kuota non-Critical 20 pesan per jam server per akun; pesan basi 30 menit dibuang; jarak kirim 1 detik untuk semua instance; saat gagal sementara maks 1 kiriman per 10 detik. Heartbeat (tanpa bunyi, tiap `InpHeartbeatMinutes`) dan laporan harian dikirim satu instance pemimpin per akun; start/stop per instance tanpa bunyi. Status setiap pesan ada di tabel `alerts` (`status`, `status_reason`).
+
 ## Alat pengembangan
 
 Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolicy Bypass -File …`):
@@ -75,6 +85,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `link-mt5.ps1 -DataDir <folder data MT5>` | Hubungkan `ea/src` dan `ea/tests` ke MT5 lewat junction |
 | `build-ea.ps1` | Compile EA dan entry point uji; gagal bila ada error atau warning |
 | `run-ea-tests.ps1 [-Unit] [-Scenario SC-xx] [-All]` | Compile lalu jalankan unit test/skenario di Strategy Tester terminal uji; exit 0 = semua lulus |
+| `uv run python tools/make_local_presets.py [--force]` | Buat `SDBot_DAY_<SIMBOL>c.local.set` dari preset repo + `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` di `.env` bot Python; tidak menimpa yang sudah disunting tanpa `--force`; gagal bila hasilnya tidak diabaikan git |
 | `uv run python tools/gen_presets.py` | Bangkitkan ulang 12 preset dari tabel di skrip (pytest memastikan file sama dengan hasil generator) |
 | `tools/queries/*.sql` | Query analisis (ringkasan per simbol/versi, alasan tutup, kebocoran BE, loser yang tidak pernah profit, per input, per run, operasi saldo, alert); diuji terhadap fixture |
 | `uv run python tools/schema.py new data "<deskripsi>"` | Buat file migrasi baru bernomor berikutnya |
@@ -87,7 +98,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | Input | Isi |
 |---|---|
 | `InpTestRunId` | ID run, diisi runner |
-| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`, `SC-10`; `SC-09` optimasi diperiksa runner); ID lain = FAIL |
+| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`, `SC-10`, `SC-11`; `SC-09` optimasi diperiksa runner); ID lain = FAIL |
 | `HarnessEveryBars` | entry setiap N bar chart |
 | `HarnessDirection` | 0 BUY, 1 SELL, 2 bergantian |
 | `HarnessSlPoints` / `HarnessTpPoints` | jarak SL/TP dari harga (point) |

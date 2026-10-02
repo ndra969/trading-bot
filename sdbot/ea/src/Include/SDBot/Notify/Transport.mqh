@@ -26,6 +26,8 @@ public:
       r.code = SDB_SEND_OK;
       r.retryAfterSec = 0;
       r.error = "";
+      r.disable = false;
+      r.note = "";
       return r;
      }
    string Name() { return "LOG"; }

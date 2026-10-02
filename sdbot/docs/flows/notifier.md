@@ -42,3 +42,35 @@ flowchart TB
 Status (`SENT`, `FAILED`, `SKIPPED` + alasan) dikirim ke `CLogger.OnAlertStatus` dan ditulis di flush yang sama dengan baris alert-nya (UPDATE per `login + notify_key`). Umur pesan dihitung dari waktu masuk antrean menurut waktu notifier (`TimeTradeServer` di live, `TimeCurrent` di tester), karena `TimeCurrent` berhenti saat pasar tutup.
 
 Restart: `CLogger.TakeRestartAlerts` menandai `PENDING` instance dari sesi lalu (> 30 menit `STALE`, non-Critical muda `RESTART`) dan mengembalikan Critical muda untuk `Requeue`. Deinit: `DrainCritical` mengirim Critical tersisa maksimal 3 detik.
+
+## Telegram, push, pesan berjadwal (spec 09)
+
+```mermaid
+flowchart TB
+    T([OnTimer]) --> L[tiap 30 detik: GV NT_ALIVE_magic, lease NT_LEADER compare-and-set, TTL 120 detik]
+    L --> P{pemimpin?}
+    P -->|ya| HB{NT_HB_AT + HeartbeatMinutes lewat?}
+    HB -->|ya, menang CAS| H[antre HEARTBEAT tanpa bunyi: data App + instance hidup + ditahan kuota]
+    P -->|ya| RD[hari setelah NT_REPORT_DAY sampai kemarin, maks 7]
+    RD --> C[history deal hari itu, posisi SDBot dari deal pembuka]
+    C --> CL{menang CAS hari itu?}
+    CL -->|ya, ada aktivitas| R[antre DAILY_REPORT]
+    T --> S[kirim lewat transport]
+```
+
+```mermaid
+flowchart TB
+    S([CTelegramTransport.Send]) --> D{nonaktif / token kosong?}
+    D -->|ya| OFF[PERMANENT TELEGRAM_OFF]
+    D -->|tidak| G{GV NT_TG_NEXT sudah lewat? CAS +1 detik}
+    G -->|belum| LIM[LIMITED sisa detik]
+    G -->|ya| W[WebRequest POST sendMessage, 3 detik]
+    W --> K{TgClassify}
+    K -->|200 ok| OK[OK]
+    K -->|429| RA[NT_TG_NEXT = retry_after untuk semua instance]
+    K -->|HTML ditolak| PL[kirim ulang teks polos sekali: PLAIN_TEXT]
+    K -->|4014, 401, 403, 404, chat not found| CF[nonaktif sesi ini: 1 CRITICAL + 1 push]
+    K -->|5xx, timeout| TP[TEMP, jeda 10 detik]
+```
+
+Critical yang `FAILED` (atau saat Telegram nonaktif) dikirim lewat `SendNotification` sebagai teks polos maks 255 karakter; status `FAILED` + `PUSH_SENT`/`PUSH_FAILED`. Push dibatasi 2/detik dan 10/menit (ditunda, maks 20 di memori).

@@ -25,6 +25,14 @@ Versi EA saat checklist dibuat: 1.06 (Fase 1 selesai). Terminal live: akun cent 
 | MC-IN-01 | spec 07 | Muat setiap preset lewat Inputs → Load di satu chart | File terbaca, nilai sesuai; preset simbol lain di chart ini → WARN `InpPresetTag` | | | |
 | MC-IN-02 | spec 07 | Cek simbol NZDUSDc tersedia di akun cent | Ada di Market Watch; bila tidak, catat di kolom Catatan | | | |
 | PRD-08 | PRD uji fungsi wajib | Akun real dengan `AllowLiveTrading = false` | EA menolak jalan (= MC-01) | | | |
+| MC-TG-01 | spec 09 | `uv run python sdbot/tools/make_local_presets.py`, muat `SDBot_DAY_EURUSDc.local.set` di chart EURUSDc akun cent | 12 file `.local.set` dibuat, tidak muncul di `git status`; token terisi di tab Inputs | | | |
+| MC-TG-02 | spec 09 | Pasang EA v1.08 dengan `.local.set` | Pesan start masuk chat bot Python tanpa bunyi, HTML tampil benar (penanda `SDBot` · EURUSDc · CENT · v1.08) | | | |
+| MC-TG-03 | spec 09 | Hapus `https://api.telegram.org` dari daftar WebRequest, init ulang EA | 1 log CRITICAL "Telegram nonaktif" + 1 push HP; tidak diulang tiap detik | | | |
+| MC-TG-04 | spec 09 | Ubah satu karakter token di Inputs | Sama dengan MC-TG-03 (HTTP 401/404) | | | |
+| MC-TG-05 | spec 09 | Dua chart (EURUSDc, GBPUSDc) 2 jam | 1 heartbeat per jam (tanpa bunyi), "Instance hidup 2" | | | |
+| MC-TG-06 | spec 09 | Lepas chart pemimpin | Heartbeat berikutnya tetap datang dari chart lain | | | |
+| MC-TG-07 | spec 09 | Laporan harian pertama setelah pergantian hari server | Angka (P&L, posisi tutup, per simbol) cocok dengan history MT5 | | | |
+| MC-TG-08 | spec 09 | Telegram nonaktif (MC-TG-03), lalu picu Critical (GV `SDB_<login>_STOPPED` = 1 lewat F3) | Push Critical sampai di HP; baris `alerts` `FAILED` + `PUSH_SENT` | | | |
 | MC-NT-01 | spec 08 | EA v1.07 di chart EURUSDc akun cent 1 jam | Pesan notifier di log Experts berformat spec 08 design §4.4 (penanda `SDBot` · simbol · `CENT` · versi), baris `alerts` berstatus `SENT` dengan `notify_key` | | | |
 
 ## Fase 3: setelah ada entry dari sinyal

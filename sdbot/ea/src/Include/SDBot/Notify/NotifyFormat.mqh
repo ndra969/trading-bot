@@ -227,4 +227,98 @@ string NtFormatClosed(const SdbNtContext &c, const ClosureRecord &cl, const stri
    return NtTruncate(s, SDB_NT_MAX_LEN);
   }
 
+//--- Pesan berjadwal (spec 09 design §4.4). Heartbeat dan laporan tentang akun: penanda AKUN <login>.
+
+// 1234567.891 -> "1,234,567.89" (tanpa tanda).
+string NtGroupDigits(const double v)
+  {
+   string s = DoubleToString(MathAbs(v), 2);
+   int dot = StringFind(s, ".");
+   string whole = StringSubstr(s, 0, dot);
+   string out = "";
+   int n = StringLen(whole);
+   for(int i = 0; i < n; i++)
+     {
+      if(i > 0 && (n - i) % 3 == 0)
+         out += ",";
+      out += StringSubstr(whole, i, 1);
+     }
+   return out + StringSubstr(s, dot);
+  }
+
+string NtMoneyGrouped(const double v, const string ccy)
+  {
+   return (v < 0.0 && MathAbs(v) >= 0.005 ? "-" : "") + NtGroupDigits(v) + " " + NtEscape(ccy);
+  }
+
+// "+120.00", "-48.00", "0.00": P&L per simbol di laporan.
+string NtSigned(const double v)
+  {
+   if(MathAbs(v) < 0.005)
+      return "0.00";
+   return (v > 0.0 ? "+" : "-") + NtGroupDigits(v);
+  }
+
+string NtHeaderWith(const string emoji, const SdbNtContext &c, const string subject)
+  {
+   return emoji + " <b>SDBot</b>" + NtDot() + subject + NtDot() + NtEscape(c.accountTag) + NtDot() + "v" + NtEscape(c.eaVersion);
+  }
+
+string NtAccountSubject(const SdbNtContext &c) { return "AKUN " + IntegerToString(c.login); }
+
+string NtFormatHeartbeat(const SdbNtContext &c, const SdbHeartbeat &h)
+  {
+   string s = NtHeaderWith(NtLevelEmoji(SDB_NT_INFO), c, NtAccountSubject(c)) + "\n<b>Heartbeat</b>\n" +
+              NtCp(0x1F4B0) + " Balance " + NtCode(NtMoneyGrouped(h.balance, c.currency)) + NtDot() +
+              "Equity " + NtCode(NtMoneyGrouped(h.equity, c.currency)) + "\n" +
+              NtCp(0x1F4C9) + " DD dari puncak " + NtCode(DoubleToString(h.ddPct, 2) + "%") + NtDot() +
+              "Status " + NtCode(NtEscape(h.riskStatus)) + "\n" +
+              NtCp(0x1F4C8) + " Posisi SDBot " + NtCode(IntegerToString(h.sdbotPositions)) + NtDot() +
+              "Instance hidup " + NtCode(IntegerToString(h.instancesAlive)) + "\n" +
+              NtCp(0x1F515) + " Ditahan kuota jam lalu " + NtCode(IntegerToString(h.heldLastHour));
+   return NtTruncate(s, SDB_NT_MAX_LEN);
+  }
+
+string NtFormatDailyReport(const SdbNtContext &c, const SdbDayStats &d)
+  {
+   string day = TimeToString((datetime)d.dayStart, TIME_DATE);
+   StringReplace(day, ".", "-");
+   string winRate = (d.closed > 0) ? DoubleToString(100.0 * d.wins / d.closed, 1) + "%" : "-";
+   string s = NtHeaderWith(NtCp(d.net >= 0.0 ? 0x1F4C8 : 0x1F4C9), c, NtAccountSubject(c)) +
+              "\n<b>Laporan harian " + day + "</b>\n" +
+              NtCp(0x1F4B5) + " P&amp;L <b>" + NtSigned(d.net) + " " + NtEscape(c.currency) + "</b>" + NtDot() +
+              NtCp(0x1F522) + " Posisi tutup " + NtCode(IntegerToString(d.closed)) + NtDot() +
+              NtCp(0x1F3AF) + " Win rate " + NtCode(winRate) + "\n";
+   string symbols = "";
+   for(int i = 0; i < d.symbolCount; i++)
+      symbols += (i > 0 ? NtDot() : "") + NtEscape(d.symbols[i]) + " " + NtCode(NtSigned(d.symbolNet[i]));
+   if(symbols != "")
+      s += symbols + "\n";
+   s += NtCp(0x1F3E6) + " Operasi saldo " + NtCode(NtMoneyGrouped(d.balanceOps, c.currency)) + NtDot() +
+        NtCp(0x1F4B0) + " Balance " + NtCode(NtMoneyGrouped(d.balanceNow, c.currency));
+   return NtTruncate(s, SDB_NT_MAX_LEN);
+  }
+
+string NtFormatStart(const SdbNtContext &c, const SdbStartInfo &s)
+  {
+   string previous;
+   if(!s.hasPrevious)
+      previous = "Sesi pertama";
+   else if(s.previousAbnormal)
+      previous = NtLevelEmoji(SDB_NT_MEDIUM) + " Sesi lalu tidak ditutup normal";
+   else
+      previous = NtCp(0x1F558) + " Sesi lalu berhenti " + NtCode(TimeToString(s.previousEndedAt, TIME_DATE | TIME_MINUTES)) +
+                 " (" + NtCode(NtEscape(s.previousReason)) + ")";
+   string text = NtHeaderWith(NtCp(0x1F680), c, NtEscape(c.symbol)) + "\n<b>SDBot aktif</b>\n" +
+                 NtCp(0x1F522) + " Magic " + NtCode(IntegerToString(s.magic)) + NtDot() +
+                 "Preset " + NtCode(s.presetTag == "" ? "-" : NtEscape(s.presetTag)) + "\n" +
+                 NtLevelEmoji(SDB_NT_SUCCESS) + " Validasi akun " + NtCode(NtEscape(s.validation)) + "\n" + previous;
+   return NtTruncate(text, SDB_NT_MAX_LEN);
+  }
+
+string NtFormatStop(const SdbNtContext &c, const string reason)
+  {
+   return NtHeaderWith(NtCp(0x1F6D1), c, NtEscape(c.symbol)) + "\n<b>SDBot berhenti</b>\nAlasan " + NtCode(NtEscape(reason));
+  }
+
 #endif // SDB_NOTIFY_NOTIFYFORMAT_MQH

@@ -300,8 +300,74 @@ enum ENUM_SDB_NT_NEXT
    SDB_NT_DONE_FAILED = 3
   };
 
+// Hasil klasifikasi respons Telegram (spec 09 design §4.3).
+enum ENUM_SDB_TG_OUTCOME
+  {
+   SDB_TG_OK = 0,
+   SDB_TG_TEMP = 1,
+   SDB_TG_LIMITED = 2,
+   SDB_TG_PARSE_ERROR = 3,    // HTML ditolak: kirim ulang sekali sebagai teks polos
+   SDB_TG_PERMANENT = 4,
+   SDB_TG_CONFIG = 5          // URL belum diizinkan, token/chat salah: Telegram nonaktif sesi ini
+  };
+
+// Laporan harian (spec 09 design §4.1-4.2).
+#define SDB_DS_KIND_IN      0
+#define SDB_DS_KIND_OUT     1
+#define SDB_DS_KIND_BALANCE 2
+#define SDB_DS_MAX_SYMBOLS  16
+
+struct SdbDealRow
+  {
+   long              ticket;
+   long              positionId;
+   string            symbol;
+   int               kind;            // SDB_DS_KIND_*
+   long              time;            // waktu server
+   double            net;             // profit + komisi + swap + fee (deal trading)
+   double            amount;          // jumlah operasi saldo (BALANCE/CREDIT)
+  };
+
+struct SdbDayStats
+  {
+   long              dayStart;
+   double            net;
+   int               closed;
+   int               wins;
+   double            balanceOps;
+   bool              hasBalanceOps;
+   int               symbolCount;
+   string            symbols[SDB_DS_MAX_SYMBOLS];
+   double            symbolNet[SDB_DS_MAX_SYMBOLS];
+   double            balanceNow;      // diisi pengumpul saat laporan dibuat
+  };
+
+// Data heartbeat dari App (spec 09 design §4.1); instance hidup dan pesan ditahan diisi notifier.
+struct SdbHeartbeat
+  {
+   double            balance;
+   double            equity;
+   double            ddPct;
+   string            riskStatus;      // normal, lot x 0.5, pause harian, STOPPED
+   int               sdbotPositions;
+   int               instancesAlive;
+   int               heldLastHour;
+  };
+
+struct SdbStartInfo
+  {
+   long              magic;
+   string            presetTag;
+   string            validation;
+   bool              hasPrevious;
+   bool              previousAbnormal;
+   datetime          previousEndedAt;
+   string            previousReason;
+  };
+
 struct SdbNtContext
   {
+   long              login;           // penanda AKUN <login> untuk heartbeat dan laporan harian
    string            symbol;
    string            accountTag;      // CENT, REAL, DEMO, TESTER
    string            eaVersion;
@@ -321,8 +387,10 @@ struct SdbOutMessage
 struct SdbSendResult
   {
    ENUM_SDB_SEND_CODE code;
-   int               retryAfterSec;
+   int               retryAfterSec;   // LIMITED: tunggu; TEMP: jeda sebelum kiriman berikutnya (spec 09 Req 2.6)
    string            error;
+   bool              disable;         // error konfigurasi: transport nonaktif sesi ini (spec 09 Req 2.3)
+   string            note;            // alasan status saat SENT/FAILED, mis. PLAIN_TEXT, TELEGRAM_OFF
   };
 
 struct SdbNtItem

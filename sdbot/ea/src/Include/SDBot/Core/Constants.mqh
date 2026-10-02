@@ -76,10 +76,31 @@
 #define SDB_NT_MAX_PER_TIMER          2        // WebRequest blocking: batasi kiriman per siklus (PC-13)
 #define SDB_NT_MAX_ATTEMPTS           3
 #define SDB_NT_MAX_LEN                4096     // batas pesan Telegram
-#define SDB_NT_DRAIN_MS               3000     // kirim Critical tersisa saat deinit
+#define SDB_NT_DRAIN_MS               2000     // kirim Critical + stop saat deinit; MT5 memotong OnDeinit di 2.5 detik (PC-14)
 #define SDB_NT_QUOTA_HOUR_FACTOR      1000     // GV NT_QUOTA = jam x 1000 + jumlah
 #define SDB_GV_NT_QUOTA               "NT_QUOTA"
 #define SDB_GV_NT_CD_PREFIX           "NT_CD_"
+
+//--- Telegram, push, pesan berjadwal (spec 09 design §4.5-4.6, PC-14)
+#define SDB_TG_TIMEOUT_MS             3000     // PRD
+#define SDB_TG_MIN_GAP_MS             1000     // jarak kiriman semua instance ke satu chat
+#define SDB_TG_TEMP_BACKOFF_SEC       10       // selama gagal sementara: maks 1 kiriman per 10 detik
+#define SDB_PUSH_MAX_LEN              255      // batas SendNotification
+#define SDB_PUSH_PER_SEC              2
+#define SDB_PUSH_PER_MIN              10
+#define SDB_PUSH_QUEUE_MAX            20
+#define SDB_NT_LEASE_TTL_SEC          120
+#define SDB_NT_LEASE_RENEW_SEC        30
+#define SDB_NT_REPORT_MAX_DAYS        7
+#define SDB_DEF_HEARTBEAT_MIN         60       // PRD HeartbeatMinutes
+#define SDB_MIN_HEARTBEAT_MIN         5
+#define SDB_MAX_HEARTBEAT_MIN         1440
+#define SDB_GV_NT_TG_NEXT             "NT_TG_NEXT"
+#define SDB_GV_NT_LEADER              "NT_LEADER"
+#define SDB_GV_NT_ALIVE_PREFIX        "NT_ALIVE_"
+#define SDB_GV_NT_HB_AT               "NT_HB_AT"
+#define SDB_GV_NT_REPORT_DAY          "NT_REPORT_DAY"
+#define SDB_GV_NT_HELD                "NT_HELD"
 
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart

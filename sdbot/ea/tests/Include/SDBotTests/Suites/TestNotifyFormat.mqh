@@ -43,6 +43,88 @@ bool NfEndsWith(const string s, const string tail)
    return n >= m && StringSubstr(s, n - m) == tail;
   }
 
+// TC-NF-20..24 (spec 09 design §4.4): heartbeat, laporan harian, start, stop, uang dengan pemisah ribuan.
+void RunTestNotifyFormatScheduled()
+  {
+   string dot = NtCp(0x00B7);
+   string nl = "\n";
+   SdbNtContext c = NfTestCtx("EURUSDc", 5);
+   c.login = 12345;
+   c.eaVersion = "1.08";
+   string acct = " <b>SDBot</b> " + dot + " AKUN 12345 " + dot + " CENT " + dot + " v1.08" + nl;
+
+   SdbHeartbeat h;
+   h.balance = 10234.5;
+   h.equity = 10180.2;
+   h.ddPct = 1.25;
+   h.riskStatus = "normal";
+   h.sdbotPositions = 3;
+   h.instancesAlive = 12;
+   h.heldLastHour = 0;
+   string hb = NtLevelEmoji(SDB_NT_INFO) + acct + "<b>Heartbeat</b>" + nl +
+               NtCp(0x1F4B0) + " Balance <code>10,234.50 USC</code> " + dot + " Equity <code>10,180.20 USC</code>" + nl +
+               NtCp(0x1F4C9) + " DD dari puncak <code>1.25%</code> " + dot + " Status <code>normal</code>" + nl +
+               NtCp(0x1F4C8) + " Posisi SDBot <code>3</code> " + dot + " Instance hidup <code>12</code>" + nl +
+               NtCp(0x1F515) + " Ditahan kuota jam lalu <code>0</code>";
+   AssertStrEq("TC-NF-20", "heartbeat sesuai contoh design", NtFormatHeartbeat(c, h), hb);
+
+   SdbDayStats d;
+   ZeroMemory(d);
+   d.dayStart = 1790812800;   // 2026.10.01
+   d.net = 152.4;
+   d.closed = 7;
+   d.wins = 4;
+   d.symbolCount = 3;
+   d.symbols[0] = "EURUSDc";
+   d.symbolNet[0] = 120.0;
+   d.symbols[1] = "XAUUSDc";
+   d.symbolNet[1] = 80.4;
+   d.symbols[2] = "GBPJPYc";
+   d.symbolNet[2] = -48.0;
+   d.balanceOps = 0.0;
+   d.balanceNow = 10386.9;
+   string rep = NtCp(0x1F4C8) + acct + "<b>Laporan harian 2026-10-01</b>" + nl +
+                NtCp(0x1F4B5) + " P&amp;L <b>+152.40 USC</b> " + dot + " " + NtCp(0x1F522) + " Posisi tutup <code>7</code> " + dot + " " +
+                NtCp(0x1F3AF) + " Win rate <code>57.1%</code>" + nl +
+                "EURUSDc <code>+120.00</code> " + dot + " XAUUSDc <code>+80.40</code> " + dot + " GBPJPYc <code>-48.00</code>" + nl +
+                NtCp(0x1F3E6) + " Operasi saldo <code>0.00 USC</code> " + dot + " " + NtCp(0x1F4B0) + " Balance <code>10,386.90 USC</code>";
+   string got = NtFormatDailyReport(c, d);
+   d.net = -12.0;
+   d.closed = 0;
+   d.symbolCount = 0;
+   string neg = NtFormatDailyReport(c, d);
+   AssertTrue("TC-NF-21", "laporan harian sesuai contoh; rugi = 1F4C9, tanpa posisi = win rate - dan tanpa baris simbol",
+              got == rep && StringGetCharacter(neg, 1) == 0xDCC9 && StringFind(neg, "Win rate <code>-</code>") > 0 &&
+              StringFind(neg, "EURUSDc") < 0);
+
+   SdbStartInfo s;
+   s.magic = 2026091901;
+   s.presetTag = "EURUSDc";
+   s.validation = "PASSED";
+   s.hasPrevious = true;
+   s.previousAbnormal = false;
+   s.previousEndedAt = D'2026.10.01 22:15:00';
+   s.previousReason = "REMOVE";
+   string st1 = NtFormatStart(c, s);
+   s.previousAbnormal = true;
+   string st2 = NtFormatStart(c, s);
+   s.hasPrevious = false;
+   string st3 = NtFormatStart(c, s);
+   AssertTrue("TC-NF-22", "start: emoji 1F680, simbol, magic, preset, validasi, sesi lalu normal / tidak normal / pertama",
+              StringFind(st1, NtCp(0x1F680) + " <b>SDBot</b> " + dot + " EURUSDc ") == 0 && StringFind(st1, "<b>SDBot aktif</b>") > 0 &&
+              StringFind(st1, "Magic <code>2026091901</code>") > 0 && StringFind(st1, "Preset <code>EURUSDc</code>") > 0 &&
+              StringFind(st1, "Validasi akun <code>PASSED</code>") > 0 &&
+              StringFind(st1, "Sesi lalu berhenti <code>2026.10.01 22:15</code> (<code>REMOVE</code>)") > 0 &&
+              StringFind(st2, "Sesi lalu tidak ditutup normal") > 0 && StringFind(st3, "Sesi pertama") > 0);
+   string stop = NtFormatStop(c, "CHARTCLOSE");
+   AssertTrue("TC-NF-23", "stop: emoji 1F6D1, judul, alasan",
+              StringFind(stop, NtCp(0x1F6D1) + " <b>SDBot</b> ") == 0 && StringFind(stop, "<b>SDBot berhenti</b>" + nl + "Alasan <code>CHARTCLOSE</code>") > 0);
+   AssertTrue("TC-NF-24", "uang dengan pemisah ribuan dan tanda",
+              NtMoneyGrouped(10234.5, "USC") == "10,234.50 USC" && NtMoneyGrouped(-48, "USC") == "-48.00 USC" &&
+              NtMoneyGrouped(1234567.891, "USC") == "1,234,567.89 USC" && NtSigned(120) == "+120.00" && NtSigned(-48) == "-48.00" &&
+              NtSigned(0) == "0.00");
+  }
+
 void RunTestNotifyFormat()
   {
    TfBeginSuite("NotifyFormat");
@@ -149,6 +231,8 @@ void RunTestNotifyFormat()
               StringLen(cut) <= 4096 && entitiesWhole && NfOpenTags(cut) == 0 && StringFind(body, "<b") == StringFind(body, "<b>"));
    string exact = StringSubstr(longText, 0, 4096);
    AssertStrEq("TC-NF-18", "tepat 4096 tidak berubah", NtTruncate(exact, 4096), exact);
+
+   RunTestNotifyFormatScheduled();
 
    TfEndSuite();
   }

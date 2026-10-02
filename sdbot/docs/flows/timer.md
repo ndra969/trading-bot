@@ -13,7 +13,7 @@ flowchart TB
     SN --> G{24 jam sejak touch GV?}
     G -->|ya| TG[touch semua GV agar tidak dihapus MT5]
     G -->|tidak| F
-    TG --> N[CNotifier.OnTimer: buang pesan basi, kirim maks 2]
+    TG --> N[CNotifier.OnTimer: lease + heartbeat + laporan harian, push tertunda, buang pesan basi, kirim maks 2]
     N --> F[CLogger.Flush: antrean ke SQLite dalam satu transaksi, termasuk status kirim]
 ```
 

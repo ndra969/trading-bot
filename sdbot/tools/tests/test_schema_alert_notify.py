@@ -90,5 +90,9 @@ def test_ts30_enums_list_trade_types_and_status_reasons(real_schema_dir: Path):
         "RESTART",
         "TRANSPORT_TEMP",
         "TRANSPORT_PERMANENT",
+        "TELEGRAM_OFF",
+        "PUSH_SENT",
+        "PUSH_FAILED",
+        "PLAIN_TEXT",
     ]
     assert reason.columns == ["alerts.status_reason"]

@@ -40,6 +40,11 @@ input double                 InpPartialPct            = SDB_DEF_PARTIAL_PCT;    
 input int                    InpTrailATRPeriod        = SDB_DEF_TRAIL_ATR_PERIOD;   // Periode ATR trailing (LTF)
 input double                 InpTrailATRMult          = SDB_DEF_TRAIL_ATR_MULT;     // Pengali ATR trailing
 
+input group "Notifikasi"
+input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
+input string                 InpTelegramChatID        = "";                         // Chat ID Telegram (sama dengan bot Python)
+input int                    InpHeartbeatMinutes      = SDB_DEF_HEARTBEAT_MIN;      // Heartbeat tiap N menit (0 = mati, 5-1440)
+
 // Salin nilai input ke struct agar aturan validasi bisa diuji tanpa bergantung pada input global.
 InputValues CurrentInputs()
   {
@@ -60,6 +65,7 @@ InputValues CurrentInputs()
    v.maxPosForexCross = InpMaxPosForexCross;
    v.maxPosCommodity = InpMaxPosCommodity;
    v.maxPosCrypto = InpMaxPosCrypto;
+   v.heartbeatMinutes = InpHeartbeatMinutes;
    return v;
   }
 
@@ -71,7 +77,8 @@ string CurrentInputsJson()
                  "InpRiskPerTradePct", "InpMaxOpenRiskPct", "InpDailyLossPct", "InpDDReducePct", "InpDDStopPct",
                  "InpResetEmergencyStop", "InpBreakevenR", "InpBreakevenBufferPoints", "InpPartialR",
                  "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult", "InpMaxPosForexMajor",
-                 "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto", "InpPresetTag"};
+                 "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto", "InpPresetTag",
+                 "InpHeartbeatMinutes", "InpTelegramConfigured"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -96,6 +103,9 @@ string CurrentInputsJson()
    v[19] = JsonNum(InpMaxPosCommodity);
    v[20] = JsonNum(InpMaxPosCrypto);
    v[21] = JsonStr(InpPresetTag);
+   v[22] = JsonNum(InpHeartbeatMinutes);
+   // Token dan chat ID rahasia: hanya tanda terisi, agar input_hash tidak membocorkan dan tidak berubah karenanya.
+   v[23] = JsonBool(InpTelegramToken != "" && InpTelegramChatID != "");
    return CanonicalJson(k, v);
   }
 
@@ -114,6 +124,8 @@ SdbAppConfig CurrentAppConfig(const ENUM_SDB_APP_MODE mode, const string eaVersi
    c.dbTarget = SdbDbTargetForRuntime();
    c.resetEmergencyStop = InpResetEmergencyStop;
    c.presetTag = InpPresetTag;
+   c.telegramToken = InpTelegramToken;
+   c.telegramChatId = InpTelegramChatID;
    return c;
   }
 

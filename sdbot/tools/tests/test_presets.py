@@ -57,7 +57,8 @@ def test_tp03_safe_defaults_suffix_and_tag():
 
 
 def test_tp04_ascii_and_no_secret_values():
-    for path in PRESETS.glob("SDBot_DAY_*.set"):
+    # *.local.set (salinan pribadi berisi token, diabaikan git) bukan preset repo.
+    for path in (p for p in PRESETS.glob("SDBot_DAY_*.set") if not p.name.endswith(".local.set")):
         raw = path.read_bytes()
         assert all(b < 128 for b in raw), f"{path.name} bukan ASCII"
         for line in raw.decode("ascii").splitlines():
@@ -74,3 +75,12 @@ def test_tp05_files_equal_generator_output():
         expected = gen_presets.render(symbol)
         actual = (PRESETS / f"SDBot_DAY_{symbol}c.set").read_text(encoding="ascii")
         assert actual == expected, f"{symbol}: jalankan `uv run python sdbot/tools/gen_presets.py`"
+
+
+def test_ts46_telegram_inputs_present_and_empty():
+    """Spec 09 Req 1.8: input Telegram ada di preset repo, token dan chat ID kosong."""
+    for symbol in EXPECTED_MAGIC:
+        v = _read(symbol)
+        assert v.get("InpTelegramToken") == "", symbol
+        assert v.get("InpTelegramChatID") == "", symbol
+        assert v.get("InpHeartbeatMinutes") == "60", symbol

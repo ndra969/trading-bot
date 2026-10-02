@@ -23,7 +23,8 @@ flowchart TB
     PC --> ES[EnsureState: bila akun PASSED]
     ES --> TM{EventSetTimer 1 detik}
     TM -->|gagal| F
-    TM -->|ok| OK([INIT_SUCCEEDED])
+    TM -->|ok| ST[SendStart: pesan start + akhir sesi lalu]
+    ST --> OK([INIT_SUCCEEDED])
 ```
 
 `EnsureState` (juga dicoba ulang dari timer selama akun PENDING): `CState` → `CRiskState` (nilai awal aman) → `CRiskMonitor.OnStateReady` (baseline operasi saldo, `STATE_RESET`, reset emergency, operasi saldo tertunda) → snapshot akun dengan puncak equity → `CReconciler.Run` (posisi terbuka `RECONCILED`, deal yang terlewat).
@@ -32,5 +33,5 @@ flowchart TB
 flowchart LR
     D([OnDeinit]) --> X{sudah deinit?}
     X -->|ya| Z([selesai])
-    X -->|tidak| K[EventKillTimer] --> L[log alasan] --> I[IndicatorRelease ATR] --> DR[CNotifier.DrainCritical maks 3 detik] --> ES[EndSession alasan] --> C[CLogger.Close: flush terakhir] --> Z
+    X -->|tidak| K[EventKillTimer] --> L[log alasan] --> I[IndicatorRelease ATR] --> DR[SendStop, Drain: Critical lalu stop maks 2 detik, lepas lease pemimpin] --> ES[EndSession alasan] --> C[CLogger.Close: flush terakhir] --> Z
 ```

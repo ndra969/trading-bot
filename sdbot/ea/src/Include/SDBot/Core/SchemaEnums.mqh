@@ -144,6 +144,10 @@
 #define SDB_ALERT_TYPE_SL_MISSING "SL_MISSING"
 #define SDB_ALERT_TYPE_TRADE_OPENED "TRADE_OPENED"
 #define SDB_ALERT_TYPE_TRADE_CLOSED "TRADE_CLOSED"
+#define SDB_ALERT_TYPE_EA_START "EA_START"
+#define SDB_ALERT_TYPE_EA_STOP "EA_STOP"
+#define SDB_ALERT_TYPE_HEARTBEAT "HEARTBEAT"
+#define SDB_ALERT_TYPE_DAILY_REPORT "DAILY_REPORT"
 
 // alert_status_reason: alerts.status_reason
 #define SDB_ALERT_STATUS_REASON_COOLDOWN "COOLDOWN"
@@ -153,6 +157,10 @@
 #define SDB_ALERT_STATUS_REASON_RESTART "RESTART"
 #define SDB_ALERT_STATUS_REASON_TRANSPORT_TEMP "TRANSPORT_TEMP"
 #define SDB_ALERT_STATUS_REASON_TRANSPORT_PERMANENT "TRANSPORT_PERMANENT"
+#define SDB_ALERT_STATUS_REASON_TELEGRAM_OFF "TELEGRAM_OFF"
+#define SDB_ALERT_STATUS_REASON_PUSH_SENT "PUSH_SENT"
+#define SDB_ALERT_STATUS_REASON_PUSH_FAILED "PUSH_FAILED"
+#define SDB_ALERT_STATUS_REASON_PLAIN_TEXT "PLAIN_TEXT"
 
 // deinit_reason: sessions.end_reason
 #define SDB_DEINIT_REASON_PROGRAM "PROGRAM"
@@ -203,9 +211,9 @@ bool SdbEnumIsValid(const string enumName, const string value)
    if(enumName == "reject_stage")
       return value == "STOPPED" || value == "DAILY_PAUSE" || value == "NOT_TRADABLE" || value == "MAX_OPEN_RISK" || value == "CLASS_POSITION_LIMIT" || value == "MARGIN_LOW" || value == "CURRENCY_EXPOSURE" || value == "NEWS_BLACKOUT" || value == "OUTSIDE_SESSION" || value == "SPREAD_TOO_WIDE" || value == "NO_HTF_BIAS" || value == "NO_VALID_ZONE" || value == "ZONE_USED" || value == "NO_PA_TRIGGER" || value == "SCORE_TOO_LOW" || value == "RR_TOO_LOW" || value == "SL_TOO_CLOSE" || value == "INVALID_STOPS" || value == "INVALID_VOLUME" || value == "LOT_BELOW_MIN" || value == "RISK_PER_TRADE" || value == "BROKER_REJECTED" || value == "OTHER";
    if(enumName == "alert_type")
-      return value == "ACCOUNT_REJECTED" || value == "CONN_DOWN" || value == "CONN_UP" || value == "DB_UNAVAILABLE" || value == "DB_RECOVERED" || value == "DB_NEWER_SCHEMA" || value == "MIGRATION_FAILED" || value == "ORDER_FAILED" || value == "MODIFY_FAILED" || value == "DD_INFO" || value == "DD_REDUCE" || value == "DD_RECOVERED" || value == "DD_STOP" || value == "DAILY_LOSS" || value == "MARGIN_LOW" || value == "MARGIN_OK" || value == "CLOSE_ALL_FAILED" || value == "EMERGENCY_RESET" || value == "BALANCE_OP" || value == "STATE_RESET" || value == "SL_RESTORED" || value == "BE_MOVED" || value == "PARTIAL_CLOSED" || value == "SL_MISSING" || value == "TRADE_OPENED" || value == "TRADE_CLOSED";
+      return value == "ACCOUNT_REJECTED" || value == "CONN_DOWN" || value == "CONN_UP" || value == "DB_UNAVAILABLE" || value == "DB_RECOVERED" || value == "DB_NEWER_SCHEMA" || value == "MIGRATION_FAILED" || value == "ORDER_FAILED" || value == "MODIFY_FAILED" || value == "DD_INFO" || value == "DD_REDUCE" || value == "DD_RECOVERED" || value == "DD_STOP" || value == "DAILY_LOSS" || value == "MARGIN_LOW" || value == "MARGIN_OK" || value == "CLOSE_ALL_FAILED" || value == "EMERGENCY_RESET" || value == "BALANCE_OP" || value == "STATE_RESET" || value == "SL_RESTORED" || value == "BE_MOVED" || value == "PARTIAL_CLOSED" || value == "SL_MISSING" || value == "TRADE_OPENED" || value == "TRADE_CLOSED" || value == "EA_START" || value == "EA_STOP" || value == "HEARTBEAT" || value == "DAILY_REPORT";
    if(enumName == "alert_status_reason")
-      return value == "COOLDOWN" || value == "QUOTA" || value == "STALE" || value == "OVERFLOW" || value == "RESTART" || value == "TRANSPORT_TEMP" || value == "TRANSPORT_PERMANENT";
+      return value == "COOLDOWN" || value == "QUOTA" || value == "STALE" || value == "OVERFLOW" || value == "RESTART" || value == "TRANSPORT_TEMP" || value == "TRANSPORT_PERMANENT" || value == "TELEGRAM_OFF" || value == "PUSH_SENT" || value == "PUSH_FAILED" || value == "PLAIN_TEXT";
    if(enumName == "deinit_reason")
       return value == "PROGRAM" || value == "REMOVE" || value == "RECOMPILE" || value == "CHARTCHANGE" || value == "CHARTCLOSE" || value == "PARAMETERS" || value == "ACCOUNT" || value == "TEMPLATE" || value == "INITFAILED" || value == "CLOSE" || value == "OTHER";
    return false;

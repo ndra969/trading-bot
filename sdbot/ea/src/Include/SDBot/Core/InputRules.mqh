@@ -26,6 +26,7 @@ struct InputValues
    int               maxPosForexCross;
    int               maxPosCommodity;
    int               maxPosCrypto;
+   int               heartbeatMinutes;   // InpHeartbeatMinutes: 0 = mati (spec 09 Req 1.1)
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -43,6 +44,8 @@ struct SdbAppConfig
    ENUM_SDB_DB_TARGET     dbTarget;
    bool                   resetEmergencyStop;   // InpResetEmergencyStop (spec 05 Req 5.5)
    string                 presetTag;            // InpPresetTag (spec 07 Req 2.6)
+   string                 telegramToken;        // rahasia: tidak masuk InputValues, JSON sesi, maupun log (spec 09 Req 1.3)
+   string                 telegramChatId;
   };
 
 InputValues DefaultInputValues()
@@ -64,6 +67,7 @@ InputValues DefaultInputValues()
    v.maxPosForexCross = SDB_DEF_MAX_POS_FOREX_CROSS;
    v.maxPosCommodity = SDB_DEF_MAX_POS_COMMODITY;
    v.maxPosCrypto = SDB_DEF_MAX_POS_CRYPTO;
+   v.heartbeatMinutes = SDB_DEF_HEARTBEAT_MIN;
    return v;
   }
 
@@ -133,6 +137,9 @@ bool ValidateInputValues(const InputValues &v, const bool allowHarnessMagic, str
    IrCheckClassLimit("InpMaxPosCommodity", v.maxPosCommodity, errors);
    IrCheckClassLimit("InpMaxPosCrypto", v.maxPosCrypto, errors);
    IrCheckPosition(v, errors);
+   if(v.heartbeatMinutes != 0 && (v.heartbeatMinutes < SDB_MIN_HEARTBEAT_MIN || v.heartbeatMinutes > SDB_MAX_HEARTBEAT_MIN))
+      IrAdd(errors, "InpHeartbeatMinutes=" + IntegerToString(v.heartbeatMinutes) + " harus 0 (mati) atau " +
+            IntegerToString(SDB_MIN_HEARTBEAT_MIN) + " <= x <= " + IntegerToString(SDB_MAX_HEARTBEAT_MIN));
    return errors == "";
   }
 

@@ -1,17 +1,17 @@
 //+------------------------------------------------------------------+
 //| SDBot.mq5 — EA Supply & Demand + konfluensi (PRD-EA).
-//| v1.07 (spec 08 notifier core): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
+//| v1.08 (Fase 2 selesai, spec 09): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
 //| yang memegang validasi input dan akun, state bersama, pencatatan
 //| SQLite, CExecutor, risk management (spec 05), dan manajemen posisi
 //| (BE, partial, trailing ATR, closure, rekonsiliasi), metrik OnTester, notifier
-//| (pesan ke log sampai Telegram di spec 09). Belum ada logika entry:
+//| (Telegram, push HP, heartbeat, laporan harian). Belum ada logika entry:
 //| EA ini tidak membuka posisi sebelum Fase 3 (spec 04 Req 6.7).
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.07"
-#property description "SDBot EA v1.07: risk management, manajemen posisi, pencatatan SQLite, notifier (log). Tidak membuka posisi apa pun."
+#property version   "1.08"
+#property description "SDBot EA v1.08: risk management, manajemen posisi, pencatatan SQLite, notifikasi Telegram. Tidak membuka posisi apa pun."
 
-#define SDB_EA_VERSION "1.07"   // sama dengan #property version
+#define SDB_EA_VERSION "1.08"   // sama dengan #property version
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>

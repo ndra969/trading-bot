@@ -110,6 +110,25 @@ void RunTestCoreUtilsInputs()
    AssertTrue("TC-IR-01", "mode harness: 2026091900 lolos, 2026091899 ditolak, 2026091901 tetap lolos",
               harnessOk && belowRejected && normalOk);
 
+   // TC-SU-30 (spec 09 Req 1.1): heartbeat 0 = mati, selain itu 5-1440 menit.
+   bool hbOk = true, hbBad = true;
+   int okValues[] = {0, 5, 60, 1440};
+   int badValues[] = {3, -1, 1441};
+   for(int i = 0; i < ArraySize(okValues); i++)
+     {
+      v = DefaultInputValues();
+      v.heartbeatMinutes = okValues[i];
+      hbOk = hbOk && ValidateInputValues(v, false, err);
+     }
+   for(int i = 0; i < ArraySize(badValues); i++)
+     {
+      v = DefaultInputValues();
+      v.heartbeatMinutes = badValues[i];
+      hbBad = hbBad && !ValidateInputValues(v, false, err) && CuContains(err, "InpHeartbeatMinutes");
+     }
+   AssertTrue("TC-SU-30", "InpHeartbeatMinutes: 0, 5, 60, 1440 lolos; 3, -1, 1441 ditolak; default 60",
+              hbOk && hbBad && DefaultInputValues().heartbeatMinutes == 60);
+
    // Batas posisi per kategori aset (spec 05 Req 2.8, PC-10): default dari bot Python, batas 1-20.
    v = DefaultInputValues();
    bool defaultsOk = v.maxPosForexMajor == 5 && v.maxPosForexCross == 3 && v.maxPosCommodity == 1 &&

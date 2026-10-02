@@ -10,11 +10,12 @@
 #include <SDBotTests/TestFramework.mqh>
 #include <SDBotTests/FakeSink.mqh>
 #include <SDBotTests/FakeTransport.mqh>
+#include <SDBotTests/FakePush.mqh>
 #include <SDBot/Notify/Notifier.mqh>
 
 #define TNR_PREFIX "SDBTEST"
 #define TNR_LOGIN  990002
-#define TNR_T0     1790762405   // 2026.10.01 10:00:05
+#define TNR_T0     1790762405   // 2026.09.30 10:00:05
 
 SdbNtContext TnrCtx()
   {
@@ -317,7 +318,7 @@ void TnrRestartAndOverflow()
    d.Requeue(TnrAlert("TEST_I2", SDB_SEV_INFO, "i2"));
    d.Requeue(TnrAlert("CLOSE_ALL_FAILED", SDB_SEV_CRITICAL, "c2"));
    d.Requeue(TnrAlert("TEST_I3", SDB_SEV_INFO, "i3"));
-   d.DrainCritical(SDB_NT_DRAIN_MS);
+   d.Drain(SDB_NT_DRAIN_MS);
    SdbOutMessage m0, m1;
    AssertTrue("TC-NR-17", "deinit: hanya Critical yang dikirim",
               dt.Count() == 2 && dt.At(0, m0) && dt.At(1, m1) && m0.severity == SDB_SEV_CRITICAL && m1.severity == SDB_SEV_CRITICAL &&
@@ -336,6 +337,218 @@ void TnrRestartAndOverflow()
    TnrClean();
   }
 
+//--- Spec 09 (TC-NR-30..40): push, Telegram nonaktif, jeda gagal sementara, pemimpin, heartbeat, start/stop.
+
+int TnrCaptured(const string text)
+  {
+   int n = 0;
+   for(int i = 0; i < SdbLogCapturedCount(); i++)
+      if(StringFind(SdbLogCaptured(i), text) >= 0)
+         n++;
+   return n;
+  }
+
+SdbStartInfo TnrStartInfo()
+  {
+   SdbStartInfo s;
+   s.magic = 2026091901;
+   s.presetTag = "EURUSDc";
+   s.validation = "PASSED";
+   s.hasPrevious = false;
+   s.previousAbnormal = false;
+   s.previousEndedAt = 0;
+   s.previousReason = "";
+   return s;
+  }
+
+void TnrPushAndOff()
+  {
+   TnrClean();
+   CNotifier n;
+   CState st;
+   CFakeSink store;
+   CFakeTransport tr;
+   CFakePush push;
+   TnrSetup(n, st, store, tr, "P");
+   n.SetPush(GetPointer(push));
+   AlertStatus s;
+
+   for(int i = 1; i <= SDB_NT_QUOTA_PER_HOUR; i++)
+      n.OnAlert(TnrAlert("TEST_F" + IntegerToString(i), SDB_SEV_INFO, "f" + IntegerToString(i)));
+   n.SendStart(TnrStartInfo());
+   AlertEvent startRow;
+   bool startStored = store.CountAlertType("EA_START") == 1 && store.LastAlert(startRow);
+   for(int i = 0; i < 12; i++)
+     {
+      n.SetNowOverride(TNR_T0 + i);
+      n.OnTimer();
+     }
+   int startIdx = tr.FirstIndexOf("EA_START");
+   SdbOutMessage m;
+   AssertTrue("TC-NR-30", "kuota habis: start tetap terkirim tanpa bunyi, tidak SKIPPED",
+              startStored && startIdx >= 0 && tr.At(startIdx, m) && m.silent && store.StatusOf(startRow.key, s) && s.status == "SENT");
+
+   tr.Reset();
+   tr.Script("TEMP");
+   n.SetNowOverride(TNR_T0 + 100);
+   n.OnAlert(TnrAlert("DD_STOP", SDB_SEV_CRITICAL, "c1"));
+   for(int i = 0; i < 3; i++)
+     {
+      n.SetNowOverride(TNR_T0 + 100 + i);
+      n.OnTimer();
+     }
+   AssertTrue("TC-NR-31", "Critical gagal 3x: FAILED, push 1x berisi teks polos, alasan PUSH_SENT",
+              store.StatusOf("c1", s) && s.status == "FAILED" && s.reason == "PUSH_SENT" && push.Calls() == 1 &&
+              StringFind(push.TextAt(0), "SDBot") >= 0 && StringFind(push.TextAt(0), "<b>") < 0);
+
+   tr.Script("CONFIG");
+   SdbLogCaptureStart();
+   n.SetNowOverride(TNR_T0 + 3700);   // jam kuota baru: kuota jam TNR_T0 habis di TC-NR-30
+   n.OnAlert(TnrAlert("TEST_OFF1", SDB_SEV_INFO, "o1"));
+   n.OnTimer();
+   n.SetNowOverride(TNR_T0 + 3701);
+   n.OnAlert(TnrAlert("TEST_OFF2", SDB_SEV_INFO, "o2"));
+   n.OnAlert(TnrAlert("CLOSE_ALL_FAILED", SDB_SEV_CRITICAL, "c2"));
+   n.OnTimer();
+   n.SetNowOverride(TNR_T0 + 3702);
+   n.OnTimer();
+   int critLogs = TnrCaptured("Telegram nonaktif");
+   SdbLogCaptureStop();
+   AlertStatus s1, s2, s3;
+   AssertTrue("TC-NR-32", StringFormat("Telegram nonaktif: 1 push pemberitahuan + push Critical (push=%d, log=%d)", push.Calls(), critLogs),
+              store.StatusOf("o1", s1) && s1.status == "FAILED" && s1.reason == "TELEGRAM_OFF" &&
+              store.StatusOf("o2", s2) && s2.reason == "TELEGRAM_OFF" && store.StatusOf("c2", s3) && s3.reason == "PUSH_SENT" &&
+              push.Calls() == 3 && StringFind(push.TextAt(1), "Telegram nonaktif") >= 0 && critLogs == 1);
+   TnrClean();
+  }
+
+void TnrPushStates()
+  {
+   TnrClean();
+   CNotifier n;
+   CState st;
+   CFakeSink store;
+   CFakeTransport tr;
+   CFakePush push;
+   TnrSetup(n, st, store, tr, "Q");
+   n.SetPush(GetPointer(push));
+   tr.Script("PERM");
+   push.Script("3");
+   AlertStatus s;
+   SdbLogCaptureStart();
+   n.OnAlert(TnrAlert("DD_STOP", SDB_SEV_CRITICAL, "n1"));
+   n.OnAlert(TnrAlert("CLOSE_ALL_FAILED", SDB_SEV_CRITICAL, "n2"));
+   n.OnTimer();
+   int warn = TnrCaptured("push HP belum");
+   SdbLogCaptureStop();
+   AlertStatus s2;
+   AssertTrue("TC-NR-33", StringFormat("push belum dikonfigurasi: 2x PUSH_FAILED, log CRITICAL 1x (%d)", warn),
+              store.StatusOf("n1", s) && s.reason == "PUSH_FAILED" && store.StatusOf("n2", s2) && s2.reason == "PUSH_FAILED" && warn == 1);
+
+   push.Script("1,0");
+   n.SetNowOverride(TNR_T0 + 50);
+   n.OnAlert(TnrAlert("SL_MISSING", SDB_SEV_CRITICAL, "d1"));
+   n.OnTimer();
+   bool waiting = !store.StatusOf("d1", s);
+   n.SetNowOverride(TNR_T0 + 51);
+   n.OnTimer();
+   AssertTrue("TC-NR-34", "push ditunda: belum ada status, siklus berikutnya PUSH_SENT",
+              waiting && store.StatusOf("d1", s) && s.status == "FAILED" && s.reason == "PUSH_SENT" && push.Calls() == 2);
+
+   tr.Reset();
+   tr.Script("TEMP:10,OK");
+   n.SetNowOverride(TNR_T0 + 100);
+   n.OnAlert(TnrAlert("TEST_B1", SDB_SEV_INFO, "b1"));
+   n.OnAlert(TnrAlert("TEST_B2", SDB_SEV_INFO, "b2"));
+   n.OnTimer();
+   int afterFail = tr.Calls();
+   n.SetNowOverride(TNR_T0 + 105);
+   n.OnTimer();
+   int during = tr.Calls();
+   n.SetNowOverride(TNR_T0 + 110);
+   n.OnTimer();
+   AssertTrue("TC-NR-35", StringFormat("gagal sementara dengan jeda 10 detik: diam sampai +10 (%d, %d, %d)", afterFail, during, tr.Calls()),
+              afterFail == 1 && during == 1 && tr.Calls() == 3);
+
+   tr.Reset();
+   tr.Script("OK:PLAIN_TEXT");
+   n.SetNowOverride(TNR_T0 + 200);
+   n.OnAlert(TnrAlert("TEST_PT", SDB_SEV_INFO, "pt"));
+   n.OnTimer();
+   AssertTrue("TC-NR-36", "terkirim sebagai teks polos: SENT alasan PLAIN_TEXT",
+              store.StatusOf("pt", s) && s.status == "SENT" && s.reason == "PLAIN_TEXT");
+   TnrClean();
+  }
+
+void TnrLeader()
+  {
+   TnrClean();
+   CNotifier a, b;
+   CState sa, sb;
+   CFakeSink fa, fb;
+   CFakeTransport ta, tb;
+   CFakeStatusSource src;
+   TnrSetup(a, sa, fa, ta, "LA");
+   TnrSetup(b, sb, fb, tb, "LB");
+   a.SetSchedule(60, 2026091901);
+   b.SetSchedule(60, 2026091902);
+   a.SetStatusSource(GetPointer(src));
+   b.SetStatusSource(GetPointer(src));
+   a.OnTimer();
+   b.OnTimer();
+   bool oneLeader = a.IsLeader() && !b.IsLeader();
+   a.ReleaseLeader();
+   b.SetNowOverride(TNR_T0 + 30);
+   b.OnTimer();
+   AssertTrue("TC-NR-37", "satu pemimpin; setelah dilepas, instance lain memimpin di siklus berikutnya",
+              oneLeader && b.IsLeader());
+
+   // Kedua instance aktif tiap 30 detik: b memperbarui lease, a menandai diri hidup.
+   for(long t = TNR_T0 + 30; t <= TNR_T0 + 3600; t += 30)
+     {
+      b.SetNowOverride(t);
+      b.OnTimer();
+      a.SetNowOverride(t);
+      a.OnTimer();
+     }
+   int hbIdx = tb.FirstIndexOf("HEARTBEAT");
+   SdbOutMessage m;
+   AssertTrue("TC-NR-39", "heartbeat 60 menit dari pemimpin: tanpa bunyi, data sumber status, instance hidup 2",
+              hbIdx >= 0 && tb.At(hbIdx, m) && m.silent && StringFind(m.text, "Instance hidup <code>2</code>") > 0 &&
+              StringFind(m.text, "Posisi SDBot <code>2</code>") > 0 && ta.CountType("HEARTBEAT") == 0);
+
+   // b berhenti tanpa melepas lease; a mengambil alih setelah 120 detik tanpa heartbeat ganda.
+   a.SetNowOverride(TNR_T0 + 3600 + 119);
+   a.OnTimer();
+   bool notYet = !a.IsLeader();
+   a.SetNowOverride(TNR_T0 + 3600 + 150);
+   a.OnTimer();
+   AssertTrue("TC-NR-38", "lease kedaluwarsa: pemimpin baru, heartbeat tidak ganda dalam interval",
+              notYet && a.IsLeader() && ta.CountType("HEARTBEAT") == 0 && tb.CountType("HEARTBEAT") == 1);
+   TnrClean();
+  }
+
+void TnrStop()
+  {
+   TnrClean();
+   CNotifier n;
+   CState st;
+   CFakeSink store;
+   CFakeTransport tr;
+   TnrSetup(n, st, store, tr, "S");
+   n.OnAlert(TnrAlert("TEST_I1", SDB_SEV_INFO, "i1"));
+   n.OnAlert(TnrAlert("DD_STOP", SDB_SEV_CRITICAL, "c1"));
+   n.OnAlert(TnrAlert("TEST_I2", SDB_SEV_INFO, "i2"));
+   n.OnAlert(TnrAlert("TEST_I3", SDB_SEV_INFO, "i3"));
+   n.SendStop("REMOVE");
+   n.Drain(SDB_NT_DRAIN_MS);
+   SdbOutMessage m0, m1;
+   AssertTrue("TC-NR-40", "deinit: Critical lalu stop (tanpa bunyi) terkirim, Info tidak",
+              tr.Count() == 2 && tr.At(0, m0) && tr.At(1, m1) && m0.key == "c1" && m1.type == "EA_STOP" && m1.silent &&
+              StringFind(m1.text, "REMOVE") > 0 && n.QueueSize() == 3 && store.CountAlertType("EA_STOP") == 1);
+   TnrClean();
+  }
+
 void RunTestNotifier()
   {
    TfBeginSuite("Notifier");
@@ -345,6 +558,10 @@ void RunTestNotifier()
    TnrQuota();
    TnrTransportResults();
    TnrRestartAndOverflow();
+   TnrPushAndOff();
+   TnrPushStates();
+   TnrLeader();
+   TnrStop();
    TfEndSuite();
   }
 

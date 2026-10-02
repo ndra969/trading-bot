@@ -10,6 +10,7 @@
 #include <SDBot/Core/Types.mqh>
 #include <SDBot/Core/Constants.mqh>
 #include <SDBot/Core/SchemaEnums.mqh>
+#include <SDBot/Core/Utils.mqh>   // IsSdbotMagic (dipindah ke Core di spec 09)
 
 // Digit desimal step volume (0.01 -> 2, 0.1 -> 1, 1 -> 0), untuk menormalkan hasil kali floating point.
 int StepDigits(const double step)
@@ -158,11 +159,6 @@ string BalanceOpType(const long dealType)
    if(dealType == DEAL_TYPE_CREDIT)
       return SDB_BALANCE_OP_TYPE_CREDIT;
    return "";
-  }
-
-bool IsSdbotMagic(const long magic)
-  {
-   return magic >= SDB_MAGIC_HARNESS && magic <= SDB_MAGIC_MAX;
   }
 
 bool CsvHas(const string csv, const string item)

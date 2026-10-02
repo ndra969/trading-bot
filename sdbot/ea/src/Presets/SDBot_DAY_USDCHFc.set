@@ -24,3 +24,6 @@ InpPartialR=1.5
 InpPartialPct=50.0
 InpTrailATRPeriod=14
 InpTrailATRMult=2.0
+InpTelegramToken=
+InpTelegramChatID=
+InpHeartbeatMinutes=60

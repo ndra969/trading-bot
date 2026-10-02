@@ -19,11 +19,12 @@
 #include <SDBot/Position/Reconciler.mqh>
 #include <SDBot/App/TeeSink.mqh>
 #include <SDBot/Notify/Notifier.mqh>
+#include <SDBot/Notify/TelegramTransport.mqh>
 #include <SDBot/App/TesterMetric.mqh>
 
 #define SDB_GV_PREFIX_UNITTEST "SDBTEST"
 
-class CSdbApp
+class CSdbApp : public ISdbStatusSource
   {
 private:
    SdbAppConfig      m_cfg;
@@ -31,7 +32,11 @@ private:
    CTeeSink          m_tee;
    ISdbEventSink    *m_sink;          // tee(Logger, Notifier, observer harness/uji)
    CNotifier         m_notifier;
-   CLogTransport     m_logTransport;   // live sebelum spec 09 dan tester (spec 08 Req 7.1, 7.3)
+   CLogTransport     m_logTransport;   // tester dan live tanpa token (spec 08 Req 7.1, spec 09 Req 1.2)
+   CTelegramTransport m_telegram;      // live dengan token (spec 09)
+   CPushSender       m_pushSender;     // live
+   CLogPush          m_logPush;        // tester: tanpa SendNotification (spec 09 Req 2.7)
+   bool              m_startSent;
    ISdbTransport    *m_transport;
    bool              m_notifyOn;       // false tanpa DB (optimasi, Req 7.2)
    CAccount          m_account;
@@ -65,8 +70,9 @@ private:
          return;
       if(m_notifyOn)
         {
-         m_notifier.SetState(GetPointer(m_state));   // cooldown dan kuota akun di GV (spec 08 Req 2.5, 2.6)
+         m_notifier.SetState(GetPointer(m_state));   // cooldown, kuota, lease, jadwal di GV (spec 08 Req 2.5, spec 09 Req 4)
          m_notifier.SetContext(NotifyContext());
+         m_telegram.SetState(GetPointer(m_state));   // jarak kirim Telegram bersama (spec 09 Req 2.5)
         }
       // Status risiko bersama (spec 05): baseline, reset input, operasi saldo tertunda, lalu snapshot
       // langsung dengan puncak yang benar (Req 3.8), karena snapshot Validate() dibuat sebelum puncak diketahui.
@@ -130,6 +136,7 @@ private:
    SdbNtContext NotifyContext() const
      {
       SdbNtContext c;
+      c.login = AccountInfoInteger(ACCOUNT_LOGIN);
       c.symbol = _Symbol;
       c.eaVersion = m_cfg.eaVersion;
       c.currency = AccountInfoString(ACCOUNT_CURRENCY);
@@ -151,6 +158,9 @@ private:
         {
          m_notifier.Init(GetPointer(m_logger), m_transport, NotifyContext());
          m_notifier.SetKeyPrefix(keyPrefix);
+         m_notifier.SetPush(MQLInfoInteger(MQL_TESTER) ? (ISdbPush *)GetPointer(m_logPush) : (ISdbPush *)GetPointer(m_pushSender));
+         m_notifier.SetStatusSource(GetPointer(this));
+         m_notifier.SetSchedule(m_cfg.inputs.heartbeatMinutes, m_cfg.inputs.magic);
          m_tee.Add(GetPointer(m_notifier));
         }
       if(observer != NULL)
@@ -185,6 +195,46 @@ private:
       RequeuePending();
      }
 
+   // Uji > Strategy Tester / token kosong (log) > Telegram (spec 09 Req 1.2, 2.7).
+   ISdbTransport *ChooseTransport(const SdbAppConfig &cfg, ISdbTransport *injected)
+     {
+      if(injected != NULL)
+         return injected;
+      if(MQLInfoInteger(MQL_TESTER))
+         return GetPointer(m_logTransport);
+      if(cfg.telegramToken == "" || cfg.telegramChatId == "")
+        {
+         LogWarn("App", "InpTelegramToken / InpTelegramChatID kosong: notifikasi hanya di log Experts (isi lewat *.local.set)");
+         return GetPointer(m_logTransport);
+        }
+      m_telegram.Init(cfg.telegramToken, cfg.telegramChatId, NULL);
+      return GetPointer(m_telegram);
+     }
+
+   string ValidationText() const
+     {
+      switch(m_account.State())
+        {
+         case SDB_VAL_PASSED:   return "PASSED";
+         case SDB_VAL_REJECTED: return "REJECTED";
+         default:               return "PENDING";
+        }
+     }
+
+   // Pesan start dengan akhir sesi lalu (spec 09 Req 7.1).
+   void SendStart(const SdbAppConfig &cfg)
+     {
+      if(!m_notifyOn)
+         return;
+      SdbStartInfo s;
+      s.magic = cfg.inputs.magic;
+      s.presetTag = cfg.presetTag;
+      s.validation = ValidationText();
+      s.hasPrevious = m_logger.PreviousSessionEnd(s.previousEndedAt, s.previousReason, s.previousAbnormal);
+      m_notifier.SendStart(s);
+      m_startSent = true;
+     }
+
    // Pesan instance dari sesi lalu (spec 08 Req 6.1, 6.2): Critical muda dikirim ulang.
    void RequeuePending()
      {
@@ -199,7 +249,7 @@ private:
      }
 
 public:
-                     CSdbApp(void) : m_sink(NULL), m_transport(NULL), m_notifyOn(false), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
+                     CSdbApp(void) : m_sink(NULL), m_transport(NULL), m_notifyOn(false), m_startSent(false), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
                      m_deinitDone(false), m_lastSnapshot(0), m_lastTouch(0) {}
 
    // Urutan init (Req 6.1). observer: perekam harness / sink uji, menerima event di samping Logger.
@@ -207,7 +257,8 @@ public:
    int OnInit(const SdbAppConfig &cfg, ISdbEventSink *observer = NULL, ISdbTransport *transport = NULL)
      {
       m_sink = NULL;
-      m_transport = (transport != NULL) ? transport : GetPointer(m_logTransport);
+      m_transport = ChooseTransport(cfg, transport);
+      m_startSent = false;
       m_notifyOn = false;
       m_riskReady = false;
       m_storageOpened = false;
@@ -243,6 +294,7 @@ public:
          return INIT_FAILED;
         }
       m_timerSet = true;
+      SendStart(cfg);
       LogInfo("App", "SDBot v" + cfg.eaVersion + " aktif | magic=" + IntegerToString(cfg.inputs.magic) +
               " mode=" + EnumToString(cfg.mode) + " style=" + EnumToString(cfg.style) +
               " validasi=" + EnumToString(m_account.State()) + " db=" + (m_logger.IsWritable() ? "ok" : "tidak ada"));
@@ -314,7 +366,12 @@ public:
          IndicatorRelease(m_atrHandle);
       m_atrHandle = INVALID_HANDLE;
       if(m_notifyOn)
-         m_notifier.DrainCritical(SDB_NT_DRAIN_MS);   // termasuk init gagal (Req 6.3, 6.4)
+        {
+         if(m_startSent)
+            m_notifier.SendStop(SdbDeinitReasonText(reason));   // spec 09 Req 7.2
+         m_notifier.Drain(SDB_NT_DRAIN_MS);   // Critical lalu stop, termasuk init gagal (spec 08 Req 6.3, spec 09 Req 7.4)
+         m_notifier.ReleaseLeader();           // spec 09 Req 4.3
+        }
       if(m_storageOpened)
         {
          m_logger.EndSession(reason);
@@ -325,6 +382,27 @@ public:
    CExecutor *Executor() { return GetPointer(m_executor); }
    ISdbEventSink *Sink() { return m_sink; }
    bool NotifierActive() const { return m_notifyOn; }
+   string TransportName() { return m_transport != NULL ? m_transport.Name() : ""; }
+
+   // Data heartbeat (spec 09 Req 5.2); false sampai status risiko siap.
+   bool HeartbeatData(SdbHeartbeat &h)
+     {
+      if(!m_riskReady)
+         return false;
+      h.balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      h.equity = AccountInfoDouble(ACCOUNT_EQUITY);
+      double peak = m_riskState.PeakEquity();
+      h.ddPct = (peak > 0.0 && h.equity < peak) ? (peak - h.equity) / peak * 100.0 : 0.0;
+      h.riskStatus = m_riskState.IsStopped() ? "STOPPED" : m_riskState.IsDailyPaused() ? "pause harian"
+                     : m_riskState.IsLotReduced() ? "lot x 0.5" : "normal";
+      h.sdbotPositions = 0;
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+         if(PositionGetTicket(i) != 0 && IsSdbotMagic(PositionGetInteger(POSITION_MAGIC)))
+            h.sdbotPositions++;
+      h.instancesAlive = 0;
+      h.heldLastHour = 0;
+      return true;
+     }
    CNotifier *Notifier() { return GetPointer(m_notifier); }
    CAccount  *Account()  { return GetPointer(m_account); }
    CLogger   *Logger()   { return GetPointer(m_logger); }

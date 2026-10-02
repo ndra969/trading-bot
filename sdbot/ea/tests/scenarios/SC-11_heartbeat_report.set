@@ -1,0 +1,15 @@
+; SC-11: heartbeat 60 menit, laporan harian, start/stop; entry tiap 8 bar SL/TP 100 point; restart di hari ketiga
+; (bar 250) agar pemimpin berganti; transport palsu selalu OK. Melewati akhir pekan 19-20 September.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpHeartbeatMinutes=60
+HarnessScenario=SC-11
+HarnessEveryBars=8
+HarnessDirection=2
+HarnessSlPoints=100
+HarnessTpPoints=100
+HarnessMaxOpen=1
+HarnessFixedLot=0
+HarnessRestartAtBar=250
+HarnessTransportScript=OK
