@@ -77,6 +77,16 @@ def test_tp05_files_equal_generator_output():
         assert actual == expected, f"{symbol}: jalankan `uv run python sdbot/tools/gen_presets.py`"
 
 
+def test_ts47_analysis_inputs_have_defaults():
+    """Spec 10 Req 7.3: input analisis dengan default PRD/katalog di semua preset."""
+    for symbol in EXPECTED_MAGIC:
+        v = _read(symbol)
+        assert v.get("InpSwingStrength") == "2", symbol
+        assert v.get("InpStructureLookback") == "100", symbol
+        assert v.get("InpEmaPeriod") == "50", symbol
+        assert v.get("InpEmaSlopeBars") == "3", symbol
+
+
 def test_ts46_telegram_inputs_present_and_empty():
     """Spec 09 Req 1.8: input Telegram ada di preset repo, token dan chat ID kosong."""
     for symbol in EXPECTED_MAGIC:

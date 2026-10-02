@@ -102,6 +102,21 @@
 #define SDB_GV_NT_REPORT_DAY          "NT_REPORT_DAY"
 #define SDB_GV_NT_HELD                "NT_HELD"
 
+//--- Analisis struktur (spec 10 design §4.2, PC-16)
+#define SDB_DEF_SWING_STRENGTH        2
+#define SDB_MIN_SWING_STRENGTH        1
+#define SDB_MAX_SWING_STRENGTH        5
+#define SDB_DEF_STRUCTURE_LOOKBACK    100
+#define SDB_MIN_STRUCTURE_LOOKBACK    20
+#define SDB_MAX_STRUCTURE_LOOKBACK    500
+#define SDB_DEF_EMA_PERIOD            50       // PRD: EMA 50
+#define SDB_MIN_EMA_PERIOD            10
+#define SDB_MAX_EMA_PERIOD            400
+#define SDB_DEF_EMA_SLOPE_BARS        3
+#define SDB_MIN_EMA_SLOPE_BARS        1
+#define SDB_MAX_EMA_SLOPE_BARS        20
+#define SDB_EMA_WARMUP_MULT           3        // EMA dihitung dari >= 3 x periode bar (konvergen, deterministik)
+
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
 #define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama

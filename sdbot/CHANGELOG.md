@@ -4,6 +4,14 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.09 — 2026-10-02 — spec 10 struktur pasar
+
+- Lapisan Analysis: `CBarCache` (bar tertutup per TF, salin ulang hanya saat bar baru), `StructureRules` (swing fractal berjeda, BOS, EMA, bias, skor keselarasan tren), `CMarketStructure` (HTF/MTF dari gaya trading, bias HTF dengan alasan, log saat berubah).
+- Input `InpSwingStrength` 2, `InpStructureLookback` 100, `InpEmaPeriod` 50, `InpEmaSlopeBars` 3 (preset diperbarui). `IsSdbotMagic` sudah di Core sejak 1.08.
+- Skenario SC-12 (EURUSDc) dan SC-12x (XAUUSDc): analisis selama run = analisis dari histori, termasuk setelah restart. Belum ada entry dari sinyal. Keputusan PC-15, PC-16.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-02): build 0 error / 0 warning (4 target); unit 476/476 di 27 suite; 17 skenario PASS (SC-00..SC-12x); durasi total 4 menit 20 detik. pytest `sdbot/tools` 65/65, `schema.py check` OK (data versi 3).
+
 ### 1.08 — 2026-10-02 — Fase 2 selesai (spec 09 notifier Telegram)
 
 - `CTelegramTransport`: `sendMessage` lewat `WebRequest` (HTML, timeout 3 detik), klasifikasi respons, jarak 1 detik dan jeda 429 dibagi semua instance (GV `NT_TG_NEXT`), teks polos bila HTML ditolak, nonaktif sampai init ulang bila URL belum diizinkan / token / chat salah, maks 1 kiriman per 10 detik saat gagal sementara. Token tidak pernah ditulis ke log, DB, atau JSON input sesi.

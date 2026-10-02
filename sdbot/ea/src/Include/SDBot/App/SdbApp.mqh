@@ -17,6 +17,7 @@
 #include <SDBot/Position/PositionManager.mqh>
 #include <SDBot/Position/ClosureTracker.mqh>
 #include <SDBot/Position/Reconciler.mqh>
+#include <SDBot/Analysis/MarketStructure.mqh>
 #include <SDBot/App/TeeSink.mqh>
 #include <SDBot/Notify/Notifier.mqh>
 #include <SDBot/Notify/TelegramTransport.mqh>
@@ -48,6 +49,7 @@ private:
    bool              m_riskReady;
    CPositionCache    m_posCache;
    CPositionManager  m_posManager;
+   CMarketStructure  m_structure;      // bias HTF + struktur MTF (spec 10)
    CClosureTracker   m_closureTracker;
    CReconciler       m_reconciler;
    int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
@@ -104,6 +106,19 @@ private:
                             cfg.inputs.breakevenBufferPoints);
       m_reconciler.Init(cfg.inputs.magic, _Symbol, GetPointer(m_posCache), GetPointer(m_closureTracker), m_sink, cfg.eaVersion);
       return true;
+     }
+
+   // Analisis struktur dari input gaya trading, bukan timeframe chart (spec 10 Req 1.4).
+   void InitAnalysis(const SdbAppConfig &cfg)
+     {
+      ENUM_TIMEFRAMES htf, mtf, ltf;
+      StyleTimeframes(cfg.style, htf, mtf, ltf);
+      SdbStructureParams p;
+      p.strength = cfg.inputs.swingStrength;
+      p.lookback = cfg.inputs.structureLookback;
+      p.emaPeriod = cfg.inputs.emaPeriod;
+      p.slopeBars = cfg.inputs.emaSlopeBars;
+      m_structure.Init(_Symbol, htf, mtf, p);
      }
 
    void SendSnapshot()
@@ -287,6 +302,7 @@ public:
       m_riskMonitor.Init(_Symbol, cfg.inputs.magic, GetPointer(m_riskState), GetPointer(m_executor), m_sink, cfg);
       if(!InitPositions(cfg))
          return INIT_FAILED;
+      InitAnalysis(cfg);
       EnsureState();
       if(!EventSetTimer(SDB_TIMER_SEC))
         {
@@ -304,7 +320,10 @@ public:
    // Manajemen posisi per tick (spec 06); sampai akun lolos dan status siap, tick diabaikan.
    void OnTick()
      {
-      if(m_account.State() != SDB_VAL_PASSED || !m_stateReady || m_deinitDone)
+      if(m_deinitDone)
+         return;
+      m_structure.OnTick();   // hanya membaca harga: jalan walau akun belum PASSED (spec 10 design §8.3)
+      if(m_account.State() != SDB_VAL_PASSED || !m_stateReady)
          return;
       m_posManager.OnTick();
      }
@@ -380,6 +399,7 @@ public:
      }
 
    CExecutor *Executor() { return GetPointer(m_executor); }
+   CMarketStructure *Structure() { return GetPointer(m_structure); }
    ISdbEventSink *Sink() { return m_sink; }
    bool NotifierActive() const { return m_notifyOn; }
    string TransportName() { return m_transport != NULL ? m_transport.Name() : ""; }

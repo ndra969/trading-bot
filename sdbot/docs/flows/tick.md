@@ -1,8 +1,9 @@
-# OnTick: manajemen posisi
+# OnTick: analisis struktur dan manajemen posisi
 
 ```mermaid
 flowchart TB
-    T([OnTick]) --> G{akun PASSED, status siap, CanTrade?}
+    T([OnTick]) --> AN[CMarketStructure.OnTick: hitung ulang HTF/MTF hanya bila bar baru tutup; lihat structure.md]
+    AN --> G{akun PASSED, status siap, CanTrade?}
     G -->|tidak| Z([selesai])
     G -->|ya| M[baca pasar sekali: bid/ask, spread, stops, ATR bar tutup]
     M --> L[tiket posisi magic + simbol dikumpulkan dulu]

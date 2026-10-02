@@ -27,6 +27,10 @@ struct InputValues
    int               maxPosCommodity;
    int               maxPosCrypto;
    int               heartbeatMinutes;   // InpHeartbeatMinutes: 0 = mati (spec 09 Req 1.1)
+   int               swingStrength;      // analisis struktur (spec 10)
+   int               structureLookback;
+   int               emaPeriod;
+   int               emaSlopeBars;
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -68,6 +72,10 @@ InputValues DefaultInputValues()
    v.maxPosCommodity = SDB_DEF_MAX_POS_COMMODITY;
    v.maxPosCrypto = SDB_DEF_MAX_POS_CRYPTO;
    v.heartbeatMinutes = SDB_DEF_HEARTBEAT_MIN;
+   v.swingStrength = SDB_DEF_SWING_STRENGTH;
+   v.structureLookback = SDB_DEF_STRUCTURE_LOOKBACK;
+   v.emaPeriod = SDB_DEF_EMA_PERIOD;
+   v.emaSlopeBars = SDB_DEF_EMA_SLOPE_BARS;
    return v;
   }
 
@@ -95,6 +103,20 @@ void IrCheckRisk(const InputValues &v, string &errors)
    if(v.ddStopPct <= v.ddReducePct || v.ddStopPct > SDB_MAX_DD_STOP_PCT)
       IrAdd(errors, "InpDDStopPct=" + IrNum(v.ddStopPct) + " harus InpDDReducePct (" + IrNum(v.ddReducePct) +
             ") < x <= " + IrNum(SDB_MAX_DD_STOP_PCT));
+  }
+
+void IrCheckRange(const string name, const int value, const int lo, const int hi, string &errors)
+  {
+   if(value < lo || value > hi)
+      IrAdd(errors, name + "=" + IntegerToString(value) + " harus " + IntegerToString(lo) + " <= x <= " + IntegerToString(hi));
+  }
+
+void IrCheckAnalysis(const InputValues &v, string &errors)
+  {
+   IrCheckRange("InpSwingStrength", v.swingStrength, SDB_MIN_SWING_STRENGTH, SDB_MAX_SWING_STRENGTH, errors);
+   IrCheckRange("InpStructureLookback", v.structureLookback, SDB_MIN_STRUCTURE_LOOKBACK, SDB_MAX_STRUCTURE_LOOKBACK, errors);
+   IrCheckRange("InpEmaPeriod", v.emaPeriod, SDB_MIN_EMA_PERIOD, SDB_MAX_EMA_PERIOD, errors);
+   IrCheckRange("InpEmaSlopeBars", v.emaSlopeBars, SDB_MIN_EMA_SLOPE_BARS, SDB_MAX_EMA_SLOPE_BARS, errors);
   }
 
 void IrCheckClassLimit(const string name, const int value, string &errors)
@@ -137,6 +159,7 @@ bool ValidateInputValues(const InputValues &v, const bool allowHarnessMagic, str
    IrCheckClassLimit("InpMaxPosCommodity", v.maxPosCommodity, errors);
    IrCheckClassLimit("InpMaxPosCrypto", v.maxPosCrypto, errors);
    IrCheckPosition(v, errors);
+   IrCheckAnalysis(v, errors);
    if(v.heartbeatMinutes != 0 && (v.heartbeatMinutes < SDB_MIN_HEARTBEAT_MIN || v.heartbeatMinutes > SDB_MAX_HEARTBEAT_MIN))
       IrAdd(errors, "InpHeartbeatMinutes=" + IntegerToString(v.heartbeatMinutes) + " harus 0 (mati) atau " +
             IntegerToString(SDB_MIN_HEARTBEAT_MIN) + " <= x <= " + IntegerToString(SDB_MAX_HEARTBEAT_MIN));

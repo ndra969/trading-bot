@@ -96,6 +96,11 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpPartialPct", "50.0"),
     ("InpTrailATRPeriod", "14"),
     ("InpTrailATRMult", "2.0"),
+    # Analisis struktur (spec 10, PC-16)
+    ("InpSwingStrength", "2"),
+    ("InpStructureLookback", "100"),
+    ("InpEmaPeriod", "50"),
+    ("InpEmaSlopeBars", "3"),
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),

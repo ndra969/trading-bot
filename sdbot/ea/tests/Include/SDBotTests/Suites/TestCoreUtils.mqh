@@ -129,6 +129,37 @@ void RunTestCoreUtilsInputs()
    AssertTrue("TC-SU-30", "InpHeartbeatMinutes: 0, 5, 60, 1440 lolos; 3, -1, 1441 ditolak; default 60",
               hbOk && hbBad && DefaultInputValues().heartbeatMinutes == 60);
 
+   // TC-SU-31 (spec 10 Req 7.3): batas input analisis, default PRD/katalog.
+   InputValues d = DefaultInputValues();
+   bool defaultsAnalysis = d.swingStrength == 2 && d.structureLookback == 100 && d.emaPeriod == 50 && d.emaSlopeBars == 3 &&
+                           ValidateInputValues(d, false, err);
+   int badAnalysis = 0;
+   for(int i = 0; i < 8; i++)
+     {
+      v = DefaultInputValues();
+      switch(i)
+        {
+         case 0: v.swingStrength = 0; break;
+         case 1: v.swingStrength = 6; break;
+         case 2: v.structureLookback = 19; break;
+         case 3: v.structureLookback = 501; break;
+         case 4: v.emaPeriod = 9; break;
+         case 5: v.emaPeriod = 401; break;
+         case 6: v.emaSlopeBars = 0; break;
+         default: v.emaSlopeBars = 21; break;
+        }
+      if(ValidateInputValues(v, false, err))
+         badAnalysis++;
+     }
+   v = DefaultInputValues();
+   v.swingStrength = 5;
+   v.structureLookback = 500;
+   v.emaPeriod = 10;
+   v.emaSlopeBars = 20;
+   bool edgesOk = ValidateInputValues(v, false, err);
+   AssertTrue("TC-SU-31", StringFormat("input analisis: default 2/100/50/3 lolos, batas tepi lolos, di luar batas ditolak (lolos salah %d)", badAnalysis),
+              defaultsAnalysis && edgesOk && badAnalysis == 0);
+
    // Batas posisi per kategori aset (spec 05 Req 2.8, PC-10): default dari bot Python, batas 1-20.
    v = DefaultInputValues();
    bool defaultsOk = v.maxPosForexMajor == 5 && v.maxPosForexCross == 3 && v.maxPosCommodity == 1 &&

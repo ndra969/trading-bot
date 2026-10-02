@@ -4,7 +4,29 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
-(tidak ada)
+### PC-15: Aturan Fase 3 (ambang skor, TP cadangan, parameter relatif ATR, kriteria backtest dasar)
+- Status: Open
+- Tanggal disetujui: 2026-10-02
+- Dokumen: PRD-EA §Skor konfluensi, §Eksekusi order, §Parameter input EA, §Roadmap (Fase 3 "selesai jika")
+- Sumber: [fase-3-overview.md](../specs/fase-3-overview.md) §7, keputusan 1–5
+- Perubahan:
+    - §Skor konfluensi: `MinConfluenceScore` diartikan persen dari skor maksimum komponen yang aktif. Fase 3 hanya zona (30), keselarasan tren (15), price action (10), jadi maksimum 55 dan ambang default 65% ≈ 36; saat komponen Fase 5 aktif, maksimum kembali 100. Semua komponen tetap dicatat per sinyal.
+    - §Eksekusi order: bila tidak ada zona lawan dalam jangkauan, TP = entry ± `MinRR` × jarak SL (2R), dicatat di konteks sinyal.
+    - §Parameter input / katalog: ukuran zona minimum dan maksimum, buffer SL di luar zona, serta jarak SL minimum dan maksimum dinyatakan relatif ATR MTF (input, default dari distribusi histori 12 simbol yang diukur di requirements spec 11 dan 13). Filter candle klimaks ditunda ke Fase 5.
+    - §Roadmap Fase 3 "selesai jika": backtest dasar 12 simbol × 12 bulan terakhir berjalan tanpa error kritis, minimal 30 trade per simbol dengan `signal_id` lengkap, dan query kalibrasi menghasilkan data; profit dinilai di Fase 5–6.
+    - Pembagian Fase 3 menjadi empat spec (struktur, zona, trigger PA, sinyal + entry); versi EA 1.09–1.12.
+
+### PC-16: Definisi struktur, EMA, dan bias HTF; input analisis
+- Status: Open
+- Tanggal disetujui: 2026-10-02
+- Dokumen: PRD-EA §Pipeline analisis (alur, bias HTF), §Skor konfluensi (keselarasan tren), §Parameter input EA
+- Sumber: spec `ea-10-market-structure` requirements, keputusan 1–6
+- Perubahan:
+    - Swing = fractal dengan kekuatan `SwingStrength` (default 2) dari bar tertutup, diakui setelah `SwingStrength` bar di kanannya tutup; high/low sama persis: bar lebih awal. BOS = close bar tertutup melewati swing terkonfirmasi terakhir; arah struktur = BOS terakhir dalam `StructureLookback` bar (default 100).
+    - Arah EMA (`EmaPeriod` default 50): bullish bila close > EMA dan EMA naik dibanding `EmaSlopeBars` bar sebelumnya (default 3); bearish kebalikannya; selain itu netral.
+    - Bias HTF bullish/bearish hanya bila arah struktur dan arah EMA HTF sama; selain itu netral (termasuk data kurang).
+    - Skor keselarasan tren (15) dinilai di MTF: struktur dan EMA MTF searah sinyal = 15, salah satu = 7, tidak ada = 0.
+    - Input baru di tabel parameter: `SwingStrength` 2 (1–5), `StructureLookback` 100 (20–500), `EmaPeriod` 50 (10–400), `EmaSlopeBars` 3 (1–20).
 
 ## Done
 

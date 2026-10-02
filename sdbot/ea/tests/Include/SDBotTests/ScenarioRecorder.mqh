@@ -9,6 +9,21 @@
 
 #include <SDBot/Core/EventSink.mqh>
 
+// Sampel analisis struktur satu bar (SC-12): hasil yang dipakai EA selama run.
+struct SdbAnalysisSample
+  {
+   ENUM_TIMEFRAMES   tf;
+   datetime          barTime;
+   bool              ready;
+   int               structDir;
+   double            bosLevel;
+   datetime          bosTime;
+   int               emaDir;
+   double            ema;
+   int               bias;            // HTF saja
+   datetime          recordedAt;      // TimeCurrent saat direkam (sebelum/sesudah restart)
+  };
+
 class CScenarioRecorder : public ISdbEventSink
   {
 private:
@@ -34,6 +49,7 @@ private:
    int               m_levelAfter;
    bool              m_afterSampled;
    int               m_notifyQueueAtStop;   // antrean notifier setelah deinit (SC-10)
+   SdbAnalysisSample m_samples[];           // analisis HTF/MTF per bar baru (SC-12)
    long              m_sends;           // jumlah OrderSend dari semua CExecutor (termasuk sebelum restart)
    DealRecord        m_dealRecs[];
    PositionEvent     m_events[];
@@ -256,6 +272,20 @@ public:
 
    // "1,2,3" untuk klausa SQL IN; "0" bila belum ada sesi (tidak cocok dengan id mana pun).
    void SetNotifyQueueAtStop(const int n)   { m_notifyQueueAtStop = n; }
+   void AddAnalysisSample(const SdbAnalysisSample &s)
+     {
+      int n = ArraySize(m_samples);
+      ArrayResize(m_samples, n + 1, 512);
+      m_samples[n] = s;
+     }
+   int  SampleCount() const                 { return ArraySize(m_samples); }
+   bool SampleAt(const int i, SdbAnalysisSample &out) const
+     {
+      if(i < 0 || i >= ArraySize(m_samples))
+         return false;
+      out = m_samples[i];
+      return true;
+     }
    int  NotifyQueueAtStop() const           { return m_notifyQueueAtStop; }
 
    string SessionIdList() const

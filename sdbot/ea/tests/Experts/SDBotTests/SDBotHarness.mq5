@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.08"
+#property version   "1.09"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.08"
+#define SDB_HARNESS_EA_VERSION "1.09"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
@@ -43,11 +43,14 @@ input double                 HarnessWithdrawPct   = 20.0;      // besar penarika
 input string                 HarnessTransportScript   = "";    // skrip CFakeTransport ("" = transport log biasa), SC-10
 input string                 HarnessTransportFailType = "";    // tipe yang selalu gagal sementara di transport palsu
 input int                    HarnessAlertBurstAtBar   = 0;     // kirim burst alert uji di bar ini (0 = tidak)
+input bool                   HarnessRecordAnalysis    = false; // rekam analisis HTF/MTF tiap bar baru (SC-12)
 
 CSdbApp          *g_app = NULL;
 CScenarioRecorder g_rec;
 CFakeTransport    g_tr;
 long              g_timerCycle = 0;
+datetime          g_lastHtfSample = 0;
+datetime          g_lastMtfSample = 0;
 bool              g_runStarted = false;
 datetime          g_lastBar = 0;
 int               g_bar = 0;
@@ -216,10 +219,49 @@ void AlertBurst()
      }
   }
 
+// Satu sampel per bar baru HTF/MTF (bertahan lintas restart karena variabel global harness).
+void RecordAnalysis()
+  {
+   if(!HarnessRecordAnalysis || g_app == NULL)
+      return;
+   SdbTfAnalysis h, m;
+   SdbBias b;
+   g_app.Structure().Htf(h);
+   g_app.Structure().Mtf(m);
+   g_app.Structure().Bias(b);
+   if(h.barTime != 0 && h.barTime != g_lastHtfSample)
+     {
+      g_lastHtfSample = h.barTime;
+      g_rec.AddAnalysisSample(SampleOf(g_app.Structure().HtfTimeframe(), h, (int)b.dir));
+     }
+   if(m.barTime != 0 && m.barTime != g_lastMtfSample)
+     {
+      g_lastMtfSample = m.barTime;
+      g_rec.AddAnalysisSample(SampleOf(g_app.Structure().MtfTimeframe(), m, 0));
+     }
+  }
+
+SdbAnalysisSample SampleOf(const ENUM_TIMEFRAMES tf, const SdbTfAnalysis &a, const int bias)
+  {
+   SdbAnalysisSample s;
+   s.tf = tf;
+   s.barTime = a.barTime;
+   s.ready = a.ready;
+   s.structDir = (int)a.st.dir;
+   s.bosLevel = a.st.bosLevel;
+   s.bosTime = a.st.bosTime;
+   s.emaDir = (int)a.emaDir;
+   s.ema = a.ema;
+   s.bias = bias;
+   s.recordedAt = TimeCurrent();
+   return s;
+  }
+
 void HarnessTick()
   {
    if(g_app != NULL)
       g_app.OnTick();
+   RecordAnalysis();
    datetime bar = iTime(_Symbol, _Period, 0);
    if(bar == 0 || bar == g_lastBar)
       return;

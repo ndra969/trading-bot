@@ -311,6 +311,59 @@ enum ENUM_SDB_TG_OUTCOME
    SDB_TG_CONFIG = 5          // URL belum diizinkan, token/chat salah: Telegram nonaktif sesi ini
   };
 
+//--- Analisis struktur (spec 10 design §4.1). Array bar selalu urut waktu naik (indeks 0 tertua).
+enum ENUM_SDB_DIR
+  {
+   SDB_DIR_BEAR = -1,
+   SDB_DIR_NONE = 0,
+   SDB_DIR_BULL = 1
+  };
+
+struct SdbSwing
+  {
+   int               index;           // indeks di array bar
+   datetime          time;
+   double            price;
+   bool              isHigh;
+  };
+
+struct SdbStructure
+  {
+   ENUM_SDB_DIR      dir;             // arah BOS terakhir dalam jendela lookback
+   datetime          bosTime;         // 0 = belum ada BOS
+   double            bosLevel;
+   double            lastHigh;        // swing high terkonfirmasi terakhir (0 = tidak ada)
+   datetime          lastHighTime;
+   double            lastLow;
+   datetime          lastLowTime;
+   int               swings;
+  };
+
+struct SdbStructureParams
+  {
+   int               strength;
+   int               lookback;
+   int               emaPeriod;
+   int               slopeBars;
+  };
+
+struct SdbTfAnalysis
+  {
+   bool              ready;
+   string            reason;          // "" = siap; "data kurang"
+   datetime          barTime;         // bar tertutup terbaru yang dianalisis
+   SdbStructure      st;
+   double            ema;
+   ENUM_SDB_DIR      emaDir;
+  };
+
+struct SdbBias
+  {
+   ENUM_SDB_DIR      dir;
+   string            reason;          // OK, STRUCTURE, EMA, CONFLICT, DATA
+   datetime          htfBarTime;
+  };
+
 // Laporan harian (spec 09 design §4.1-4.2).
 #define SDB_DS_KIND_IN      0
 #define SDB_DS_KIND_OUT     1

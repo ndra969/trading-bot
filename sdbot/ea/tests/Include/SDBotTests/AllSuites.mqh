@@ -31,6 +31,8 @@
 #include <SDBotTests/Suites/TestNotifier.mqh>
 #include <SDBotTests/Suites/TestTelegramRules.mqh>
 #include <SDBotTests/Suites/TestSchedule.mqh>
+#include <SDBotTests/Suites/TestStructure.mqh>
+#include <SDBotTests/Suites/TestMarketStructure.mqh>
 
 void RunAllSuites()
   {
@@ -59,6 +61,8 @@ void RunAllSuites()
    RunTestNotifier();
    RunTestTelegramRules();
    RunTestSchedule();
+   RunTestStructure();
+   RunTestMarketStructure();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

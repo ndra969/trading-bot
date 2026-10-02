@@ -1,0 +1,9 @@
+; SC-12: rekam analisis HTF/MTF tiap bar baru, tanpa entry, restart di bar 3000. Pembanding = AnalyzeTf
+; atas CopyRates berbasis waktu yang dihitung di akhir run.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-12
+HarnessEveryBars=0
+HarnessRestartAtBar=3000
+HarnessRecordAnalysis=true

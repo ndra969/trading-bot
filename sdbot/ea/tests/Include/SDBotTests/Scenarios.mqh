@@ -14,6 +14,8 @@
 #include <SDBot/Core/Constants.mqh>
 #include <SDBot/Core/SchemaEnums.mqh>
 #include <SDBot/Execution/ExecutionRules.mqh>
+#include <SDBot/Analysis/StructureRules.mqh>
+#include <SDBot/Core/Inputs.mqh>
 
 // File tester dipakai semua run: hitung hanya baris sesi yang direkam run ini. -1 = DB tidak terbaca.
 long ScDbCount(const string sql)
@@ -955,6 +957,77 @@ void CheckSc11(const string id, const CScenarioRecorder &rec, const CFakeTranspo
    ScCheckSessions(id, rec, 2);
   }
 
+// Satu sampel dibanding analisis dari histori: CopyRates berbasis waktu (bar <= waktu sampel), jumlah sama.
+bool ScSampleMatches(const SdbAnalysisSample &s, const SdbStructureParams &p, string &why)
+  {
+   int need = BarsNeeded(p.strength, p.lookback, p.emaPeriod, p.slopeBars);
+   MqlRates r[];
+   ArraySetAsSeries(r, false);
+   if(CopyRates(_Symbol, s.tf, s.barTime, need, r) != need || r[need - 1].time != s.barTime)
+     {
+      why = "histori " + TimeToString(s.barTime) + " tidak bisa disalin";
+      return !s.ready;   // EA juga belum siap = konsisten
+     }
+   SdbTfAnalysis a;
+   AnalyzeTf(r, p, a);
+   int bias = (s.tf == PERIOD_H4) ? (int)BiasOf(a.st.dir, a.emaDir) : 0;
+   bool ok = a.ready == s.ready && (int)a.st.dir == s.structDir && MathAbs(a.st.bosLevel - s.bosLevel) < 1e-9 &&
+             a.st.bosTime == s.bosTime && (int)a.emaDir == s.emaDir && MathAbs(a.ema - s.ema) < 1e-8 && bias == s.bias;
+   if(!ok)
+      why = StringFormat("%s %s: EA dir=%d bos=%.5f ema=%d %.6f bias=%d, histori dir=%d bos=%.5f ema=%d %.6f bias=%d",
+                         EnumToString(s.tf), TimeToString(s.barTime), s.structDir, s.bosLevel, s.emaDir, s.ema, s.bias,
+                         a.st.dir, a.st.bosLevel, a.emaDir, a.ema, bias);
+   return ok;
+  }
+
+// SC-12 (spec 10 Req 1.2, 5.1, 7.1, 7.2): analisis selama run = analisis dari histori, termasuk setelah restart.
+void CheckSc12(const string id, const CScenarioRecorder &rec)
+  {
+   InputValues in = CurrentInputs();
+   SdbStructureParams p;
+   p.strength = in.swingStrength;
+   p.lookback = in.structureLookback;
+   p.emaPeriod = in.emaPeriod;
+   p.slopeBars = in.emaSlopeBars;
+   int htf = 0, mtf = 0, bad = 0, afterRestart = 0, bull = 0, bear = 0, dup = 0;
+   string firstBad = "";
+   datetime firstHtf = 0, lastHtf = 0, prevHtf = 0, prevMtf = 0;
+   for(int i = 0; i < rec.SampleCount(); i++)
+     {
+      SdbAnalysisSample s;
+      rec.SampleAt(i, s);
+      string why = "";
+      if(!ScSampleMatches(s, p, why) && bad++ == 0)
+         firstBad = why;
+      if(rec.RestartAt() > 0 && s.recordedAt > rec.RestartAt())
+         afterRestart++;
+      if(s.tf == PERIOD_H4)
+        {
+         htf++;
+         dup += (s.barTime <= prevHtf) ? 1 : 0;
+         prevHtf = s.barTime;
+         firstHtf = (firstHtf == 0) ? s.barTime : firstHtf;
+         lastHtf = s.barTime;
+         bull += (s.bias == (int)SDB_DIR_BULL) ? 1 : 0;
+         bear += (s.bias == (int)SDB_DIR_BEAR) ? 1 : 0;
+        }
+      else
+        {
+         mtf++;
+         dup += (s.barTime <= prevMtf) ? 1 : 0;
+         prevMtf = s.barTime;
+        }
+     }
+   AssertTrue(id + "-norepaint", StringFormat("%d sampel HTF + %d MTF sama dengan histori (beda %d) %s", htf, mtf, bad, firstBad),
+              htf >= 100 && mtf >= 400 && bad == 0);
+   int barsHtf = Bars(_Symbol, PERIOD_H4, firstHtf, lastHtf);
+   AssertTrue(id + "-perbar", StringFormat("satu sampel per bar H4 baru (%d sampel, %d bar, urutan salah %d)", htf, barsHtf, dup),
+              htf == barsHtf && dup == 0);
+   AssertTrue(id + "-bias", StringFormat("bias pernah BULL (%d) dan BEAR (%d)", bull, bear), bull > 0 && bear > 0);
+   AssertTrue(id + "-restart", StringFormat("restart terjadi dan sampel sesudahnya ikut cocok (%d sampel sesudah %s)", afterRestart,
+                                            TimeToString(rec.RestartAt())), rec.RestartAt() > 0 && afterRestart > 0);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -988,6 +1061,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc10(id, rec, tr);
    else if(id == "SC-11")
       CheckSc11(id, rec, tr);
+   else if(id == "SC-12" || id == "SC-12x")
+      CheckSc12(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

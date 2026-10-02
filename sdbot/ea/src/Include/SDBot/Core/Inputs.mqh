@@ -40,6 +40,12 @@ input double                 InpPartialPct            = SDB_DEF_PARTIAL_PCT;    
 input int                    InpTrailATRPeriod        = SDB_DEF_TRAIL_ATR_PERIOD;   // Periode ATR trailing (LTF)
 input double                 InpTrailATRMult          = SDB_DEF_TRAIL_ATR_MULT;     // Pengali ATR trailing
 
+input group "Analisis"
+input int                    InpSwingStrength         = SDB_DEF_SWING_STRENGTH;     // Kekuatan swing fractal (bar tiap sisi, 1-5)
+input int                    InpStructureLookback     = SDB_DEF_STRUCTURE_LOOKBACK; // Jendela struktur/BOS (bar, 20-500)
+input int                    InpEmaPeriod             = SDB_DEF_EMA_PERIOD;         // Periode EMA tren (10-400)
+input int                    InpEmaSlopeBars          = SDB_DEF_EMA_SLOPE_BARS;     // Kemiringan EMA dibanding N bar (1-20)
+
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
 input string                 InpTelegramChatID        = "";                         // Chat ID Telegram (sama dengan bot Python)
@@ -66,6 +72,10 @@ InputValues CurrentInputs()
    v.maxPosCommodity = InpMaxPosCommodity;
    v.maxPosCrypto = InpMaxPosCrypto;
    v.heartbeatMinutes = InpHeartbeatMinutes;
+   v.swingStrength = InpSwingStrength;
+   v.structureLookback = InpStructureLookback;
+   v.emaPeriod = InpEmaPeriod;
+   v.emaSlopeBars = InpEmaSlopeBars;
    return v;
   }
 
@@ -78,7 +88,8 @@ string CurrentInputsJson()
                  "InpResetEmergencyStop", "InpBreakevenR", "InpBreakevenBufferPoints", "InpPartialR",
                  "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult", "InpMaxPosForexMajor",
                  "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto", "InpPresetTag",
-                 "InpHeartbeatMinutes", "InpTelegramConfigured"};
+                 "InpHeartbeatMinutes", "InpTelegramConfigured", "InpSwingStrength", "InpStructureLookback",
+                 "InpEmaPeriod", "InpEmaSlopeBars"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -106,6 +117,10 @@ string CurrentInputsJson()
    v[22] = JsonNum(InpHeartbeatMinutes);
    // Token dan chat ID rahasia: hanya tanda terisi, agar input_hash tidak membocorkan dan tidak berubah karenanya.
    v[23] = JsonBool(InpTelegramToken != "" && InpTelegramChatID != "");
+   v[24] = JsonNum(InpSwingStrength);
+   v[25] = JsonNum(InpStructureLookback);
+   v[26] = JsonNum(InpEmaPeriod);
+   v[27] = JsonNum(InpEmaSlopeBars);
    return CanonicalJson(k, v);
   }
 
