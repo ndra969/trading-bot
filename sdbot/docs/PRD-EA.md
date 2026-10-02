@@ -2,7 +2,7 @@
 
 2026-09-19 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-01). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
+> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-02). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -277,12 +277,14 @@ Satu class `CNotifier` menangani semua pesan (risiko, trade, heartbeat). Alert C
 
 | Event | Severity | Aturan kirim |
 | --- | --- | --- |
-| Drawdown ≥ 15%, close gagal 3x | Critical | Langsung, tanpa limit, push HP jika Telegram gagal |
-| Drawdown ≥ 10%, rugi harian ≥ 3%, margin < 300% | High | Saat status berubah |
+| Drawdown ≥ 15%, close gagal 3x, posisi tanpa SL | Critical | Langsung, tanpa cooldown dan kuota; push HP bila Telegram gagal 3x atau nonaktif |
+| Drawdown ≥ 10%, rugi harian ≥ 3%, margin < 300%, SL dipasang kembali | High | Saat status berubah |
 | Terputus > 5 menit, order gagal | Medium | Cooldown 5 menit per tipe |
-| Drawdown ≥ 5%, heartbeat tiap 1 jam | Info | Cooldown per tipe |
-| Open, close, BE, partial | Info | Setiap event |
+| Drawdown ≥ 5%, alert Info lain | Info | Cooldown 5 menit per tipe |
+| Open, close, BE, partial | Info (tutup profit, BE, partial ditampilkan SUCCESS) | Setiap event, tanpa cooldown |
 | Pulih di bawah level | Info | Sekali saat pulih |
+| Heartbeat, laporan harian | Info | Satu instance pemimpin per akun; tanpa cooldown dan kuota |
+| Start, stop EA | Info | Per instance, tanpa bunyi; tanpa cooldown dan kuota |
 
 ```mermaid
 flowchart TB
@@ -302,12 +304,19 @@ flowchart TB
 
 Kebutuhan:
 
-- Pesan dikirim dari antrean di `OnTimer`, tidak pernah di tengah proses order, karena `WebRequest` blocking.
+- Pesan dikirim dari antrean di `OnTimer` (setelah risk monitor, maks 2 per siklus), tidak pernah di tengah proses order, karena `WebRequest` blocking. Critical diambil lebih dulu; antrean maks 100, non-Critical tertua digeser bila penuh.
 - URL `https://api.telegram.org` wajib diizinkan di pengaturan Expert Advisors.
-- Format pesan HTML mode untuk menghindari gagal kirim karena karakter khusus Markdown.
-- Kuota non-Critical 20 pesan per jam. Pesan non-Critical yang lebih tua dari 30 menit dibuang.
-- Token dan chat ID disimpan sebagai input EA, tidak ditulis di kode.
-- Telegram memakai bot dan chat yang sama dengan bot Python. Format mengikuti bot Python: emoji per level, HTML, pesan start dan stop, heartbeat tanpa bunyi, laporan harian. Setiap pesan diawali penanda `SDBot` + simbol + tipe akun + versi EA, dan batas kirim Telegram dibagi dengan bot Python.
+- Format pesan HTML mode dengan escape `& < >`, dipotong di 4096 karakter tanpa merusak tag.
+- Kuota non-Critical 20 pesan per jam server untuk semua instance SDBot di akun (Global Variables, compare-and-set); event trade ikut kuota. Cooldown tipe akun (`CONN_*`, `DD_*`, `DAILY_LOSS`, `MARGIN_*`, `BALANCE_OP`, `STATE_RESET`, `EMERGENCY_RESET`) juga per akun. Pesan non-Critical yang lebih tua dari 30 menit sejak masuk antrean dibuang. Pesan yang ditahan tercatat `SKIPPED` dengan alasan, tanpa pesan ringkasan. Waktu memakai `TimeTradeServer()` agar tetap berjalan saat pasar tutup.
+- Gagal sementara (timeout, 5xx, jaringan): coba lagi maks 3 kali, maks 1 kiriman per 10 detik per instance selama gagal. HTTP 429: tunggu `retry_after`, berlaku untuk semua instance. Jarak kiriman ke Telegram minimal 1 detik untuk semua instance. Pesan yang ditolak parser HTML dikirim ulang sekali sebagai teks polos.
+- URL belum diizinkan (4014), token salah (401/404), bot dikeluarkan (403), atau chat tidak ditemukan: Telegram nonaktif sampai EA di-init ulang, satu log CRITICAL dan satu push HP.
+- Push HP (`SendNotification`, teks polos maks 255 karakter) untuk Critical yang gagal di Telegram atau saat Telegram nonaktif; dibatasi 2 per detik dan 10 per menit (ditunda, bukan dibuang); push belum dikonfigurasi = satu CRITICAL per sesi.
+- Token dan chat ID disimpan sebagai input EA, tidak ditulis di kode, log, DB, maupun JSON input sesi.
+- Telegram memakai bot dan chat yang sama dengan bot Python. Format mengikuti bot Python: emoji per level, HTML, pesan start dan stop, heartbeat tanpa bunyi, laporan harian. Setiap pesan diawali penanda `SDBot` + simbol (atau `AKUN <login>` untuk heartbeat dan laporan) + tipe akun (`TESTER` di Strategy Tester) + versi EA.
+- Heartbeat dan laporan harian dikirim satu instance pemimpin per akun (lease Global Variable 120 detik, diperbarui tiap 30 detik, dilepas saat berhenti). Heartbeat tanpa bunyi tiap `HeartbeatMinutes`: balance, equity, drawdown dari puncak, status risiko, posisi SDBot terbuka di akun, instance hidup, pesan yang ditahan kuota jam sebelumnya.
+- Laporan harian saat hari server berganti, dari history deal MT5 posisi SDBot: P&L bersih, jumlah posisi tutup, win rate, P&L per simbol, operasi saldo, balance. Hari tanpa posisi tutup dan tanpa operasi saldo tidak dilaporkan; hari yang terlewat dikirim kemudian, sekali per hari (maks 7 hari).
+- Pesan start (memuat akhir sesi sebelumnya) dan stop per instance, tanpa bunyi. Saat deinit, Critical lalu stop dikirim maks 2 detik (MT5 menghentikan `OnDeinit` setelah 2.5 detik).
+- Restart: baris `PENDING` milik instance yang lebih tua dari 30 menit menjadi `SKIPPED`; Critical yang lebih muda dikirim ulang; non-Critical muda `SKIPPED`.
 - Event posisi: BE (`BE_MOVED`) dan partial (`PARTIAL_CLOSED`) Info; SL dipasang kembali (`SL_RESTORED`) High; posisi tetap tanpa SL setelah 3 gagal (`SL_MISSING`) Critical.
 
 ## Data dan database
@@ -324,7 +333,7 @@ Database memakai SQLite bawaan MQL5 di folder Common, satu file untuk semua EA, 
 | `position_events` | BE, PARTIAL, PARTIAL_SKIPPED, TRAILING, MODIFY_FAILED, SL_RESTORED: SL lama/baru, volume, harga, spread |
 | `closures` | alasan (TP/SL/BE_STOP/TRAIL_STOP/MANUAL/STOP_OUT/EA_CLOSE/ROLLOVER/OTHER), harga level dan isi, slippage exit, volume, profit, komisi, swap, fee, net, R hasil, MFE/MAE dalam R, lama posisi, flag BE/partial/trailing |
 | `balance_ops` | deposit, penarikan, kredit: tiket deal, waktu, jenis, nominal |
-| `alerts` | waktu, tipe, severity, pesan, status kirim, attempts, sent_at |
+| `alerts` | waktu, tipe (termasuk event trade, heartbeat, laporan, start/stop), severity, pesan, status kirim, attempts, sent_at, notify_key, status_reason (skema v3) |
 | `v_trade_results` | view trades + closures per posisi |
 | `schema_migrations` | migrasi yang sudah diterapkan (menggantikan `schema_version`) |
 
@@ -371,7 +380,7 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Posisi | `PartialR` / `PartialPct` | 1.5 / 50 |
 | Posisi | `TrailATRPeriod` / `TrailATRMult` | 14 / 2.0 |
 | Notifikasi | `TelegramToken` / `TelegramChatID` | kosong |
-| Notifikasi | `HeartbeatMinutes` | 60 |
+| Notifikasi | `HeartbeatMinutes` | 60 (0 = mati, selain itu 5–1440) |
 
 Input tambahan untuk integrasi backoffice: `InpEnableBackoffice` (default true) dan `InpControlPollSeconds` (default 2). Nilai input MT5 menjadi batas atas untuk setting yang diubah dari admin panel; panel hanya boleh membuat EA lebih ketat.
 
@@ -417,8 +426,8 @@ Buka tab Notifications, centang Enable Push Notifications, lalu isi MetaQuotes I
 ### 4. Siapkan bot Telegram
 
 1. Tidak membuat bot baru: SDBot memakai bot dan chat Telegram yang sama dengan bot Python.
-2. Salin nilai `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` dari `.env` bot Python ke input `TelegramToken` dan `TelegramChatID`, di salinan pribadi preset `*.local.set`.
-3. File `*.local.set` tidak pernah di-commit; token dan chat ID tidak pernah ditulis di kode atau preset repo.
+2. Jalankan `python sdbot/tools/make_local_presets.py`: skrip membaca `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` dari `.env` bot Python dan membuat salinan pribadi `SDBot_DAY_<SIMBOL>c.local.set` dari setiap preset repo. File yang sudah disunting tidak ditimpa tanpa `--force`.
+3. File `*.local.set` tidak pernah di-commit (skrip gagal bila tidak diabaikan git); token dan chat ID tidak pernah ditulis di kode atau preset repo. Token kosong: EA tetap jalan, pesan hanya di log Experts.
 
 ### 5. Pasang EA ke chart
 

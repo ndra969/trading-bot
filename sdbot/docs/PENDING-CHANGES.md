@@ -4,8 +4,12 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+(tidak ada)
+
+## Done
+
 ### PC-13: Aturan notifier dan status alert (skema v3)
-- Status: Open
+- Status: Done (2026-10-02, PRD-EA rev 42, PRD-Backoffice rev 16)
 - Tanggal disetujui: 2026-10-01
 - Dokumen: PRD-EA §Notifikasi, §Data dan database; PRD-Backoffice §Database dan kontrak data
 - Sumber: spec `ea-08-notifier-core` requirements, keputusan 1–10
@@ -17,7 +21,20 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Restart: baris `PENDING` milik instance > 30 menit menjadi `SKIPPED`; Critical ≤ 30 menit dikirim ulang (bisa dobel bila EA crash setelah kirim); non-Critical muda `SKIPPED`. Saat deinit, Critical di antrean dikirim (maks 3 detik).
     - §Data: migrasi `0003` menambah kolom `alerts.notify_key` (kunci notifikasi untuk pembaruan status) dan `alerts.status_reason` (`COOLDOWN`, `QUOTA`, `STALE`, `OVERFLOW`, `RESTART`, kode error transport). Event trade juga tercatat di `alerts` (tipe `TRADE_OPENED`, `TRADE_CLOSED`).
 
-## Done
+### PC-14: Telegram, push HP, heartbeat, laporan harian, start/stop
+- Status: Done (2026-10-02, PRD-EA rev 42, PRD-Backoffice rev 16)
+- Tanggal disetujui: 2026-10-02
+- Dokumen: PRD-EA §Notifikasi, §Parameter input EA, §Instalasi 4, §Pengujian dan kriteria penerimaan; PRD-Backoffice §Database dan kontrak data (nilai enum)
+- Sumber: spec `ea-09-notifier-telegram` requirements, keputusan 1–11
+- Perubahan:
+    - Respons Telegram: 200 terkirim; 429 tunggu `retry_after` untuk semua instance; 5xx/timeout/jaringan gagal sementara (maks 1 kiriman per 10 detik per instance selama gagal); 400/401/403/404 permanen. URL belum diizinkan (4014), token salah, bot dikeluarkan, atau chat salah: Telegram nonaktif sampai init ulang + 1 log CRITICAL + 1 push HP. Pesan yang ditolak parser HTML dikirim ulang sekali sebagai teks polos. Jarak kiriman ≥ 1 detik untuk semua instance SDBot di akun. Token tidak pernah ditulis ke log, DB, atau pesan.
+    - Push HP (`SendNotification`, teks polos ≤ 255 karakter) untuk Critical yang gagal di Telegram atau saat Telegram nonaktif; dibatasi 2/detik dan 10/menit (ditunda, bukan dibuang); belum dikonfigurasi = 1 CRITICAL per sesi.
+    - Heartbeat dan laporan harian dikirim satu instance pemimpin per akun (lease Global Variable 120 detik, diperbarui tiap 30 detik, dilepas saat berhenti). Heartbeat tanpa bunyi tiap `HeartbeatMinutes` (0 = mati, selain itu 5–1440): balance, equity, drawdown dari puncak, status risiko, posisi SDBot terbuka di akun, instance hidup, pesan yang ditahan kuota jam sebelumnya.
+    - Laporan harian saat hari server berganti, dari history deal MT5 posisi SDBot: P&L bersih, jumlah posisi tutup, win rate, P&L per simbol, operasi saldo, balance akhir; tidak dikirim untuk hari tanpa posisi tutup dan tanpa operasi saldo; hari yang terlewat (EA mati, akhir pekan di tester) dikirim kemudian, sekali per hari.
+    - Pesan start dan stop per instance tanpa bunyi; start memuat akhir sesi sebelumnya. Heartbeat, laporan harian, start, dan stop tidak terkena cooldown dan kuota 20/jam.
+    - Batas kirim saat deinit 2 detik (MT5 menghentikan `OnDeinit` setelah 2.5 detik), menggantikan 3 detik PC-13.
+    - Instalasi 4: preset pribadi dibuat dengan `python sdbot/tools/make_local_presets.py` dari `.env` bot Python (tidak menimpa `.local.set` yang sudah disunting tanpa `--force`).
+    - Enum: `alert_status_reason` + `TELEGRAM_OFF`, `PUSH_SENT`, `PUSH_FAILED`, `PLAIN_TEXT`; `alert_type` + `EA_START`, `EA_STOP`, `HEARTBEAT`, `DAILY_REPORT`.
 
 ### PC-01: Skema data baru menggantikan tabel PRD
 - Status: Done (2026-10-01, PRD-EA rev 40, PRD-Backoffice rev 14)
