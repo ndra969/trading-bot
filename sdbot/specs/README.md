@@ -49,7 +49,7 @@ Use case, pembagian spec, arsitektur bersama, strategi uji, dan keputusan terbuk
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
 | 10 | [ea-10-market-structure](ea-10-market-structure/) | Cache bar per TF, swing Fractals berjeda, BOS, EMA, bias HTF, skor keselarasan tren | 1–9 | suite StructureRules ALL PASS, SC-12 PASS | **Done** 2026-10-02 (v1.09; MC-MS-01 manual tertunda; PC-15, PC-16) |
-| 11 | ea-11-zones | Zona S&D MTF, status Fresh/Tested/Invalid/Used/kedaluwarsa, rebuild saat init, skor kualitas zona | 10 | suite ZoneRules ALL PASS, SC-13 PASS | Belum dimulai |
+| 11 | [ea-11-zones](ea-11-zones/) | Zona S&D MTF, status Fresh/Tested/Invalid/Used/kedaluwarsa, rebuild saat init, skor kualitas zona | 10 | suite ZoneRules ALL PASS, SC-13 PASS | **Done** 2026-10-02 (v1.10; MC-ZN-01 manual tertunda; PC-17) |
 | 12 | ea-12-pa-trigger | Pola candle LTF berurutan spesifik ke netral, kekuatan pola, skor PA | 10 | suite PatternRules ALL PASS | Belum dimulai |
 | 13 | ea-13-signal-entry | Pipeline per bar LTF, gerbang, skor, telemetri sinyal, SL/TP dari zona, entry market/limit, EA membuka posisi, DoD Fase 3 | 10–12 | suite SignalRules ALL PASS, SC-14 PASS, backtest dasar 12 simbol | Belum dimulai |
 

@@ -1,0 +1,10 @@
+; SC-13: rekam sidik peta zona tiap bar H1 baru, tandai zona valid terbaru Used di bar 500, restart di bar 600
+; (zona yang ditandai belum melewati usia 100 bar H1), tanpa entry.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-13
+HarnessEveryBars=0
+HarnessRestartAtBar=600
+HarnessRecordZones=true
+HarnessMarkUsedAtBar=500

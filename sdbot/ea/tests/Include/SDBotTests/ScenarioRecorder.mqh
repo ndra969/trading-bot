@@ -24,6 +24,15 @@ struct SdbAnalysisSample
    datetime          recordedAt;      // TimeCurrent saat direkam (sebelum/sesudah restart)
   };
 
+// Sidik peta zona satu bar MTF (SC-13).
+struct SdbZoneSample
+  {
+   datetime          barTime;
+   string            map;
+   int               zones;
+   datetime          recordedAt;
+  };
+
 class CScenarioRecorder : public ISdbEventSink
   {
 private:
@@ -50,6 +59,9 @@ private:
    bool              m_afterSampled;
    int               m_notifyQueueAtStop;   // antrean notifier setelah deinit (SC-10)
    SdbAnalysisSample m_samples[];           // analisis HTF/MTF per bar baru (SC-12)
+   SdbZoneSample     m_zoneSamples[];       // sidik peta zona per bar MTF baru (SC-13)
+   string            m_markedZone;
+   datetime          m_markedAt;
    long              m_sends;           // jumlah OrderSend dari semua CExecutor (termasuk sebelum restart)
    DealRecord        m_dealRecs[];
    PositionEvent     m_events[];
@@ -63,7 +75,7 @@ private:
      }
 
 public:
-                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_reattachAt(0), m_restartPosition(0), m_notifyQueueAtStop(-1), m_sends(0) {}
+                     CScenarioRecorder(void) : m_withdrawAmount(0), m_peakBefore(0), m_levelBefore(-1), m_peakAfter(0), m_levelAfter(-1), m_afterSampled(false), m_firstStoppedAt(0), m_lastOpenWhileStopped(0), m_restartAt(0), m_reattachAt(0), m_restartPosition(0), m_notifyQueueAtStop(-1), m_markedAt(0), m_sends(0) {}
 
    //--- ISdbEventSink
    // Jam timer (TimeLocal), bukan a.time: a.time = waktu tick terakhir, yang tertinggal dari jadwal
@@ -279,6 +291,23 @@ public:
       m_samples[n] = s;
      }
    int  SampleCount() const                 { return ArraySize(m_samples); }
+   void AddZoneSample(const SdbZoneSample &s)
+     {
+      int n = ArraySize(m_zoneSamples);
+      ArrayResize(m_zoneSamples, n + 1, 512);
+      m_zoneSamples[n] = s;
+     }
+   int  ZoneSampleCount() const             { return ArraySize(m_zoneSamples); }
+   bool ZoneSampleAt(const int i, SdbZoneSample &out) const
+     {
+      if(i < 0 || i >= ArraySize(m_zoneSamples))
+         return false;
+      out = m_zoneSamples[i];
+      return true;
+     }
+   void NoteMarkedZone(const string id, const datetime t) { m_markedZone = id; m_markedAt = t; }
+   string MarkedZone() const                { return m_markedZone; }
+   datetime MarkedAt() const                { return m_markedAt; }
    bool SampleAt(const int i, SdbAnalysisSample &out) const
      {
       if(i < 0 || i >= ArraySize(m_samples))

@@ -33,6 +33,8 @@
 #include <SDBotTests/Suites/TestSchedule.mqh>
 #include <SDBotTests/Suites/TestStructure.mqh>
 #include <SDBotTests/Suites/TestMarketStructure.mqh>
+#include <SDBotTests/Suites/TestZones.mqh>
+#include <SDBotTests/Suites/TestZoneBook.mqh>
 
 void RunAllSuites()
   {
@@ -63,6 +65,8 @@ void RunAllSuites()
    RunTestSchedule();
    RunTestStructure();
    RunTestMarketStructure();
+   RunTestZones();
+   RunTestZoneBook();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

@@ -364,6 +364,44 @@ struct SdbBias
    datetime          htfBarTime;
   };
 
+//--- Zona Supply & Demand (spec 11 design §4.1)
+enum ENUM_SDB_ZONE_STATUS
+  {
+   SDB_ZONE_FRESH = 0,
+   SDB_ZONE_TESTED = 1,
+   SDB_ZONE_WEAK = 2,          // >= 2 sentuhan: tidak dipakai (PRD)
+   SDB_ZONE_INVALID = 3,       // close melewati batas jauh (final)
+   SDB_ZONE_EXPIRED = 4        // usia > MaxZoneAgeBars (final)
+  };
+
+struct SdbZoneParams
+  {
+   double            minWidthAtr;
+   double            maxWidthAtr;
+   double            minLegAtr;
+   int               legBars;
+   int               maxAge;
+   int               strength;
+  };
+
+struct SdbZone
+  {
+   string            id;
+   bool              demand;
+   datetime          swingTime;
+   int               swingIdx;
+   double            distal;          // batas jauh: low (demand) / high (supply) candle swing
+   double            proximal;        // batas dekat: sisi badan yang menghadap harga
+   double            atr;             // ATR MTF di bar swing
+   double            widthAtr;
+   double            legAtr;
+   int               activeIdx;
+   datetime          activeTime;
+   int               touches;
+   ENUM_SDB_ZONE_STATUS status;
+   bool              used;
+  };
+
 // Laporan harian (spec 09 design §4.1-4.2).
 #define SDB_DS_KIND_IN      0
 #define SDB_DS_KIND_OUT     1

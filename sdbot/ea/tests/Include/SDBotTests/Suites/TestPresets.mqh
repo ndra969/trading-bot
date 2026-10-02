@@ -21,7 +21,8 @@ string TprKnownKeys()
           "InpMaxPosCrypto,InpDailyLossPct,InpDDReducePct,InpDDStopPct,InpResetEmergencyStop,InpBreakevenR,"
           "InpBreakevenBufferPoints,InpPartialR,InpPartialPct,InpTrailATRPeriod,InpTrailATRMult,"
           "InpTelegramToken,InpTelegramChatID,InpHeartbeatMinutes,"
-          "InpSwingStrength,InpStructureLookback,InpEmaPeriod,InpEmaSlopeBars,";
+          "InpSwingStrength,InpStructureLookback,InpEmaPeriod,InpEmaSlopeBars,"
+          "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -47,6 +48,11 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpStructureLookback")     v.structureLookback = (int)StringToInteger(value);
    else if(key == "InpEmaPeriod")             v.emaPeriod = (int)StringToInteger(value);
    else if(key == "InpEmaSlopeBars")          v.emaSlopeBars = (int)StringToInteger(value);
+   else if(key == "InpZoneMinWidthAtr")       v.zoneMinWidthAtr = StringToDouble(value);
+   else if(key == "InpZoneMaxWidthAtr")       v.zoneMaxWidthAtr = StringToDouble(value);
+   else if(key == "InpZoneMinLegAtr")         v.zoneMinLegAtr = StringToDouble(value);
+   else if(key == "InpZoneLegBars")           v.zoneLegBars = (int)StringToInteger(value);
+   else if(key == "InpMaxZoneAgeBars")        v.maxZoneAgeBars = (int)StringToInteger(value);
   }
 
 // "" = lolos; selain itu alasan gagal.
@@ -58,7 +64,8 @@ string TprCheckFile(const string name)
    InputValues v = DefaultInputValues();
    string unknown = "";
    int telegramKeys = 0;
-   int analysisKeys = 0;   // spec 10: 4 input analisis dengan default   // TC-PR-02 (spec 09 Req 1.8): token dan chat ID ada dan kosong, heartbeat ada
+   int analysisKeys = 0;   // spec 10: 4 input analisis dengan default
+   int zoneKeys = 0;       // spec 11: 5 input zona   // TC-PR-02 (spec 09 Req 1.8): token dan chat ID ada dan kosong, heartbeat ada
    while(!FileIsEnding(h))
      {
       string line = FileReadString(h);
@@ -78,11 +85,16 @@ string TprCheckFile(const string name)
       if((key == "InpSwingStrength" && value == "2") || (key == "InpStructureLookback" && value == "100") ||
          (key == "InpEmaPeriod" && value == "50") || (key == "InpEmaSlopeBars" && value == "3"))
          analysisKeys++;
+      if(key == "InpZoneMinWidthAtr" || key == "InpZoneMaxWidthAtr" || key == "InpZoneMinLegAtr" || key == "InpZoneLegBars" ||
+         key == "InpMaxZoneAgeBars")
+         zoneKeys++;
       TprApply(v, key, StringSubstr(line, eq + 1));
      }
    FileClose(h);
    if(unknown != "")
       return "kunci bukan input EA: " + unknown;
+   if(zoneKeys != 5)
+      return "5 input zona wajib ada (spec 11)";
    if(analysisKeys != 4)
       return "InpSwingStrength=2, InpStructureLookback=100, InpEmaPeriod=50, InpEmaSlopeBars=3 wajib ada (spec 10)";
    if(telegramKeys != 3)

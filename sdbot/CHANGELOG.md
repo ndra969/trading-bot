@@ -4,6 +4,15 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.10 — 2026-10-02 — spec 11 zona S&D
+
+- `ZoneRules` (ATR Wilder, calon zona dari candle swing H1 dengan lebar 0,3–2,0 ATR dan gerak keluar ≥ 1,5 ATR dalam 10 bar, status, peta, zona disentuh, zona lawan, skor 30/15) dan `CZoneBook` (bangun ulang penuh tiap bar H1, penanda Used di Global Variable per magic).
+- Input `InpZoneMinWidthAtr`, `InpZoneMaxWidthAtr`, `InpZoneMinLegAtr`, `InpZoneLegBars`, `InpMaxZoneAgeBars` (default dari ukuran histori H1 12 simbol, preset diperbarui).
+- Perbaikan sebelum rilis: penanda Used zona dibersihkan berdasarkan jumlah bar, bukan jam kalender (gap akhir pekan sempat membuat zona yang masih aktif bisa dipakai lagi; temuan SC-13).
+- Skenario SC-13 (EURUSDc) dan SC-13x (XAUUSDc): peta zona tanpa repaint, penanda Used lintas restart. Keputusan PC-17.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-02): build 0 error / 0 warning (4 target); unit 507/507 di 29 suite; 19 skenario PASS (SC-00..SC-13x); durasi total 6 menit 14 detik. pytest `sdbot/tools` 66/66, `schema.py check` OK (data versi 3).
+
 ### 1.09 — 2026-10-02 — spec 10 struktur pasar
 
 - Lapisan Analysis: `CBarCache` (bar tertutup per TF, salin ulang hanya saat bar baru), `StructureRules` (swing fractal berjeda, BOS, EMA, bias, skor keselarasan tren), `CMarketStructure` (HTF/MTF dari gaya trading, bias HTF dengan alasan, log saat berubah).

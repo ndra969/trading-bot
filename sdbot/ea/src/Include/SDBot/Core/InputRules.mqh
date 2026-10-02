@@ -31,6 +31,11 @@ struct InputValues
    int               structureLookback;
    int               emaPeriod;
    int               emaSlopeBars;
+   double            zoneMinWidthAtr;    // zona S&D (spec 11)
+   double            zoneMaxWidthAtr;
+   double            zoneMinLegAtr;
+   int               zoneLegBars;
+   int               maxZoneAgeBars;
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -76,6 +81,11 @@ InputValues DefaultInputValues()
    v.structureLookback = SDB_DEF_STRUCTURE_LOOKBACK;
    v.emaPeriod = SDB_DEF_EMA_PERIOD;
    v.emaSlopeBars = SDB_DEF_EMA_SLOPE_BARS;
+   v.zoneMinWidthAtr = SDB_DEF_ZONE_MIN_WIDTH_ATR;
+   v.zoneMaxWidthAtr = SDB_DEF_ZONE_MAX_WIDTH_ATR;
+   v.zoneMinLegAtr = SDB_DEF_ZONE_MIN_LEG_ATR;
+   v.zoneLegBars = SDB_DEF_ZONE_LEG_BARS;
+   v.maxZoneAgeBars = SDB_DEF_MAX_ZONE_AGE_BARS;
    return v;
   }
 
@@ -119,6 +129,23 @@ void IrCheckAnalysis(const InputValues &v, string &errors)
    IrCheckRange("InpEmaSlopeBars", v.emaSlopeBars, SDB_MIN_EMA_SLOPE_BARS, SDB_MAX_EMA_SLOPE_BARS, errors);
   }
 
+void IrCheckRangeD(const string name, const double value, const double lo, const double hi, string &errors)
+  {
+   if(value < lo || value > hi)
+      IrAdd(errors, name + "=" + IrNum(value) + " harus " + IrNum(lo) + " <= x <= " + IrNum(hi));
+  }
+
+void IrCheckZones(const InputValues &v, string &errors)
+  {
+   IrCheckRangeD("InpZoneMinWidthAtr", v.zoneMinWidthAtr, SDB_MIN_ZONE_MIN_WIDTH_ATR, SDB_MAX_ZONE_MIN_WIDTH_ATR, errors);
+   IrCheckRangeD("InpZoneMaxWidthAtr", v.zoneMaxWidthAtr, SDB_MIN_ZONE_MAX_WIDTH_ATR, SDB_MAX_ZONE_MAX_WIDTH_ATR, errors);
+   if(v.zoneMinWidthAtr >= v.zoneMaxWidthAtr)
+      IrAdd(errors, "InpZoneMinWidthAtr (" + IrNum(v.zoneMinWidthAtr) + ") harus < InpZoneMaxWidthAtr (" + IrNum(v.zoneMaxWidthAtr) + ")");
+   IrCheckRangeD("InpZoneMinLegAtr", v.zoneMinLegAtr, SDB_MIN_ZONE_MIN_LEG_ATR, SDB_MAX_ZONE_MIN_LEG_ATR, errors);
+   IrCheckRange("InpZoneLegBars", v.zoneLegBars, SDB_MIN_ZONE_LEG_BARS, SDB_MAX_ZONE_LEG_BARS, errors);
+   IrCheckRange("InpMaxZoneAgeBars", v.maxZoneAgeBars, SDB_MIN_MAX_ZONE_AGE_BARS, SDB_MAX_MAX_ZONE_AGE_BARS, errors);
+  }
+
 void IrCheckClassLimit(const string name, const int value, string &errors)
   {
    if(value < 1 || value > SDB_MAX_POS_PER_CLASS)
@@ -160,6 +187,7 @@ bool ValidateInputValues(const InputValues &v, const bool allowHarnessMagic, str
    IrCheckClassLimit("InpMaxPosCrypto", v.maxPosCrypto, errors);
    IrCheckPosition(v, errors);
    IrCheckAnalysis(v, errors);
+   IrCheckZones(v, errors);
    if(v.heartbeatMinutes != 0 && (v.heartbeatMinutes < SDB_MIN_HEARTBEAT_MIN || v.heartbeatMinutes > SDB_MAX_HEARTBEAT_MIN))
       IrAdd(errors, "InpHeartbeatMinutes=" + IntegerToString(v.heartbeatMinutes) + " harus 0 (mati) atau " +
             IntegerToString(SDB_MIN_HEARTBEAT_MIN) + " <= x <= " + IntegerToString(SDB_MAX_HEARTBEAT_MIN));

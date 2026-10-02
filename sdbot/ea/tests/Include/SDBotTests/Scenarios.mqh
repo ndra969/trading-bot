@@ -15,6 +15,7 @@
 #include <SDBot/Core/SchemaEnums.mqh>
 #include <SDBot/Execution/ExecutionRules.mqh>
 #include <SDBot/Analysis/StructureRules.mqh>
+#include <SDBot/Analysis/ZoneRules.mqh>
 #include <SDBot/Core/Inputs.mqh>
 
 // File tester dipakai semua run: hitung hanya baris sesi yang direkam run ini. -1 = DB tidak terbaca.
@@ -1028,6 +1029,89 @@ void CheckSc12(const string id, const CScenarioRecorder &rec)
                                             TimeToString(rec.RestartAt())), rec.RestartAt() > 0 && afterRestart > 0);
   }
 
+SdbZoneParams ScZoneParams()
+  {
+   InputValues in = CurrentInputs();
+   SdbZoneParams p;
+   p.minWidthAtr = in.zoneMinWidthAtr;
+   p.maxWidthAtr = in.zoneMaxWidthAtr;
+   p.minLegAtr = in.zoneMinLegAtr;
+   p.legBars = in.zoneLegBars;
+   p.maxAge = in.maxZoneAgeBars;
+   p.strength = in.swingStrength;
+   return p;
+  }
+
+// Peta dari histori untuk satu sampel: penanda Used berlaku bila sampel direkam sesudah penandaan dan
+// zonanya belum lewat batas pembersihan GV (sama dengan CZoneBook.CleanupUsed).
+string ScZoneMapFromHistory(const SdbZoneSample &s, const CScenarioRecorder &rec, const SdbZoneParams &p)
+  {
+   int need = ZonesNeeded(p);
+   MqlRates r[];
+   ArraySetAsSeries(r, false);
+   if(CopyRates(_Symbol, PERIOD_H1, s.barTime, need, r) != need || r[need - 1].time != s.barTime)
+      return "histori tidak bisa disalin";
+   string used[];
+   string marked = rec.MarkedZone();
+   if(marked != "" && s.recordedAt > rec.MarkedAt())
+     {
+      string parts[];
+      StringSplit(marked, '-', parts);
+      if(StringToInteger(parts[1]) >= (long)ZoneUsedCutoff(r, p.maxAge))
+        {
+         ArrayResize(used, 1);
+         used[0] = marked;
+        }
+     }
+   SdbZone z[];
+   BuildZones(r, p, PERIOD_H1, used, z);
+   return ZoneMapText(z, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
+  }
+
+// SC-13 (spec 11 Req 3.1, 3.3, 5.1): peta zona selama run = peta dari histori; Used bertahan lintas restart.
+void CheckSc13(const string id, const CScenarioRecorder &rec)
+  {
+   SdbZoneParams p = ScZoneParams();
+   int n = rec.ZoneSampleCount(), bad = 0, dup = 0, zonesTotal = 0, usedAfterRestart = 0;
+   string firstBad = "", statuses = "";
+   datetime first = 0, last = 0, prev = 0;
+   for(int i = 0; i < n; i++)
+     {
+      SdbZoneSample s;
+      rec.ZoneSampleAt(i, s);
+      string hist = ScZoneMapFromHistory(s, rec, p);
+      if(hist != s.map && bad++ == 0)
+         firstBad = TimeToString(s.barTime) + " EA=" + StringSubstr(s.map, 0, 120) + " histori=" + StringSubstr(hist, 0, 120);
+      dup += (s.barTime <= prev) ? 1 : 0;
+      prev = s.barTime;
+      first = (first == 0) ? s.barTime : first;
+      last = s.barTime;
+      zonesTotal += s.zones;
+      for(int st = 0; st <= 4; st++)
+         if(StringFind(s.map, ":" + IntegerToString(st) + ":") >= 0 && StringFind(statuses, IntegerToString(st)) < 0)
+            statuses += IntegerToString(st);
+      if(rec.MarkedZone() != "" && s.recordedAt > rec.RestartAt() && rec.RestartAt() > 0 &&
+         StringFind(s.map, rec.MarkedZone() + ":") >= 0)
+        {
+         int at = StringFind(s.map, rec.MarkedZone() + ":");
+         string item = StringSubstr(s.map, at, StringFind(s.map, ";", at) - at);
+         string f[];
+         if(StringSplit(item, ':', f) >= 4 && f[3] == "1")
+            usedAfterRestart++;
+        }
+     }
+   AssertTrue(id + "-norepaint", StringFormat("%d sidik peta = peta dari histori (beda %d) %s", n, bad, firstBad), n >= 400 && bad == 0);
+   int bars = Bars(_Symbol, PERIOD_H1, first, last);
+   AssertTrue(id + "-perbar", StringFormat("satu sampel per bar H1 (%d sampel, %d bar, urutan salah %d)", n, bars, dup), n == bars && dup == 0);
+   bool allStatus = StringFind(statuses, "0") >= 0 && StringFind(statuses, "1") >= 0 && StringFind(statuses, "2") >= 0 &&
+                    (StringFind(statuses, "3") >= 0 || StringFind(statuses, "4") >= 0);
+   AssertTrue(id + "-statuses", StringFormat("rata-rata %.1f zona per sampel, status muncul: %s", n > 0 ? (double)zonesTotal / n : 0, statuses),
+              n > 0 && zonesTotal > 0 && allStatus);
+   AssertTrue(id + "-used", StringFormat("zona %s ditandai Used (%s), tetap Used di %d sampel sesudah restart (%s)", rec.MarkedZone(),
+                                         TimeToString(rec.MarkedAt()), usedAfterRestart, TimeToString(rec.RestartAt())),
+              rec.MarkedZone() != "" && rec.RestartAt() > rec.MarkedAt() && usedAfterRestart > 0);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -1063,6 +1147,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc11(id, rec, tr);
    else if(id == "SC-12" || id == "SC-12x")
       CheckSc12(id, rec);
+   else if(id == "SC-13" || id == "SC-13x")
+      CheckSc13(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.09"
+#property version   "1.10"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.09"
+#define SDB_HARNESS_EA_VERSION "1.10"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
@@ -44,6 +44,8 @@ input string                 HarnessTransportScript   = "";    // skrip CFakeTra
 input string                 HarnessTransportFailType = "";    // tipe yang selalu gagal sementara di transport palsu
 input int                    HarnessAlertBurstAtBar   = 0;     // kirim burst alert uji di bar ini (0 = tidak)
 input bool                   HarnessRecordAnalysis    = false; // rekam analisis HTF/MTF tiap bar baru (SC-12)
+input bool                   HarnessRecordZones       = false; // rekam sidik peta zona tiap bar MTF baru (SC-13)
+input int                    HarnessMarkUsedAtBar     = 0;     // tandai zona valid pertama Used di bar ini (0 = tidak, SC-13)
 
 CSdbApp          *g_app = NULL;
 CScenarioRecorder g_rec;
@@ -51,6 +53,8 @@ CFakeTransport    g_tr;
 long              g_timerCycle = 0;
 datetime          g_lastHtfSample = 0;
 datetime          g_lastMtfSample = 0;
+datetime          g_lastZoneSample = 0;
+bool              g_zoneMarked = false;
 bool              g_runStarted = false;
 datetime          g_lastBar = 0;
 int               g_bar = 0;
@@ -257,11 +261,46 @@ SdbAnalysisSample SampleOf(const ENUM_TIMEFRAMES tf, const SdbTfAnalysis &a, con
    return s;
   }
 
+void RecordZones()
+  {
+   if(!HarnessRecordZones || g_app == NULL || !g_app.Zones().Ready())
+      return;
+   datetime t = g_app.Zones().LastBarTime();
+   if(t == 0 || t == g_lastZoneSample)
+      return;
+   g_lastZoneSample = t;
+   SdbZone z[];
+   SdbZoneSample s;
+   s.zones = g_app.Zones().Zones(z);
+   s.barTime = t;
+   s.map = ZoneMapText(z, (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS));
+   s.recordedAt = TimeCurrent();
+   g_rec.AddZoneSample(s);
+  }
+
+// SC-13: zona valid terbaru ditandai Used (seperti entry spec 13); terbaru agar belum kedaluwarsa saat restart.
+void MarkFirstValidZone()
+  {
+   if(g_zoneMarked || HarnessMarkUsedAtBar <= 0 || g_bar < HarnessMarkUsedAtBar || g_app == NULL)
+      return;
+   SdbZone z[];
+   int n = g_app.Zones().Zones(z), pick = -1;
+   for(int i = 0; i < n; i++)
+      if(ZoneValid(z[i]) && (pick < 0 || z[i].swingTime > z[pick].swingTime))
+         pick = i;
+   if(pick >= 0 && g_app.Zones().MarkUsed(z[pick].id))
+     {
+      g_zoneMarked = true;
+      g_rec.NoteMarkedZone(z[pick].id, TimeCurrent());
+     }
+  }
+
 void HarnessTick()
   {
    if(g_app != NULL)
       g_app.OnTick();
    RecordAnalysis();
+   RecordZones();
    datetime bar = iTime(_Symbol, _Period, 0);
    if(bar == 0 || bar == g_lastBar)
       return;
@@ -297,6 +336,7 @@ void HarnessTick()
       TryWithdraw();
    if(g_app != NULL && HarnessAlertBurstAtBar > 0 && g_bar == HarnessAlertBurstAtBar)
       AlertBurst();
+   MarkFirstValidZone();
   }
 
 // Penarikan saldo terjadwal (spec 05 Req 8.3, SC-07): saat tanpa posisi, agar puncak tidak ikut

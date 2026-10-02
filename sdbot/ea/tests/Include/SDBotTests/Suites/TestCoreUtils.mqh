@@ -157,6 +157,35 @@ void RunTestCoreUtilsInputs()
    v.emaPeriod = 10;
    v.emaSlopeBars = 20;
    bool edgesOk = ValidateInputValues(v, false, err);
+   // TC-SU-32 (spec 11 Req 5.2): input zona, default dari ukuran histori, min < max.
+   InputValues z = DefaultInputValues();
+   bool zoneDefaults = MathAbs(z.zoneMinWidthAtr - 0.3) < 1e-9 && MathAbs(z.zoneMaxWidthAtr - 2.0) < 1e-9 &&
+                       MathAbs(z.zoneMinLegAtr - 1.5) < 1e-9 && z.zoneLegBars == 10 && z.maxZoneAgeBars == 100 &&
+                       ValidateInputValues(z, false, err);
+   int badZone = 0;
+   for(int i = 0; i < 11; i++)
+     {
+      z = DefaultInputValues();
+      switch(i)
+        {
+         case 0: z.zoneMinWidthAtr = 0.04; break;
+         case 1: z.zoneMinWidthAtr = 1.01; break;
+         case 2: z.zoneMaxWidthAtr = 0.49; break;
+         case 3: z.zoneMaxWidthAtr = 5.01; break;
+         case 4: z.zoneMinWidthAtr = 1.0; z.zoneMaxWidthAtr = 1.0; break;
+         case 5: z.zoneMinLegAtr = 0.49; break;
+         case 6: z.zoneMinLegAtr = 5.01; break;
+         case 7: z.zoneLegBars = 2; break;
+         case 8: z.zoneLegBars = 51; break;
+         case 9: z.maxZoneAgeBars = 19; break;
+         default: z.maxZoneAgeBars = 501; break;
+        }
+      if(ValidateInputValues(z, false, err))
+         badZone++;
+     }
+   AssertTrue("TC-SU-32", StringFormat("input zona: default 0.3/2.0/1.5/10/100 lolos, di luar batas dan min >= max ditolak (lolos salah %d)", badZone),
+              zoneDefaults && badZone == 0);
+
    AssertTrue("TC-SU-31", StringFormat("input analisis: default 2/100/50/3 lolos, batas tepi lolos, di luar batas ditolak (lolos salah %d)", badAnalysis),
               defaultsAnalysis && edgesOk && badAnalysis == 0);
 

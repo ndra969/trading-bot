@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 3 (strategi inti) berjalan, versi EA **1.09**. Fase 2 (notifikasi) **selesai** di 1.08. Fase 1 (fondasi) **selesai** di 1.06 (spec 01–07: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart; metrik `OnTester`, preset 12 simbol, query analisis). Spec 08 (1.07): notifier dengan aturan kirim PRD (Critical lebih dulu, cooldown, kuota 20/jam per akun, pesan basi 30 menit), format pesan gaya bot Python, status kirim di tabel `alerts` (skema v3). Spec 09 (1.08): Telegram (bot dan chat bot Python), push HP untuk Critical, heartbeat dan laporan harian satu per akun, pesan start/stop, preset pribadi dari `.env`. Spec 10 (1.09): analisis struktur HTF/MTF (swing fractal berjeda, BOS, EMA 50, bias HTF) per bar baru, tanpa repaint (SC-12); belum dipakai untuk entry. Belum ada logika entry: EA utama tidak membuka posisi apa pun.
+Status: Fase 3 (strategi inti) berjalan, versi EA **1.10**. Fase 2 (notifikasi) **selesai** di 1.08. Fase 1 (fondasi) **selesai** di 1.06 (spec 01–07: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart; metrik `OnTester`, preset 12 simbol, query analisis). Spec 08 (1.07): notifier dengan aturan kirim PRD (Critical lebih dulu, cooldown, kuota 20/jam per akun, pesan basi 30 menit), format pesan gaya bot Python, status kirim di tabel `alerts` (skema v3). Spec 09 (1.08): Telegram (bot dan chat bot Python), push HP untuk Critical, heartbeat dan laporan harian satu per akun, pesan start/stop, preset pribadi dari `.env`. Spec 10 (1.09): analisis struktur HTF/MTF (swing fractal berjeda, BOS, EMA 50, bias HTF) per bar baru, tanpa repaint (SC-12). Spec 11 (1.10): peta zona S&D H1 (candle swing, lebar 0,3–2,0 ATR, gerak keluar ≥ 1,5 ATR, status Fresh/Tested/Lemah/Invalid/Kedaluwarsa/Used) dibangun ulang tiap bar H1, penanda Used di Global Variable (SC-13); belum dipakai untuk entry. Belum ada logika entry: EA utama tidak membuka posisi apa pun.
 
 ## Konfigurasi dan tuning
 
@@ -52,7 +52,10 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Analisis | `InpStructureLookback` | 100 bar (jendela BOS / arah struktur) | 20–500 | spec 10 |
 | Analisis | `InpEmaPeriod` / `InpEmaSlopeBars` | 50 / 3 (arah EMA: close vs EMA + kemiringan) | 10–400 / 1–20 | spec 10 |
 | Entry | `InpEntryMode` | Market (opsi Limit) | — | Fase 3 |
-| Entry | `InpMinConfluenceScore` / `InpMinRR` / `InpMaxZoneAgeBars` | 65 / 2.0 / 100 | — | Fase 3 |
+| Zona | `InpZoneMinWidthAtr` / `InpZoneMaxWidthAtr` | 0.3 / 2.0 × ATR(14) H1 (lebar zona dari candle swing) | 0.05–1.0 / 0.5–5.0, min < max | spec 11 |
+| Zona | `InpZoneMinLegAtr` / `InpZoneLegBars` | 1.5 × ATR dalam 10 bar (gerak keluar dari zona) | 0.5–5.0 / 3–50 | spec 11 |
+| Zona | `InpMaxZoneAgeBars` | 100 bar H1 (PRD) | 20–500 | spec 11 |
+| Entry | `InpMinConfluenceScore` / `InpMinRR` | 65 / 2.0 | — | Fase 3 |
 | Filter | `InpMaxSpreadPoints` | per simbol (disetel dari data spread) | — | Fase 4 |
 | Filter | `InpNewsBlockMinutes` / `InpTradingSessions` | 30 / London + New York | — | Fase 4 |
 | Notifikasi | `InpTelegramToken` / `InpTelegramChatID` | kosong (isi di `*.local.set` lewat `tools/make_local_presets.py`); kosong = pesan hanya di log | — (tidak masuk `inputs_json`, hanya `InpTelegramConfigured`) | spec 09 |
@@ -101,7 +104,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | Input | Isi |
 |---|---|
 | `InpTestRunId` | ID run, diisi runner |
-| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`, `SC-10`, `SC-11`, `SC-12`, `SC-12x`; `SC-09` optimasi diperiksa runner); ID lain = FAIL |
+| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`, `SC-10`, `SC-11`, `SC-12`, `SC-12x`, `SC-13`, `SC-13x`; `SC-09` optimasi diperiksa runner); ID lain = FAIL |
 | `HarnessEveryBars` | entry setiap N bar chart |
 | `HarnessDirection` | 0 BUY, 1 SELL, 2 bergantian |
 | `HarnessSlPoints` / `HarnessTpPoints` | jarak SL/TP dari harga (point) |
@@ -115,6 +118,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `HarnessTransportScript` | skrip transport palsu notifier (`OK,TEMP,LIMITED:60,PERM`, elemen terakhir berulang); kosong = transport log biasa |
 | `HarnessTransportFailType` | tipe alert yang selalu gagal sementara di transport palsu |
 | `HarnessRecordAnalysis` | rekam analisis HTF/MTF tiap bar baru untuk uji tanpa repaint (SC-12) |
+| `HarnessRecordZones` / `HarnessMarkUsedAtBar` | rekam sidik peta zona tiap bar H1; tandai zona valid terbaru Used di bar ini (SC-13) |
 | `HarnessAlertBurstAtBar` | kirim burst alert uji (2x `ORDER_FAILED`, tipe gagal, 25 Info) di bar ini (0 = tidak) |
 
 Menjalankan: `powershell -ExecutionPolicy Bypass -File tools/run-ea-tests.ps1 -Scenario SC-00,SC-08` (atau `-All` untuk unit + semua skenario). Skenario baru = pasangan `.ini`/`.set` di `ea/tests/scenarios/` plus cabang `CheckScenario` di `ea/tests/Include/SDBotTests/Scenarios.mqh`. Skenario dengan `Optimization=1` di `.ini` diperiksa runner (file DB tester tidak berubah, laporan optimasi berisi hasil metrik custom). Uji manual: [ea/tests/manual-checklist.md](ea/tests/manual-checklist.md). Alur EA: [docs/flows/](docs/flows/README.md).

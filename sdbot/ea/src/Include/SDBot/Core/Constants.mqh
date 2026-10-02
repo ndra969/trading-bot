@@ -117,6 +117,25 @@
 #define SDB_MAX_EMA_SLOPE_BARS        20
 #define SDB_EMA_WARMUP_MULT           3        // EMA dihitung dari >= 3 x periode bar (konvergen, deterministik)
 
+//--- Zona S&D (spec 11 design §4.2, PC-17); default dari ukuran histori H1 12 simbol 2025-10..2026-10
+#define SDB_DEF_ZONE_MIN_WIDTH_ATR    0.3
+#define SDB_MIN_ZONE_MIN_WIDTH_ATR    0.05
+#define SDB_MAX_ZONE_MIN_WIDTH_ATR    1.0
+#define SDB_DEF_ZONE_MAX_WIDTH_ATR    2.0
+#define SDB_MIN_ZONE_MAX_WIDTH_ATR    0.5
+#define SDB_MAX_ZONE_MAX_WIDTH_ATR    5.0
+#define SDB_DEF_ZONE_MIN_LEG_ATR      1.5
+#define SDB_MIN_ZONE_MIN_LEG_ATR      0.5
+#define SDB_MAX_ZONE_MIN_LEG_ATR      5.0
+#define SDB_DEF_ZONE_LEG_BARS         10
+#define SDB_MIN_ZONE_LEG_BARS         3
+#define SDB_MAX_ZONE_LEG_BARS         50
+#define SDB_DEF_MAX_ZONE_AGE_BARS     100      // PRD MaxZoneAgeBars
+#define SDB_MIN_MAX_ZONE_AGE_BARS     20
+#define SDB_MAX_MAX_ZONE_AGE_BARS     500
+#define SDB_ZONE_ATR_PERIOD           14
+#define SDB_GV_ZONE_USED              "ZU"     // GV "<magic>_ZU_<epoch swing>_<D|S>"
+
 //--- run_key (spec 04, PC-08): ID MT5 berulang di setiap run tester, jadi baris dipisah per run.
 #define SDB_RUN_KEY_LIVE              0        // live: posisi unik per login lintas restart
 #define SDB_RUN_KEY_NEW               -1       // run tester baru: run_key = ID sesi pertama

@@ -87,6 +87,17 @@ def test_ts47_analysis_inputs_have_defaults():
         assert v.get("InpEmaSlopeBars") == "3", symbol
 
 
+def test_ts48_zone_inputs_have_defaults():
+    """Spec 11 Req 5.2: input zona dengan default dari ukuran histori di semua preset."""
+    for symbol in EXPECTED_MAGIC:
+        v = _read(symbol)
+        assert v.get("InpZoneMinWidthAtr") == "0.3", symbol
+        assert v.get("InpZoneMaxWidthAtr") == "2.0", symbol
+        assert v.get("InpZoneMinLegAtr") == "1.5", symbol
+        assert v.get("InpZoneLegBars") == "10", symbol
+        assert v.get("InpMaxZoneAgeBars") == "100", symbol
+
+
 def test_ts46_telegram_inputs_present_and_empty():
     """Spec 09 Req 1.8: input Telegram ada di preset repo, token dan chat ID kosong."""
     for symbol in EXPECTED_MAGIC:

@@ -28,6 +28,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Skor keselarasan tren (15) dinilai di MTF: struktur dan EMA MTF searah sinyal = 15, salah satu = 7, tidak ada = 0.
     - Input baru di tabel parameter: `SwingStrength` 2 (1–5), `StructureLookback` 100 (20–500), `EmaPeriod` 50 (10–400), `EmaSlopeBars` 3 (1–20).
 
+### PC-17: Definisi zona S&D dan input zona
+- Status: Open
+- Tanggal disetujui: 2026-10-02
+- Dokumen: PRD-EA §Aturan zona Supply & Demand, §Parameter input EA
+- Sumber: spec `ea-11-zones` requirements (ukuran histori H1 12 simbol 2025-10..2026-10), keputusan 1–6
+- Perubahan:
+    - Zona dari satu candle swing MTF: demand = low sampai max(open, close) candle swing low; supply = high sampai min(open, close) candle swing high. Lebar wajib 0,3–2,0 × ATR(14) MTF dan gerak keluar (close terjauh dari batas dekat) ≥ 1,5 × ATR dalam 10 bar; zona aktif sejak swing terkonfirmasi dan gerak keluar tercapai.
+    - Sentuhan = bar MTF tertutup yang masuk zona setelah bar sebelumnya di luar; status Fresh (0), Tested (1), Lemah (≥ 2, tidak dipakai), Invalid (close melewati batas jauh, final), Kedaluwarsa (> `MaxZoneAgeBars` bar), Used (sudah dipakai entry, penanda di Global Variable per magic, dibersihkan setelah kedaluwarsa).
+    - Peta zona dibangun ulang penuh dari histori setiap bar MTF baru (tidak dari DB); zona bertumpuk tidak digabung, pipeline memilih Fresh lalu terbaru.
+    - Input baru: `ZoneMinWidthAtr` 0,3, `ZoneMaxWidthAtr` 2,0, `ZoneMinLegAtr` 1,5, `ZoneLegBars` 10; `MaxZoneAgeBars` 100 (sudah di PRD).
+
 ## Done
 
 ### PC-13: Aturan notifier dan status alert (skema v3)

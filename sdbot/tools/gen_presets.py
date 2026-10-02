@@ -101,6 +101,12 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpStructureLookback", "100"),
     ("InpEmaPeriod", "50"),
     ("InpEmaSlopeBars", "3"),
+    # Zona S&D (spec 11, PC-17): default dari ukuran histori H1 12 simbol
+    ("InpZoneMinWidthAtr", "0.3"),
+    ("InpZoneMaxWidthAtr", "2.0"),
+    ("InpZoneMinLegAtr", "1.5"),
+    ("InpZoneLegBars", "10"),
+    ("InpMaxZoneAgeBars", "100"),
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),

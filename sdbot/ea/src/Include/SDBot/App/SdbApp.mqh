@@ -18,6 +18,7 @@
 #include <SDBot/Position/ClosureTracker.mqh>
 #include <SDBot/Position/Reconciler.mqh>
 #include <SDBot/Analysis/MarketStructure.mqh>
+#include <SDBot/Analysis/ZoneBook.mqh>
 #include <SDBot/App/TeeSink.mqh>
 #include <SDBot/Notify/Notifier.mqh>
 #include <SDBot/Notify/TelegramTransport.mqh>
@@ -50,6 +51,7 @@ private:
    CPositionCache    m_posCache;
    CPositionManager  m_posManager;
    CMarketStructure  m_structure;      // bias HTF + struktur MTF (spec 10)
+   CZoneBook         m_zones;          // zona S&D MTF (spec 11)
    CClosureTracker   m_closureTracker;
    CReconciler       m_reconciler;
    int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
@@ -70,6 +72,7 @@ private:
       m_lastSnapshot = TimeLocal();   // Validate() baru saja mengirim snapshot
       if(!m_stateReady)
          return;
+      m_zones.SetState(GetPointer(m_state));   // penanda Used zona di GV per magic (spec 11 Req 3.3)
       if(m_notifyOn)
         {
          m_notifier.SetState(GetPointer(m_state));   // cooldown, kuota, lease, jadwal di GV (spec 08 Req 2.5, spec 09 Req 4)
@@ -119,6 +122,14 @@ private:
       p.emaPeriod = cfg.inputs.emaPeriod;
       p.slopeBars = cfg.inputs.emaSlopeBars;
       m_structure.Init(_Symbol, htf, mtf, p);
+      SdbZoneParams zp;
+      zp.minWidthAtr = cfg.inputs.zoneMinWidthAtr;
+      zp.maxWidthAtr = cfg.inputs.zoneMaxWidthAtr;
+      zp.minLegAtr = cfg.inputs.zoneMinLegAtr;
+      zp.legBars = cfg.inputs.zoneLegBars;
+      zp.maxAge = cfg.inputs.maxZoneAgeBars;
+      zp.strength = cfg.inputs.swingStrength;
+      m_zones.Init(_Symbol, mtf, zp, cfg.inputs.magic);
      }
 
    void SendSnapshot()
@@ -323,6 +334,7 @@ public:
       if(m_deinitDone)
          return;
       m_structure.OnTick();   // hanya membaca harga: jalan walau akun belum PASSED (spec 10 design §8.3)
+      m_zones.OnTick();       // penanda Used baru terbaca setelah status bersama siap (spec 11)
       if(m_account.State() != SDB_VAL_PASSED || !m_stateReady)
          return;
       m_posManager.OnTick();
@@ -400,6 +412,7 @@ public:
 
    CExecutor *Executor() { return GetPointer(m_executor); }
    CMarketStructure *Structure() { return GetPointer(m_structure); }
+   CZoneBook *Zones() { return GetPointer(m_zones); }
    ISdbEventSink *Sink() { return m_sink; }
    bool NotifierActive() const { return m_notifyOn; }
    string TransportName() { return m_transport != NULL ? m_transport.Name() : ""; }

@@ -45,6 +45,11 @@ input int                    InpSwingStrength         = SDB_DEF_SWING_STRENGTH; 
 input int                    InpStructureLookback     = SDB_DEF_STRUCTURE_LOOKBACK; // Jendela struktur/BOS (bar, 20-500)
 input int                    InpEmaPeriod             = SDB_DEF_EMA_PERIOD;         // Periode EMA tren (10-400)
 input int                    InpEmaSlopeBars          = SDB_DEF_EMA_SLOPE_BARS;     // Kemiringan EMA dibanding N bar (1-20)
+input double                 InpZoneMinWidthAtr       = SDB_DEF_ZONE_MIN_WIDTH_ATR; // Lebar zona minimum (x ATR MTF)
+input double                 InpZoneMaxWidthAtr       = SDB_DEF_ZONE_MAX_WIDTH_ATR; // Lebar zona maksimum (x ATR MTF)
+input double                 InpZoneMinLegAtr         = SDB_DEF_ZONE_MIN_LEG_ATR;   // Gerak keluar minimum (x ATR MTF)
+input int                    InpZoneLegBars           = SDB_DEF_ZONE_LEG_BARS;      // Gerak keluar dalam N bar MTF (3-50)
+input int                    InpMaxZoneAgeBars        = SDB_DEF_MAX_ZONE_AGE_BARS;  // Usia maksimum zona (bar MTF, PRD 100)
 
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
@@ -76,6 +81,11 @@ InputValues CurrentInputs()
    v.structureLookback = InpStructureLookback;
    v.emaPeriod = InpEmaPeriod;
    v.emaSlopeBars = InpEmaSlopeBars;
+   v.zoneMinWidthAtr = InpZoneMinWidthAtr;
+   v.zoneMaxWidthAtr = InpZoneMaxWidthAtr;
+   v.zoneMinLegAtr = InpZoneMinLegAtr;
+   v.zoneLegBars = InpZoneLegBars;
+   v.maxZoneAgeBars = InpMaxZoneAgeBars;
    return v;
   }
 
@@ -89,7 +99,8 @@ string CurrentInputsJson()
                  "InpPartialPct", "InpTrailATRPeriod", "InpTrailATRMult", "InpMaxPosForexMajor",
                  "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto", "InpPresetTag",
                  "InpHeartbeatMinutes", "InpTelegramConfigured", "InpSwingStrength", "InpStructureLookback",
-                 "InpEmaPeriod", "InpEmaSlopeBars"};
+                 "InpEmaPeriod", "InpEmaSlopeBars", "InpZoneMinWidthAtr", "InpZoneMaxWidthAtr", "InpZoneMinLegAtr",
+                 "InpZoneLegBars", "InpMaxZoneAgeBars"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -121,6 +132,11 @@ string CurrentInputsJson()
    v[25] = JsonNum(InpStructureLookback);
    v[26] = JsonNum(InpEmaPeriod);
    v[27] = JsonNum(InpEmaSlopeBars);
+   v[28] = JsonNum(InpZoneMinWidthAtr);
+   v[29] = JsonNum(InpZoneMaxWidthAtr);
+   v[30] = JsonNum(InpZoneMinLegAtr);
+   v[31] = JsonNum(InpZoneLegBars);
+   v[32] = JsonNum(InpMaxZoneAgeBars);
    return CanonicalJson(k, v);
   }
 
