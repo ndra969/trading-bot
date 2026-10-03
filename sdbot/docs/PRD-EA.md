@@ -2,7 +2,7 @@
 
 2026-09-19 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-02). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
+> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-03). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -115,23 +115,32 @@ Sinyal hanya lahir jika lolos tiga gerbang wajib (bias HTF, zona S&D valid, trig
 
 Satu gaya per instance EA, dipilih lewat input. Hasil analisis tiap TF disimpan di memori dan dihitung ulang hanya saat bar baru di TF tersebut.
 
+### Struktur dan bias HTF
+
+- Swing = fractal dengan kekuatan `SwingStrength` (default 2) dari bar tertutup, diakui setelah `SwingStrength` bar di kanannya tutup. High/low sama persis: bar lebih awal yang dipakai.
+- BOS = close bar tertutup melewati swing terkonfirmasi terakhir. Arah struktur = BOS terakhir dalam `StructureLookback` bar (default 100).
+- Arah EMA (`EmaPeriod` default 50): bullish bila close > EMA dan EMA naik dibanding `EmaSlopeBars` bar sebelumnya (default 3); bearish kebalikannya; selain itu netral.
+- Bias HTF bullish/bearish hanya bila arah struktur dan arah EMA HTF sama. Selain itu netral, termasuk saat histori kurang.
+
 ### Alur
 
 ```mermaid
 flowchart TB
-    B([Bar LTF baru]) --> F{Pre-filter: risiko,<br/>berita, sesi, spread,<br/>posisi & eksposur}
-    F -->|Gagal| X[Skip + log alasan]
-    F -->|Lolos| H{Bias HTF<br/>bullish/bearish?}
-    H -->|Netral| X
-    H -->|Ada| Z{Harga di zona MTF<br/>searah bias & valid?}
-    Z -->|Tidak| X
-    Z -->|Ya| T{Trigger PA di LTF?}
+    B([Bar LTF baru tutup, dinilai sekali]) --> H{Bias HTF<br/>bullish/bearish?}
+    H -->|Netral| C[Dihitung di ringkasan harian]
+    H -->|Ada| Z{Bar menyentuh zona MTF<br/>valid searah bias?}
+    Z -->|Tidak| C
+    Z -->|Ya: kandidat| F{Pre-filter: risiko,<br/>berita, sesi, spread,<br/>posisi & eksposur}
+    F -->|Gagal| X[Tolak + catat di signals]
+    F -->|Lolos| T{Trigger PA di LTF?}
     T -->|Tidak| X
     T -->|Ya| S[Hitung skor konfluensi]
-    S --> Q{Skor ≥ 65?}
+    S --> Q{Skor ≥ 65% dari<br/>maksimum aktif?}
     Q -->|Tidak| X
     Q -->|Ya| E[Ke eksekusi]
 ```
+
+Kandidat = bar LTF tertutup yang menyentuh zona valid searah bias HTF. Setiap kandidat menjadi satu baris `signals` dengan tahap pertama yang gagal, dalam urutan: pre-filter risiko (STOPPED, pause harian, tidak bisa trading) → posisi instance masih terbuka (`POSITION_OPEN`) → trigger PA (`NO_PA_TRIGGER`) → skor (`SCORE_TOO_LOW`) → SL/TP dan R:R → lot dan pre-trade check → eksekusi. Bar tanpa bias atau tanpa zona hanya dihitung di ringkasan log harian. Setiap bar dinilai sekali (penanda bar di Global Variable per magic), dan bar yang lebih tua dari 2 × LTF tidak dinilai.
 
 ### Aturan zona Supply & Demand
 
@@ -141,6 +150,29 @@ flowchart TB
 - Usia maksimal zona dalam jumlah bar MTF (default 100 bar), bukan jam.
 - Satu zona hanya boleh menghasilkan satu entry.
 - Zona dihitung ulang dari histori saat `OnInit`, tidak dimuat dari DB, agar backtest tidak bocor data.
+
+Definisi zona:
+
+- Zona dari satu candle swing MTF. Demand = low sampai max(open, close) candle swing low; supply = high sampai min(open, close) candle swing high.
+- Lebar wajib `ZoneMinWidthAtr`–`ZoneMaxWidthAtr` (0,3–2,0) × ATR(14) MTF. Gerak keluar (close terjauh dari batas dekat) wajib ≥ `ZoneMinLegAtr` (1,5) × ATR dalam `ZoneLegBars` (10) bar. Zona aktif sejak swing terkonfirmasi dan gerak keluar tercapai.
+- Sentuhan = bar MTF tertutup yang masuk zona setelah bar sebelumnya di luar. Status: Fresh (0), Tested (1), Lemah (≥ 2, tidak dipakai), Invalid (close melewati batas jauh, final), Kedaluwarsa (> `MaxZoneAgeBars` bar), Used (sudah dipakai entry).
+- Penanda Used disimpan di Global Variable per magic dan dibersihkan setelah zona kedaluwarsa.
+- Peta zona dibangun ulang penuh dari histori setiap bar MTF baru, tidak dari DB. Zona bertumpuk tidak digabung; pipeline memilih Fresh lebih dulu, lalu yang terbaru.
+
+### Trigger price action
+
+Trigger PA = pola terarah pertama yang cocok di bar LTF tertutup, diperiksa dalam urutan: bintang pagi/sore, engulfing kuat, pin bar, engulfing biasa, tweezer, outside bar terarah. Pola netral (inside bar, doji, harami) tidak pernah menjadi trigger. Ukuran relatif ATR(14) LTF dan rentang bar, sebagai konstanta:
+
+| Pola | Syarat (versi bullish; bearish cerminnya) |
+| --- | --- |
+| Bintang | Badan bar pertama > 0,5 ATR, badan tengah < 0,3 × badan pertama, bar ketiga close melewati titik tengah badan pertama |
+| Engulfing kuat | Badan menelan badan sebelumnya, badan ≥ 60% rentang dan ≥ 0,8 ATR, close melewati high/low bar sebelumnya |
+| Pin bar | Badan ≤ 35% rentang; sumbu ≥ 2 × badan, ≥ 60% rentang, dan > 2 × sumbu lain; rentang ≥ 0,8 ATR |
+| Engulfing biasa | Syarat badan engulfing saja |
+| Tweezer | Bar sebelumnya berlawanan, selisih low/high ≤ 0,1 ATR |
+| Outside bar | High dan low melewati bar sebelumnya, close melewati close sebelumnya |
+
+Kode pola (enum `pa_pattern`): `STAR`, `ENGULF_STRONG`, `PIN`, `ENGULF`, `TWEEZER`, `OUTSIDE`, `NONE`. Tidak ada aturan khusus logam atau crypto; sekitar 40% bar M15 punya pola terarah.
 
 ### Skor konfluensi (total 100)
 
@@ -157,6 +189,8 @@ flowchart TB
 Struktur dan MA digabung karena sama-sama mengukur tren, agar tidak dihitung ganda. Semua komponen dinilai sesuai arah sinyal. Ambang 65 adalah titik awal dan ditentukan ulang lewat backtest.
 
 Strategi konfirmasi ditambahkan satu per satu, dan setiap penambahan harus terbukti meningkatkan hasil forward test.
+
+`MinConfluenceScore` diartikan persen dari skor maksimum komponen yang aktif. Fase 3 hanya punya zona (30), keselarasan tren (15), dan price action (10), jadi maksimum 55 dan ambang default 65% berarti skor ≥ 36. Saat komponen Fase 5 aktif, maksimum kembali 100. Keselarasan tren dinilai di MTF: struktur dan EMA MTF searah sinyal = 15, salah satu = 7, tidak ada = 0. `signals.score_total` menyimpan skor mentah; setiap kandidat mencatat komponen `ZONE`, `TREND`, `PA` di `signal_scores` (enum `score_component`, cadangan `FIB`, `TRENDLINE`, `BREAKOUT`, `RSI`).
 
 ## Eksekusi order
 
@@ -190,6 +224,14 @@ Kebutuhan:
 - `CExecutor` adalah satu-satunya pintu ke broker. `OrderCheck` dijalankan sebelum setiap `OrderSend`; deviasi maksimum 10 point; modify dan close juga diulang maksimal 3 kali untuk retcode sementara.
 - Komentar order `SDB|<SL awal>|<ID permintaan>`: ID 4 karakter unik per permintaan. Setelah retcode ambigu (timeout), EA mencari posisi atau deal dengan ID itu dulu, sehingga order yang ternyata terisi tidak dikirim dua kali.
 - Alasan tolak memakai kode `enums.md`, termasuk `INVALID_STOPS` (SL/TP kosong atau di sisi salah) dan `INVALID_VOLUME`.
+
+Aturan entry Fase 3:
+
+- Hanya market order. `EntryMode` limit ditunda ke Fase 5.
+- SL = batas jauh zona ∓ `SlBufferAtr` (0,1) × ATR(14) MTF; SL SELL ditambah spread saat itu.
+- Jarak SL wajib ≥ max(stops level + spread, `MinSlAtr` 0,3 × ATR MTF) dan ≤ `MaxSlAtr` 3,0 × ATR MTF (`SL_TOO_CLOSE` / `SL_TOO_FAR`). Entry yang sudah melewati SL ditolak `INVALID_STOPS`.
+- TP = batas dekat zona lawan valid terdekat. Bila tidak ada, TP = entry ± `MinRR` × jarak SL (2R); sumber TP (`ZONE` / `RR`) dicatat di konteks sinyal.
+- Maksimal satu posisi terbuka per instance (simbol). Zona menjadi Used hanya setelah order terisi.
 
 ## Position management
 
@@ -352,6 +394,8 @@ Kebutuhan:
 - Kolom `run_key` memisahkan run backtest: 0 di live, ID sesi pertama run di tester (posisi dan deal tester bernomor sama di setiap run). Kunci posisi = `login + run_key + position_id`.
 - Skema hanya berubah lewat migrasi maju di `shared/schema/migrations/` (`tools/schema.py`), diterapkan EA sendiri saat start. DDL lengkap: `shared/schema/data_db.sql`.
 
+Telemetri sinyal: satu baris `signals` per kandidat dan tiga baris `signal_scores` (`ZONE`, `TREND`, `PA`). `signals.id` dihitung EA dari login, run_key, magic, dan waktu bar, sehingga `trades.signal_id` terisi sebelum order dan restart di bar yang sama tidak menambah baris. `context_json` berisi pola PA, status zona, alasan bias, entry/SL/TP, sumber TP, R:R, ATR MTF, persen skor, dan maksimum aktif.
+
 ## Parameter input EA
 
 Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading dan per simbol.
@@ -363,10 +407,16 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Umum | `SymbolSuffix` | kosong |
 | Umum | `AllowLiveTrading` | false |
 | Umum | PresetTag | kosong (preset mengisi simbolnya; beda dengan simbol chart = WARN) |
-| Entry | `EntryMode` | Market |
-| Entry | `MinConfluenceScore` | 65 |
-| Entry | `MinRR` | 2.0 |
+| Entry | `EntryMode` | Market (limit ditunda ke Fase 5) |
+| Entry | `MinConfluenceScore` | 65 (% dari skor maksimum komponen aktif; Fase 3: 55, jadi skor ≥ 36) |
+| Entry | `MinRR` | 2.0 (TP ke zona lawan terdekat, atau 2R bila tidak ada) |
 | Entry | `MaxZoneAgeBars` | 100 |
+| Entry | SlBufferAtr | 0.1 × ATR(14) MTF di luar batas jauh zona (SELL + spread) |
+| Entry | MinSlAtr / MaxSlAtr | 0.3 / 3.0 × ATR(14) MTF (jarak SL minimal juga ≥ stops level + spread) |
+| Analisis | SwingStrength / StructureLookback | 2 (1–5) / 100 bar (20–500) |
+| Analisis | EmaPeriod / EmaSlopeBars | 50 (10–400) / 3 (1–20) |
+| Zona | ZoneMinWidthAtr / ZoneMaxWidthAtr | 0.3 / 2.0 × ATR(14) MTF |
+| Zona | ZoneMinLegAtr / ZoneLegBars | 1.5 × ATR dalam 10 bar MTF |
 | Filter | `MaxSpreadPoints` | per simbol |
 | Filter | `NewsBlockMinutes` | 30 sebelum/sesudah berita high impact |
 | Filter | `TradingSessions` | London + New York |
@@ -528,7 +578,7 @@ Pengembangan dimulai dari fondasi pengaman, lalu strategi ditambah bertahap agar
 | --- | --- | --- |
 | 1. Fondasi | CAccount, CRiskManager, CPositionManager, CLogger | Uji fungsi BE, partial, trailing, limit risiko lolos |
 | 2. Notifikasi | CNotifier, Telegram, push HP, heartbeat | Semua event di tabel notifikasi terkirim sesuai aturan |
-| 3. Strategi inti | Bias HTF, zona S&D, trigger PA, eksekusi | Backtest dasar lolos tanpa lapisan konfirmasi |
+| 3. Strategi inti | Bias HTF, zona S&D, trigger PA, eksekusi | Backtest dasar 12 simbol × 12 bulan terakhir tanpa lapisan konfirmasi: tanpa error kritis, total ≥ 300 trade dan setiap simbol ≥ 15 trade, semua trade punya signal_id dengan skor lengkap, query kalibrasi menghasilkan data. Profit dinilai di Fase 5–6 |
 | 4. Filter | Berita, sesi, spread, eksposur mata uang | Filter tercatat di tabel signals dengan alasan tolak |
 | 5. Konfirmasi | Fibonacci, trendline, breakout retest, RSI (satu per satu) | Setiap lapisan meningkatkan hasil forward test |
 | 6. Validasi | Forward test dan live akun cent 1–3 bulan | Kriteria penerimaan tahap 3 dan 4 terpenuhi |

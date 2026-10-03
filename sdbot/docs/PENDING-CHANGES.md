@@ -4,8 +4,10 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+## Done
+
 ### PC-15: Aturan Fase 3 (ambang skor, TP cadangan, parameter relatif ATR, kriteria backtest dasar)
-- Status: Open
+- Status: Done (2026-10-03, PRD-EA rev 47)
 - Tanggal disetujui: 2026-10-02
 - Dokumen: PRD-EA §Skor konfluensi, §Eksekusi order, §Parameter input EA, §Roadmap (Fase 3 "selesai jika")
 - Sumber: [fase-3-overview.md](../specs/fase-3-overview.md) §7, keputusan 1–5
@@ -17,7 +19,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Pembagian Fase 3 menjadi empat spec (struktur, zona, trigger PA, sinyal + entry); versi EA 1.09–1.12.
 
 ### PC-16: Definisi struktur, EMA, dan bias HTF; input analisis
-- Status: Open
+- Status: Done (2026-10-03, PRD-EA rev 47)
 - Tanggal disetujui: 2026-10-02
 - Dokumen: PRD-EA §Pipeline analisis (alur, bias HTF), §Skor konfluensi (keselarasan tren), §Parameter input EA
 - Sumber: spec `ea-10-market-structure` requirements, keputusan 1–6
@@ -29,7 +31,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Input baru di tabel parameter: `SwingStrength` 2 (1–5), `StructureLookback` 100 (20–500), `EmaPeriod` 50 (10–400), `EmaSlopeBars` 3 (1–20).
 
 ### PC-17: Definisi zona S&D dan input zona
-- Status: Open
+- Status: Done (2026-10-03, PRD-EA rev 47)
 - Tanggal disetujui: 2026-10-02
 - Dokumen: PRD-EA §Aturan zona Supply & Demand, §Parameter input EA
 - Sumber: spec `ea-11-zones` requirements (ukuran histori H1 12 simbol 2025-10..2026-10), keputusan 1–6
@@ -40,7 +42,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Input baru: `ZoneMinWidthAtr` 0,3, `ZoneMaxWidthAtr` 2,0, `ZoneMinLegAtr` 1,5, `ZoneLegBars` 10; `MaxZoneAgeBars` 100 (sudah di PRD).
 
 ### PC-18: Definisi trigger price action
-- Status: Open
+- Status: Done (2026-10-03, PRD-EA rev 47, PRD-Backoffice rev 17)
 - Tanggal disetujui: 2026-10-03
 - Dokumen: PRD-EA §Pipeline analisis (trigger PA), §Skor konfluensi (kekuatan PA); PRD-Backoffice §Database (enum)
 - Sumber: spec `ea-12-pa-trigger` requirements (ukuran M15 12 simbol 2026-04..2026-10), keputusan 1–4
@@ -51,7 +53,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Tidak ada aturan khusus logam/crypto; sekitar 40% bar M15 punya pola terarah.
 
 ### PC-19: Pipeline sinyal, entry, dan kriteria backtest dasar
-- Status: Open
+- Status: Done (2026-10-03, PRD-EA rev 47, PRD-Backoffice rev 17)
 - Tanggal disetujui: 2026-10-03
 - Dokumen: PRD-EA §Pipeline analisis (alur), §Skor konfluensi, §Eksekusi order, §Data dan database (`signals`), §Parameter input EA, §Roadmap Fase 3; PRD-Backoffice §Database (enum)
 - Sumber: spec `ea-13-signal-entry` requirements (simulasi pipeline 12 simbol 2025-10..2026-10), keputusan 1–9
@@ -62,8 +64,6 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Input baru: `MinConfluenceScore` 65 (persen dari maksimum aktif), `MinRR` 2,0 (sudah di PRD), `SlBufferAtr` 0,1, `MinSlAtr` 0,3, `MaxSlAtr` 3,0.
     - Enum `reject_stage` + `POSITION_OPEN`, `SL_TOO_FAR`.
     - Koreksi PC-15, Roadmap Fase 3 "selesai jika": backtest dasar 12 simbol × 12 bulan terakhir tanpa error kritis, **total ≥ 300 trade dan setiap simbol ≥ 15 trade**, semua trade punya `signal_id` dengan skor lengkap, query kalibrasi menghasilkan data; profit dinilai di Fase 5–6. (Simulasi: gerbang skor 65% memberi 19–37 trade per simbol per tahun, total 312.)
-
-## Done
 
 ### PC-13: Aturan notifier dan status alert (skema v3)
 - Status: Done (2026-10-02, PRD-EA rev 42, PRD-Backoffice rev 16)
