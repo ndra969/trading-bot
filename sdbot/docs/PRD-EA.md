@@ -233,6 +233,11 @@ Aturan entry Fase 3:
 - TP = batas dekat zona lawan valid terdekat. Bila tidak ada, TP = entry ± `MinRR` × jarak SL (2R); sumber TP (`ZONE` / `RR`) dicatat di konteks sinyal.
 - Maksimal satu posisi terbuka per instance (simbol). Zona menjadi Used hanya setelah order terisi.
 
+Ketahanan eksekusi:
+
+- Setelah lot dibulatkan ke bawah, rugi lot akhir dihitung ulang dengan `OrderCalcProfit`, karena broker membulatkan uang ke sen. Bila hasilnya melebihi risiko per trade, lot diturunkan satu step sampai pas. Di bawah lot minimum = tolak `LOT_BELOW_MIN`.
+- Retcode 10018 (pasar tutup) bukan kegagalan permanen. Request (order, modify, partial, close) tidak dikirim di luar jadwal sesi trading simbol, dan ditahan 60 detik setelah 10018. Modify dan partial dicoba lagi tanpa dihitung gagal; order ditolak `NOT_TRADABLE` tanpa alert `ORDER_FAILED`.
+
 ## Position management
 
 Semua ambang memakai kelipatan R (R = jarak SL awal) dan ATR, bukan pips tetap per aset, sehingga otomatis cocok untuk forex, emas, dan crypto.

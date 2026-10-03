@@ -6,6 +6,15 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Done
 
+### PC-20: Lot pas dengan rugi broker; request saat pasar tutup
+- Status: Done (2026-10-03, PRD-EA rev 48)
+- Tanggal disetujui: 2026-10-03
+- Dokumen: PRD-EA §Eksekusi order (Kebutuhan)
+- Sumber: perbaikan bug spec 13 (TC-RK-14, TC-EX-33, TC-PS-05) dan v1.13 (TC-EX-34, TC-PS-06); permintaan user 2026-10-03
+- Perubahan:
+    - Lot: setelah dibulatkan ke bawah, rugi lot akhir dihitung ulang dengan `OrderCalcProfit` (broker membulatkan uang ke sen). Bila melebihi risiko per trade, lot diturunkan satu step sampai pas; di bawah lot minimum = tolak `LOT_BELOW_MIN`.
+    - Pasar tutup: retcode 10018 bukan kegagalan permanen. Request (order, modify, partial, close) tidak dikirim di luar jadwal sesi trading simbol, dan ditahan 60 detik setelah 10018. Modify/partial dicoba lagi tanpa dihitung gagal; order ditolak `NOT_TRADABLE` tanpa alert `ORDER_FAILED`.
+
 ### PC-15: Aturan Fase 3 (ambang skor, TP cadangan, parameter relatif ATR, kriteria backtest dasar)
 - Status: Done (2026-10-03, PRD-EA rev 47)
 - Tanggal disetujui: 2026-10-02
