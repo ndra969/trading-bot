@@ -29,6 +29,8 @@ private:
    long              m_sendCount;
    long              m_memCounter;    // cadangan bila GV penghitung gagal ditulis
    uint              m_forceRc;       // hook uji: != 0 -> modify/close tidak dikirim, retcode ini dipakai
+   datetime          m_closedUntil;   // jeda setelah retcode 10018: tidak ada request simbol sampai waktu server ini
+   int               m_sessionOverride; // hook uji: -1 jadwal broker, 0 tutup, 1 buka
 
    void SendAlert(const string type, const string message)
      {
@@ -43,6 +45,48 @@ private:
      }
 
    string CounterName() const { return IntegerToString(m_magic) + "_REQ_COUNTER"; }
+
+   // Jadwal sesi trading simbol hari ini (SymbolInfoSessionTrade). Broker tanpa jadwal sama sekali = selalu buka.
+   bool TradeSessionOpenNow()
+     {
+      if(m_sessionOverride >= 0)
+         return m_sessionOverride == 1;
+      MqlDateTime dt;
+      TimeToStruct(TimeCurrent(), dt);
+      int fromSec[], toSec[];
+      datetime f, t;
+      for(uint i = 0; SymbolInfoSessionTrade(m_symbol, (ENUM_DAY_OF_WEEK)dt.day_of_week, i, f, t); i++)
+        {
+         int n = ArraySize(fromSec);
+         ArrayResize(fromSec, n + 1);
+         ArrayResize(toSec, n + 1);
+         fromSec[n] = (int)((long)f % 86400);
+         toSec[n] = ((long)t >= 86400 && (long)t % 86400 == 0) ? 86400 : (int)((long)t % 86400);
+        }
+      if(ArraySize(fromSec) == 0)
+        {
+         for(int d = 0; d < 7; d++)
+            if(SymbolInfoSessionTrade(m_symbol, (ENUM_DAY_OF_WEEK)d, 0, f, t))
+               return false;   // ada jadwal di hari lain: hari ini tutup
+         return true;
+        }
+      return SessionContains(fromSec, toSec, dt.hour * 3600 + dt.min * 60 + dt.sec);
+     }
+
+   // Pasar tutup: jeda setelah 10018 atau di luar jadwal sesi. Request tidak dikirim (bug: kiriman tiap tick saat tutup).
+   bool MarketBlocked(const string op, string &why)
+     {
+      if(TimeCurrent() < m_closedUntil)
+         why = op + ": pasar tutup, ditahan sampai " + TimeToString(m_closedUntil, TIME_DATE | TIME_SECONDS);
+      else if(!TradeSessionOpenNow())
+         why = op + ": di luar sesi trading " + m_symbol;
+      else
+         return false;
+      LogThrottled(SDB_LOG_WARN, "exec-market-closed", SDB_LOG_THROTTLE_DEFAULT_SEC, "Execution", why);
+      return true;
+     }
+
+   void NoteMarketClosed() { m_closedUntil = TimeCurrent() + SDB_MARKET_CLOSED_BACKOFF_SEC; }
 
    // Dinaikkan dan di-flush sebelum kiriman pertama, agar restart tidak mengulang ID (Req 5.3, EC-14).
    string NextRequestId()
@@ -270,6 +314,7 @@ private:
          // Pasar tutup (temuan backtest dasar spec 13): manajer posisi mencoba lagi di tick berikutnya, tidak dihitung gagal.
          LogThrottled(SDB_LOG_WARN, "exec-market-closed", SDB_LOG_THROTTLE_DEFAULT_SEC, "Execution",
                       why + " | pasar tutup, ditunda pos=" + IntegerToString((long)positionId));
+         NoteMarketClosed();
          out = SDB_EXEC_SKIPPED;
          return true;
         }
@@ -293,6 +338,9 @@ private:
         {
          if(!PositionSelectByTicket(ticket))
             return true;
+         string blocked;
+         if(MarketBlocked("close all", blocked))
+            return false;
          m_sendCount++;
          m_trade.PositionClose(ticket);
          uint rc = m_trade.ResultRetcode();
@@ -301,6 +349,7 @@ private:
             return true;
          if(step == SDB_STEP_DEFER)
            {
+            NoteMarketClosed();
             LogWarn("Execution", StringFormat("close all: posisi %I64u ditunda, pasar tutup | retcode=%u", ticket, rc));
             return false;
            }
@@ -316,7 +365,7 @@ private:
      }
 
 public:
-                     CExecutor(void) : m_magic(0), m_acc(NULL), m_state(NULL), m_sink(NULL), m_sendCount(0), m_memCounter(0), m_forceRc(0) {}
+                     CExecutor(void) : m_magic(0), m_acc(NULL), m_state(NULL), m_sink(NULL), m_sendCount(0), m_memCounter(0), m_forceRc(0), m_closedUntil(0), m_sessionOverride(-1) {}
 
    bool Init(const long magic, const string symbol, CAccount *acc, CState *state, ISdbEventSink *sink, const string eaVersion)
      {
@@ -342,6 +391,8 @@ public:
       res.riskMoney = SDB_NULL_DOUBLE;
       string why;
       if(m_acc == NULL || !m_acc.CanTrade(why))
+         return Reject(res, SDB_REJECT_STAGE_NOT_TRADABLE, why);
+      if(MarketBlocked("order", why))
          return Reject(res, SDB_REJECT_STAGE_NOT_TRADABLE, why);
       int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
       double sl = NormalizeDouble(req.sl, digits);
@@ -375,6 +426,7 @@ public:
          string desc = StringFormat("retcode=%u %s", res.retcode, m_trade.ResultRetcodeDescription());
          if(step == SDB_STEP_DEFER)
            {
+            NoteMarketClosed();
             return Reject(res, SDB_REJECT_STAGE_NOT_TRADABLE, "pasar tutup: " + desc);
            }
          if(step == SDB_STEP_RETRY)
@@ -414,6 +466,8 @@ public:
             LogDebug("Execution", "modify SL dilewati | " + why);
             return SDB_EXEC_SKIPPED;
            }
+         if(MarketBlocked("modify SL", why))
+            return SDB_EXEC_SKIPPED;
          m_sendCount++;
          if(m_forceRc == 0)
             m_trade.PositionModify(positionId, target, PositionGetDouble(POSITION_TP));
@@ -443,6 +497,8 @@ public:
             LogWarn("Execution", "tutup sebagian ditolak | " + why);
             return SDB_EXEC_SKIPPED;
            }
+         if(MarketBlocked("tutup sebagian", why))
+            return SDB_EXEC_SKIPPED;
          m_sendCount++;
          if(m_forceRc == 0)
             m_trade.PositionClosePartial(positionId, volume);
@@ -460,6 +516,8 @@ public:
         {
          if(!SelectOwn(positionId))
             return (attempt > 1) ? SDB_EXEC_OK : SDB_EXEC_GONE;
+         if(MarketBlocked("tutup posisi", why))
+            return SDB_EXEC_SKIPPED;
          m_sendCount++;
          m_trade.PositionClose(positionId);
          ENUM_SDB_EXEC out;
@@ -483,6 +541,8 @@ public:
 
    //--- Hook uji: penolakan broker tidak bisa dipicu di tester (stops level 0); modify/close tidak dikirim.
    void SetForceRetcodeForTest(const uint rc) { m_forceRc = rc; }
+   void SetMarketClosedUntilForTest(const datetime t) { m_closedUntil = t; }
+   void SetSessionOverrideForTest(const int v) { m_sessionOverride = v; }   // -1 jadwal broker, 0 tutup, 1 buka
 
 
    // Margin level (%) setelah order ini, dari OrderCheck (spec 05 Req 2.6). 0 = tidak diketahui.

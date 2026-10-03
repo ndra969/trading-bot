@@ -51,6 +51,7 @@
 #define SDB_CAS_RETRY                    5
 #define SDB_RISK_EPS                     1e-9    // toleransi perbandingan persen risiko
 #define SDB_LOT_FIT_STEPS                5       // maks langkah turun lot agar rugi pembulatan broker <= risiko
+#define SDB_MARKET_CLOSED_BACKOFF_SEC    60      // setelah retcode 10018, request simbol ditahan sekian detik
 // Batas posisi per kategori aset (PC-10), default dari config/active_symbols.yaml bot Python.
 #define SDB_DEF_MAX_POS_FOREX_MAJOR      5
 #define SDB_DEF_MAX_POS_FOREX_CROSS      3

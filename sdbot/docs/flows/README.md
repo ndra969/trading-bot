@@ -1,4 +1,4 @@
-# Alur SDBot EA (v1.12)
+# Alur SDBot EA (v1.13)
 
 Diagram Mermaid alur utama EA, mengikuti kode di `ea/src/Include/SDBot/App/SdbApp.mqh` dan modul yang dipanggilnya. Diperbarui setiap spec yang mengubah alur (RULES §Definition of done).
 

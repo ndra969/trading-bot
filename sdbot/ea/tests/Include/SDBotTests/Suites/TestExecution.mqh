@@ -94,6 +94,17 @@ void RunTestExecutionBroker()
    // TC-EX-33 (temuan backtest dasar spec 13): pasar tutup bukan kegagalan; ditunda ke tick berikutnya tanpa retry beruntun.
    AssertTrue("TC-EX-33", "MARKET_CLOSED attempt 1 dan 4 -> DEFER",
               NextStep(SDB_RC_MARKET_CLOSED, 1, false) == SDB_STEP_DEFER && NextStep(SDB_RC_MARKET_CLOSED, 4, false) == SDB_STEP_DEFER);
+   // TC-EX-34: jam sesi trading simbol (detik sejak 00:00 server); batas akhir eksklusif; to <= from = lewat tengah malam.
+   int f1[] = {0, 79500};          // 00:00-21:00 dan 22:05-24:00 (jeda harian emas)
+   int t1[] = {75600, 86400};
+   int f2[] = {79200};             // 22:00-02:00
+   int t2[] = {7200};
+   int none[];
+   bool gold = SessionContains(f1, t1, 75540) && !SessionContains(f1, t1, 75600) && !SessionContains(f1, t1, 77400) &&
+               SessionContains(f1, t1, 79500) && SessionContains(f1, t1, 86399) && SessionContains(f1, t1, 0);
+   bool wrap = SessionContains(f2, t2, 3600) && SessionContains(f2, t2, 82800) && !SessionContains(f2, t2, 43200);
+   AssertTrue("TC-EX-34", "sesi 00:00-21:00 + 22:05-24:00: 20:59 buka, 21:00 dan 21:30 tutup, 22:05 buka; 22:00-02:00 lewat tengah malam; tanpa sesi tutup",
+              gold && wrap && !SessionContains(none, none, 3600));
   }
 
 void RunTestExecutionComment()

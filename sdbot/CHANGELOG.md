@@ -4,6 +4,17 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.13 — 2026-10-03 — perbaikan: request saat pasar tutup
+
+- Bug: setelah perbaikan 1.12, modify SL / partial yang ditolak "market closed" (retcode 10018) dikirim ulang setiap tick selama pasar tutup. Di live ini bisa membanjiri broker dengan request.
+- Perbaikan di `CExecutor`, berlaku untuk open, modify, partial, close, dan close all:
+  - request tidak dikirim di luar jadwal sesi trading simbol (`SymbolInfoSessionTrade`; broker tanpa jadwal sama sekali dianggap selalu buka);
+  - setelah retcode 10018, semua request simbol ditahan 60 detik (`SDB_MARKET_CLOSED_BACKOFF_SEC`).
+- Modify dan partial yang tertahan mengembalikan `SKIPPED` (dicoba lagi tanpa dihitung gagal). Order ditolak `NOT_TRADABLE`. Peringatan dicetak WARN dengan throttle.
+- Uji: TC-EX-34 (jam sesi, termasuk jeda harian emas dan sesi lewat tengah malam), TC-PS-06 (satu kiriman lalu tertahan; sesi tutup = 0 kiriman); TC-PS-05 disesuaikan (partial sesudah 10018 tidak dikirim).
+
+Regresi (2026-10-03): build 0 error / 0 warning; unit 564/564; 21 skenario PASS (SC-00..SC-14x). Backtest dasar ulang GBPUSDc, NZDUSDc, XAUUSDc (tiga simbol yang sebelumnya kena 10018): 0 log ERROR/CRITICAL, jumlah trade sama (28/31/31).
+
 ### 1.12 — 2026-10-03 — spec 13 sinyal dan entry (Fase 3 selesai)
 
 - EA utama **membuka posisi sendiri**. `CSignalEngine` menilai setiap bar M15 tertutup sekali (penanda bar di Global Variable, bar basi dilewati). Kandidat = bar yang menyentuh zona H1 valid searah bias H4. Kandidat dinilai berurutan: pre-filter risiko → posisi instance terbuka (`POSITION_OPEN`) → trigger PA → skor ≥ 65% dari 55 (zona 30/15, tren 15/7/0, PA 10/7/3) → SL/TP. Bila lolos: lot dan pre-trade check Fase 1 → `OpenMarket` dengan `signal_id` → zona Used.

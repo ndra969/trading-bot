@@ -40,7 +40,7 @@ void RunTestPositionAlertOnFail(CTrkRig &r)
   }
 
 // TC-PS-05 (temuan backtest dasar spec 13): retcode MARKET_CLOSED -> SKIPPED (dicoba tick berikutnya tanpa dihitung gagal),
-// satu kiriman, tanpa alert walau alertOnFail, tanpa log ERROR.
+// tanpa alert walau alertOnFail, tanpa log ERROR. Partial sesudahnya ditahan jeda pasar tutup: tidak dikirim (TC-PS-06).
 void RunTestPositionMarketClosed(CTrkRig &r)
   {
    OrderRequest rq = TrkRequest(_Symbol, true, 300, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN) * 2);
@@ -66,9 +66,52 @@ void RunTestPositionMarketClosed(CTrkRig &r)
          errors++;
    int alerts = r.sink.CountAlert();
    r.exe.CloseAllSdbot();
+   r.exe.SetMarketClosedUntilForTest(0);
    AssertTrue("TC-PS-05", StringFormat("MARKET_CLOSED: modify %s, partial %s, kiriman %I64d, alert %d, log ERROR %d",
                                        EnumToString(m), EnumToString(p), sent, alerts, errors),
-              m == SDB_EXEC_SKIPPED && p == SDB_EXEC_SKIPPED && sent == 2 && alerts == 0 && errors == 0);
+              m == SDB_EXEC_SKIPPED && p == SDB_EXEC_SKIPPED && sent == 1 && alerts == 0 && errors == 0);
+  }
+
+// TC-PS-06 (bug: modify yang ditunda dikirim ulang tiap tick selama pasar tutup): setelah 10018 semua request simbol
+// ditahan SDB_MARKET_CLOSED_BACKOFF_SEC; di luar sesi trading simbol tidak ada request sama sekali.
+void RunTestPositionMarketBackoff(CTrkRig &r)
+  {
+   OrderRequest rq = TrkRequest(_Symbol, true, 300, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN) * 2);
+   OrderResult ro;
+   if(!r.exe.OpenMarket(rq, ro))
+     {
+      AssertTrue("TC-PS-06", "posisi uji terbuka | " + ro.rejectStage + " " + ro.detail, false);
+      return;
+     }
+   string why;
+   double better = rq.sl + 50 * SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   long s0 = r.exe.SendCount();
+   r.exe.SetForceRetcodeForTest(TRADE_RETCODE_MARKET_CLOSED);
+   ENUM_SDB_EXEC m1 = r.exe.ModifySl((ulong)ro.positionId, better, why, false);
+   ENUM_SDB_EXEC m2 = r.exe.ModifySl((ulong)ro.positionId, better, why, false);
+   ENUM_SDB_EXEC m3 = r.exe.ModifySl((ulong)ro.positionId, better, why, false);
+   OrderResult rb;
+   bool openBlocked = !r.exe.OpenMarket(rq, rb) && rb.rejectStage == SDB_REJECT_STAGE_NOT_TRADABLE;
+   long backoffSends = r.exe.SendCount() - s0;
+   r.exe.SetForceRetcodeForTest(0);
+   r.exe.SetMarketClosedUntilForTest(0);
+   r.exe.SetSessionOverrideForTest(0);   // jadwal sesi simbol: tutup
+   long s1 = r.exe.SendCount();
+   ENUM_SDB_EXEC c1 = r.exe.ModifySl((ulong)ro.positionId, better, why, false);
+   ENUM_SDB_EXEC c2 = r.exe.ClosePartial((ulong)ro.positionId, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN), why, false);
+   OrderResult rc;
+   bool openClosed = !r.exe.OpenMarket(rq, rc) && rc.rejectStage == SDB_REJECT_STAGE_NOT_TRADABLE;
+   long sessionSends = r.exe.SendCount() - s1;
+   r.exe.SetSessionOverrideForTest(-1);
+   long s2 = r.exe.SendCount();
+   ENUM_SDB_EXEC ok = r.exe.ModifySl((ulong)ro.positionId, better, why, false);
+   long openSends = r.exe.SendCount() - s2;
+   r.exe.CloseAllSdbot();
+   AssertTrue("TC-PS-06", StringFormat("10018: %s/%s/%s, kiriman %I64d (harus 1), order %s; sesi tutup: %s/%s, kiriman %I64d (harus 0); "
+                                       "sesi buka lagi: %s, kiriman %I64d", EnumToString(m1), EnumToString(m2), EnumToString(m3), backoffSends,
+                                       openBlocked ? "ditolak" : "lolos", EnumToString(c1), EnumToString(c2), sessionSends, EnumToString(ok), openSends),
+              m1 == SDB_EXEC_SKIPPED && m2 == SDB_EXEC_SKIPPED && m3 == SDB_EXEC_SKIPPED && backoffSends == 1 && openBlocked &&
+              c1 == SDB_EXEC_SKIPPED && c2 == SDB_EXEC_SKIPPED && openClosed && sessionSends == 0 && ok == SDB_EXEC_OK && openSends == 1);
   }
 
 // TC-PS-01 (Req 1.1, 1.2, EC-08): SL awal dari komentar; tanpa komentar dari ORDER_SL order pembuka.
@@ -197,6 +240,7 @@ void RunTestPosition()
      {
       RunTestPositionAlertOnFail(r);
       RunTestPositionMarketClosed(r);
+      RunTestPositionMarketBackoff(r);
       RunTestPositionCache(r);
       RunTestPositionOwnership(r);
       RunTestPositionOnce(r);
