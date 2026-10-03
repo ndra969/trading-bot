@@ -4,6 +4,24 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.12 — 2026-10-03 — spec 13 sinyal dan entry (Fase 3 selesai)
+
+- EA utama **membuka posisi sendiri**. `CSignalEngine` menilai setiap bar M15 tertutup sekali (penanda bar di Global Variable, bar basi dilewati). Kandidat = bar yang menyentuh zona H1 valid searah bias H4. Kandidat dinilai berurutan: pre-filter risiko → posisi instance terbuka (`POSITION_OPEN`) → trigger PA → skor ≥ 65% dari 55 (zona 30/15, tren 15/7/0, PA 10/7/3) → SL/TP. Bila lolos: lot dan pre-trade check Fase 1 → `OpenMarket` dengan `signal_id` → zona Used.
+- SL = batas jauh zona ∓ 0,1 × ATR(14) H1 (SELL ditambah spread). Jarak SL wajib ≥ max(stops + spread, 0,3 ATR) dan ≤ 3 ATR. TP = zona lawan terdekat, atau 2R bila tidak ada; R:R ≥ 2.
+- Telemetri: satu baris `signals` per kandidat + 3 baris `signal_scores`. ID sinyal dari SHA-256 (login, run_key, magic, bar), sehingga `trades.signal_id` terisi sebelum order dan restart tidak membuat baris ganda. Bar bukan kandidat diringkas di log harian.
+- Input `InpMinConfluenceScore`, `InpMinRR`, `InpSlBufferAtr`, `InpMinSlAtr`, `InpMaxSlAtr`; preset diperbarui. Enum `POSITION_OPEN`, `SL_TOO_FAR`, `score_component`, `tp_source`. Keputusan PC-19 (mengoreksi kriteria backtest dasar PC-15).
+- Alat: 6 query kalibrasi, `run-ea-tests.ps1 -Baseline` + `baseline_report.py`, skenario SC-14 / SC-14x.
+- Perbaikan Fase 1 yang ditemukan uji:
+  - `CalcVolume` kini menurunkan lot per step bila rugi `OrderCalcProfit` lot akhir (dibulatkan ke sen) melewati batas risiko. Sebelumnya order sinyal yang sah bisa ditolak `RISK_PER_TRADE` (TC-RK-14).
+  - Retcode 10018 "market closed" tidak lagi dianggap gagal permanen. Modify/partial ditunda ke tick berikutnya tanpa ERROR dan tanpa dihitung gagal; order ditolak `NOT_TRADABLE` tanpa alert (TC-EX-33, TC-PS-05).
+
+Backtest dasar (`-Baseline`, 12 simbol, 2025.10.01–2026.10.01, OHLC M1): **LOLOS**.
+- 351 trade (18–43 per simbol), 13.742 kandidat.
+- Tanpa log ERROR/CRITICAL; semua trade punya `signal_id` dan skor lengkap.
+- Expectancy +0,024R per trade (5 simbol positif). Profit dinilai di Fase 5–6.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-03): build 0 error / 0 warning (4 target); unit 562/562 di 37 suite; 21 skenario PASS (SC-00..SC-14x). pytest `sdbot/tools` 82/82, `schema.py check` OK (data versi 3).
+
 ### 1.11 — 2026-10-03 — spec 12 trigger price action
 
 - `PatternRules` (fungsi murni): enam pola candle terarah relatif ATR(14) LTF dan rentang bar, diperiksa dalam urutan bintang pagi/sore, engulfing kuat, pin bar, engulfing, tweezer, outside bar; pola pertama yang cocok menang. Pola netral (inside bar, doji, harami) tidak pernah menjadi trigger (python-bot-lessons §1). Skor kekuatan PA 10/7/3/0.

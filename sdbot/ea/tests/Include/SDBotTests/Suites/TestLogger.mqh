@@ -340,6 +340,58 @@ void RunTestLoggerNotify()
    lg.Close();
   }
 
+SignalRecord TlSignal(const long id, const string status, const string stage)
+  {
+   SignalRecord s;
+   s.id = id;
+   s.magic = SDB_MAGIC_HARNESS;
+   s.symbol = "EURUSDc";
+   s.time = TL_SERVER_T;
+   s.direction = SDB_DIRECTION_BUY;
+   s.style = SDB_TRADING_STYLE_DAY;
+   s.zoneRef = "H1-1790000000-D";
+   s.scoreTotal = 37;
+   s.spreadPoints = 12;
+   s.status = status;
+   s.rejectStage = stage;
+   s.rejectDetail = stage == "" ? "" : "pola=NONE";
+   s.contextJson = "{\"pa\":\"NONE\"}";
+   s.scoreZone = 30;
+   s.scoreTrend = 7;
+   s.scorePa = 0;
+   return s;
+  }
+
+// TC-SG-24 (spec 13 Req 3.2, 6.1, EC-01): baris signals dengan id eksplisit + 3 skor, idempoten.
+void RunTestLoggerSignal()
+  {
+   TlDeleteFiles();
+   CLogger lg;
+   lg.Init(NULL, "EURUSDc", SDB_MAGIC_HARNESS, "1.12");
+   lg.SetUtcOffsetForTest(TL_OFFSET);
+   lg.Open(SDB_DB_UNITTEST);
+   lg.BeginSession(TlSession("{}"));
+   lg.OnSignal(TlSignal(4242424242, SDB_SIGNAL_STATUS_REJECTED, SDB_REJECT_STAGE_NO_PA_TRIGGER));
+   lg.OnSignal(TlSignal(4242424243, SDB_SIGNAL_STATUS_ACCEPTED, ""));
+   lg.Flush();
+   lg.OnSignal(TlSignal(4242424242, SDB_SIGNAL_STATUS_REJECTED, SDB_REJECT_STAGE_NO_PA_TRIGGER));
+   bool again = lg.Flush();
+   long utc = (long)TL_SERVER_T - TL_OFFSET;
+   AssertTrue("TC-SG-24", "signals id eksplisit + 3 skor; kirim ulang tidak menambah baris; reject_stage kosong = NULL",
+              again && TlCount("signals") == 2 && TlCount("signal_scores") == 6 &&
+              TlInt("SELECT time FROM signals WHERE id=4242424242") == utc &&
+              TlText("SELECT reject_stage FROM signals WHERE id=4242424242") == SDB_REJECT_STAGE_NO_PA_TRIGGER &&
+              TlCount("signals", "id=4242424243 AND reject_stage IS NULL AND reject_detail IS NULL AND status='ACCEPTED'") == 1 &&
+              TlCount("signal_scores", "signal_id=4242424242 AND component='ZONE' AND score=30 AND max_score=30") == 1 &&
+              TlCount("signal_scores", "signal_id=4242424242 AND component='TREND' AND score=7 AND max_score=15") == 1 &&
+              TlCount("signal_scores", "signal_id=4242424242 AND component='PA' AND score=0 AND max_score=10") == 1 &&
+              TlInt("SELECT session_id FROM signals WHERE id=4242424243") > 0 &&
+              TlText("SELECT zone_ref || '|' || score_total || '|' || spread_points || '|' || context_json FROM signals WHERE id=4242424243") ==
+              "H1-1790000000-D|37.0|12|{\"pa\":\"NONE\"}");
+   lg.EndSession(REASON_PROGRAM);
+   lg.Close();
+  }
+
 // TC-LG-34 (spec 09 Req 7.1): akhir sesi sebelumnya untuk pesan start.
 void RunTestLoggerPreviousSession()
   {
@@ -588,6 +640,7 @@ void RunTestLogger()
 
    RunTestLoggerNotify();
    RunTestLoggerPreviousSession();
+   RunTestLoggerSignal();
    TlDeleteFiles();
    SdbLogCaptureStop();
    TfEndSuite();

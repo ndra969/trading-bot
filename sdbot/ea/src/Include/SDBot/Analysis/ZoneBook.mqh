@@ -26,6 +26,7 @@ private:
    string            m_used[];
    bool              m_dirty;          // penanda Used berubah: bangun ulang walau tidak ada bar baru
    bool              m_ready;
+   double            m_lastAtr;        // ATR(14) MTF bar tertutup terakhir (SL sinyal, spec 13)
 
    bool StateReady() const { return m_state != NULL && m_state.IsReady(); }
 
@@ -96,6 +97,8 @@ private:
         }
       CleanupUsed(r);
       BuildZones(r, m_params, m_tf, m_used, m_zones);
+      double atr[];
+      m_lastAtr = AtrSeries(r, SDB_ZONE_ATR_PERIOD, atr) ? atr[ArraySize(atr) - 1] : 0.0;
       m_ready = true;
       m_dirty = false;
       LogDebug("Zones", StringFormat("peta %s | fresh=%d tested=%d lemah=%d invalid=%d kedaluwarsa=%d used=%d", EnumToString(m_tf),
@@ -105,7 +108,7 @@ private:
      }
 
 public:
-                     CZoneBook(void) : m_tf(PERIOD_CURRENT), m_magic(0), m_state(NULL), m_dirty(false), m_ready(false) {}
+                     CZoneBook(void) : m_tf(PERIOD_CURRENT), m_magic(0), m_state(NULL), m_dirty(false), m_ready(false), m_lastAtr(0.0) {}
 
    void Init(const string symbol, const ENUM_TIMEFRAMES mtf, const SdbZoneParams &p, const long magic)
      {
@@ -146,7 +149,8 @@ public:
       return Rebuild();
      }
 
-   bool Ready() const { return m_ready; }
+   bool Ready() const { return m_ready && m_lastAtr > 0.0; }
+   double LastAtr() const { return m_lastAtr; }
    datetime LastBarTime() const { return m_cache.LastClosedTime(); }
    ENUM_TIMEFRAMES Timeframe() const { return m_tf; }
    void Params(SdbZoneParams &out) const { out = m_params; }

@@ -37,6 +37,8 @@
 #include <SDBotTests/Suites/TestZoneBook.mqh>
 #include <SDBotTests/Suites/TestPatterns.mqh>
 #include <SDBotTests/Suites/TestPaTrigger.mqh>
+#include <SDBotTests/Suites/TestSignalRules.mqh>
+#include <SDBotTests/Suites/TestSignalEngine.mqh>
 
 void RunAllSuites()
   {
@@ -71,6 +73,8 @@ void RunAllSuites()
    RunTestZoneBook();
    RunTestPatterns();
    RunTestPaTrigger();
+   RunTestSignalRules();
+   RunTestSignalEngine();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

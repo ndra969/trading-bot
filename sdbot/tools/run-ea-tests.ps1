@@ -19,6 +19,12 @@
     Jalankan satu atau beberapa skenario, misalnya -Scenario SC-00,SC-06.
 .PARAMETER All
     Unit test lalu semua skenario di ea\tests\scenarios.
+.PARAMETER Baseline
+    Backtest dasar Fase 3 (spec 13 Req 8): EA utama SDBot dengan preset tiap simbol, file
+    ea\tests\baseline\BL-<SIMBOL>.ini, lalu tools\baseline_report.py menilai kriteria PC-19
+    (total >= 300 trade, >= 15 per simbol, signal_id dan skor lengkap, tanpa log ERROR/CRITICAL).
+.PARAMETER Symbols
+    Batasi -Baseline ke simbol tertentu, misalnya -Symbols EURUSDc,XAUUSDc (kriteria jumlah tetap sama).
 .PARAMETER SkipBuild
     Lewati compile.
 .PARAMETER TimeoutSec
@@ -30,6 +36,8 @@ param(
     [switch]$Unit,
     [string[]]$Scenario = @(),
     [switch]$All,
+    [switch]$Baseline,
+    [string[]]$Symbols = @(),
     [switch]$SkipBuild,
     [int]$TimeoutSec = 0,
     [string]$Config = ''
@@ -75,6 +83,23 @@ function Get-AgentLogTail([int]$count) {
     if ($null -eq $log) { return @('(jurnal tester tidak ditemukan)') }
     return @(Get-Content -LiteralPath $log.FullName -Encoding Unicode -Tail $count | ForEach-Object {
             $c = $_ -split "`t"; if ($c.Count -ge 5) { "{0} {1}: {2}" -f $c[2], $c[3], ($c[4..($c.Count - 1)] -join ' ') } else { $_ } })
+}
+
+function Get-SdbErrorLines([datetime]$since) {
+    # Baris log EA [SDB][ERROR]/[SDB][CRITICAL] di jurnal tester sejak run dimulai (backtest dasar, spec 13 Req 8.2).
+    $log = Get-ChildItem -Path (Join-Path $script:cfg.TestDataDir 'Tester\logs') -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime | Select-Object -Last 1
+    if ($null -eq $log) { return @() }
+    $from = $since.TimeOfDay.Subtract([TimeSpan]::FromSeconds(1))
+    $out = @()
+    foreach ($line in (Get-Content -LiteralPath $log.FullName -Encoding Unicode)) {
+        if ($line -notmatch '\[SDB\]\[(ERROR|CRITICAL)\]') { continue }
+        $cols = $line -split "`t"
+        $t = [TimeSpan]::Zero
+        if ($cols.Count -ge 5 -and [TimeSpan]::TryParse($cols[2], [ref]$t) -and $t -lt $from) { continue }
+        $out += $(if ($cols.Count -ge 5) { $cols[4..($cols.Count - 1)] -join ' ' } else { $line })
+    }
+    return $out
 }
 
 function New-RunId([string]$prefix) {
@@ -162,7 +187,14 @@ function Invoke-TesterRun($r) {
         ToDate   = (Get-Date).ToString('yyyy.MM.dd')
     }
     $setLines = @()
-    if ($r.Kind -eq 'scenario') {
+    if ($r.Kind -eq 'baseline') {
+        # EA utama dengan preset simbol apa adanya (tanpa InpTestRunId: EA utama tidak punya input itu).
+        $tester['Expert'] = 'SDBot\SDBot.ex5'
+        $sc = Read-ScenarioIni $r.Ini
+        foreach ($k in $sc.Keys) { $tester[$k] = $sc[$k] }
+        $setLines = @(Get-Content -LiteralPath $r.Set -Encoding ASCII | Where-Object { $_ -notmatch '^\s*;' })
+    }
+    elseif ($r.Kind -eq 'scenario') {
         $tester['Expert'] = 'SDBotTests\SDBotHarness.ex5'
         $sc = Read-ScenarioIni $r.Ini
         foreach ($k in $sc.Keys) { $tester[$k] = $sc[$k] }
@@ -180,7 +212,7 @@ function Invoke-TesterRun($r) {
     }
     $tester['ExpertParameters'] = "$runId.set"
     $tester['ShutdownTerminal'] = '1'
-    $setLines += "InpTestRunId=$runId"
+    if ($r.Kind -ne 'baseline') { $setLines += "InpTestRunId=$runId" }
     Set-Content -LiteralPath $setPath -Value $setLines -Encoding Unicode
 
     # [Experts] Enabled=0: EA di chart terminal uji (jika ada) tidak ikut jalan selama run.
@@ -228,6 +260,13 @@ function Invoke-TesterRun($r) {
         Remove-Item -LiteralPath $resultFile -Force -ErrorAction SilentlyContinue
         return Test-OptimizationRun $r $reportBase $dbPath $dbBefore $secs
     }
+    if ($r.Kind -eq 'baseline') {
+        # Tidak ada file hasil: penilaian lewat baseline_report.py setelah semua simbol selesai.
+        $errs = @(Get-SdbErrorLines $start)
+        if ($errs.Count -gt 0) { Add-Content -LiteralPath $script:baselineErrors -Value ($errs | ForEach-Object { "$($r.Id): $_" }) -Encoding UTF8 }
+        Write-Run ("selesai {0} ({1} detik, {2} baris log ERROR/CRITICAL)" -f $r.Id, $secs, $errs.Count)
+        return 0
+    }
     if (-not (Test-Path -LiteralPath $resultFile)) {
         Write-Run "GAGAL $($r.Id): file hasil tidak dibuat ($secs detik). Dari log terminal:"
         Get-TerminalLogReasons $start | ForEach-Object { Write-Host "    $_" }
@@ -269,6 +308,7 @@ function Invoke-Main {
             Where-Object { $_.Extension -in @('.mq5', '.mqh') } | Sort-Object LastWriteTime | Select-Object -Last 1
         $experts = @('tests\Experts\SDBotTests\RunUnitTestsEA.ex5')
         if ($script:runs | Where-Object { $_.Kind -eq 'scenario' }) { $experts += 'tests\Experts\SDBotTests\SDBotHarness.ex5' }
+        if ($script:runs | Where-Object { $_.Kind -eq 'baseline' }) { $experts += 'src\Experts\SDBot\SDBot.ex5' }
         foreach ($e in $experts) {
             $ex5 = Join-Path $script:repoEa $e
             if (-not (Test-Path -LiteralPath $ex5)) { Write-Run "'$e' belum di-build; jalankan tanpa -SkipBuild."; return 2 }
@@ -289,9 +329,23 @@ function Invoke-Main {
     }
     $summary = @()
     $allStart = Get-Date
+    $dbFile = Join-Path $script:cfg.CommonFilesDir 'sdbot_tester.sqlite'
+    $hasBaseline = [bool]($script:runs | Where-Object { $_.Kind -eq 'baseline' })
+    $marker = 0
+    if ($hasBaseline) {
+        $script:baselineErrors = Join-Path $script:tmp 'baseline-errors.txt'
+        Set-Content -LiteralPath $script:baselineErrors -Value @() -Encoding UTF8
+        if (Test-Path -LiteralPath $dbFile) { $marker = [int](& uv run --project $script:repoRoot python $script:reportPy --db $dbFile --max-session) }
+    }
     foreach ($r in $script:runs) {
         $code = Invoke-TesterRun $r
         $summary += [pscustomobject]@{ Run = $r.Id; Code = $code }
+    }
+    if ($hasBaseline -and -not ($summary | Where-Object { $_.Code -ne 0 })) {
+        Write-Host ''
+        Write-Run "laporan backtest dasar (sesi > $marker):"
+        & uv run --project $script:repoRoot python $script:reportPy --db $dbFile --after-session $marker --errors $script:baselineErrors | ForEach-Object { Write-Host $_ }
+        $summary += [pscustomobject]@{ Run = 'baseline-report'; Code = $(if ($LASTEXITCODE -eq 0) { 0 } else { 1 }) }
     }
     Write-Host ''
     Write-Run ("durasi total {0:mm\:ss} untuk {1} run" -f ((Get-Date) - $allStart), $summary.Count)
@@ -315,8 +369,10 @@ $script:testerProfiles = Join-Path $script:cfg.TestDataDir 'MQL5\Profiles\Tester
 $script:terminalDir = Split-Path -Parent $script:cfg.TestTerminal
 $script:repoEa = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\ea'))
 $repoEa = $script:repoEa
+$script:repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$script:reportPy = Join-Path $PSScriptRoot 'baseline_report.py'
 
-if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All) { $Unit = $true }
+if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All -and -not $Baseline) { $Unit = $true }
 $script:runs = @()
 if ($Unit -or $All) { $script:runs += [pscustomobject]@{ Kind = 'unit'; Id = 'unit'; Ini = $null; Set = $null } }
 $scenarioDir = Join-Path $repoEa 'tests\scenarios'
@@ -331,6 +387,17 @@ foreach ($id in $wanted) {
     if ($null -eq $ini) { Write-Run "skenario '$id' tidak ditemukan di $scenarioDir"; exit 2 }
     $set = [IO.Path]::ChangeExtension($ini.FullName, '.set')
     $script:runs += [pscustomobject]@{ Kind = 'scenario'; Id = $id; Ini = $ini.FullName; Set = $(if (Test-Path -LiteralPath $set) { $set } else { $null }) }
+}
+
+if ($Baseline) {
+    $want = @($Symbols | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+    foreach ($ini in (Get-ChildItem -LiteralPath (Join-Path $repoEa 'tests\baseline') -Filter 'BL-*.ini' -File | Sort-Object Name)) {
+        $sym = $ini.BaseName.Substring(3)
+        if ($want.Count -gt 0 -and $want -notcontains $sym) { continue }
+        $preset = Join-Path $repoEa "src\Presets\SDBot_DAY_$sym.set"
+        if (-not (Test-Path -LiteralPath $preset)) { Write-Run "preset $preset tidak ada"; exit 2 }
+        $script:runs += [pscustomobject]@{ Kind = 'baseline'; Id = "BL-$sym"; Ini = $ini.FullName; Set = $preset }
+    }
 }
 
 # ------------------------------------------------------------------ kunci + jalankan

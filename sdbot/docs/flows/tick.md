@@ -1,4 +1,4 @@
-# OnTick: analisis struktur dan manajemen posisi
+# OnTick: analisis, sinyal, dan manajemen posisi
 
 ```mermaid
 flowchart TB
@@ -7,7 +7,8 @@ flowchart TB
     ZN --> PA[CPaTrigger.OnTick: pola bar LTF tertutup untuk BUY dan SELL bila bar baru; lihat pa-trigger.md]
     PA --> G{akun PASSED, status siap, CanTrade?}
     G -->|tidak| Z([selesai])
-    G -->|ya| M[baca pasar sekali: bid/ask, spread, stops, ATR bar tutup]
+    G -->|ya| SG[CSignalEngine.OnTick bila status risiko siap: kandidat, skor, entry; lihat signals.md]
+    SG --> M[baca pasar sekali: bid/ask, spread, stops, ATR bar tutup]
     M --> L[tiket posisi magic + simbol dikumpulkan dulu]
     L --> C[cache: SL awal komentar -> ORDER_SL -> DB, volume awal, risiko, komisi]
     C --> S0{SL = 0?}

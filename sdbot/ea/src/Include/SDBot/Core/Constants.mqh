@@ -50,6 +50,7 @@
 #define SDB_BALANCE_SCAN_SEC             10
 #define SDB_CAS_RETRY                    5
 #define SDB_RISK_EPS                     1e-9    // toleransi perbandingan persen risiko
+#define SDB_LOT_FIT_STEPS                5       // maks langkah turun lot agar rugi pembulatan broker <= risiko
 // Batas posisi per kategori aset (PC-10), default dari config/active_symbols.yaml bot Python.
 #define SDB_DEF_MAX_POS_FOREX_MAJOR      5
 #define SDB_DEF_MAX_POS_FOREX_CROSS      3
@@ -135,6 +136,30 @@
 #define SDB_MAX_MAX_ZONE_AGE_BARS     500
 #define SDB_ZONE_ATR_PERIOD           14
 #define SDB_GV_ZONE_USED              "ZU"     // GV "<magic>_ZU_<epoch swing>_<D|S>"
+
+//--- Sinyal dan entry (spec 13 design §3.3, PC-19); default SL dari simulasi pipeline 12 simbol 2025-10..2026-10
+#define SDB_DEF_MIN_CONFLUENCE_SCORE  65.0     // persen dari skor maksimum komponen aktif (PC-15)
+#define SDB_MIN_MIN_CONFLUENCE_SCORE  0.0
+#define SDB_MAX_MIN_CONFLUENCE_SCORE  100.0
+#define SDB_DEF_MIN_RR                2.0      // PRD MinRR
+#define SDB_MIN_MIN_RR                1.0
+#define SDB_MAX_MIN_RR                10.0
+#define SDB_DEF_SL_BUFFER_ATR         0.1      // SL di luar batas jauh zona (x ATR MTF)
+#define SDB_MIN_SL_BUFFER_ATR         0.0
+#define SDB_MAX_SL_BUFFER_ATR         1.0
+#define SDB_DEF_MIN_SL_ATR            0.3      // jarak SL minimum (x ATR MTF)
+#define SDB_MIN_MIN_SL_ATR            0.05
+#define SDB_MAX_MIN_SL_ATR            2.0
+#define SDB_DEF_MAX_SL_ATR            3.0      // jarak SL maksimum (x ATR MTF)
+#define SDB_MIN_MAX_SL_ATR            0.5
+#define SDB_MAX_MAX_SL_ATR            10.0
+#define SDB_SCORE_MAX_ACTIVE          55       // Fase 3: zona 30 + tren 15 + PA 10
+#define SDB_SCORE_MAX_ZONE            30
+#define SDB_SCORE_MAX_TREND           15
+#define SDB_SCORE_MAX_PA              10
+#define SDB_SIGNAL_STALE_BARS         2        // bar LTF lebih tua dari 2 x durasi LTF tidak dinilai
+#define SDB_SIGNAL_EPS                1e-9     // x ATR: batas inklusif SL/TP
+#define SDB_GV_SIGNAL_BAR             "SIGBAR" // GV "<magic>_SIGBAR": waktu bar LTF terakhir yang dinilai
 
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol
 #define SDB_PA_STAR_FIRST_BODY_ATR    0.5      // badan bar pertama bintang > 0,5 ATR

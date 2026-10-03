@@ -22,7 +22,8 @@ string TprKnownKeys()
           "InpBreakevenBufferPoints,InpPartialR,InpPartialPct,InpTrailATRPeriod,InpTrailATRMult,"
           "InpTelegramToken,InpTelegramChatID,InpHeartbeatMinutes,"
           "InpSwingStrength,InpStructureLookback,InpEmaPeriod,InpEmaSlopeBars,"
-          "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,";
+          "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
+          "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -53,6 +54,11 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpZoneMinLegAtr")         v.zoneMinLegAtr = StringToDouble(value);
    else if(key == "InpZoneLegBars")           v.zoneLegBars = (int)StringToInteger(value);
    else if(key == "InpMaxZoneAgeBars")        v.maxZoneAgeBars = (int)StringToInteger(value);
+   else if(key == "InpMinConfluenceScore")    v.minConfluenceScore = StringToDouble(value);
+   else if(key == "InpMinRR")                 v.minRR = StringToDouble(value);
+   else if(key == "InpSlBufferAtr")           v.slBufferAtr = StringToDouble(value);
+   else if(key == "InpMinSlAtr")              v.minSlAtr = StringToDouble(value);
+   else if(key == "InpMaxSlAtr")              v.maxSlAtr = StringToDouble(value);
   }
 
 // "" = lolos; selain itu alasan gagal.

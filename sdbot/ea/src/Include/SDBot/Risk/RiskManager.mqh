@@ -22,6 +22,7 @@ private:
    InputValues       m_in;
    int               m_limits[4];     // urutan ENUM_SDB_ASSET_CLASS: major, cross, komoditas, crypto
    double            m_marginOverride; // hook uji; < 0 = pakai OrderCheck
+   double            m_balanceOverride; // hook uji; <= 0 = balance akun
 
    bool Reject(string &stage, string &detail, const string s, const string d)
      {
@@ -55,10 +56,12 @@ private:
       return AssetClassOf(SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE), SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT));
      }
 
+   double Balance() const { return (m_balanceOverride > 0.0) ? m_balanceOverride : AccountInfoDouble(ACCOUNT_BALANCE); }
+
    double EffRiskPct() { return EffectiveRiskPct(m_in.riskPerTradePct, m_rs.IsLotReduced()); }
 
 public:
-                     CRiskManager(void) : m_rs(NULL), m_exe(NULL), m_acc(NULL), m_marginOverride(-1.0) {}
+                     CRiskManager(void) : m_rs(NULL), m_exe(NULL), m_acc(NULL), m_marginOverride(-1.0), m_balanceOverride(0.0) {}
 
    bool Init(const string symbol, CRiskState *rs, CExecutor *exe, CAccount *acc, const InputValues &inputs)
      {
@@ -80,7 +83,7 @@ public:
       double lossPerLot = 0.0;
       if(!OrderLossMoney(req, 1.0, lossPerLot))
          return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "OrderCalcProfit gagal " + ErrText(GetLastError()));
-      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      double balance = Balance();
       ENUM_SDB_LOT_FLAG flag;
       double lot = CalcLotSize(balance, EffRiskPct(), lossPerLot, SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP),
                                SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN), SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MAX), flag);
@@ -92,6 +95,15 @@ public:
                        StringFormat("lot < minimum %.2f | %s", SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN), d));
       if(flag == SDB_LOT_CAPPED_MAX)
          LogWarn("Risk", StringFormat("lot dibatasi SYMBOL_VOLUME_MAX %.2f | %s", lot, d));
+      // OrderCalcProfit membulatkan uang ke digit akun, sehingga rugi lot akhir bisa sedikit di atas uang/lot x lot
+      // (temuan SC-14 spec 13, TC-RK-14). Lot diturunkan per step sampai rugi sebenarnya <= batas risiko.
+      double step = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP), vMin = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
+      double limit = balance * EffRiskPct() / 100.0, loss = 0.0;
+      for(int i = 0; i < SDB_LOT_FIT_STEPS && OrderLossMoney(req, lot, loss) && RiskPctOf(loss, balance) > EffRiskPct() + SDB_RISK_EPS; i++)
+         lot = RoundLotDown(lot - step, step);
+      if(lot < vMin - 1e-9 || !OrderLossMoney(req, lot, loss) || RiskPctOf(loss, balance) > EffRiskPct() + SDB_RISK_EPS)
+         return Reject(stage, detail, SDB_REJECT_STAGE_LOT_BELOW_MIN,
+                       StringFormat("lot minimum %.2f melebihi risiko %.2f setelah pembulatan uang | %s", vMin, limit, d));
       req.volume = lot;
       stage = "";
       detail = d;
@@ -110,14 +122,15 @@ public:
          return Reject(stage, detail, SDB_REJECT_STAGE_STOPPED, "emergency stop aktif, butuh reset manual");
       if(m_rs.IsDailyPaused())
          return Reject(stage, detail, SDB_REJECT_STAGE_DAILY_PAUSE, "batas rugi harian tercapai");
-      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      double balance = Balance();
       double loss = 0.0;
       if(!OrderLossMoney(req, req.volume, loss))
          return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "OrderCalcProfit gagal " + ErrText(GetLastError()));
       double newPct = RiskPctOf(loss, balance);
       if(newPct > EffRiskPct() + SDB_RISK_EPS)
          return Reject(stage, detail, SDB_REJECT_STAGE_RISK_PER_TRADE,
-                       StringFormat("risiko order %.3f%% > %.3f%% (vol %.2f)", newPct, EffRiskPct(), req.volume));
+                       StringFormat("risiko order %.5f%% > %.5f%% (vol %.2f, rugi %.4f, balance %.2f, sl %s)", newPct, EffRiskPct(), req.volume,
+                                    loss, balance, DoubleToString(req.sl, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS))));
       double openPct = RiskPctOf(OpenRiskMoney(), balance);
       if(openPct + newPct > m_in.maxOpenRiskPct + SDB_RISK_EPS)
          return Reject(stage, detail, SDB_REJECT_STAGE_MAX_OPEN_RISK,
@@ -141,7 +154,7 @@ public:
    double OpenRiskMoney()
      {
       double total = 0.0;
-      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+      double balance = Balance();
       for(int i = PositionsTotal() - 1; i >= 0; i--)
         {
          if(PositionGetTicket(i) == 0 || !IsSdbotMagic(PositionGetInteger(POSITION_MAGIC)))
@@ -178,6 +191,7 @@ public:
 
    //--- Hook uji: margin level rendah tidak bisa dipicu di tester tanpa melewati batas risiko lebih dulu.
    void SetMarginLevelForTest(const double v) { m_marginOverride = v; }
+   void SetBalanceForTest(const double v)     { m_balanceOverride = v; }
   };
 
 #endif // SDB_RISK_RISKMANAGER_MQH

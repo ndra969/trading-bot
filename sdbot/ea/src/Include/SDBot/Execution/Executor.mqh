@@ -265,6 +265,14 @@ private:
          return true;
         }
       why = StringFormat("%s retcode=%u %s", op, rc, (m_forceRc != 0) ? "(uji)" : m_trade.ResultRetcodeDescription());
+      if(step == SDB_STEP_DEFER)
+        {
+         // Pasar tutup (temuan backtest dasar spec 13): manajer posisi mencoba lagi di tick berikutnya, tidak dihitung gagal.
+         LogThrottled(SDB_LOG_WARN, "exec-market-closed", SDB_LOG_THROTTLE_DEFAULT_SEC, "Execution",
+                      why + " | pasar tutup, ditunda pos=" + IntegerToString((long)positionId));
+         out = SDB_EXEC_SKIPPED;
+         return true;
+        }
       if(step == SDB_STEP_RETRY)
         {
          LogWarn("Execution", why + " | ulang ke-" + IntegerToString(attempt) + " pos=" + IntegerToString((long)positionId));
@@ -291,6 +299,11 @@ private:
          ENUM_SDB_NEXT_STEP step = NextStep(ClassifyRetcode(rc), attempt, false);
          if(step == SDB_STEP_SUCCEED || step == SDB_STEP_GONE)
             return true;
+         if(step == SDB_STEP_DEFER)
+           {
+            LogWarn("Execution", StringFormat("close all: posisi %I64u ditunda, pasar tutup | retcode=%u", ticket, rc));
+            return false;
+           }
          if(step != SDB_STEP_RETRY)
            {
             LogError("Execution", StringFormat("close all: posisi %I64u gagal ditutup | retcode=%u %s",
@@ -360,6 +373,10 @@ public:
             return true;
            }
          string desc = StringFormat("retcode=%u %s", res.retcode, m_trade.ResultRetcodeDescription());
+         if(step == SDB_STEP_DEFER)
+           {
+            return Reject(res, SDB_REJECT_STAGE_NOT_TRADABLE, "pasar tutup: " + desc);
+           }
          if(step == SDB_STEP_RETRY)
            {
             LogWarn("Execution", "kirim order diulang | " + desc + " ke-" + IntegerToString(attempt) + " id=" + res.requestId);

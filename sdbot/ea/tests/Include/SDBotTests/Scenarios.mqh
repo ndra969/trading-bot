@@ -1112,6 +1112,43 @@ void CheckSc13(const string id, const CScenarioRecorder &rec)
               rec.MarkedZone() != "" && rec.RestartAt() > rec.MarkedAt() && usedAfterRestart > 0);
   }
 
+// SC-14 (spec 13 Req 5.1–5.4, 6.1, 9.2): pipeline sinyal -> posisi -> closure, signal_id dan skor lengkap,
+// satu entry per zona, satu baris per bar. Posisi yang masih terbuka di akhir run boleh tanpa closure (paling banyak 1).
+void CheckSc14(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string sig = "SELECT id FROM signals WHERE session_id IN (" + ses + ")";
+   long trades = ScDbCount("SELECT COUNT(*) FROM trades WHERE source='EA' AND session_id IN (" + ses + ")");
+   long noSignal = ScDbCount("SELECT COUNT(*) FROM trades WHERE session_id IN (" + ses + ") AND (signal_id IS NULL OR signal_id NOT IN "
+                             "(SELECT id FROM signals WHERE status='ACCEPTED'))");
+   AssertTrue(id + "-trades", StringFormat("pipeline membuka posisi (%I64d trade EA), semua punya signal_id ACCEPTED (tanpa: %I64d)", trades, noSignal),
+              trades >= 1 && noSignal == 0);
+
+   long accepted = ScDbCount("SELECT COUNT(*) FROM signals WHERE status='ACCEPTED' AND session_id IN (" + ses + ")");
+   long orphan = ScDbCount("SELECT COUNT(*) FROM signals s WHERE s.status='ACCEPTED' AND s.session_id IN (" + ses + ") AND NOT EXISTS "
+                           "(SELECT 1 FROM trades t WHERE t.signal_id = s.id)");
+   long badScores = ScDbCount("SELECT COUNT(*) FROM (" + sig + ") s WHERE (SELECT COUNT(*) FROM signal_scores c WHERE c.signal_id = s.id "
+                              "AND c.component IN ('ZONE','TREND','PA')) <> 3");
+   long rows = ScDbCount("SELECT COUNT(*) FROM signals WHERE session_id IN (" + ses + ")");
+   AssertTrue(id + "-signals", StringFormat("%I64d baris kandidat (rekam %d), ACCEPTED %I64d = trade, tanpa trade %I64d, skor tidak lengkap %I64d",
+                                            rows, rec.SignalCount(), accepted, orphan, badScores),
+              rows > accepted && rows == rec.SignalCount() && accepted == trades && orphan == 0 && badScores == 0);
+
+   long dupBar = ScDbCount("SELECT COUNT(*) FROM (SELECT time FROM signals WHERE session_id IN (" + ses + ") GROUP BY time HAVING COUNT(*) > 1)");
+   long dupZone = ScDbCount("SELECT COUNT(*) FROM (SELECT zone_ref FROM signals WHERE status='ACCEPTED' AND session_id IN (" + ses +
+                            ") GROUP BY zone_ref HAVING COUNT(*) > 1)");
+   long riskPerTrade = ScDbCount("SELECT COUNT(*) FROM signals WHERE reject_stage='RISK_PER_TRADE' AND session_id IN (" + ses + ")");
+   AssertTrue(id + "-once", StringFormat("satu baris per bar (ganda %I64d), satu entry per zona (ganda %I64d), lot CalcVolume tidak pernah "
+                                         "ditolak RISK_PER_TRADE (%I64d, TC-RK-14)", dupBar, dupZone, riskPerTrade),
+              dupBar == 0 && dupZone == 0 && riskPerTrade == 0);
+
+   long closures = ScDbCount("SELECT COUNT(*) FROM closures c JOIN trades t ON t.login = c.login AND t.run_key = c.run_key AND "
+                             "t.position_id = c.position_id WHERE t.session_id IN (" + ses + ")");
+   long stages = ScDbCount("SELECT COUNT(DISTINCT reject_stage) FROM signals WHERE status='REJECTED' AND session_id IN (" + ses + ")");
+   AssertTrue(id + "-closures", StringFormat("closure %I64d dari %I64d trade (terbuka di akhir run maks 1); %I64d jenis tahap tolak", closures, trades, stages),
+              closures >= trades - 1 && closures <= trades && stages >= 2);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -1149,6 +1186,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc12(id, rec);
    else if(id == "SC-13" || id == "SC-13x")
       CheckSc13(id, rec);
+   else if(id == "SC-14" || id == "SC-14x")
+      CheckSc14(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

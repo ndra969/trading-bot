@@ -51,6 +51,13 @@ input double                 InpZoneMinLegAtr         = SDB_DEF_ZONE_MIN_LEG_ATR
 input int                    InpZoneLegBars           = SDB_DEF_ZONE_LEG_BARS;      // Gerak keluar dalam N bar MTF (3-50)
 input int                    InpMaxZoneAgeBars        = SDB_DEF_MAX_ZONE_AGE_BARS;  // Usia maksimum zona (bar MTF, PRD 100)
 
+input group "Entry"
+input double                 InpMinConfluenceScore    = SDB_DEF_MIN_CONFLUENCE_SCORE; // Skor minimum (% dari maksimum komponen aktif)
+input double                 InpMinRR                 = SDB_DEF_MIN_RR;             // R:R minimum (TP ke zona lawan)
+input double                 InpSlBufferAtr           = SDB_DEF_SL_BUFFER_ATR;      // Buffer SL di luar zona (x ATR MTF)
+input double                 InpMinSlAtr              = SDB_DEF_MIN_SL_ATR;         // Jarak SL minimum (x ATR MTF)
+input double                 InpMaxSlAtr              = SDB_DEF_MAX_SL_ATR;         // Jarak SL maksimum (x ATR MTF)
+
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
 input string                 InpTelegramChatID        = "";                         // Chat ID Telegram (sama dengan bot Python)
@@ -86,6 +93,11 @@ InputValues CurrentInputs()
    v.zoneMinLegAtr = InpZoneMinLegAtr;
    v.zoneLegBars = InpZoneLegBars;
    v.maxZoneAgeBars = InpMaxZoneAgeBars;
+   v.minConfluenceScore = InpMinConfluenceScore;
+   v.minRR = InpMinRR;
+   v.slBufferAtr = InpSlBufferAtr;
+   v.minSlAtr = InpMinSlAtr;
+   v.maxSlAtr = InpMaxSlAtr;
    return v;
   }
 
@@ -100,7 +112,8 @@ string CurrentInputsJson()
                  "InpMaxPosForexCross", "InpMaxPosCommodity", "InpMaxPosCrypto", "InpPresetTag",
                  "InpHeartbeatMinutes", "InpTelegramConfigured", "InpSwingStrength", "InpStructureLookback",
                  "InpEmaPeriod", "InpEmaSlopeBars", "InpZoneMinWidthAtr", "InpZoneMaxWidthAtr", "InpZoneMinLegAtr",
-                 "InpZoneLegBars", "InpMaxZoneAgeBars"};
+                 "InpZoneLegBars", "InpMaxZoneAgeBars", "InpMinConfluenceScore", "InpMinRR", "InpSlBufferAtr",
+                 "InpMinSlAtr", "InpMaxSlAtr"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -137,6 +150,11 @@ string CurrentInputsJson()
    v[30] = JsonNum(InpZoneMinLegAtr);
    v[31] = JsonNum(InpZoneLegBars);
    v[32] = JsonNum(InpMaxZoneAgeBars);
+   v[33] = JsonNum(InpMinConfluenceScore);
+   v[34] = JsonNum(InpMinRR);
+   v[35] = JsonNum(InpSlBufferAtr);
+   v[36] = JsonNum(InpMinSlAtr);
+   v[37] = JsonNum(InpMaxSlAtr);
    return CanonicalJson(k, v);
   }
 
@@ -146,6 +164,7 @@ SdbAppConfig CurrentAppConfig(const ENUM_SDB_APP_MODE mode, const string eaVersi
    SdbAppConfig c;
    c.mode = mode;
    c.inputs = CurrentInputs();
+   c.signalsOn = (mode == SDB_APP_LIVE);   // EA utama; harness menyetel dari HarnessPipeline
    c.symbolSuffix = InpSymbolSuffix;
    c.allowLive = InpAllowLiveTrading;
    c.logLevel = InpLogLevel;

@@ -96,6 +96,18 @@ void RunTestEventSink()
    AssertTrue("TC-ES-12", "status sampai ke sink dengan key yang sama",
               a1.CountStatus() == 1 && a3.CountStatus() == 1 && a3.LastStatus(gs) && gs.key == "row-42" && gs.status == "SENT");
 
+   // TC-ES-13 (spec 13 Req 6.1): sinyal diteruskan ke semua sink tanpa diubah.
+   SignalRecord sig;
+   ZeroMemory(sig);
+   sig.id = 777;
+   sig.status = SDB_SIGNAL_STATUS_ACCEPTED;
+   sig.scorePa = 7;
+   tee.OnSignal(sig);
+   SignalRecord gsig;
+   AssertTrue("TC-ES-13", "sinyal sampai ke ketiga sink dengan id dan skor sama",
+              a1.CountSignal() == 1 && a2.CountSignal() == 1 && a3.CountSignal() == 1 && a3.LastSignal(gsig) &&
+              gsig.id == 777 && gsig.scorePa == 7 && gsig.status == SDB_SIGNAL_STATUS_ACCEPTED);
+
    TfEndSuite();
   }
 

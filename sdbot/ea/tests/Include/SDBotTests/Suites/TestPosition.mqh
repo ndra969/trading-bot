@@ -39,6 +39,38 @@ void RunTestPositionAlertOnFail(CTrkRig &r)
               loud == SDB_EXEC_FAILED && alertsLoud == 1);
   }
 
+// TC-PS-05 (temuan backtest dasar spec 13): retcode MARKET_CLOSED -> SKIPPED (dicoba tick berikutnya tanpa dihitung gagal),
+// satu kiriman, tanpa alert walau alertOnFail, tanpa log ERROR.
+void RunTestPositionMarketClosed(CTrkRig &r)
+  {
+   OrderRequest rq = TrkRequest(_Symbol, true, 300, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN) * 2);
+   OrderResult ro;
+   if(!r.exe.OpenMarket(rq, ro))
+     {
+      AssertTrue("TC-PS-05", "posisi uji terbuka | " + ro.rejectStage + " " + ro.detail, false);
+      return;
+     }
+   string why;
+   double better = rq.sl + 50 * SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   r.sink.Reset();
+   SdbLogCaptureStart();   // suite sudah menangkap log; mulai ulang agar hanya baris kasus ini yang dihitung
+   long sentBefore = r.exe.SendCount();
+   r.exe.SetForceRetcodeForTest(TRADE_RETCODE_MARKET_CLOSED);
+   ENUM_SDB_EXEC m = r.exe.ModifySl((ulong)ro.positionId, better, why);
+   ENUM_SDB_EXEC p = r.exe.ClosePartial((ulong)ro.positionId, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN), why);
+   r.exe.SetForceRetcodeForTest(0);
+   long sent = r.exe.SendCount() - sentBefore;
+   int errors = 0;
+   for(int i = 0; i < SdbLogCapturedCount(); i++)
+      if(StringFind(SdbLogCaptured(i), "[ERROR]") >= 0)
+         errors++;
+   int alerts = r.sink.CountAlert();
+   r.exe.CloseAllSdbot();
+   AssertTrue("TC-PS-05", StringFormat("MARKET_CLOSED: modify %s, partial %s, kiriman %I64d, alert %d, log ERROR %d",
+                                       EnumToString(m), EnumToString(p), sent, alerts, errors),
+              m == SDB_EXEC_SKIPPED && p == SDB_EXEC_SKIPPED && sent == 2 && alerts == 0 && errors == 0);
+  }
+
 // TC-PS-01 (Req 1.1, 1.2, EC-08): SL awal dari komentar; tanpa komentar dari ORDER_SL order pembuka.
 void RunTestPositionCache(CTrkRig &r)
   {
@@ -164,6 +196,7 @@ void RunTestPosition()
    else
      {
       RunTestPositionAlertOnFail(r);
+      RunTestPositionMarketClosed(r);
       RunTestPositionCache(r);
       RunTestPositionOwnership(r);
       RunTestPositionOnce(r);

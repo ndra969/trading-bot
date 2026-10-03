@@ -51,6 +51,7 @@ private:
    long              m_restartPosition;
    BalanceOpRecord   m_balanceOps[];
    AlertStatus       m_statuses[];
+   SignalRecord      m_signals[];
    double            m_withdrawAmount;     // SC-07: penarikan harness, puncak dan level DD sebelum/sesudah diproses
    double            m_peakBefore;
    int               m_levelBefore;
@@ -128,7 +129,21 @@ public:
       ArrayResize(m_statuses, n + 1);
       m_statuses[n] = s;
      }
+   void OnSignal(const SignalRecord &s)
+     {
+      int n = ArraySize(m_signals);
+      ArrayResize(m_signals, n + 1);
+      m_signals[n] = s;
+     }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
+   int  SignalCount() const { return ArraySize(m_signals); }
+   bool SignalAt(const int i, SignalRecord &out) const
+     {
+      if(i < 0 || i >= ArraySize(m_signals))
+         return false;
+      out = m_signals[i];
+      return true;
+     }
 
    //--- Catatan dari harness
    void AddOpenResult(const OrderResult &r, const datetime time)

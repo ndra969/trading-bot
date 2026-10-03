@@ -88,7 +88,9 @@ enum ENUM_SDB_QUEUE_KIND
    SDB_Q_BALANCE = 5,
    SDB_Q_ALERT = 6,
    SDB_Q_ALERT_STATUS = 7,   // hasil kirim notifikasi (spec 08)
-   SDB_Q_KINDS = 8
+   SDB_Q_SIGNAL = 8,         // kandidat sinyal (spec 13)
+   SDB_Q_SIGNAL_SCORE = 9,   // satu komponen skor kandidat
+   SDB_Q_KINDS = 10
   };
 
 #define SDB_Q_PRIO_KEEP     0   // trade, deal, closure, operasi saldo, alert Critical
@@ -113,6 +115,10 @@ struct SdbQueuedEvent
    BalanceOpRecord   balance;
    AlertEvent        alert;
    AlertStatus       status;
+   SignalRecord      signal;
+   string            component;       // SDB_Q_SIGNAL_SCORE: SDB_SCORE_COMPONENT_*
+   double            score;
+   double            maxScore;
   };
 
 class CLogger : public ISdbEventSink
@@ -181,6 +187,19 @@ private:
            }
         }
       return false;
+     }
+
+   void EnqueueScore(const SignalRecord &s, const string component, const int score, const int maxScore)
+     {
+      SdbQueuedEvent e;
+      e.kind = SDB_Q_SIGNAL_SCORE;
+      e.priority = SDB_Q_PRIO_LOW;
+      e.login = m_login;
+      e.signal.id = s.id;
+      e.component = component;
+      e.score = score;
+      e.maxScore = maxScore;
+      Enqueue(e);
      }
 
    void Enqueue(SdbQueuedEvent &e)
@@ -380,6 +399,14 @@ private:
          case SDB_Q_ALERT_STATUS:
             return "UPDATE alerts SET status = ?1, attempts = ?2, sent_at = NULLIF(?3, 0), status_reason = NULLIF(?4, '') "
                    "WHERE login = ?5 AND notify_key = ?6";
+         case SDB_Q_SIGNAL:   // id dari SignalIdOf: kirim ulang (restart di bar yang sama) tidak menambah baris
+            return "INSERT INTO signals (id, session_id, login, magic, symbol, time, direction, style, zone_ref, score_total, "
+                   "spread_points, status, reject_stage, reject_detail, context_json) "
+                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULLIF(?9, ''), ?10, ?11, ?12, NULLIF(?13, ''), NULLIF(?14, ''), "
+                   "NULLIF(?15, '')) ON CONFLICT (id) DO NOTHING";
+         case SDB_Q_SIGNAL_SCORE:
+            return "INSERT INTO signal_scores (signal_id, component, score, max_score) VALUES (?1, ?2, ?3, ?4) "
+                   "ON CONFLICT (signal_id, component) DO NOTHING";
          default:
             return "";
         }
@@ -478,6 +505,19 @@ private:
             ok = DatabaseBind(st, 0, e.status.status) && DatabaseBind(st, 1, (long)e.status.attempts) &&
                  DatabaseBind(st, 2, e.status.sentAt == 0 ? (long)0 : Utc(e.status.sentAt)) && DatabaseBind(st, 3, e.status.reason) &&
                  DatabaseBind(st, 4, e.login) && DatabaseBind(st, 5, e.status.key);
+            return ok;
+         case SDB_Q_SIGNAL:
+            ok = DatabaseBind(st, 0, e.signal.id) && DatabaseBind(st, 1, m_sessionId) && DatabaseBind(st, 2, e.login) &&
+                 DatabaseBind(st, 3, e.signal.magic) && DatabaseBind(st, 4, e.signal.symbol) &&
+                 DatabaseBind(st, 5, Utc(e.signal.time)) && DatabaseBind(st, 6, e.signal.direction) &&
+                 DatabaseBind(st, 7, e.signal.style) && DatabaseBind(st, 8, e.signal.zoneRef) &&
+                 DatabaseBind(st, 9, e.signal.scoreTotal) && DatabaseBind(st, 10, e.signal.spreadPoints) &&
+                 DatabaseBind(st, 11, e.signal.status) && DatabaseBind(st, 12, e.signal.rejectStage) &&
+                 DatabaseBind(st, 13, e.signal.rejectDetail) && DatabaseBind(st, 14, e.signal.contextJson);
+            return ok;
+         case SDB_Q_SIGNAL_SCORE:
+            ok = DatabaseBind(st, 0, e.signal.id) && DatabaseBind(st, 1, e.component) &&
+                 DatabaseBind(st, 2, e.score) && DatabaseBind(st, 3, e.maxScore);
             return ok;
         }
       return false;
@@ -774,6 +814,20 @@ public:
       e.login = m_login;
       e.trade = t;
       Enqueue(e);
+     }
+
+   // Satu baris signals + 3 komponen skor; prioritas rendah (dibuang lebih dulu bila antrean penuh).
+   void OnSignal(const SignalRecord &s)
+     {
+      SdbQueuedEvent e;
+      e.kind = SDB_Q_SIGNAL;
+      e.priority = SDB_Q_PRIO_LOW;
+      e.login = m_login;
+      e.signal = s;
+      Enqueue(e);
+      EnqueueScore(s, SDB_SCORE_COMPONENT_ZONE, s.scoreZone, SDB_SCORE_MAX_ZONE);
+      EnqueueScore(s, SDB_SCORE_COMPONENT_TREND, s.scoreTrend, SDB_SCORE_MAX_TREND);
+      EnqueueScore(s, SDB_SCORE_COMPONENT_PA, s.scorePa, SDB_SCORE_MAX_PA);
      }
 
    void OnDeal(const DealRecord &d)

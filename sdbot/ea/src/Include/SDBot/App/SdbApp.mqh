@@ -20,6 +20,7 @@
 #include <SDBot/Analysis/MarketStructure.mqh>
 #include <SDBot/Analysis/ZoneBook.mqh>
 #include <SDBot/Strategies/PaTrigger.mqh>
+#include <SDBot/Signals/SignalEngine.mqh>
 #include <SDBot/App/TeeSink.mqh>
 #include <SDBot/Notify/Notifier.mqh>
 #include <SDBot/Notify/TelegramTransport.mqh>
@@ -54,6 +55,7 @@ private:
    CMarketStructure  m_structure;      // bias HTF + struktur MTF (spec 10)
    CZoneBook         m_zones;          // zona S&D MTF (spec 11)
    CPaTrigger        m_trigger;        // pola candle LTF (spec 12)
+   CSignalEngine     m_signals;        // pipeline sinyal dan entry (spec 13)
    CClosureTracker   m_closureTracker;
    CReconciler       m_reconciler;
    int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
@@ -75,6 +77,7 @@ private:
       if(!m_stateReady)
          return;
       m_zones.SetState(GetPointer(m_state));   // penanda Used zona di GV per magic (spec 11 Req 3.3)
+      m_signals.SetState(GetPointer(m_state), m_account.Login(), m_logger.RunKey());   // penanda bar + ID sinyal (spec 13)
       if(m_notifyOn)
         {
          m_notifier.SetState(GetPointer(m_state));   // cooldown, kuota, lease, jadwal di GV (spec 08 Req 2.5, spec 09 Req 4)
@@ -133,6 +136,15 @@ private:
       zp.strength = cfg.inputs.swingStrength;
       m_zones.Init(_Symbol, mtf, zp, cfg.inputs.magic);
       m_trigger.Init(_Symbol, ltf);
+      SdbSignalParams sp;
+      sp.minScorePct = cfg.inputs.minConfluenceScore;
+      sp.minRR = cfg.inputs.minRR;
+      sp.slBufferAtr = cfg.inputs.slBufferAtr;
+      sp.minSlAtr = cfg.inputs.minSlAtr;
+      sp.maxSlAtr = cfg.inputs.maxSlAtr;
+      m_signals.Init(_Symbol, cfg.inputs.magic, ltf, sp, GetPointer(m_structure), GetPointer(m_zones), GetPointer(m_trigger),
+                     GetPointer(m_riskState), GetPointer(m_riskManager), GetPointer(m_executor), GetPointer(m_account), m_sink,
+                     cfg.style);
      }
 
    void SendSnapshot()
@@ -341,6 +353,8 @@ public:
       m_trigger.OnTick();     // pola bar LTF tertutup untuk kedua arah (spec 12)
       if(m_account.State() != SDB_VAL_PASSED || !m_stateReady)
          return;
+      if(m_cfg.signalsOn && m_riskReady)
+         m_signals.OnTick();  // setelah analisis bar yang sama; sebelum manajemen posisi (spec 13 Req 1.1)
       m_posManager.OnTick();
      }
 
@@ -397,6 +411,8 @@ public:
          EventKillTimer();
       m_timerSet = false;
       LogInfo("App", "SDBot berhenti | reason=" + IntegerToString(reason) + " (" + SdbDeinitReasonText(reason) + ")");
+      if(m_cfg.signalsOn)
+         m_signals.LogDaySummary();
       if(m_atrHandle != INVALID_HANDLE)
          IndicatorRelease(m_atrHandle);
       m_atrHandle = INVALID_HANDLE;
@@ -418,6 +434,7 @@ public:
    CMarketStructure *Structure() { return GetPointer(m_structure); }
    CZoneBook *Zones() { return GetPointer(m_zones); }
    CPaTrigger *Trigger() { return GetPointer(m_trigger); }
+   CSignalEngine *Signals() { return GetPointer(m_signals); }
    ISdbEventSink *Sink() { return m_sink; }
    bool NotifierActive() const { return m_notifyOn; }
    string TransportName() { return m_transport != NULL ? m_transport.Name() : ""; }

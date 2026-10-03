@@ -43,6 +43,7 @@ public:
    void OnClosure(const ClosureRecord &c)       { for(int i = 0; i < m_count; i++) m_sinks[i].OnClosure(c); }
    void OnBalanceOp(const BalanceOpRecord &b)   { for(int i = 0; i < m_count; i++) m_sinks[i].OnBalanceOp(b); }
    void OnAlertStatus(const AlertStatus &s)     { for(int i = 0; i < m_count; i++) m_sinks[i].OnAlertStatus(s); }
+   void OnSignal(const SignalRecord &s)         { for(int i = 0; i < m_count; i++) m_sinks[i].OnSignal(s); }
 
    void OnAlert(const AlertEvent &a)
      {

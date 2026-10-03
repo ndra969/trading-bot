@@ -6,7 +6,7 @@ Expert Advisor MQL5 untuk MetaTrader 5 (zona Supply & Demand + skor konfluensi) 
 - Aturan kode dan struktur: [docs/RULES.md](docs/RULES.md)
 - Rencana kerja per spec: [specs/README.md](specs/README.md)
 
-Status: Fase 3 (strategi inti) berjalan, versi EA **1.11**. Fase 2 (notifikasi) **selesai** di 1.08. Fase 1 (fondasi) **selesai** di 1.06 (spec 01–07: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart; metrik `OnTester`, preset 12 simbol, query analisis). Spec 08 (1.07): notifier dengan aturan kirim PRD (Critical lebih dulu, cooldown, kuota 20/jam per akun, pesan basi 30 menit), format pesan gaya bot Python, status kirim di tabel `alerts` (skema v3). Spec 09 (1.08): Telegram (bot dan chat bot Python), push HP untuk Critical, heartbeat dan laporan harian satu per akun, pesan start/stop, preset pribadi dari `.env`. Spec 10 (1.09): analisis struktur HTF/MTF (swing fractal berjeda, BOS, EMA 50, bias HTF) per bar baru, tanpa repaint (SC-12). Spec 11 (1.10): peta zona S&D H1 (candle swing, lebar 0,3–2,0 ATR, gerak keluar ≥ 1,5 ATR, status Fresh/Tested/Lemah/Invalid/Kedaluwarsa/Used) dibangun ulang tiap bar H1, penanda Used di Global Variable (SC-13). Spec 12 (1.11): pola candle terarah M15 (bintang, engulfing kuat, pin bar, engulfing, tweezer, outside bar; pola netral tidak pernah jadi trigger) dengan skor kekuatan PA 10/7/3; belum dipakai untuk entry. Belum ada logika entry: EA utama tidak membuka posisi apa pun.
+Status: Fase 3 (strategi inti) **selesai** di 1.12; berikutnya Fase 4 (filter). Versi EA **1.12**. Fase 2 (notifikasi) **selesai** di 1.08. Fase 1 (fondasi) **selesai** di 1.06 (spec 01–07: alat build/uji, input, validasi akun, koneksi, status bersama, database SQLite + migrasi, executor order, orkestrasi `CSdbApp`, harness skenario, risk management: lot dari risiko %, pre-trade check, drawdown, rugi harian, margin, emergency stop, operasi saldo, batas posisi per kategori, manajemen posisi: BE, partial, trailing ATR, SL yang hilang, closure dengan alasan SL/BE_STOP/TRAIL_STOP/EA_CLOSE/..., MFE/MAE, rekonsiliasi setelah restart; metrik `OnTester`, preset 12 simbol, query analisis). Spec 08 (1.07): notifier dengan aturan kirim PRD (Critical lebih dulu, cooldown, kuota 20/jam per akun, pesan basi 30 menit), format pesan gaya bot Python, status kirim di tabel `alerts` (skema v3). Spec 09 (1.08): Telegram (bot dan chat bot Python), push HP untuk Critical, heartbeat dan laporan harian satu per akun, pesan start/stop, preset pribadi dari `.env`. Spec 10 (1.09): analisis struktur HTF/MTF (swing fractal berjeda, BOS, EMA 50, bias HTF) per bar baru, tanpa repaint (SC-12). Spec 11 (1.10): peta zona S&D H1 (candle swing, lebar 0,3–2,0 ATR, gerak keluar ≥ 1,5 ATR, status Fresh/Tested/Lemah/Invalid/Kedaluwarsa/Used) dibangun ulang tiap bar H1, penanda Used di Global Variable (SC-13). Spec 12 (1.11): pola candle terarah M15 (bintang, engulfing kuat, pin bar, engulfing, tweezer, outside bar; pola netral tidak pernah jadi trigger) dengan skor kekuatan PA 10/7/3. Spec 13 (1.12): **EA membuka posisi sendiri**. Pipeline sinyal per bar M15 (bias + zona + trigger PA, skor ≥ 65% dari 55, SL/TP dari zona, R:R ≥ 2) memakai jalur risiko Fase 1, dengan telemetri `signals` + `signal_scores` dan query kalibrasi. Backtest dasar 12 simbol 12 bulan lolos (351 trade; `tools/run-ea-tests.ps1 -Baseline`).
 
 ## Konfigurasi dan tuning
 
@@ -51,11 +51,14 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Analisis | `InpSwingStrength` | 2 (bar tiap sisi fractal; swing diakui setelah N bar kanan tutup) | 1–5 | spec 10 |
 | Analisis | `InpStructureLookback` | 100 bar (jendela BOS / arah struktur) | 20–500 | spec 10 |
 | Analisis | `InpEmaPeriod` / `InpEmaSlopeBars` | 50 / 3 (arah EMA: close vs EMA + kemiringan) | 10–400 / 1–20 | spec 10 |
-| Entry | `InpEntryMode` | Market (opsi Limit) | — | Fase 3 |
+| Entry | `InpEntryMode` | Market (opsi Limit) | — | Fase 5 (PC-19) |
 | Zona | `InpZoneMinWidthAtr` / `InpZoneMaxWidthAtr` | 0.3 / 2.0 × ATR(14) H1 (lebar zona dari candle swing) | 0.05–1.0 / 0.5–5.0, min < max | spec 11 |
 | Zona | `InpZoneMinLegAtr` / `InpZoneLegBars` | 1.5 × ATR dalam 10 bar (gerak keluar dari zona) | 0.5–5.0 / 3–50 | spec 11 |
 | Zona | `InpMaxZoneAgeBars` | 100 bar H1 (PRD) | 20–500 | spec 11 |
-| Entry | `InpMinConfluenceScore` / `InpMinRR` | 65 / 2.0 | — | Fase 3 |
+| Entry | `InpMinConfluenceScore` | 65 (% dari skor maksimum komponen aktif; Fase 3: 55 → skor ≥ 36) | 0–100 | spec 13 |
+| Entry | `InpMinRR` | 2.0 (TP ke zona lawan terdekat, atau 2R bila tidak ada) | 1.0–10.0 | spec 13 |
+| Entry | `InpSlBufferAtr` | 0.1 × ATR(14) H1 di luar batas jauh zona (SELL + spread) | 0–1.0 | spec 13 |
+| Entry | `InpMinSlAtr` / `InpMaxSlAtr` | 0.3 / 3.0 × ATR(14) H1 (jarak SL; minimal juga ≥ stops level + spread) | 0.05–2.0 / 0.5–10.0, min < max | spec 13 |
 | Filter | `InpMaxSpreadPoints` | per simbol (disetel dari data spread) | — | Fase 4 |
 | Filter | `InpNewsBlockMinutes` / `InpTradingSessions` | 30 / London + New York | — | Fase 4 |
 | Notifikasi | `InpTelegramToken` / `InpTelegramChatID` | kosong (isi di `*.local.set` lewat `tools/make_local_presets.py`); kosong = pesan hanya di log | — (tidak masuk `inputs_json`, hanya `InpTelegramConfigured`) | spec 09 |
@@ -91,6 +94,8 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `link-mt5.ps1 -DataDir <folder data MT5>` | Hubungkan `ea/src` dan `ea/tests` ke MT5 lewat junction |
 | `build-ea.ps1` | Compile EA dan entry point uji; gagal bila ada error atau warning |
 | `run-ea-tests.ps1 [-Unit] [-Scenario SC-xx] [-All]` | Compile lalu jalankan unit test/skenario di Strategy Tester terminal uji; exit 0 = semua lulus |
+| `run-ea-tests.ps1 -Baseline [-Symbols EURUSDc,...]` | Backtest dasar Fase 3: EA utama + preset per simbol, 12 bulan (`ea/tests/baseline/BL-*.ini`, sekitar 25 menit), lalu `baseline_report.py` menilai kriteria PC-19 (≥ 300 trade, ≥ 15 per simbol, `signal_id` + skor lengkap, tanpa log ERROR/CRITICAL) |
+| `baseline_report.py --db <sdbot_tester.sqlite> --after-session N` | Laporan per simbol dari DB tester: kandidat, tahap tolak, trade, win rate, R; dipanggil `-Baseline` |
 | `uv run python tools/make_local_presets.py [--force]` | Buat `SDBot_DAY_<SIMBOL>c.local.set` dari preset repo + `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` di `.env` bot Python; tidak menimpa yang sudah disunting tanpa `--force`; gagal bila hasilnya tidak diabaikan git |
 | `uv run python tools/gen_presets.py` | Bangkitkan ulang 12 preset dari tabel di skrip (pytest memastikan file sama dengan hasil generator) |
 | `tools/queries/*.sql` | Query analisis (ringkasan per simbol/versi, alasan tutup, kebocoran BE, loser yang tidak pernah profit, per input, per run, operasi saldo, alert); diuji terhadap fixture |
@@ -104,7 +109,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | Input | Isi |
 |---|---|
 | `InpTestRunId` | ID run, diisi runner |
-| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`, `SC-10`, `SC-11`, `SC-12`, `SC-12x`, `SC-13`, `SC-13x`; `SC-09` optimasi diperiksa runner); ID lain = FAIL |
+| `HarnessScenario` | ID skenario yang diperiksa di akhir run (`SC-00`, `SC-01`, `SC-01b`, `SC-02`, `SC-03`, `SC-03r`, `SC-04`, `SC-04b`, `SC-05`, `SC-06`, `SC-07`, `SC-08`, `SC-10`, `SC-11`, `SC-12`, `SC-12x`, `SC-13`, `SC-13x`, `SC-14`, `SC-14x`; `SC-09` optimasi diperiksa runner); ID lain = FAIL |
 | `HarnessEveryBars` | entry setiap N bar chart |
 | `HarnessDirection` | 0 BUY, 1 SELL, 2 bergantian |
 | `HarnessSlPoints` / `HarnessTpPoints` | jarak SL/TP dari harga (point) |
@@ -119,6 +124,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `HarnessTransportFailType` | tipe alert yang selalu gagal sementara di transport palsu |
 | `HarnessRecordAnalysis` | rekam analisis HTF/MTF tiap bar baru untuk uji tanpa repaint (SC-12) |
 | `HarnessRecordZones` / `HarnessMarkUsedAtBar` | rekam sidik peta zona tiap bar H1; tandai zona valid terbaru Used di bar ini (SC-13) |
+| `HarnessPipeline` | pipeline sinyal membuka posisi seperti EA utama (SC-14); pakai `HarnessEveryBars=0` |
 | `HarnessAlertBurstAtBar` | kirim burst alert uji (2x `ORDER_FAILED`, tipe gagal, 25 Info) di bar ini (0 = tidak) |
 
 Menjalankan: `powershell -ExecutionPolicy Bypass -File tools/run-ea-tests.ps1 -Scenario SC-00,SC-08` (atau `-All` untuk unit + semua skenario). Skenario baru = pasangan `.ini`/`.set` di `ea/tests/scenarios/` plus cabang `CheckScenario` di `ea/tests/Include/SDBotTests/Scenarios.mqh`. Skenario dengan `Optimization=1` di `.ini` diperiksa runner (file DB tester tidak berubah, laporan optimasi berisi hasil metrik custom). Uji manual: [ea/tests/manual-checklist.md](ea/tests/manual-checklist.md). Alur EA: [docs/flows/](docs/flows/README.md).

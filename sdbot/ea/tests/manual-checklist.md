@@ -43,6 +43,8 @@ Versi EA saat checklist dibuat: 1.06 (Fase 1 selesai). Terminal live: akun cent 
 | MC-PS-02 | spec 06 | Hapus SL posisi SDBot manual | SL dipasang kembali dalam 1 detik + alert High `SL_RESTORED` | | | |
 | MC-PS-03 | spec 06 | Cek `ORDER_SL` order pembuka di Exness | Tidak 0 | | | |
 | MC-PS-04 | spec 06 | Tutup MT5 saat ada posisi, posisi kena TP saat MT5 mati, buka lagi | Closure `TP` tercatat saat init | | | |
+| MC-SG-01 | spec 13 | EA v1.12 di akun cent EURUSDc (risiko minimum) sampai sinyal pertama | Baris `signals` ACCEPTED dengan 3 skor, posisi punya SL/TP dari zona, pesan Telegram masuk | | | |
+| MC-SG-02 | spec 13 | Restart EA di tengah bar M15 setelah kandidat | Tidak ada baris `signals` atau order ganda | | | |
 | PRD-01 | PRD uji fungsi wajib | Restart EA saat ada posisi terbuka | Status BE dan partial tetap benar (otomatis: SC-04) | | | |
 | PRD-02 | PRD uji fungsi wajib | Koneksi putus saat ada sinyal | Entry tertahan, alert terkirim | | | |
 | PRD-03 | PRD uji fungsi wajib | Rugi harian 3% tercapai | Entry pause sampai hari server berikutnya (otomatis: SC-02) | | | |

@@ -36,6 +36,11 @@ struct InputValues
    double            zoneMinLegAtr;
    int               zoneLegBars;
    int               maxZoneAgeBars;
+   double            minConfluenceScore; // sinyal dan entry (spec 13): persen dari maksimum aktif
+   double            minRR;
+   double            slBufferAtr;
+   double            minSlAtr;
+   double            maxSlAtr;
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -53,6 +58,7 @@ struct SdbAppConfig
    ENUM_SDB_DB_TARGET     dbTarget;
    bool                   resetEmergencyStop;   // InpResetEmergencyStop (spec 05 Req 5.5)
    string                 presetTag;            // InpPresetTag (spec 07 Req 2.6)
+   bool                   signalsOn;            // pipeline sinyal membuka posisi (spec 13 Req 7.1, 7.3)
    string                 telegramToken;        // rahasia: tidak masuk InputValues, JSON sesi, maupun log (spec 09 Req 1.3)
    string                 telegramChatId;
   };
@@ -86,6 +92,11 @@ InputValues DefaultInputValues()
    v.zoneMinLegAtr = SDB_DEF_ZONE_MIN_LEG_ATR;
    v.zoneLegBars = SDB_DEF_ZONE_LEG_BARS;
    v.maxZoneAgeBars = SDB_DEF_MAX_ZONE_AGE_BARS;
+   v.minConfluenceScore = SDB_DEF_MIN_CONFLUENCE_SCORE;
+   v.minRR = SDB_DEF_MIN_RR;
+   v.slBufferAtr = SDB_DEF_SL_BUFFER_ATR;
+   v.minSlAtr = SDB_DEF_MIN_SL_ATR;
+   v.maxSlAtr = SDB_DEF_MAX_SL_ATR;
    return v;
   }
 
@@ -146,6 +157,17 @@ void IrCheckZones(const InputValues &v, string &errors)
    IrCheckRange("InpMaxZoneAgeBars", v.maxZoneAgeBars, SDB_MIN_MAX_ZONE_AGE_BARS, SDB_MAX_MAX_ZONE_AGE_BARS, errors);
   }
 
+void IrCheckSignals(const InputValues &v, string &errors)
+  {
+   IrCheckRangeD("InpMinConfluenceScore", v.minConfluenceScore, SDB_MIN_MIN_CONFLUENCE_SCORE, SDB_MAX_MIN_CONFLUENCE_SCORE, errors);
+   IrCheckRangeD("InpMinRR", v.minRR, SDB_MIN_MIN_RR, SDB_MAX_MIN_RR, errors);
+   IrCheckRangeD("InpSlBufferAtr", v.slBufferAtr, SDB_MIN_SL_BUFFER_ATR, SDB_MAX_SL_BUFFER_ATR, errors);
+   IrCheckRangeD("InpMinSlAtr", v.minSlAtr, SDB_MIN_MIN_SL_ATR, SDB_MAX_MIN_SL_ATR, errors);
+   IrCheckRangeD("InpMaxSlAtr", v.maxSlAtr, SDB_MIN_MAX_SL_ATR, SDB_MAX_MAX_SL_ATR, errors);
+   if(v.minSlAtr >= v.maxSlAtr)
+      IrAdd(errors, "InpMinSlAtr (" + IrNum(v.minSlAtr) + ") harus < InpMaxSlAtr (" + IrNum(v.maxSlAtr) + ")");
+  }
+
 void IrCheckClassLimit(const string name, const int value, string &errors)
   {
    if(value < 1 || value > SDB_MAX_POS_PER_CLASS)
@@ -188,6 +210,7 @@ bool ValidateInputValues(const InputValues &v, const bool allowHarnessMagic, str
    IrCheckPosition(v, errors);
    IrCheckAnalysis(v, errors);
    IrCheckZones(v, errors);
+   IrCheckSignals(v, errors);
    if(v.heartbeatMinutes != 0 && (v.heartbeatMinutes < SDB_MIN_HEARTBEAT_MIN || v.heartbeatMinutes > SDB_MAX_HEARTBEAT_MIN))
       IrAdd(errors, "InpHeartbeatMinutes=" + IntegerToString(v.heartbeatMinutes) + " harus 0 (mati) atau " +
             IntegerToString(SDB_MIN_HEARTBEAT_MIN) + " <= x <= " + IntegerToString(SDB_MAX_HEARTBEAT_MIN));

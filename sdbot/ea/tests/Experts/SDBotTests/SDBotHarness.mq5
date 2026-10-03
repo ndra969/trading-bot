@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.11"
+#property version   "1.12"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.11"
+#define SDB_HARNESS_EA_VERSION "1.12"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
@@ -45,6 +45,7 @@ input string                 HarnessTransportFailType = "";    // tipe yang sela
 input int                    HarnessAlertBurstAtBar   = 0;     // kirim burst alert uji di bar ini (0 = tidak)
 input bool                   HarnessRecordAnalysis    = false; // rekam analisis HTF/MTF tiap bar baru (SC-12)
 input bool                   HarnessRecordZones       = false; // rekam sidik peta zona tiap bar MTF baru (SC-13)
+input bool                   HarnessPipeline          = false; // pipeline sinyal membuka posisi seperti EA utama (SC-14)
 input int                    HarnessMarkUsedAtBar     = 0;     // tandai zona valid pertama Used di bar ini (0 = tidak, SC-13)
 
 CSdbApp          *g_app = NULL;
@@ -86,7 +87,9 @@ int StartApp()
   {
    g_app = new CSdbApp;
    ISdbTransport *tr = (HarnessTransportScript != "") ? GetPointer(g_tr) : NULL;   // NULL = transport log (skenario lain)
-   int r = g_app.OnInit(CurrentAppConfig(SDB_APP_HARNESS, SDB_HARNESS_EA_VERSION), GetPointer(g_rec), tr);
+   SdbAppConfig cfg = CurrentAppConfig(SDB_APP_HARNESS, SDB_HARNESS_EA_VERSION);
+   cfg.signalsOn = HarnessPipeline;
+   int r = g_app.OnInit(cfg, GetPointer(g_rec), tr);
    if(g_app.Logger().SessionId() > 0)
       g_rec.AddSession(g_app.Logger().SessionId());
    return r;

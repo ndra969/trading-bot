@@ -1,6 +1,6 @@
 # Fase 3 — Strategi inti: overview
 
-Status: Approved (2026-10-02)
+Status: Done (2026-10-03, v1.12; spec 10–13 selesai, backtest dasar lolos)
 Sumber: PRD-EA §Pipeline analisis (timeframe, alur, aturan zona, skor), §Eksekusi order, §Roadmap Fase 3, §Temuan review; [python-bot-lessons.md](python-bot-lessons.md) §1–2, §4; katalog parameter di [README.md](README.md#katalog-parameter-strategi-draf-difinalkan-di-spec-fase-3-dan-5)
 
 Dokumen ini adalah pintu masuk Fase 3: use case, pembagian spec, arsitektur bersama, strategi uji, dan keputusan yang perlu diambil sebelum requirements. Fase ini membuat EA **membuka posisi sendiri untuk pertama kali**.

@@ -105,3 +105,14 @@ def test_ts46_telegram_inputs_present_and_empty():
         assert v.get("InpTelegramToken") == "", symbol
         assert v.get("InpTelegramChatID") == "", symbol
         assert v.get("InpHeartbeatMinutes") == "60", symbol
+
+
+def test_ts51_signal_inputs_have_defaults():
+    """Spec 13 Req 7.2: input sinyal dan SL dengan default PC-19 di semua preset."""
+    for symbol in EXPECTED_MAGIC:
+        v = _read(symbol)
+        assert v.get("InpMinConfluenceScore") == "65", symbol
+        assert v.get("InpMinRR") == "2.0", symbol
+        assert v.get("InpSlBufferAtr") == "0.1", symbol
+        assert v.get("InpMinSlAtr") == "0.3", symbol
+        assert v.get("InpMaxSlAtr") == "3.0", symbol

@@ -50,6 +50,19 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Skor: engulfing kuat 10, pin bar 7, pola terarah lain 3 (PRD). Kode pola (enum `pa_pattern`): `STAR`, `ENGULF_STRONG`, `PIN`, `ENGULF`, `TWEEZER`, `OUTSIDE`, `NONE`.
     - Tidak ada aturan khusus logam/crypto; sekitar 40% bar M15 punya pola terarah.
 
+### PC-19: Pipeline sinyal, entry, dan kriteria backtest dasar
+- Status: Open
+- Tanggal disetujui: 2026-10-03
+- Dokumen: PRD-EA §Pipeline analisis (alur), §Skor konfluensi, §Eksekusi order, §Data dan database (`signals`), §Parameter input EA, §Roadmap Fase 3; PRD-Backoffice §Database (enum)
+- Sumber: spec `ea-13-signal-entry` requirements (simulasi pipeline 12 simbol 2025-10..2026-10), keputusan 1–9
+- Perubahan:
+    - Kandidat = bar LTF tertutup yang menyentuh zona valid searah bias HTF; satu baris `signals` per kandidat. Bar tanpa bias atau tanpa zona hanya dihitung di ringkasan log harian. Urutan tahap untuk kandidat: pre-filter risiko (STOPPED, pause harian, tidak bisa trading) → posisi instance terbuka (`POSITION_OPEN`) → trigger PA (`NO_PA_TRIGGER`) → skor (`SCORE_TOO_LOW`) → SL/TP dan R:R → lot dan pre-trade check → eksekusi. Bar dinilai sekali (penanda bar di Global Variable per magic); bar yang lebih tua dari 2 × LTF tidak dinilai.
+    - Skor: `score_total` = skor mentah; persen = skor ÷ maksimum komponen aktif (Fase 3: 55) dibanding `MinConfluenceScore`; komponen `ZONE`, `TREND`, `PA` selalu dicatat di `signal_scores` (enum `score_component`, cadangan `FIB`, `TRENDLINE`, `BREAKOUT`, `RSI`).
+    - Eksekusi: Fase 3 hanya market order (`EntryMode` limit ditunda ke Fase 5). SL = batas jauh zona ∓ `SlBufferAtr` (0,1) × ATR(14) MTF, SELL ditambah spread. Jarak SL wajib ≥ max(stops level + spread, `MinSlAtr` 0,3 × ATR MTF) dan ≤ `MaxSlAtr` 3,0 × ATR MTF (`SL_TOO_CLOSE` / `SL_TOO_FAR`). TP = batas dekat zona lawan valid terdekat, atau `MinRR` × R bila tidak ada (sumber TP dicatat). Maksimal satu posisi terbuka per instance (simbol). Zona menjadi Used hanya setelah order terisi.
+    - Input baru: `MinConfluenceScore` 65 (persen dari maksimum aktif), `MinRR` 2,0 (sudah di PRD), `SlBufferAtr` 0,1, `MinSlAtr` 0,3, `MaxSlAtr` 3,0.
+    - Enum `reject_stage` + `POSITION_OPEN`, `SL_TOO_FAR`.
+    - Koreksi PC-15, Roadmap Fase 3 "selesai jika": backtest dasar 12 simbol × 12 bulan terakhir tanpa error kritis, **total ≥ 300 trade dan setiap simbol ≥ 15 trade**, semua trade punya `signal_id` dengan skor lengkap, query kalibrasi menghasilkan data; profit dinilai di Fase 5–6. (Simulasi: gerbang skor 65% memberi 19–37 trade per simbol per tahun, total 312.)
+
 ## Done
 
 ### PC-13: Aturan notifier dan status alert (skema v3)

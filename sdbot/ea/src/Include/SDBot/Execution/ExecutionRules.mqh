@@ -105,6 +105,7 @@ ENUM_SDB_RETCODE_CLASS ClassifyRetcode(const uint retcode)
       case TRADE_RETCODE_CONNECTION:
       case TRADE_RETCODE_ERROR:             return SDB_RC_AMBIGUOUS;
       case TRADE_RETCODE_POSITION_CLOSED:   return SDB_RC_POSITION_GONE;
+      case TRADE_RETCODE_MARKET_CLOSED:     return SDB_RC_MARKET_CLOSED;
       default:                              return SDB_RC_PERMANENT;
      }
   }
@@ -118,6 +119,8 @@ ENUM_SDB_NEXT_STEP NextStep(const ENUM_SDB_RETCODE_CLASS c, const int attempt, c
       return SDB_STEP_SUCCEED;
    if(c == SDB_RC_POSITION_GONE)
       return SDB_STEP_GONE;
+   if(c == SDB_RC_MARKET_CLOSED)
+      return SDB_STEP_DEFER;
    if((c == SDB_RC_TRANSIENT || c == SDB_RC_AMBIGUOUS) && attempt <= SDB_MAX_RETRY)
       return SDB_STEP_RETRY;
    return SDB_STEP_GIVE_UP;

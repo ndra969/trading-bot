@@ -120,3 +120,29 @@ VALUES (2, 12345, 2026091903, 'EURJPYc', 1790702000, 'TRADE_OPENED', 'INFO', 'BU
         '2026091903-1790690000-12345-4', 'QUOTA'),
        (2, 12345, 2026091903, 'EURJPYc', 1790715000, 'ORDER_FAILED', 'MEDIUM', 'retcode 10006', 'FAILED', 3, NULL,
         '2026091903-1790690000-12345-5', 'TRANSPORT_TEMP');
+
+-- Sinyal Fase 3 (spec 13, PC-19) di run tester 3 dan 4: id dari hash (contoh kecil di sini), skor ZONE/TREND/PA,
+-- konteks JSON; trade run 3 posisi 2-3 dan run 4 posisi 2 berasal dari sinyal ACCEPTED.
+INSERT INTO signals (id, session_id, login, magic, symbol, time, direction, style, zone_ref, score_total, spread_points, status,
+                     reject_stage, reject_detail, context_json)
+VALUES (101, 3, 12345, 2026091900, 'EURUSDc', 1788099900, 'BUY', 'DAY', 'H1-1788000000-D', 44, 8, 'ACCEPTED', NULL, NULL,
+        '{"atr_mtf":0.00100,"bias_reason":"OK","entry":1.10000,"max_active":55,"pa":"PIN","rr":5.00,"score_pct":80.0,"sl":1.09800,"tp":1.11000,"tp_source":"ZONE","zone_status":"FRESH"}'),
+       (102, 3, 12345, 2026091900, 'EURUSDc', 1788199900, 'SELL', 'DAY', 'H1-1788100000-S', 37, 8, 'ACCEPTED', NULL, NULL,
+        '{"atr_mtf":0.00100,"bias_reason":"OK","entry":1.10500,"max_active":55,"pa":"ENGULF","rr":2.00,"score_pct":67.3,"sl":1.10700,"tp":1.10100,"tp_source":"RR","zone_status":"TESTED"}'),
+       (103, 3, 12345, 2026091900, 'EURUSDc', 1788150000, 'BUY', 'DAY', 'H1-1788000000-D', 37, 9, 'REJECTED', 'NO_PA_TRIGGER', 'pola=NONE',
+        '{"atr_mtf":0.00100,"bias_reason":"OK","entry":null,"max_active":55,"pa":"NONE","rr":null,"score_pct":67.3,"sl":null,"tp":null,"tp_source":null,"zone_status":"FRESH"}'),
+       (104, 3, 12345, 2026091900, 'EURUSDc', 1788160000, 'BUY', 'DAY', 'H1-1788050000-D', 25, 9, 'REJECTED', 'SCORE_TOO_LOW', 'skor=25 pct=45.5 min=65.0',
+        '{"atr_mtf":0.00100,"bias_reason":"OK","entry":null,"max_active":55,"pa":"TWEEZER","rr":null,"score_pct":45.5,"sl":null,"tp":null,"tp_source":null,"zone_status":"TESTED"}'),
+       (105, 4, 12345, 2026091900, 'EURUSDc', 1788099900, 'BUY', 'DAY', 'H1-1788000000-D', 40, 8, 'ACCEPTED', NULL, NULL,
+        '{"atr_mtf":0.00100,"bias_reason":"OK","entry":1.10001,"max_active":55,"pa":"ENGULF_STRONG","rr":5.00,"score_pct":72.7,"sl":1.09800,"tp":1.11000,"tp_source":"ZONE","zone_status":"FRESH"}');
+
+INSERT INTO signal_scores (signal_id, component, score, max_score)
+VALUES (101, 'ZONE', 30, 30), (101, 'TREND', 7, 15), (101, 'PA', 7, 10),
+       (102, 'ZONE', 15, 30), (102, 'TREND', 15, 15), (102, 'PA', 3, 10),
+       (103, 'ZONE', 30, 30), (103, 'TREND', 7, 15), (103, 'PA', 0, 10),
+       (104, 'ZONE', 15, 30), (104, 'TREND', 7, 15), (104, 'PA', 3, 10),
+       (105, 'ZONE', 30, 30), (105, 'TREND', 0, 15), (105, 'PA', 10, 10);
+
+UPDATE trades SET signal_id = 101 WHERE run_key = 3 AND position_id = 2;
+UPDATE trades SET signal_id = 102 WHERE run_key = 3 AND position_id = 3;
+UPDATE trades SET signal_id = 105 WHERE run_key = 4 AND position_id = 2;

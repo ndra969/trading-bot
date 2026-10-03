@@ -527,6 +527,7 @@ public:
    void OnPositionEvent(const PositionEvent &e) { }
    void OnBalanceOp(const BalanceOpRecord &b)   { }
    void OnAlertStatus(const AlertStatus &s)     { }
+   void OnSignal(const SignalRecord &s)         { }   // posisi dari sinyal diumumkan lewat TRADE_OPENED
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
 
    //--- Siklus

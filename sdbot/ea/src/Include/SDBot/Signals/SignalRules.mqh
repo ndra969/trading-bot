@@ -1,0 +1,162 @@
+//+------------------------------------------------------------------+
+//| SignalRules.mqh — aturan sinyal sebagai fungsi murni (spec 13
+//| Req 1–6; design §3.1): skor per komponen, tahap tolak pertama
+//| sesuai urutan PRD, entry/SL/TP/R:R dari zona, ID sinyal
+//| deterministik, dan isi signals.context_json. Tanpa akses terminal.
+//+------------------------------------------------------------------+
+#ifndef SDB_SIGNALS_SIGNALRULES_MQH
+#define SDB_SIGNALS_SIGNALRULES_MQH
+
+#include <SDBot/Core/Types.mqh>
+#include <SDBot/Core/Constants.mqh>
+#include <SDBot/Core/SchemaEnums.mqh>
+#include <SDBot/Core/Utils.mqh>
+#include <SDBot/Analysis/MarketStructure.mqh>
+#include <SDBot/Analysis/ZoneRules.mqh>
+#include <SDBot/Strategies/PatternRules.mqh>
+
+// Bar LTF tertutup (barTime = waktu buka) yang sudah lebih tua dari 2 x LTF tidak dinilai (Req 1.3).
+bool StaleLtfBar(const datetime barTime, const int ltfSec, const datetime now)
+  {
+   return (long)(now - barTime) > (long)SDB_SIGNAL_STALE_BARS * ltfSec;
+  }
+
+double ScorePct(const int total, const int maxActive)
+  {
+   return maxActive > 0 ? 100.0 * total / maxActive : 0.0;
+  }
+
+string ZoneStatusText(const ENUM_SDB_ZONE_STATUS s)
+  {
+   switch(s)
+     {
+      case SDB_ZONE_FRESH:   return "FRESH";
+      case SDB_ZONE_TESTED:  return "TESTED";
+      case SDB_ZONE_WEAK:    return "WEAK";
+      case SDB_ZONE_INVALID: return "INVALID";
+      default:               return "EXPIRED";
+     }
+  }
+
+bool SgReject(string &stage, string &detail, const string s, const string d)
+  {
+   stage = s;
+   detail = d;
+   return false;
+  }
+
+// Entry market, SL dari batas jauh zona + buffer (SELL + spread), TP zona lawan atau minRR x R (Req 4.1–4.6).
+bool BuildStops(const SdbSignalFacts &f, const SdbSignalParams &p, SdbStops &s, string &stage, string &detail)
+  {
+   ZeroMemory(s);
+   bool buy = (f.dir == SDB_DIR_BULL);
+   double spread = f.ask - f.bid;
+   double eps = SDB_SIGNAL_EPS * f.atrMtf;
+   s.entry = buy ? f.ask : f.bid;
+   double sl = buy ? f.zone.distal - p.slBufferAtr * f.atrMtf : f.zone.distal + p.slBufferAtr * f.atrMtf + spread;
+   s.sl = NormalizeDouble(sl, f.digits);
+   s.risk = buy ? s.entry - s.sl : s.sl - s.entry;
+   if(s.risk <= 0.0)
+      return SgReject(stage, detail, SDB_REJECT_STAGE_INVALID_STOPS,
+                      StringFormat("entry=%s sl=%s", DoubleToString(s.entry, f.digits), DoubleToString(s.sl, f.digits)));
+   double minDist = MathMax(f.stopsLevel * f.point + spread, p.minSlAtr * f.atrMtf);
+   if(s.risk < minDist - eps)
+      return SgReject(stage, detail, SDB_REJECT_STAGE_SL_TOO_CLOSE,
+                      StringFormat("r=%s min=%s", DoubleToString(s.risk, f.digits), DoubleToString(minDist, f.digits)));
+   if(s.risk > p.maxSlAtr * f.atrMtf + eps)
+      return SgReject(stage, detail, SDB_REJECT_STAGE_SL_TOO_FAR,
+                      StringFormat("r=%s max=%s", DoubleToString(s.risk, f.digits), DoubleToString(p.maxSlAtr * f.atrMtf, f.digits)));
+   if(f.haveOpposite)
+     {
+      s.tp = NormalizeDouble(f.oppositeProximal, f.digits);
+      s.tpSource = SDB_TP_SOURCE_ZONE;
+     }
+   else
+     {
+      s.tp = NormalizeDouble(buy ? s.entry + p.minRR * s.risk : s.entry - p.minRR * s.risk, f.digits);
+      s.tpSource = SDB_TP_SOURCE_RR;
+     }
+   double reward = buy ? s.tp - s.entry : s.entry - s.tp;
+   s.rr = reward / s.risk;
+   if(reward < p.minRR * s.risk - eps)
+      return SgReject(stage, detail, SDB_REJECT_STAGE_RR_TOO_LOW, StringFormat("rr=%.2f min=%.2f", s.rr, p.minRR));
+   return true;
+  }
+
+// Skor selalu dihitung; tahap tolak pertama dalam urutan PRD (Req 2.2–2.4, 3.1). Lot dan eksekusi di engine.
+void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecision &d)
+  {
+   ZeroMemory(d);
+   d.stage = "";
+   d.detail = "";
+   bool patternOk = f.pattern.code != SDB_PA_PATTERN_NONE && f.pattern.dir == f.dir && f.dir != SDB_DIR_NONE;
+   d.zoneScore = ZoneScore(f.zone);
+   d.trendScore = f.trendScore;
+   d.paScore = patternOk ? PaScore(f.pattern.code) : 0;
+   d.total = d.zoneScore + d.trendScore + d.paScore;
+   d.maxActive = SDB_SCORE_MAX_ACTIVE;
+   d.pct = ScorePct(d.total, d.maxActive);
+   if(f.preStage != "")
+     {
+      d.stage = f.preStage;
+      d.detail = f.preDetail;
+      return;
+     }
+   if(f.positionOpen)
+     {
+      d.stage = SDB_REJECT_STAGE_POSITION_OPEN;
+      return;
+     }
+   if(!patternOk)
+     {
+      d.stage = SDB_REJECT_STAGE_NO_PA_TRIGGER;
+      d.detail = "pola=" + f.pattern.code;
+      return;
+     }
+   if(d.pct < p.minScorePct - SDB_SIGNAL_EPS)
+     {
+      d.stage = SDB_REJECT_STAGE_SCORE_TOO_LOW;
+      d.detail = StringFormat("skor=%d pct=%.1f min=%.1f", d.total, d.pct, p.minScorePct);
+      return;
+     }
+   d.stopsKnown = true;
+   BuildStops(f, p, d.stops, d.stage, d.detail);
+  }
+
+// 62 bit pertama SHA-256 "login|runKey|magic|barTime": sama setelah restart, beda antar akun/run/instance/bar (Req 5.1).
+long SignalIdOf(const long login, const long runKey, const long magic, const datetime barTime)
+  {
+   string hex = Sha256Hex(StringFormat("%I64d|%I64d|%I64d|%I64d", login, runKey, magic, (long)barTime));
+   ulong v = 0;
+   for(int i = 0; i < 16 && i < StringLen(hex); i++)
+     {
+      ushort c = StringGetCharacter(hex, i);
+      int nib = (c >= '0' && c <= '9') ? c - '0' : c - 'a' + 10;
+      v = (v << 4) | (ulong)nib;
+     }
+   long id = (long)(v & 0x3FFFFFFFFFFFFFFF);
+   return id == 0 ? 1 : id;
+  }
+
+// signals.context_json: JSON kanonik; harga yang belum dihitung = null (Req 6.1).
+string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const string biasReason)
+  {
+   string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status"};
+   string v[];
+   ArrayResize(v, ArraySize(k));
+   bool known = d.stopsKnown && d.stops.risk > 0.0;
+   v[0] = DoubleToString(f.atrMtf, f.digits);
+   v[1] = JsonStr(biasReason);
+   v[2] = known ? DoubleToString(d.stops.entry, f.digits) : "null";
+   v[3] = IntegerToString(d.maxActive);
+   v[4] = JsonStr(f.pattern.code);
+   v[5] = known && d.stops.tpSource != "" ? DoubleToString(d.stops.rr, 2) : "null";
+   v[6] = DoubleToString(d.pct, 1);
+   v[7] = known ? DoubleToString(d.stops.sl, f.digits) : "null";
+   v[8] = known && d.stops.tpSource != "" ? DoubleToString(d.stops.tp, f.digits) : "null";
+   v[9] = known && d.stops.tpSource != "" ? JsonStr(d.stops.tpSource) : "null";
+   v[10] = JsonStr(ZoneStatusText(f.zone.status));
+   return CanonicalJson(k, v);
+  }
+
+#endif // SDB_SIGNALS_SIGNALRULES_MQH

@@ -74,7 +74,7 @@ void RunTestExecutionBroker()
    ENUM_SDB_RETCODE_CLASS cls[] = {SDB_RC_SUCCESS, SDB_RC_SUCCESS, SDB_RC_SUCCESS, SDB_RC_NO_CHANGES,
                                    SDB_RC_TRANSIENT, SDB_RC_TRANSIENT, SDB_RC_TRANSIENT, SDB_RC_TRANSIENT, SDB_RC_TRANSIENT,
                                    SDB_RC_AMBIGUOUS, SDB_RC_AMBIGUOUS, SDB_RC_AMBIGUOUS, SDB_RC_AMBIGUOUS,
-                                   SDB_RC_POSITION_GONE, SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT,
+                                   SDB_RC_POSITION_GONE, SDB_RC_MARKET_CLOSED, SDB_RC_PERMANENT, SDB_RC_PERMANENT,
                                    SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT, SDB_RC_PERMANENT};
    string wrong = "";
    for(int i = 0; i < ArraySize(rc); i++)
@@ -91,6 +91,9 @@ void RunTestExecutionBroker()
               NextStep(SDB_RC_NO_CHANGES, 1, false) == SDB_STEP_SUCCEED &&
               NextStep(SDB_RC_POSITION_GONE, 1, false) == SDB_STEP_GONE &&
               NextStep(SDB_RC_SUCCESS, 2, false) == SDB_STEP_SUCCEED);
+   // TC-EX-33 (temuan backtest dasar spec 13): pasar tutup bukan kegagalan; ditunda ke tick berikutnya tanpa retry beruntun.
+   AssertTrue("TC-EX-33", "MARKET_CLOSED attempt 1 dan 4 -> DEFER",
+              NextStep(SDB_RC_MARKET_CLOSED, 1, false) == SDB_STEP_DEFER && NextStep(SDB_RC_MARKET_CLOSED, 4, false) == SDB_STEP_DEFER);
   }
 
 void RunTestExecutionComment()

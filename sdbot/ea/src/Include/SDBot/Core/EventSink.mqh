@@ -8,6 +8,7 @@
 #define SDB_CORE_EVENTSINK_MQH
 
 #include <SDBot/Core/Types.mqh>
+#include <SDBot/Core/SchemaEnums.mqh>
 
 interface ISdbEventSink
   {
@@ -19,6 +20,7 @@ interface ISdbEventSink
    void OnBalanceOp(const BalanceOpRecord &b);
    void OnAlert(const AlertEvent &a);
    void OnAlertStatus(const AlertStatus &s);   // hasil kirim notifikasi (spec 08)
+   void OnSignal(const SignalRecord &s);       // kandidat sinyal + skor (spec 13)
    bool FindInitialSl(const long login, const ulong positionId, double &sl);
   };
 
@@ -34,6 +36,7 @@ public:
    void OnBalanceOp(const BalanceOpRecord &b)   { }
    void OnAlert(const AlertEvent &a)            { }
    void OnAlertStatus(const AlertStatus &s)     { }
+   void OnSignal(const SignalRecord &s)         { }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
   };
 

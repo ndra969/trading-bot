@@ -1,0 +1,7 @@
+; SC-14: pipeline sinyal (bukan entry terjadwal) membuka posisi; setiap trade punya signal_id, skor 3 komponen, satu entry per zona.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-14
+HarnessEveryBars=0
+HarnessPipeline=true

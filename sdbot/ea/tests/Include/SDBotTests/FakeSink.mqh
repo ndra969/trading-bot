@@ -18,6 +18,7 @@ private:
    TradeRecord       m_trades[];
    PositionEvent     m_events[];
    AlertStatus       m_statuses[];
+   SignalRecord      m_signals[];
 
 public:
    void OnAccount(const AccountSnapshot &a)
@@ -63,7 +64,22 @@ public:
       ArrayResize(m_statuses, n + 1);
       m_statuses[n] = s;
      }
+   void OnSignal(const SignalRecord &s)
+     {
+      int n = ArraySize(m_signals);
+      ArrayResize(m_signals, n + 1);
+      m_signals[n] = s;
+     }
    bool FindInitialSl(const long login, const ulong positionId, double &sl) { sl = 0.0; return false; }
+   int  CountSignal() const  { return ArraySize(m_signals); }
+   bool LastSignal(SignalRecord &out) const
+     {
+      int n = ArraySize(m_signals);
+      if(n == 0)
+         return false;
+      out = m_signals[n - 1];
+      return true;
+     }
 
    int  CountAccount() const { return ArraySize(m_accounts); }
    int  CountAlert() const   { return ArraySize(m_alerts); }

@@ -107,6 +107,12 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpZoneMinLegAtr", "1.5"),
     ("InpZoneLegBars", "10"),
     ("InpMaxZoneAgeBars", "100"),
+    # Sinyal dan entry (spec 13, PC-19): skor = persen dari maksimum komponen aktif; SL relatif ATR(14) H1
+    ("InpMinConfluenceScore", "65"),
+    ("InpMinRR", "2.0"),
+    ("InpSlBufferAtr", "0.1"),
+    ("InpMinSlAtr", "0.3"),
+    ("InpMaxSlAtr", "3.0"),
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),

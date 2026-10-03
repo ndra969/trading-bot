@@ -176,3 +176,18 @@ def test_ts49_pa_pattern_enum(real_schema_dir: Path):
     assert pa.values == ["STAR", "ENGULF_STRONG", "PIN", "ENGULF", "TWEEZER", "OUTSIDE", "NONE"]
     assert not pa.has_check
     assert pa.columns == ["signals.context_json"]
+
+
+def test_ts50_signal_enums(real_schema_dir: Path):
+    """Spec 13: tahap tolak baru, komponen skor, dan sumber TP (PC-19)."""
+    enums = {e.name: e for e in schema.load_enums(real_schema_dir / "enums.md")}
+    stages = enums["reject_stage"].values
+    assert "POSITION_OPEN" in stages and "SL_TOO_FAR" in stages
+    assert stages.index("POSITION_OPEN") < stages.index("NO_PA_TRIGGER")
+    comp = enums["score_component"]
+    assert comp.values == ["ZONE", "TREND", "PA", "FIB", "TRENDLINE", "BREAKOUT", "RSI"]
+    assert not comp.has_check
+    assert comp.columns == ["signal_scores.component"]
+    tp = enums["tp_source"]
+    assert tp.values == ["ZONE", "RR"]
+    assert tp.columns == ["signals.context_json"]

@@ -175,6 +175,7 @@ SdbAppConfig TrkConfig(CTrkRig &r)
    c.inputs = r.inputs;
    c.dbTarget = SDB_DB_NONE;
    c.resetEmergencyStop = false;
+   c.signalsOn = false;
    return c;
   }
 
@@ -226,6 +227,29 @@ void RunTestRiskMonitor(CTrkRig &r)
    AssertTrue("TC-RK-13", "rugi harian > batas: pause harian aktif, DAILY_LOSS tepat sekali", paused);
   }
 
+// TC-RK-14 (temuan SC-14 spec 13): lot dari CalcVolume selalu lolos cek risiko per trade PreTradeCheck.
+// OrderCalcProfit membulatkan uang ke sen, jadi uang/lot x lot bisa sedikit di bawah rugi volume itu sebenarnya.
+void RunTestRiskLotFits(CTrkRig &r)
+  {
+   int tried = 0, over = 0;
+   string first = "";
+   for(int b = 0; b < 25; b++)
+   for(int sl = 41; sl <= 401; sl += 9)
+      for(int dir = 0; dir < 2; dir++)
+        {
+         r.rm.SetBalanceForTest(9900.0 + b * 7.31);   // SC-14: balance 9973.92, SELL SL 166 pt, 30.04 lot
+         OrderRequest rq = TrkRequest(_Symbol, dir == 0, sl, 0.0);
+         string stage = "", detail = "";
+         if(!r.rm.CalcVolume(rq, stage, detail))
+            continue;
+         tried++;
+         if(!r.rm.PreTradeCheck(rq, stage, detail) && stage == SDB_REJECT_STAGE_RISK_PER_TRADE && over++ == 0)
+            first = StringFormat("sl=%d %s %s", sl, dir == 0 ? "BUY" : "SELL", detail);
+        }
+   r.rm.SetBalanceForTest(0.0);
+   AssertTrue("TC-RK-14", StringFormat("%d lot dari CalcVolume, ditolak RISK_PER_TRADE %d %s", tried, over, first), tried > 1000 && over == 0);
+  }
+
 void RunTestRisk()
   {
    TfBeginSuite("Risk");
@@ -244,6 +268,7 @@ void RunTestRisk()
    else
      {
       RunTestRiskManagerFlags(r);
+      RunTestRiskLotFits(r);
       RunTestRiskManagerPositions(r);
       RunTestRiskMonitor(r);
       RunTestRiskManagerOtherSymbols();

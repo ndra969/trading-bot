@@ -1,18 +1,18 @@
 //+------------------------------------------------------------------+
 //| SDBot.mq5 — EA Supply & Demand + konfluensi (PRD-EA).
-//| v1.11 (spec 12 trigger PA): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
+//| v1.12 (spec 13 sinyal dan entry, Fase 3 selesai): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
 //| yang memegang validasi input dan akun, state bersama, pencatatan
 //| SQLite, CExecutor, risk management (spec 05), dan manajemen posisi
 //| (BE, partial, trailing ATR, closure, rekonsiliasi), metrik OnTester, notifier
-//| (Telegram, push HP, heartbeat, laporan harian), analisis struktur, bias HTF, dan
-//| peta zona S&D, pola candle LTF (belum dipakai untuk entry). Belum ada logika entry:
-//| EA ini tidak membuka posisi sebelum Fase 3 (spec 04 Req 6.7).
+//| (Telegram, push HP, heartbeat, laporan harian), analisis struktur, bias HTF,
+//| peta zona S&D, pola candle LTF, dan pipeline sinyal yang membuka posisi sendiri
+//| (bias + zona + trigger PA, skor, SL/TP dari zona) lewat jalur risiko Fase 1.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.11"
-#property description "SDBot EA v1.11: risk management, manajemen posisi, pencatatan SQLite, notifikasi Telegram, bias HTF, zona S&D, pola PA. Tidak membuka posisi apa pun."
+#property version   "1.12"
+#property description "SDBot EA v1.12: entry S&D (bias HTF, zona H1, trigger PA M15, skor), risk management, manajemen posisi, pencatatan SQLite, notifikasi Telegram."
 
-#define SDB_EA_VERSION "1.11"   // sama dengan #property version
+#define SDB_EA_VERSION "1.12"   // sama dengan #property version
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>

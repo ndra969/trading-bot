@@ -69,7 +69,8 @@ enum ENUM_SDB_RETCODE_CLASS
    SDB_RC_TRANSIENT = 2,       // requote, harga berubah: aman diulang
    SDB_RC_AMBIGUOUS = 3,       // tanpa jawaban pasti: cari dulu berdasarkan ID permintaan
    SDB_RC_POSITION_GONE = 4,
-   SDB_RC_PERMANENT = 5
+   SDB_RC_PERMANENT = 5,
+   SDB_RC_MARKET_CLOSED = 6    // sesi simbol tutup (jeda harian, akhir pekan): tunda, bukan gagal
   };
 
 enum ENUM_SDB_NEXT_STEP
@@ -77,7 +78,8 @@ enum ENUM_SDB_NEXT_STEP
    SDB_STEP_SUCCEED = 0,
    SDB_STEP_RETRY = 1,
    SDB_STEP_GONE = 2,
-   SDB_STEP_GIVE_UP = 3
+   SDB_STEP_GIVE_UP = 3,
+   SDB_STEP_DEFER = 4          // coba lagi di tick berikutnya, tanpa retry beruntun dan tanpa ERROR
   };
 
 enum ENUM_SDB_EXEC
@@ -409,6 +411,80 @@ struct SdbPattern
    ENUM_SDB_DIR      dir;
    int               score;           // PRD: engulfing kuat 10, pin bar 7, terarah lain 3, tanpa pola 0
    datetime          barTime;
+  };
+
+// Sinyal dan entry (spec 13 design §3.1): parameter dari input, fakta satu kandidat, hasil penilaian.
+struct SdbSignalParams
+  {
+   double            minScorePct;     // InpMinConfluenceScore: persen dari maksimum aktif
+   double            minRR;
+   double            slBufferAtr;
+   double            minSlAtr;
+   double            maxSlAtr;
+  };
+
+struct SdbSignalFacts
+  {
+   ENUM_SDB_DIR      dir;             // arah bias HTF = arah kandidat
+   SdbZone           zone;            // zona valid searah yang disentuh bar
+   string            preStage;        // "" = lolos pre-filter risiko, selain itu SDB_REJECT_STAGE_*
+   string            preDetail;
+   bool              positionOpen;    // instance (magic + simbol) masih punya posisi
+   SdbPattern        pattern;         // pola bar LTF untuk arah kandidat
+   int               trendScore;      // TrendScore MTF
+   double            bid;
+   double            ask;
+   double            point;
+   int               digits;
+   int               stopsLevel;      // point
+   double            atrMtf;          // ATR(14) MTF bar tertutup terakhir
+   bool              haveOpposite;
+   double            oppositeProximal;
+  };
+
+struct SdbStops
+  {
+   double            entry;
+   double            sl;
+   double            tp;
+   double            risk;            // R: jarak entry ke SL
+   double            rr;
+   string            tpSource;        // SDB_TP_SOURCE_*
+  };
+
+struct SdbDecision
+  {
+   string            stage;           // "" = lolos sampai tahap SL/TP; lot dan eksekusi dinilai engine
+   string            detail;
+   int               zoneScore;
+   int               trendScore;
+   int               paScore;
+   int               total;
+   int               maxActive;
+   double            pct;
+   SdbStops          stops;
+   bool              stopsKnown;
+  };
+
+// Satu kandidat sinyal (tabel signals + 3 baris signal_scores). id dari SignalIdOf, bukan DB.
+struct SignalRecord
+  {
+   long              id;
+   long              magic;
+   string            symbol;
+   datetime          time;            // waktu buka bar LTF (server)
+   string            direction;       // SDB_DIRECTION_*
+   string            style;           // SDB_TRADING_STYLE_*
+   string            zoneRef;
+   double            scoreTotal;
+   long              spreadPoints;
+   string            status;          // SDB_SIGNAL_STATUS_*
+   string            rejectStage;     // "" untuk ACCEPTED
+   string            rejectDetail;
+   string            contextJson;
+   int               scoreZone;
+   int               scoreTrend;
+   int               scorePa;
   };
 
 // Laporan harian (spec 09 design §4.1-4.2).

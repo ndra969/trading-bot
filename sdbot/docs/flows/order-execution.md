@@ -4,7 +4,7 @@ Fase 1 hanya membuka posisi lewat harness uji; entry dari sinyal masuk di Fase 3
 
 ```mermaid
 flowchart TB
-    S([permintaan entry: arah, SL, TP]) --> L[CRiskManager.CalcVolume: balance x risiko% / OrderCalcProfit, bulat ke bawah]
+    S([permintaan entry: arah, SL, TP]) --> L[CRiskManager.CalcVolume: balance x risiko% / OrderCalcProfit, bulat ke bawah; turun per step bila rugi lot akhir (dibulatkan broker) > risiko, spec 13]
     L -->|lot < minimum| R1[tolak LOT_BELOW_MIN]
     L --> P[PreTradeCheck berurutan]
     P --> P1{boleh trading?} -->|tidak| X1[NOT_TRADABLE]
