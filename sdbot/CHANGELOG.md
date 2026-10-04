@@ -4,6 +4,15 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.14 — 2026-10-04 — perbaikan: Critical CLOSE_ALL_FAILED palsu saat pasar tutup
+
+- Bug: emergency close all menghitung posisi sebagai **gagal** bila broker menjawab 10018 "market closed" padahal jadwal sesi bilang buka (misalnya pukul 21:00 server), atau saat jeda 60 detik v1.13 aktif. Setelah 3 kali, `CRiskMonitor` mengirim Critical `CLOSE_ALL_FAILED` palsu.
+- Perbaikan: `CloseAnyPosition` membedakan tutup / ditunda / gagal. Ditunda (jadwal tutup, jeda, atau 10018) dihitung `closedMarket`, bukan `failed`. Hook uji retcode kini juga berlaku untuk close all.
+- Satu sumber jadwal sesi `SymbolSessionOpen` (waktu `TimeTradeServer`) untuk close all dan penahan request; `InTradeSession` mendukung sesi lewat tengah malam; fungsi duplikat dari v1.13 dihapus. Broker tanpa jadwal sesi sama sekali dianggap selalu buka.
+- Uji: TC-RK-15 (10018 dan jeda = `closedMarket`, tanpa kiriman saat jeda); TC-EX-34 kini memakai `InTradeSession`.
+
+Regresi (2026-10-04): build 0 error / 0 warning; unit 565/565; 21 skenario PASS (SC-00..SC-14x).
+
 ### 1.13 — 2026-10-03 — perbaikan: request saat pasar tutup
 
 - Bug: setelah perbaikan 1.12, modify SL / partial yang ditolak "market closed" (retcode 10018) dikirim ulang setiap tick selama pasar tutup. Di live ini bisa membanjiri broker dengan request.

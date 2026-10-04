@@ -100,11 +100,11 @@ void RunTestExecutionBroker()
    int f2[] = {79200};             // 22:00-02:00
    int t2[] = {7200};
    int none[];
-   bool gold = SessionContains(f1, t1, 75540) && !SessionContains(f1, t1, 75600) && !SessionContains(f1, t1, 77400) &&
-               SessionContains(f1, t1, 79500) && SessionContains(f1, t1, 86399) && SessionContains(f1, t1, 0);
-   bool wrap = SessionContains(f2, t2, 3600) && SessionContains(f2, t2, 82800) && !SessionContains(f2, t2, 43200);
+   bool gold = InTradeSession(75540, f1, t1) && !InTradeSession(75600, f1, t1) && !InTradeSession(77400, f1, t1) &&
+               InTradeSession(79500, f1, t1) && InTradeSession(86399, f1, t1) && InTradeSession(0, f1, t1);
+   bool wrap = InTradeSession(3600, f2, t2) && InTradeSession(82800, f2, t2) && !InTradeSession(43200, f2, t2);
    AssertTrue("TC-EX-34", "sesi 00:00-21:00 + 22:05-24:00: 20:59 buka, 21:00 dan 21:30 tutup, 22:05 buka; 22:00-02:00 lewat tengah malam; tanpa sesi tutup",
-              gold && wrap && !SessionContains(none, none, 3600));
+              gold && wrap && !InTradeSession(3600, none, none));
   }
 
 void RunTestExecutionComment()

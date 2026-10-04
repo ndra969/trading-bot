@@ -90,6 +90,14 @@ enum ENUM_SDB_EXEC
    SDB_EXEC_FAILED = 3
   };
 
+// Hasil satu percobaan close all per posisi (spec 05 Req 5; perbaikan v1.14).
+enum ENUM_SDB_CLOSE_TRY
+  {
+   SDB_CLOSE_TRY_CLOSED = 0,
+   SDB_CLOSE_TRY_DEFERRED = 1,   // pasar tutup: dicoba lagi, bukan gagal
+   SDB_CLOSE_TRY_FAILED = 2
+  };
+
 enum ENUM_SDB_APP_MODE
   {
    SDB_APP_LIVE = 0,           // SDBot.mq5 (live dan backtest)

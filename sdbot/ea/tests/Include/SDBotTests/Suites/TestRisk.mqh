@@ -250,6 +250,33 @@ void RunTestRiskLotFits(CTrkRig &r)
    AssertTrue("TC-RK-14", StringFormat("%d lot dari CalcVolume, ditolak RISK_PER_TRADE %d %s", tried, over, first), tried > 1000 && over == 0);
   }
 
+// TC-RK-15 (bug: close all saat broker menjawab 10018 dihitung gagal -> Critical CLOSE_ALL_FAILED palsu):
+// penolakan pasar tutup dan jeda sesudahnya dihitung closedMarket, bukan failed.
+void RunTestRiskCloseAllMarketClosed(CTrkRig &r)
+  {
+   OrderRequest rq = TrkRequest(_Symbol, true, 300, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN));
+   OrderResult ro;
+   if(!r.exe.OpenMarket(rq, ro))
+     {
+      AssertTrue("TC-RK-15", "posisi uji terbuka | " + ro.rejectStage + " " + ro.detail, false);
+      return;
+     }
+   long s0 = r.exe.SendCount();
+   r.exe.SetForceRetcodeForTest(TRADE_RETCODE_MARKET_CLOSED);
+   CloseAllResult a = r.exe.CloseAllSdbot();
+   long sendA = r.exe.SendCount() - s0;
+   r.exe.SetForceRetcodeForTest(0);
+   long s1 = r.exe.SendCount();
+   CloseAllResult b = r.exe.CloseAllSdbot();   // masih dalam jeda 60 detik: tidak dikirim
+   long sendB = r.exe.SendCount() - s1;
+   r.exe.SetMarketClosedUntilForTest(0);
+   CloseAllResult c = r.exe.CloseAllSdbot();
+   AssertTrue("TC-RK-15", StringFormat("10018: gagal %d pasar_tutup %d kirim %I64d; jeda: gagal %d pasar_tutup %d kirim %I64d; normal: tutup %d",
+                                       a.failed, a.closedMarket, sendA, b.failed, b.closedMarket, sendB, c.closed),
+              a.failed == 0 && a.closedMarket == 1 && sendA == 1 && b.failed == 0 && b.closedMarket == 1 && sendB == 0 &&
+              c.closed == 1 && c.failed == 0);
+  }
+
 void RunTestRisk()
   {
    TfBeginSuite("Risk");
@@ -269,6 +296,7 @@ void RunTestRisk()
      {
       RunTestRiskManagerFlags(r);
       RunTestRiskLotFits(r);
+      RunTestRiskCloseAllMarketClosed(r);
       RunTestRiskManagerPositions(r);
       RunTestRiskMonitor(r);
       RunTestRiskManagerOtherSymbols();

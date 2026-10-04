@@ -110,18 +110,6 @@ ENUM_SDB_RETCODE_CLASS ClassifyRetcode(const uint retcode)
      }
   }
 
-// Detik sejak 00:00 server ada di salah satu sesi [from, to); to <= from = sesi lewat tengah malam.
-bool SessionContains(const int &fromSec[], const int &toSec[], const int secOfDay)
-  {
-   int n = MathMin(ArraySize(fromSec), ArraySize(toSec));
-   for(int i = 0; i < n; i++)
-     {
-      if(fromSec[i] < toSec[i] ? (secOfDay >= fromSec[i] && secOfDay < toSec[i]) : (secOfDay >= fromSec[i] || secOfDay < toSec[i]))
-         return true;
-     }
-   return false;
-  }
-
 // attempt dihitung dari 1 (kiriman pertama): paling banyak 1 kirim + SDB_MAX_RETRY ulangan (Req 2.2–2.4, 4.6).
 ENUM_SDB_NEXT_STEP NextStep(const ENUM_SDB_RETCODE_CLASS c, const int attempt, const bool foundByRequestId)
   {

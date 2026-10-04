@@ -198,8 +198,12 @@ bool InTradeSession(const int secOfDay, const int &from[], const int &to[])
   {
    int n = MathMin(ArraySize(from), ArraySize(to));
    for(int i = 0; i < n; i++)
-      if(secOfDay >= from[i] && secOfDay < to[i])
+     {
+      bool inside = (from[i] < to[i]) ? (secOfDay >= from[i] && secOfDay < to[i])
+                                      : (secOfDay >= from[i] || secOfDay < to[i]);   // to <= from: lewat tengah malam
+      if(inside)
          return true;
+     }
    return false;
   }
 

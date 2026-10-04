@@ -14,7 +14,7 @@ flowchart TB
     L --> H[rugi harian >= batas: CAS pause + DAILY_LOSS High]
     H --> M[margin < 300%: MARGIN_LOW High / pulih: MARGIN_OK]
     M --> C{STOPPED dan ada posisi SDBot?}
-    C -->|ya| CA[CloseAllSdbot tiap 5 detik pasar buka / 60 detik tutup; gagal 3x saat buka: CLOSE_ALL_FAILED Critical, ulang tiap 15 menit]
+    C -->|ya| CA[CloseAllSdbot tiap 5 detik pasar buka / 60 detik tutup; gagal 3x saat buka: CLOSE_ALL_FAILED Critical, ulang tiap 15 menit; ditolak pasar tutup (10018 / jeda 60 detik) dihitung pasar_tutup, bukan gagal]
     C -->|tidak| Z([selesai])
 ```
 

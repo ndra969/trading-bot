@@ -46,37 +46,15 @@ private:
 
    string CounterName() const { return IntegerToString(m_magic) + "_REQ_COUNTER"; }
 
-   // Jadwal sesi trading simbol hari ini (SymbolInfoSessionTrade). Broker tanpa jadwal sama sekali = selalu buka.
    bool TradeSessionOpenNow()
      {
-      if(m_sessionOverride >= 0)
-         return m_sessionOverride == 1;
-      MqlDateTime dt;
-      TimeToStruct(TimeCurrent(), dt);
-      int fromSec[], toSec[];
-      datetime f, t;
-      for(uint i = 0; SymbolInfoSessionTrade(m_symbol, (ENUM_DAY_OF_WEEK)dt.day_of_week, i, f, t); i++)
-        {
-         int n = ArraySize(fromSec);
-         ArrayResize(fromSec, n + 1);
-         ArrayResize(toSec, n + 1);
-         fromSec[n] = (int)((long)f % 86400);
-         toSec[n] = ((long)t >= 86400 && (long)t % 86400 == 0) ? 86400 : (int)((long)t % 86400);
-        }
-      if(ArraySize(fromSec) == 0)
-        {
-         for(int d = 0; d < 7; d++)
-            if(SymbolInfoSessionTrade(m_symbol, (ENUM_DAY_OF_WEEK)d, 0, f, t))
-               return false;   // ada jadwal di hari lain: hari ini tutup
-         return true;
-        }
-      return SessionContains(fromSec, toSec, dt.hour * 3600 + dt.min * 60 + dt.sec);
+      return (m_sessionOverride >= 0) ? (m_sessionOverride == 1) : SymbolSessionOpen(m_symbol);
      }
 
    // Pasar tutup: jeda setelah 10018 atau di luar jadwal sesi. Request tidak dikirim (bug: kiriman tiap tick saat tutup).
    bool MarketBlocked(const string op, string &why)
      {
-      if(TimeCurrent() < m_closedUntil)
+      if(TimeTradeServer() < m_closedUntil)
          why = op + ": pasar tutup, ditahan sampai " + TimeToString(m_closedUntil, TIME_DATE | TIME_SECONDS);
       else if(!TradeSessionOpenNow())
          why = op + ": di luar sesi trading " + m_symbol;
@@ -86,7 +64,7 @@ private:
       return true;
      }
 
-   void NoteMarketClosed() { m_closedUntil = TimeCurrent() + SDB_MARKET_CLOSED_BACKOFF_SEC; }
+   void NoteMarketClosed() { m_closedUntil = TimeTradeServer() + SDB_MARKET_CLOSED_BACKOFF_SEC; }
 
    // Dinaikkan dan di-flush sebelum kiriman pertama, agar restart tidak mengulang ID (Req 5.3, EC-14).
    string NextRequestId()
@@ -331,37 +309,38 @@ private:
       return true;
      }
 
-   // Tutup satu posisi apa pun magic/simbolnya (hanya untuk CloseAllSdbot). true = tertutup atau sudah hilang.
-   bool CloseAnyPosition(const ulong ticket)
+   // Tutup satu posisi apa pun magic/simbolnya (hanya untuk CloseAllSdbot). Pasar tutup (jadwal, jeda, atau
+   // retcode 10018) = DEFERRED, bukan gagal, agar monitor tidak mengirim CLOSE_ALL_FAILED palsu.
+   ENUM_SDB_CLOSE_TRY CloseAnyPosition(const ulong ticket, const string symbol)
      {
       for(int attempt = 1; ; attempt++)
         {
          if(!PositionSelectByTicket(ticket))
-            return true;
-         string blocked;
-         if(MarketBlocked("close all", blocked))
-            return false;
+            return SDB_CLOSE_TRY_CLOSED;
+         if(TimeTradeServer() < m_closedUntil || !SymbolSessionOpen(symbol))
+            return SDB_CLOSE_TRY_DEFERRED;
          m_sendCount++;
-         m_trade.PositionClose(ticket);
-         uint rc = m_trade.ResultRetcode();
+         if(m_forceRc == 0)
+            m_trade.PositionClose(ticket);
+         uint rc = LastRetcode();
          ENUM_SDB_NEXT_STEP step = NextStep(ClassifyRetcode(rc), attempt, false);
          if(step == SDB_STEP_SUCCEED || step == SDB_STEP_GONE)
-            return true;
+            return SDB_CLOSE_TRY_CLOSED;
          if(step == SDB_STEP_DEFER)
            {
             NoteMarketClosed();
             LogWarn("Execution", StringFormat("close all: posisi %I64u ditunda, pasar tutup | retcode=%u", ticket, rc));
-            return false;
+            return SDB_CLOSE_TRY_DEFERRED;
            }
          if(step != SDB_STEP_RETRY)
            {
             LogError("Execution", StringFormat("close all: posisi %I64u gagal ditutup | retcode=%u %s",
                                                ticket, rc, m_trade.ResultRetcodeDescription()));
-            return false;
+            return SDB_CLOSE_TRY_FAILED;
            }
          Sleep(SDB_RETRY_DELAY_MS);
         }
-      return false;
+      return SDB_CLOSE_TRY_FAILED;
      }
 
 public:
@@ -574,7 +553,9 @@ public:
      }
 
    // Pasar simbol buka untuk menutup posisi sekarang: mode trading tidak DISABLED dan dalam sesi trade.
-   bool CloseAllowedNow(const string symbol)
+   // Jadwal sesi trading simbol di waktu server berjalan (SymbolInfoSessionTrade). Trade mode DISABLED = tutup;
+   // broker tanpa jadwal sama sekali = selalu buka. Dipakai close all dan penahan request (MarketBlocked).
+   bool SymbolSessionOpen(const string symbol)
      {
       if((ENUM_SYMBOL_TRADE_MODE)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE) == SYMBOL_TRADE_MODE_DISABLED)
          return false;
@@ -590,8 +571,17 @@ public:
          from[n] = (int)((long)f % 86400);
          to[n] = ((long)t >= 86400) ? 86400 : (int)((long)t % 86400);
         }
+      if(ArraySize(from) == 0)
+        {
+         for(int d = 0; d < 7; d++)
+            if(SymbolInfoSessionTrade(symbol, (ENUM_DAY_OF_WEEK)d, 0, f, t))
+               return false;   // ada jadwal di hari lain: hari ini tutup
+         return true;
+        }
       return InTradeSession(now.hour * 3600 + now.min * 60 + now.sec, from, to);
      }
+
+   bool CloseAllowedNow(const string symbol) { return SymbolSessionOpen(symbol); }
 
    // Satu-satunya operasi lintas simbol dan magic (spec 05 Req 5.8, R2-1/PC-02): tutup semua posisi
    // SDBot di akun. Tanpa alert per posisi; CRiskMonitor yang memutuskan alert CLOSE_ALL_FAILED.
@@ -620,8 +610,11 @@ public:
             r.closedMarket++;
             continue;
            }
-         if(CloseAnyPosition(tickets[i]))
+         ENUM_SDB_CLOSE_TRY c = CloseAnyPosition(tickets[i], symbols[i]);
+         if(c == SDB_CLOSE_TRY_CLOSED)
             r.closed++;
+         else if(c == SDB_CLOSE_TRY_DEFERRED)
+            r.closedMarket++;
          else
             r.failed++;
         }
