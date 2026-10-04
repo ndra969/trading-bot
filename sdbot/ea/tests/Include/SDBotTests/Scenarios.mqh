@@ -1149,6 +1149,41 @@ void CheckSc14(const string id, const CScenarioRecorder &rec)
               closures >= trades - 1 && closures <= trades && stages >= 2);
   }
 
+// SC-15 (spec 14 Req 1.2, 5.2): hanya sesi Tokyo aktif. Entry hanya 00:00-08:00 UTC, kandidat di luar sesi
+// ditolak OUTSIDE_SESSION dengan nama sesi selain TOKYO. Server tester GMT+0 (InpTesterUtcOffsetHours 0).
+void CheckSc15(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string w = " FROM signals WHERE session_id IN (" + ses + ")";
+   long trades = ScDbCount("SELECT COUNT(*) FROM trades WHERE source='EA' AND session_id IN (" + ses + ")");
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED'");
+   long acceptedOutside = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED' AND (((time / 3600) % 24) >= 8 OR "
+                                    "json_extract(context_json, '$.session') <> 'TOKYO')");
+   AssertTrue(id + "-tokyo", StringFormat("%I64d trade, %I64d ACCEPTED; di luar 00-08 UTC / sesi bukan TOKYO: %I64d", trades, accepted, acceptedOutside),
+              trades >= 1 && accepted == trades && acceptedOutside == 0);
+   long outside = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='OUTSIDE_SESSION'");
+   long outsideTokyo = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='OUTSIDE_SESSION' AND "
+                                 "(json_extract(context_json, '$.session') = 'TOKYO' OR ((time / 3600) % 24) < 8)");
+   AssertTrue(id + "-outside", StringFormat("%I64d kandidat OUTSIDE_SESSION, yang ternyata TOKYO: %I64d", outside, outsideTokyo),
+              outside >= 1 && outsideTokyo == 0);
+  }
+
+// SC-15b (spec 14 Req 2.2, 5.2): batas spread 1 point, di bawah spread normal: tidak ada entry, kandidat yang lolos
+// pre-filter risiko dan sesi ditolak SPREAD_TOO_WIDE.
+void CheckSc15b(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string w = " FROM signals WHERE session_id IN (" + ses + ")";
+   long trades = ScDbCount("SELECT COUNT(*) FROM trades WHERE source='EA' AND session_id IN (" + ses + ")");
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED'");
+   long spread = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='SPREAD_TOO_WIDE'");
+   long later = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage IN ('POSITION_OPEN','NO_PA_TRIGGER','SCORE_TOO_LOW','RR_TOO_LOW',"
+                          "'SL_TOO_CLOSE','SL_TOO_FAR','INVALID_STOPS')");
+   AssertTrue(id + "-spread", StringFormat("trade %I64d, ACCEPTED %I64d, SPREAD_TOO_WIDE %I64d, tahap sesudah spread %I64d", trades, accepted,
+                                           spread, later),
+              trades == 0 && accepted == 0 && spread >= 1 && later == 0);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -1188,6 +1223,10 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc13(id, rec);
    else if(id == "SC-14" || id == "SC-14x")
       CheckSc14(id, rec);
+   else if(id == "SC-15")
+      CheckSc15(id, rec);
+   else if(id == "SC-15b")
+      CheckSc15b(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

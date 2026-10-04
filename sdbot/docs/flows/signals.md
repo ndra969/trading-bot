@@ -15,8 +15,10 @@ flowchart TB
     ZN -->|tidak| CZ[hitung tanpa_zona] --> Z
     ZN -->|ya| F[fakta kandidat: STOPPED/pause/CanTrade, posisi instance, pola arah bias, TrendScore MTF, bid/ask, stops, ATR H1, zona lawan]
     F --> E[EvaluateSignal: skor ZONE 30/15 + TREND 15/7/0 + PA 10/7/3 dari 55]
-    E --> S1{pre-filter} -->|gagal| REJ
-    S1 --> S2{posisi instance terbuka?} -->|ya| REJ
+    E --> S1{pre-filter risiko} -->|gagal| REJ
+    S1 --> SS{sesi UTC bar diizinkan? Tokyo 00-08, London 08-17, NY 13-22; 22-24 tidak} -->|tidak: OUTSIDE_SESSION| REJ
+    SS --> SPD{spread ask-bid <= InpMaxSpreadPoints? 0 = mati} -->|tidak: SPREAD_TOO_WIDE| REJ
+    SPD --> S2{posisi instance terbuka?} -->|ya| REJ
     S2 --> S3{pola PA searah?} -->|tidak| REJ
     S3 --> S4{skor >= 65% dari 55?} -->|tidak| REJ
     S4 --> S5[SL = batas jauh -/+ 0,1 ATR, SELL + spread; TP = zona lawan atau 2R]

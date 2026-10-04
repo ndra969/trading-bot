@@ -14,6 +14,7 @@
 #include <SDBot/Analysis/MarketStructure.mqh>
 #include <SDBot/Analysis/ZoneRules.mqh>
 #include <SDBot/Strategies/PatternRules.mqh>
+#include <SDBot/Filters/FilterRules.mqh>
 
 // Bar LTF tertutup (barTime = waktu buka) yang sudah lebih tua dari 2 x LTF tidak dinilai (Req 1.3).
 bool StaleLtfBar(const datetime barTime, const int ltfSec, const datetime now)
@@ -102,6 +103,18 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
       d.detail = f.preDetail;
       return;
      }
+   if(!f.sessionAllowed)
+     {
+      d.stage = SDB_REJECT_STAGE_OUTSIDE_SESSION;
+      d.detail = "sesi=" + f.session;
+      return;
+     }
+   if(!SpreadAllowed(f.spreadPoints, p.maxSpreadPoints))
+     {
+      d.stage = SDB_REJECT_STAGE_SPREAD_TOO_WIDE;
+      d.detail = StringFormat("spread=%I64d max=%d", f.spreadPoints, p.maxSpreadPoints);
+      return;
+     }
    if(f.positionOpen)
      {
       d.stage = SDB_REJECT_STAGE_POSITION_OPEN;
@@ -139,9 +152,10 @@ long SignalIdOf(const long login, const long runKey, const long magic, const dat
   }
 
 // signals.context_json: JSON kanonik; harga yang belum dihitung = null (Req 6.1).
-string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const string biasReason)
+string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const SdbSignalParams &p, const string biasReason)
   {
-   string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status"};
+   string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
+                 "max_spread", "session"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -156,6 +170,8 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const st
    v[8] = known && d.stops.tpSource != "" ? DoubleToString(d.stops.tp, f.digits) : "null";
    v[9] = known && d.stops.tpSource != "" ? JsonStr(d.stops.tpSource) : "null";
    v[10] = JsonStr(ZoneStatusText(f.zone.status));
+   v[11] = IntegerToString(p.maxSpreadPoints);
+   v[12] = JsonStr(f.session);
    return CanonicalJson(k, v);
   }
 

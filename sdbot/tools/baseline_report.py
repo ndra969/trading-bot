@@ -26,6 +26,9 @@ from pathlib import Path
 
 ERROR_LINE = re.compile(r"\[SDB\]\[(ERROR|CRITICAL)\]")
 COMPONENTS = ("ZONE", "TREND", "PA")
+# Kriteria backtest dasar dengan filter Fase 4 (PC-22); Fase 3 tanpa filter memakai 300/15 (PC-19).
+DEFAULT_MIN_TOTAL = 200
+DEFAULT_MIN_SYMBOL = 10
 
 
 @dataclass
@@ -61,10 +64,14 @@ def max_session(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COALESCE(MAX(id), 0) FROM sessions").fetchone()[0]
 
 
-def _run_rows(conn: sqlite3.Connection, after_session: int) -> list[RunRow]:
+def _run_rows(
+    conn: sqlite3.Connection, after_session: int, upto_session: int | None = None
+) -> list[RunRow]:
+    upto = upto_session if upto_session is not None else 2**62
     runs = conn.execute(
-        "SELECT run_key, MIN(symbol) FROM sessions WHERE mode = 'TESTER' AND id > ? GROUP BY run_key ORDER BY run_key",
-        (after_session,),
+        "SELECT run_key, MIN(symbol) FROM sessions WHERE mode = 'TESTER' AND id > ? AND id <= ? "
+        "GROUP BY run_key ORDER BY run_key",
+        (after_session, upto),
     ).fetchall()
     rows = []
     for run_key, symbol in runs:
@@ -107,8 +114,9 @@ def evaluate(
     error_lines: list[str],
     min_total: int,
     min_symbol: int,
+    upto_session: int | None = None,
 ) -> Report:
-    rows = _run_rows(conn, after_session)
+    rows = _run_rows(conn, after_session, upto_session)
     errors = [line.strip() for line in error_lines if ERROR_LINE.search(line)]
     problems: list[str] = []
     if not rows:
@@ -132,14 +140,25 @@ def evaluate(
     return Report(rows, errors, problems)
 
 
-def render(rep: Report) -> str:
-    head = f"{'simbol':<9} {'run':>5} {'kandidat':>8} {'trade':>5} {'win%':>5} {'R total':>8} {'R/trade':>7}  tahap tolak teratas"
+def render(rep: Report, ref: Report | None = None) -> str:
+    """Tabel per simbol; ref = backtest pembanding (misalnya Fase 3 tanpa filter) di kolom 'ref'."""
+    by_ref = {r.symbol: r for r in ref.rows} if ref else {}
+    extra = f" {'ref trade':>9} {'ref R/tr':>8}" if ref else ""
+    head = (
+        f"{'simbol':<9} {'run':>5} {'kandidat':>8} {'trade':>5} {'win%':>5} {'R total':>8} {'R/trade':>7}"
+        f"{extra}  tahap tolak teratas"
+    )
     lines = [head, "-" * len(head)]
     for r in rep.rows:
         win = 100.0 * r.wins / r.closed if r.closed else 0.0
         top = ", ".join(f"{s} {n}" for s, n in r.stages.most_common(4) if s != "ACCEPTED")
+        cmp = ""
+        if ref:
+            o = by_ref.get(r.symbol)
+            cmp = f" {o.trades:>9} {o.expectancy:>8.3f}" if o else f" {'-':>9} {'-':>8}"
         lines.append(
-            f"{r.symbol:<9} {r.run_key:>5} {r.candidates:>8} {r.trades:>5} {win:>5.1f} {r.total_r:>8.2f} {r.expectancy:>7.3f}  {top}"
+            f"{r.symbol:<9} {r.run_key:>5} {r.candidates:>8} {r.trades:>5} {win:>5.1f} {r.total_r:>8.2f} "
+            f"{r.expectancy:>7.3f}{cmp}  {top}"
         )
     closed = sum(r.closed for r in rep.rows)
     total_r = sum(r.total_r for r in rep.rows)
@@ -158,8 +177,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--after-session", type=int, default=0)
     ap.add_argument("--max-session", action="store_true")
     ap.add_argument("--errors", type=Path, help="file baris log ERROR/CRITICAL dari jurnal tester")
-    ap.add_argument("--min-total", type=int, default=300)
-    ap.add_argument("--min-symbol", type=int, default=15)
+    ap.add_argument("--min-total", type=int, default=DEFAULT_MIN_TOTAL)
+    ap.add_argument("--min-symbol", type=int, default=DEFAULT_MIN_SYMBOL)
+    ap.add_argument("--compare-from", type=int, help="pembanding: sesi > N")
+    ap.add_argument(
+        "--compare-to", type=int, help="pembanding: sampai sesi <= M (backtest dasar sebelumnya)"
+    )
     args = ap.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # konsol Windows cp1252
@@ -185,9 +208,19 @@ def main(argv: list[str] | None = None) -> int:
             min_total=args.min_total,
             min_symbol=args.min_symbol,
         )
+        ref = None
+        if args.compare_from is not None and args.compare_to is not None:
+            ref = evaluate(
+                conn,
+                after_session=args.compare_from,
+                upto_session=args.compare_to,
+                error_lines=[],
+                min_total=0,
+                min_symbol=0,
+            )
     finally:
         conn.close()
-    print(render(rep))
+    print(render(rep, ref))
     return 0 if rep.ok else 1
 
 

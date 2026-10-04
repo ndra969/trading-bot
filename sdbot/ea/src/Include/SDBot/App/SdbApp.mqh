@@ -142,9 +142,16 @@ private:
       sp.slBufferAtr = cfg.inputs.slBufferAtr;
       sp.minSlAtr = cfg.inputs.minSlAtr;
       sp.maxSlAtr = cfg.inputs.maxSlAtr;
+      sp.maxSpreadPoints = cfg.inputs.maxSpreadPoints;
+      SdbSessionParams ses;
+      ses.tokyo = cfg.inputs.sessionTokyo;
+      ses.london = cfg.inputs.sessionLondon;
+      ses.newYork = cfg.inputs.sessionNewYork;
+      if(cfg.inputs.maxSpreadPoints <= 0 && MQLInfoInteger(MQL_TESTER) == 0)
+         LogWarn("App", "InpMaxSpreadPoints 0: filter spread mati (preset per simbol mengisi batasnya)");
       m_signals.Init(_Symbol, cfg.inputs.magic, ltf, sp, GetPointer(m_structure), GetPointer(m_zones), GetPointer(m_trigger),
                      GetPointer(m_riskState), GetPointer(m_riskManager), GetPointer(m_executor), GetPointer(m_account), m_sink,
-                     cfg.style);
+                     cfg.style, ses, cfg.inputs.testerUtcOffsetHours);
      }
 
    void SendSnapshot()

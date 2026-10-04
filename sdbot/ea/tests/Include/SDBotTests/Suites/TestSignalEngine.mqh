@@ -24,13 +24,23 @@ SdbSignalParams TseParams()
    p.slBufferAtr = v.slBufferAtr;
    p.minSlAtr = v.minSlAtr;
    p.maxSlAtr = v.maxSlAtr;
+   p.maxSpreadPoints = v.maxSpreadPoints;
    return p;
+  }
+
+SdbSessionParams TseSessions()
+  {
+   SdbSessionParams s;
+   s.tokyo = true;   // semua sesi: bar uji jatuh di jam berapa pun
+   s.london = true;
+   s.newYork = true;
+   return s;
   }
 
 void TseInit(CSignalEngine &eng, CMarketStructure &ms, CZoneBook &zb, CPaTrigger &pt, ISdbEventSink *sink, CState &st)
   {
    eng.Init(_Symbol, TSE_MAGIC, PERIOD_M15, TseParams(), GetPointer(ms), GetPointer(zb), GetPointer(pt), NULL, NULL, NULL, NULL,
-            sink, SDB_STYLE_DAY);
+            sink, SDB_STYLE_DAY, TseSessions(), 0);
    eng.SetState(GetPointer(st), TSE_LOGIN, 0);
   }
 

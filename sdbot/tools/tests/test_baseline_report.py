@@ -118,3 +118,24 @@ def test_ts52_only_sessions_after_marker(tmp_path):
     finally:
         conn.close()
     assert [r.symbol for r in rep.rows] == ["XAUUSDc"]
+
+
+def test_ts55_defaults_and_compare(tmp_path):
+    """Spec 14 Req 5.3: default kriteria Fase 4 200/10; pembanding per simbol dari sesi backtest lain."""
+    assert baseline_report.DEFAULT_MIN_TOTAL == 200 and baseline_report.DEFAULT_MIN_SYMBOL == 10
+    path = _db(tmp_path, {"EURUSDc": 6, "XAUUSDc": 5})  # sesi 1 = EURUSD, sesi 2 = XAUUSD
+    conn = sqlite3.connect(path)
+    try:
+        ref = baseline_report.evaluate(
+            conn, after_session=0, upto_session=1, error_lines=[], min_total=1, min_symbol=1
+        )
+        cur = baseline_report.evaluate(
+            conn, after_session=1, error_lines=[], min_total=1, min_symbol=1
+        )
+    finally:
+        conn.close()
+    assert [r.symbol for r in ref.rows] == ["EURUSDc"]
+    text = baseline_report.render(cur, ref)
+    assert "ref trade" in text and "XAUUSDc" in text
+    eur_ref = baseline_report.render(ref, ref)
+    assert "6" in eur_ref.splitlines()[2]

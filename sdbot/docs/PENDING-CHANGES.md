@@ -4,6 +4,31 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+### PC-22: Input sesi dan spread; kriteria backtest dasar Fase 4
+- Status: Open
+- Tanggal disetujui: 2026-10-04
+- Dokumen: PRD-EA §Parameter input EA, §Pipeline analisis (pre-filter), §Roadmap (Fase 4)
+- Sumber: spec `ea-14-session-spread` requirements (spread tick live 7 hari, 12 simbol), keputusan 1–4
+- Perubahan:
+    - `TradingSessions` menjadi tiga input `SessionTokyo` (false), `SessionLondon` (true), `SessionNewYork` (true); semua false = filter sesi mati. Jam 22:00–24:00 UTC tidak termasuk sesi mana pun.
+    - `MaxSpreadPoints` per simbol, default 3 × median spread live akun cent: EURUSD 24, GBPUSD 30, USDJPY 30, USDCHF 39, AUDUSD 27, USDCAD 48, NZDUSD 42, EURJPY 48, GBPJPY 66, XAUUSD 720, XAGUSD 90, BTCUSD 3000; 0 = mati.
+    - Input `TesterUtcOffsetHours` (default 0): selisih server–UTC di Strategy Tester.
+    - Urutan tahap kandidat: pre-filter risiko → `OUTSIDE_SESSION` → `SPREAD_TOO_WIDE` → `POSITION_OPEN` → trigger PA → skor → SL/TP → lot/pre-trade → eksekusi.
+    - Kriteria backtest dasar dengan filter Fase 4: total ≥ 200 trade dan setiap simbol ≥ 10 trade (menggantikan ≥ 300 / ≥ 15 PC-19 untuk backtest berfilter).
+
+### PC-21: Aturan Fase 4 (pembagian spec, sesi UTC, eksposur, blackout berita, kalender tester)
+- Status: Open
+- Tanggal disetujui: 2026-10-04
+- Dokumen: PRD-EA §Pipeline analisis (pre-filter), §Risk management (eksposur), §Parameter input EA, §Roadmap (Fase 4)
+- Sumber: [fase-4-overview.md](../specs/fase-4-overview.md) §7, keputusan 1–6
+- Perubahan:
+    - Fase 4 dibagi tiga spec: sesi + spread (1.15), eksposur mata uang (1.16), berita (1.17, Fase 4 selesai).
+    - Sesi trading dalam UTC (batas bot Python): Tokyo 00:00–08:00, London 08:00–17:00, New York 13:00–22:00; default London + New York (08:00–22:00 UTC). Kandidat di luar sesi ditolak `OUTSIDE_SESSION`.
+    - `MaxSpreadPoints` per simbol diambil dari spread live akun cent, bukan dari tester; kandidat dengan spread lebih lebar ditolak `SPREAD_TOO_WIDE`.
+    - Eksposur: maks 2 posisi SDBot searah per mata uang di akun, dihitung dengan arah (BUY EURUSD = long EUR + short USD); XAU, XAG, BTC dihitung sebagai mata uang sendiri vs USD.
+    - Blackout berita: high ±30 menit (PRD), medium ±10 menit, low tidak diblokir; event dipetakan ke mata uang simbol.
+    - Di tester, kalender dibaca dari CSV hasil script `ExportCalendar`; tanpa CSV, filter berita mati + satu alert per sesi, entry tidak diblokir.
+
 ## Done
 
 ### PC-20: Lot pas dengan rugi broker; request saat pasar tutup

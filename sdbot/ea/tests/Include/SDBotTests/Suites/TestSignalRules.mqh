@@ -57,6 +57,7 @@ SdbSignalParams SgP0()
    p.slBufferAtr = 0.1;
    p.minSlAtr = 0.3;
    p.maxSlAtr = 3.0;
+   p.maxSpreadPoints = 0;
    return p;
   }
 
@@ -96,6 +97,9 @@ SdbSignalFacts SgF0()
    f.atrMtf = 0.0010;
    f.haveOpposite = false;
    f.oppositeProximal = 0.0;
+   f.session = "OVERLAP";
+   f.sessionAllowed = true;
+   f.spreadPoints = 10;
    return f;
   }
 
@@ -283,18 +287,53 @@ void RunTestSignalMisc()
    f.haveOpposite = true;
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
-   string json = SignalContextJson(f, d, SDB_BIAS_OK);
-   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"max_active\":55,\"pa\":\"PIN\",\"rr\":2.60,"
-                   "\"score_pct\":80.0,\"sl\":1.09990,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
+   string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"max_active\":55,\"max_spread\":0,\"pa\":\"PIN\",\"rr\":2.60,"
+                   "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
    f = SgF0();
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
-   json = SignalContextJson(f, d, SDB_BIAS_OK);
-   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"max_active\":55,\"pa\":\"NONE\",\"rr\":null,"
-            "\"score_pct\":67.3,\"sl\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
+   json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"max_active\":55,\"max_spread\":0,\"pa\":\"NONE\",\"rr\":null,"
+            "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
+  }
+
+// TC-SG-25/26 (spec 14 Req 2.2, 3.1): sesi dan spread setelah pre-filter risiko, sebelum POSITION_OPEN.
+void RunTestSignalFilters()
+  {
+   SdbSignalFacts f = SgF0();
+   f.sessionAllowed = false;
+   f.session = "OFF";
+   string s1 = SgEval(f).stage;
+   string d1 = SgEval(f).detail;
+   f.preStage = SDB_REJECT_STAGE_STOPPED;
+   string s2 = SgEval(f).stage;
+   f.preStage = "";
+   f.positionOpen = true;
+   string s3 = SgEval(f).stage;
+   AssertTrue("TC-SG-25", "di luar sesi: " + s1 + " (" + d1 + "); + STOPPED: " + s2 + "; + posisi terbuka: " + s3,
+              s1 == SDB_REJECT_STAGE_OUTSIDE_SESSION && StringFind(d1, "OFF") >= 0 && s2 == SDB_REJECT_STAGE_STOPPED &&
+              s3 == SDB_REJECT_STAGE_OUTSIDE_SESSION);
+
+   SdbSignalParams p = SgP0();
+   p.maxSpreadPoints = 24;
+   f = SgF0();
+   f.spreadPoints = 25;
+   SdbDecision a;
+   EvaluateSignal(f, p, a);
+   f.spreadPoints = 24;
+   SdbDecision b;
+   EvaluateSignal(f, p, b);
+   f.spreadPoints = 25;
+   f.sessionAllowed = false;
+   SdbDecision c;
+   EvaluateSignal(f, p, c);
+   AssertTrue("TC-SG-26", "spread 25/24: " + a.stage + " (" + a.detail + "); 24/24: '" + b.stage + "'; luar sesi + spread lebar: " + c.stage,
+              a.stage == SDB_REJECT_STAGE_SPREAD_TOO_WIDE && StringFind(a.detail, "spread=25") >= 0 && b.stage == "" &&
+              c.stage == SDB_REJECT_STAGE_OUTSIDE_SESSION);
   }
 
 void RunTestSignalRules()
@@ -304,6 +343,7 @@ void RunTestSignalRules()
    RunTestSignalStops();
    RunTestSignalScores();
    RunTestSignalMisc();
+   RunTestSignalFilters();
    TfEndSuite();
   }
 

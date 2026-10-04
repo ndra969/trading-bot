@@ -49,6 +49,8 @@ private:
    ENUM_TIMEFRAMES   m_ltf;
    SdbSignalParams   m_params;
    string            m_style;
+   SdbSessionParams  m_sessions;      // filter sesi UTC (spec 14)
+   int               m_testerUtcOffsetH;
    CMarketStructure *m_ms;
    CZoneBook        *m_zb;
    CPaTrigger       *m_pt;
@@ -65,6 +67,19 @@ private:
    SdbSignalCounts   m_counts;
 
    bool   StateReady() const { return m_state != NULL && m_state.IsReady(); }
+
+   // Selisih server-UTC: tester dari input, live dari TimeTradeServer - TimeGMT (spec 14 Req 1.4, 4.2).
+   int UtcOffsetNow() const
+     {
+      bool tester = MQLInfoInteger(MQL_TESTER) != 0;
+      datetime gmt = TimeGMT();
+      if(!tester && gmt == 0)
+        {
+         LogThrottled(SDB_LOG_WARN, "signals-gmt", SDB_LOG_THROTTLE_DEFAULT_SEC, "Signals", "TimeGMT tidak tersedia, selisih UTC dianggap 0");
+         return 0;
+        }
+      return ServerUtcOffsetSec(tester, m_testerUtcOffsetH, TimeTradeServer(), gmt);
+     }
    string BarKey() const     { return IntegerToString(m_magic) + "_" + SDB_GV_SIGNAL_BAR; }
 
    // Penanda bar di GV sebelum penilaian, agar restart atau crash di tengah order tidak menilai bar yang sama lagi (Req 1.4).
@@ -138,6 +153,10 @@ private:
       SdbZone opp;
       f.haveOpposite = m_zb.OppositeZone(bias.dir, bias.dir == SDB_DIR_BULL ? f.ask : f.bid, opp);
       f.oppositeProximal = f.haveOpposite ? opp.proximal : 0.0;
+      ENUM_SDB_SESSION ses = SessionOfUtc(UtcSecOfDay(m_lastBar, UtcOffsetNow()));
+      f.session = SessionText(ses);
+      f.sessionAllowed = SessionAllowed(ses, m_sessions);
+      f.spreadPoints = (f.point > 0.0) ? (long)MathRound((f.ask - f.bid) / f.point) : 0;
      }
 
    // Lot dan pre-trade check Fase 1, lalu order; zona Used hanya setelah terisi (Req 4.7, 5.1–5.3).
@@ -187,7 +206,7 @@ private:
       s.status = status;
       s.rejectStage = stage;
       s.rejectDetail = detail;
-      s.contextJson = SignalContextJson(f, d, bias.reason);
+      s.contextJson = SignalContextJson(f, d, m_params, bias.reason);
       s.scoreZone = d.zoneScore;
       s.scoreTrend = d.trendScore;
       s.scorePa = d.paScore;
@@ -209,13 +228,17 @@ public:
 
    void Init(const string symbol, const long magic, const ENUM_TIMEFRAMES ltf, const SdbSignalParams &p, CMarketStructure *ms,
              CZoneBook *zb, CPaTrigger *pt, CRiskState *rs, CRiskManager *rm, CExecutor *exe, CAccount *acc,
-             ISdbEventSink *sink, const ENUM_SDB_TRADING_STYLE style)
+             ISdbEventSink *sink, const ENUM_SDB_TRADING_STYLE style, const SdbSessionParams &sessions, const int testerUtcOffsetHours)
      {
       m_symbol = symbol;
       m_magic = magic;
       m_ltf = ltf;
       m_params = p;
       m_style = SdbStyleText(style);
+      m_sessions = sessions;
+      m_testerUtcOffsetH = testerUtcOffsetHours;
+      if(!SessionFilterOn(sessions))
+         LogInfo("Signals", "filter sesi mati: ketiga input sesi false, entry diizinkan 24 jam");
       m_ms = ms;
       m_zb = zb;
       m_pt = pt;

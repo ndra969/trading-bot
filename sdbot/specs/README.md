@@ -53,7 +53,19 @@ Use case, pembagian spec, arsitektur bersama, strategi uji, dan keputusan terbuk
 | 12 | [ea-12-pa-trigger](ea-12-pa-trigger/) | Pola candle LTF terarah berurutan spesifik ke umum (netral bukan trigger), kekuatan pola, skor PA | 10 | suite PatternRules ALL PASS | **Done** 2026-10-03 (v1.11; MC-PA-01 manual tertunda; PC-18) |
 | 13 | [ea-13-signal-entry](ea-13-signal-entry/) | Pipeline per bar LTF, gerbang, skor, telemetri sinyal, SL/TP dari zona, entry market/limit, EA membuka posisi, DoD Fase 3 | 10–12 | suite SignalRules ALL PASS, SC-14 PASS, backtest dasar 12 simbol | **Done** 2026-10-03 (Fase 3 selesai, v1.12; backtest dasar lolos 351 trade; MC-SG-01..02 manual tertunda; PC-19) |
 
-Versi EA: 10 = `1.09`, 11 = `1.10`, 12 = `1.11`, 13 = `1.12` (Fase 3 selesai).
+Versi EA: 10 = `1.09`, 11 = `1.10`, 12 = `1.11`, 13 = `1.12` (Fase 3 selesai). Perbaikan bug sesudahnya: `1.13`, `1.14`.
+
+## Fase 4 — Filter
+
+Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-4-overview.md](fase-4-overview.md) (Approved 2026-10-04, PC-21).
+
+| # | Spec | Isi | Butuh | Bukti selesai | Status |
+|---|---|---|---|---|---|
+| 14 | [ea-14-session-spread](ea-14-session-spread/) | Lapisan Filters, filter sesi (UTC) dan spread per simbol, tahap tolak di pipeline | 13 | suite FilterRules ALL PASS, SC-15 PASS | **Done** 2026-10-04 (v1.15; backtest dasar berfilter lolos 241 trade; MC-FL-01 manual tertunda; PC-21, PC-22) |
+| 15 | ea-15-currency-exposure | Eksposur per mata uang dengan arah, `CURRENCY_EXPOSURE` di pre-trade check | 13 | suite ExposureRules ALL PASS, SC-16 PASS | Belum dimulai |
+| 16 | ea-16-news | Kalender live + CSV tester (`ExportCalendar`), blackout per dampak, degrade aman + alert, DoD Fase 4 | 14 | suite NewsRules ALL PASS, SC-17 PASS, backtest dasar dengan filter | Belum dimulai |
+
+Versi EA: 14 = `1.15`, 15 = `1.16`, 16 = `1.17` (Fase 4 selesai).
 
 ## Fase berikutnya
 
@@ -117,7 +129,7 @@ Aturan dari RULES dan pelajaran bot Python: tidak ada angka ajaib di kode. Setia
 
 "Perlu keputusan" berarti PRD belum menentukan angkanya. Nilainya diputuskan bersama Anda di requirements spec Fase 3, lalu dicatat di `docs/PENDING-CHANGES.md`.
 
-### Fase 4 — Filter (spec `ea-14-filters-news`)
+### Fase 4 — Filter (spec `ea-14`..`ea-16`, lihat [fase-4-overview.md](fase-4-overview.md))
 
 Isi PRD: filter berita memakai kalender bawaan MT5 (`CalendarValueHistory`) ±30 menit berita high impact; di Strategy Tester memakai CSV kalender historis di Common/Files (dibuat script `ExportCalendar`); filter sesi London + New York; filter spread per simbol; eksposur maks 2 posisi searah per mata uang.
 

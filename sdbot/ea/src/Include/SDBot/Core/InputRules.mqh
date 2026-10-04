@@ -41,6 +41,11 @@ struct InputValues
    double            slBufferAtr;
    double            minSlAtr;
    double            maxSlAtr;
+   bool              sessionTokyo;       // filter sesi dan spread (spec 14)
+   bool              sessionLondon;
+   bool              sessionNewYork;
+   int               maxSpreadPoints;    // 0 = mati
+   int               testerUtcOffsetHours;
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -97,6 +102,11 @@ InputValues DefaultInputValues()
    v.slBufferAtr = SDB_DEF_SL_BUFFER_ATR;
    v.minSlAtr = SDB_DEF_MIN_SL_ATR;
    v.maxSlAtr = SDB_DEF_MAX_SL_ATR;
+   v.sessionTokyo = false;
+   v.sessionLondon = true;
+   v.sessionNewYork = true;
+   v.maxSpreadPoints = 0;
+   v.testerUtcOffsetHours = 0;
    return v;
   }
 
@@ -166,6 +176,8 @@ void IrCheckSignals(const InputValues &v, string &errors)
    IrCheckRangeD("InpMaxSlAtr", v.maxSlAtr, SDB_MIN_MAX_SL_ATR, SDB_MAX_MAX_SL_ATR, errors);
    if(v.minSlAtr >= v.maxSlAtr)
       IrAdd(errors, "InpMinSlAtr (" + IrNum(v.minSlAtr) + ") harus < InpMaxSlAtr (" + IrNum(v.maxSlAtr) + ")");
+   IrCheckRange("InpMaxSpreadPoints", v.maxSpreadPoints, 0, SDB_MAX_MAX_SPREAD_POINTS, errors);
+   IrCheckRange("InpTesterUtcOffsetHours", v.testerUtcOffsetHours, SDB_MIN_TESTER_UTC_OFFSET_H, SDB_MAX_TESTER_UTC_OFFSET_H, errors);
   }
 
 void IrCheckClassLimit(const string name, const int value, string &errors)

@@ -1,0 +1,8 @@
+; SC-15b: InpMaxSpreadPoints=1 (spread normal EURUSDc ~8 point): tidak ada entry.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-15b
+HarnessEveryBars=0
+HarnessPipeline=true
+InpMaxSpreadPoints=1

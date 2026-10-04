@@ -58,6 +58,13 @@ input double                 InpSlBufferAtr           = SDB_DEF_SL_BUFFER_ATR;  
 input double                 InpMinSlAtr              = SDB_DEF_MIN_SL_ATR;         // Jarak SL minimum (x ATR MTF)
 input double                 InpMaxSlAtr              = SDB_DEF_MAX_SL_ATR;         // Jarak SL maksimum (x ATR MTF)
 
+input group "Filter"
+input bool                   InpSessionTokyo          = false;                      // Sesi Tokyo 00:00-08:00 UTC
+input bool                   InpSessionLondon         = true;                       // Sesi London 08:00-17:00 UTC
+input bool                   InpSessionNewYork        = true;                       // Sesi New York 13:00-22:00 UTC (semua false = filter mati)
+input int                    InpMaxSpreadPoints       = 0;                          // Spread maksimum (point; 0 = mati, preset per simbol)
+input int                    InpTesterUtcOffsetHours  = 0;                          // Selisih server-UTC di tester (jam)
+
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
 input string                 InpTelegramChatID        = "";                         // Chat ID Telegram (sama dengan bot Python)
@@ -98,6 +105,11 @@ InputValues CurrentInputs()
    v.slBufferAtr = InpSlBufferAtr;
    v.minSlAtr = InpMinSlAtr;
    v.maxSlAtr = InpMaxSlAtr;
+   v.sessionTokyo = InpSessionTokyo;
+   v.sessionLondon = InpSessionLondon;
+   v.sessionNewYork = InpSessionNewYork;
+   v.maxSpreadPoints = InpMaxSpreadPoints;
+   v.testerUtcOffsetHours = InpTesterUtcOffsetHours;
    return v;
   }
 
@@ -113,7 +125,8 @@ string CurrentInputsJson()
                  "InpHeartbeatMinutes", "InpTelegramConfigured", "InpSwingStrength", "InpStructureLookback",
                  "InpEmaPeriod", "InpEmaSlopeBars", "InpZoneMinWidthAtr", "InpZoneMaxWidthAtr", "InpZoneMinLegAtr",
                  "InpZoneLegBars", "InpMaxZoneAgeBars", "InpMinConfluenceScore", "InpMinRR", "InpSlBufferAtr",
-                 "InpMinSlAtr", "InpMaxSlAtr"};
+                 "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
+                 "InpMaxSpreadPoints", "InpTesterUtcOffsetHours"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -155,6 +168,11 @@ string CurrentInputsJson()
    v[35] = JsonNum(InpSlBufferAtr);
    v[36] = JsonNum(InpMinSlAtr);
    v[37] = JsonNum(InpMaxSlAtr);
+   v[38] = JsonBool(InpSessionTokyo);
+   v[39] = JsonBool(InpSessionLondon);
+   v[40] = JsonBool(InpSessionNewYork);
+   v[41] = JsonNum(InpMaxSpreadPoints);
+   v[42] = JsonNum(InpTesterUtcOffsetHours);
    return CanonicalJson(k, v);
   }
 

@@ -116,3 +116,30 @@ def test_ts51_signal_inputs_have_defaults():
         assert v.get("InpSlBufferAtr") == "0.1", symbol
         assert v.get("InpMinSlAtr") == "0.3", symbol
         assert v.get("InpMaxSlAtr") == "3.0", symbol
+
+
+PC22_SPREAD = {
+    "EURUSD": 24,
+    "GBPUSD": 30,
+    "USDJPY": 30,
+    "USDCHF": 39,
+    "AUDUSD": 27,
+    "USDCAD": 48,
+    "NZDUSD": 42,
+    "EURJPY": 48,
+    "GBPJPY": 66,
+    "XAUUSD": 720,
+    "XAGUSD": 90,
+    "BTCUSD": 3000,
+}
+
+
+def test_ts54_session_spread_inputs():
+    """Spec 14 Req 4.1: sesi London + NY, offset tester 0, spread per simbol PC-22."""
+    for symbol, spread in PC22_SPREAD.items():
+        v = _read(symbol)
+        assert v.get("InpSessionTokyo") == "false", symbol
+        assert v.get("InpSessionLondon") == "true", symbol
+        assert v.get("InpSessionNewYork") == "true", symbol
+        assert v.get("InpTesterUtcOffsetHours") == "0", symbol
+        assert v.get("InpMaxSpreadPoints") == str(spread), symbol

@@ -23,6 +23,9 @@
     Backtest dasar Fase 3 (spec 13 Req 8): EA utama SDBot dengan preset tiap simbol, file
     ea\tests\baseline\BL-<SIMBOL>.ini, lalu tools\baseline_report.py menilai kriteria PC-19
     (total >= 300 trade, >= 15 per simbol, signal_id dan skor lengkap, tanpa log ERROR/CRITICAL).
+.PARAMETER CompareFrom
+    Bersama -CompareTo: laporan -Baseline menampilkan pembanding per simbol dari sesi DB tester
+    (CompareFrom, CompareTo], misalnya backtest dasar Fase 3 tanpa filter.
 .PARAMETER Symbols
     Batasi -Baseline ke simbol tertentu, misalnya -Symbols EURUSDc,XAUUSDc (kriteria jumlah tetap sama).
 .PARAMETER SkipBuild
@@ -38,6 +41,8 @@ param(
     [switch]$All,
     [switch]$Baseline,
     [string[]]$Symbols = @(),
+    [int]$CompareFrom = -1,
+    [int]$CompareTo = -1,
     [switch]$SkipBuild,
     [int]$TimeoutSec = 0,
     [string]$Config = ''
@@ -344,7 +349,9 @@ function Invoke-Main {
     if ($hasBaseline -and -not ($summary | Where-Object { $_.Code -ne 0 })) {
         Write-Host ''
         Write-Run "laporan backtest dasar (sesi > $marker):"
-        & uv run --project $script:repoRoot python $script:reportPy --db $dbFile --after-session $marker --errors $script:baselineErrors | ForEach-Object { Write-Host $_ }
+        $cmpArgs = @()
+        if ($CompareFrom -ge 0 -and $CompareTo -gt $CompareFrom) { $cmpArgs = @('--compare-from', $CompareFrom, '--compare-to', $CompareTo) }
+        & uv run --project $script:repoRoot python $script:reportPy --db $dbFile --after-session $marker --errors $script:baselineErrors @cmpArgs | ForEach-Object { Write-Host $_ }
         $summary += [pscustomobject]@{ Run = 'baseline-report'; Code = $(if ($LASTEXITCODE -eq 0) { 0 } else { 1 }) }
     }
     Write-Host ''

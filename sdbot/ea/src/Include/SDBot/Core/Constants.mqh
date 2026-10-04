@@ -162,6 +162,11 @@
 #define SDB_SIGNAL_EPS                1e-9     // x ATR: batas inklusif SL/TP
 #define SDB_GV_SIGNAL_BAR             "SIGBAR" // GV "<magic>_SIGBAR": waktu bar LTF terakhir yang dinilai
 
+//--- Filter sesi dan spread (spec 14 design §3.2, PC-22)
+#define SDB_MAX_MAX_SPREAD_POINTS     100000   // 0 = filter spread mati
+#define SDB_MIN_TESTER_UTC_OFFSET_H   -12
+#define SDB_MAX_TESTER_UTC_OFFSET_H   14
+
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol
 #define SDB_PA_STAR_FIRST_BODY_ATR    0.5      // badan bar pertama bintang > 0,5 ATR
 #define SDB_PA_STAR_MID_RATIO         0.3      // badan bar tengah < 0,3 x badan pertama

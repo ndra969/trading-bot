@@ -23,7 +23,8 @@ string TprKnownKeys()
           "InpTelegramToken,InpTelegramChatID,InpHeartbeatMinutes,"
           "InpSwingStrength,InpStructureLookback,InpEmaPeriod,InpEmaSlopeBars,"
           "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
-          "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,";
+          "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,"
+          "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -59,6 +60,11 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpSlBufferAtr")           v.slBufferAtr = StringToDouble(value);
    else if(key == "InpMinSlAtr")              v.minSlAtr = StringToDouble(value);
    else if(key == "InpMaxSlAtr")              v.maxSlAtr = StringToDouble(value);
+   else if(key == "InpSessionTokyo")          v.sessionTokyo = (value == "true");
+   else if(key == "InpSessionLondon")         v.sessionLondon = (value == "true");
+   else if(key == "InpSessionNewYork")        v.sessionNewYork = (value == "true");
+   else if(key == "InpMaxSpreadPoints")       v.maxSpreadPoints = (int)StringToInteger(value);
+   else if(key == "InpTesterUtcOffsetHours")  v.testerUtcOffsetHours = (int)StringToInteger(value);
   }
 
 // "" = lolos; selain itu alasan gagal.

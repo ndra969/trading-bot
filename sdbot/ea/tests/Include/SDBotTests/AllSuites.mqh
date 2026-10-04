@@ -39,6 +39,7 @@
 #include <SDBotTests/Suites/TestPaTrigger.mqh>
 #include <SDBotTests/Suites/TestSignalRules.mqh>
 #include <SDBotTests/Suites/TestSignalEngine.mqh>
+#include <SDBotTests/Suites/TestFilterRules.mqh>
 
 void RunAllSuites()
   {
@@ -75,6 +76,7 @@ void RunAllSuites()
    RunTestPaTrigger();
    RunTestSignalRules();
    RunTestSignalEngine();
+   RunTestFilterRules();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

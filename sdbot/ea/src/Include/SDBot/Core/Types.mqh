@@ -429,6 +429,7 @@ struct SdbSignalParams
    double            slBufferAtr;
    double            minSlAtr;
    double            maxSlAtr;
+   int               maxSpreadPoints; // 0 = filter spread mati (spec 14)
   };
 
 struct SdbSignalFacts
@@ -448,6 +449,9 @@ struct SdbSignalFacts
    double            atrMtf;          // ATR(14) MTF bar tertutup terakhir
    bool              haveOpposite;
    double            oppositeProximal;
+   string            session;         // sesi UTC bar (spec 14): TOKYO, LONDON, OVERLAP, NEWYORK, OFF
+   bool              sessionAllowed;
+   long              spreadPoints;    // ask - bid saat penilaian (point)
   };
 
 struct SdbStops

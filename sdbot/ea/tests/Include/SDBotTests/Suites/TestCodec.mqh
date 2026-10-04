@@ -50,7 +50,7 @@ void RunTestCodec()
    for(int i = 0; i < StringLen(json); i++)
       if(StringGetCharacter(json, i) == ':')
          keys++;
-   AssertIntEq("TC-SU-04c", "JSON input berisi 38 input (28 + 5 zona spec 11 + 5 sinyal spec 13)", keys, 38);
+   AssertIntEq("TC-SU-04c", "JSON input berisi 43 input (28 + 5 zona spec 11 + 5 sinyal spec 13 + 5 filter spec 14)", keys, 43);
    AssertTrue("TC-SU-04d", "JSON input tanpa token dan chat ID (spec 09 Req 1.3)",
               StringFind(json, "InpTelegramToken") < 0 && StringFind(json, "InpTelegramChatID") < 0 &&
               StringFind(json, "\"InpTelegramConfigured\":false") >= 0 && StringFind(json, "\"InpHeartbeatMinutes\":60") >= 0);

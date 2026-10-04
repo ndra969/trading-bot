@@ -4,6 +4,20 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.15 — 2026-10-04 — spec 14 filter sesi dan spread (Fase 4)
+
+- Lapisan baru `Filters/FilterRules.mqh` (fungsi murni):
+  - sesi UTC dengan batas bot Python: Tokyo 00–08, London 08–17, New York 13–22, overlap termasuk keduanya, 22–24 di luar sesi;
+  - selisih server–UTC: live dari `TimeTradeServer − TimeGMT`, tester dari input;
+  - batas spread.
+- Pipeline: kandidat di luar sesi ditolak `OUTSIDE_SESSION`, kandidat dengan spread (ask − bid) di atas batas ditolak `SPREAD_TOO_WIDE`; keduanya sesudah pre-filter risiko dan sebelum `POSITION_OPEN`. Konteks sinyal mendapat `session` dan `max_spread`. Manajemen posisi tidak berubah.
+- Input `InpSessionTokyo` (false), `InpSessionLondon` (true), `InpSessionNewYork` (true), `InpMaxSpreadPoints` (preset: 3 × median spread live, EURUSD 24 … XAU 720, BTC 3000), `InpTesterUtcOffsetHours` (0). Keputusan PC-21, PC-22.
+- Alat: `baseline_report.py` default kriteria Fase 4 (≥ 200 trade, ≥ 10 per simbol) dan pembanding `--compare-from/--compare-to`; `run-ea-tests.ps1 -Baseline -CompareFrom/-CompareTo`. Skenario SC-15 (hanya Tokyo) dan SC-15b (spread ketat).
+
+Backtest dasar dengan filter (12 simbol, 2025.10.01–2026.10.01, OHLC M1): **LOLOS**, 241 trade (11–32 per simbol), tanpa log ERROR/CRITICAL. Dibanding Fase 3: trade 351 → 241, expectancy +0,024R → +0,035R per trade, total R +8,58 → +8,42; 6 simbol membaik, 6 memburuk (sampel kecil).
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-04): build 0 error / 0 warning (4 target); unit 575/575 di 38 suite; 23 skenario PASS (SC-00..SC-15b); durasi 11 menit 41 detik. pytest `sdbot/tools` 84/84, `schema.py check` OK (data versi 3).
+
 ### 1.14 — 2026-10-04 — perbaikan: Critical CLOSE_ALL_FAILED palsu saat pasar tutup
 
 - Bug: emergency close all menghitung posisi sebagai **gagal** bila broker menjawab 10018 "market closed" padahal jadwal sesi bilang buka (misalnya pukul 21:00 server), atau saat jeda 60 detik v1.13 aktif. Setelah 3 kali, `CRiskMonitor` mengirim Critical `CLOSE_ALL_FAILED` palsu.

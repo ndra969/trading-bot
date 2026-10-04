@@ -1,0 +1,10 @@
+; SC-15: hanya sesi Tokyo (00:00-08:00 UTC); tidak ada entry di luar sesi.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-15
+HarnessEveryBars=0
+HarnessPipeline=true
+InpSessionTokyo=true
+InpSessionLondon=false
+InpSessionNewYork=false

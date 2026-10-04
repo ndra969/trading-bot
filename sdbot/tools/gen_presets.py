@@ -113,11 +113,33 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpSlBufferAtr", "0.1"),
     ("InpMinSlAtr", "0.3"),
     ("InpMaxSlAtr", "3.0"),
+    # Filter sesi (spec 14, PC-21/22): London + New York UTC; selisih server-UTC tester 0 (Exness GMT+0)
+    ("InpSessionTokyo", "false"),
+    ("InpSessionLondon", "true"),
+    ("InpSessionNewYork", "true"),
+    ("InpTesterUtcOffsetHours", "0"),
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),
     ("InpHeartbeatMinutes", "60"),
 ]
+
+
+# Spread maksimum (point) = 3 x median spread live akun cent, tick 7 hari s.d. 2026-10-03 (spec 14, PC-22).
+MAX_SPREAD_POINTS: dict[str, int] = {
+    "EURUSD": 24,
+    "GBPUSD": 30,
+    "USDJPY": 30,
+    "USDCHF": 39,
+    "AUDUSD": 27,
+    "USDCAD": 48,
+    "NZDUSD": 42,
+    "EURJPY": 48,
+    "GBPJPY": 66,
+    "XAUUSD": 720,
+    "XAGUSD": 90,
+    "BTCUSD": 3000,
+}
 
 
 def render(symbol: str) -> str:
@@ -131,6 +153,7 @@ def render(symbol: str) -> str:
         f"InpPresetTag={symbol}c",
     ]
     lines += [f"{key}={value}" for key, value in COMMON_INPUTS]
+    lines.append(f"InpMaxSpreadPoints={MAX_SPREAD_POINTS[symbol]}")
     return "\n".join(lines) + "\n"
 
 
