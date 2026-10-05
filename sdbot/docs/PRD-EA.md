@@ -2,7 +2,7 @@
 
 2026-09-19 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-03). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
+> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-05). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -140,7 +140,7 @@ flowchart TB
     Q -->|Ya| E[Ke eksekusi]
 ```
 
-Kandidat = bar LTF tertutup yang menyentuh zona valid searah bias HTF. Setiap kandidat menjadi satu baris `signals` dengan tahap pertama yang gagal, dalam urutan: pre-filter risiko (STOPPED, pause harian, tidak bisa trading) → posisi instance masih terbuka (`POSITION_OPEN`) → trigger PA (`NO_PA_TRIGGER`) → skor (`SCORE_TOO_LOW`) → SL/TP dan R:R → lot dan pre-trade check → eksekusi. Bar tanpa bias atau tanpa zona hanya dihitung di ringkasan log harian. Setiap bar dinilai sekali (penanda bar di Global Variable per magic), dan bar yang lebih tua dari 2 × LTF tidak dinilai.
+Kandidat = bar LTF tertutup yang menyentuh zona valid searah bias HTF. Setiap kandidat menjadi satu baris `signals` dengan tahap pertama yang gagal, dalam urutan: pre-filter risiko (STOPPED, pause harian, tidak bisa trading) → jendela berita (NEWS_BLACKOUT) → di luar sesi UTC (OUTSIDE_SESSION) → spread terlalu lebar (SPREAD_TOO_WIDE) → posisi instance masih terbuka (`POSITION_OPEN`) → trigger PA (`NO_PA_TRIGGER`) → skor (`SCORE_TOO_LOW`) → SL/TP dan R:R → lot dan pre-trade check → eksekusi. Bar tanpa bias atau tanpa zona hanya dihitung di ringkasan log harian. Setiap bar dinilai sekali (penanda bar di Global Variable per magic), dan bar yang lebih tua dari 2 × LTF tidak dinilai.
 
 ### Aturan zona Supply & Demand
 
@@ -288,7 +288,7 @@ Satu set angka berlaku untuk semua modul. Drawdown dihitung dari puncak equity, 
 | Risiko per trade | 0.5% (maks 1%) | Dari balance, jarak ke SL |
 | Total risiko posisi terbuka | 3% | Posisi yang sudah BE dihitung 0% |
 | Batas rugi harian | 3% | Termasuk floating, pause sampai hari berikutnya |
-| Eksposur per mata uang | Maks 2 posisi searah | Contoh: maks 2 posisi long USD |
+| Eksposur per mata uang | Maks 2 posisi searah | Input MaxSameDirectionPerCurrency (0 = mati). Semua posisi SDBot di akun, per kaki mata uang dengan arah (BUY = dasar long + kuotasi short; XAU, XAG, BTC mata uang sendiri vs USD); posisi bukan SDBot tidak dihitung. Tolak CURRENCY_EXPOSURE, detail mata uang, arah, jumlah (contoh USD short 2/2). Tanpa kunci antar-instance untuk order yang hampir bersamaan |
 | Margin level | Alert di bawah 300% | Blok entry di bawah 200% |
 | Drawdown 5% | Info | Tanpa tindakan |
 | Drawdown 10% | Lot × 0.5 | Otomatis kembali normal di bawah 8% |
@@ -365,6 +365,7 @@ Kebutuhan:
 - Pesan start (memuat akhir sesi sebelumnya) dan stop per instance, tanpa bunyi. Saat deinit, Critical lalu stop dikirim maks 2 detik (MT5 menghentikan `OnDeinit` setelah 2.5 detik).
 - Restart: baris `PENDING` milik instance yang lebih tua dari 30 menit menjadi `SKIPPED`; Critical yang lebih muda dikirim ulang; non-Critical muda `SKIPPED`.
 - Event posisi: BE (`BE_MOVED`) dan partial (`PARTIAL_CLOSED`) Info; SL dipasang kembali (`SL_RESTORED`) High; posisi tetap tanpa SL setelah 3 gagal (`SL_MISSING`) Critical.
+- Kalender berita tidak terbaca (`NEWS_FILTER_OFF`) High, satu kali per sesi EA; entry tetap berjalan tanpa blackout berita.
 
 ## Data dan database
 
@@ -422,12 +423,15 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Analisis | EmaPeriod / EmaSlopeBars | 50 (10–400) / 3 (1–20) |
 | Zona | ZoneMinWidthAtr / ZoneMaxWidthAtr | 0.3 / 2.0 × ATR(14) MTF |
 | Zona | ZoneMinLegAtr / ZoneLegBars | 1.5 × ATR dalam 10 bar MTF |
-| Filter | `MaxSpreadPoints` | per simbol |
-| Filter | `NewsBlockMinutes` | 30 sebelum/sesudah berita high impact |
-| Filter | `TradingSessions` | London + New York |
+| Filter | `MaxSpreadPoints` | per simbol, 3 × median spread live akun cent (EURUSD 24, GBPUSD 30, USDJPY 30, USDCHF 39, AUDUSD 27, USDCAD 48, NZDUSD 42, EURJPY 48, GBPJPY 66, XAUUSD 720, XAGUSD 90, BTCUSD 3000); 0 = mati |
+| Filter | `NewsFilter` / `NewsHighMinutes` / `NewsMediumMinutes` | true / 15 / 0 menit sebelum dan sesudah rilis (0 = dampak itu tidak diblokir, 0–240); event mata uang simbol, XAU/XAG/BTC lewat USD |
+| Filter | `SessionTokyo` / `SessionLondon` / `SessionNewYork` | false / true / true (UTC: Tokyo 00–08, London 08–17, New York 13–22; 22–24 di luar sesi; semua false = filter mati) |
+| Filter | `TesterUtcOffsetHours` | 0 (selisih server–UTC di Strategy Tester; live dihitung dari TimeTradeServer − TimeGMT) |
+| Filter | `NewsCsvFile` | sdbot_calendar.csv di Common\Files (hanya tester; dibuat script ExportCalendar) |
 | Risiko | `RiskPerTradePct` | 0.5 |
 | Risiko | `MaxOpenRiskPct` | 3.0 |
 | Risiko | MaxPosForexMajor / ForexCross / Commodity / Crypto | 5 / 3 / 1 / 1 posisi SDBot per kategori aset di akun |
+| Risiko | `MaxSameDirectionPerCurrency` | 2 posisi SDBot searah per mata uang di akun (0 = mati, 0–10) |
 | Risiko | `DailyLossPct` | 3.0 |
 | Risiko | `DDReducePct` / `DDStopPct` | 10 / 15 |
 | Risiko | `ResetEmergencyStop` | false |
@@ -441,7 +445,7 @@ Input tambahan untuk integrasi backoffice: `InpEnableBackoffice` (default true) 
 
 Preset siap pakai ada untuk 12 simbol bot Python: `SDBot_DAY_<SIMBOL>c.set`, dibangkitkan `tools/gen_presets.py`. Di Fase 1 isinya sama untuk semua simbol kecuali `MagicNumber` dan `PresetTag`; nilai per kategori dari bot Python (spread maks, sesi, jarak SL) dicatat sebagai komentar sampai inputnya ada di Fase 3–4. Preset memakai `AllowLiveTrading = false` dan risiko 0.5% per trade.
 
-Filter berita memakai kalender ekonomi bawaan MT5 (`CalendarValueHistory`), tanpa sumber eksternal. Di Strategy Tester, filter berita memakai file CSV kalender historis karena fungsi kalender tidak tersedia di tester.
+Filter berita memakai kalender ekonomi bawaan MT5 (`CalendarValueHistory`), tanpa sumber eksternal. Di Strategy Tester, filter berita memakai file CSV kalender historis karena fungsi kalender tidak tersedia di tester. Live: kalender di-cache dan disegarkan tiap 15 menit. Tester: CSV Common\Files\sdbot_calendar.csv dari script ExportCalendar (jadwal saja, tanpa nilai actual). Kandidat di jendela event untuk mata uang simbol ditolak NEWS_BLACKOUT (detail: event, mata uang, dampak, menit ke rilis); XAU, XAG, BTC hanya lewat kaki USD; low tidak pernah diblokir. Default high ±15 menit, medium tidak diblokir: dengan ±30/±10 backtest dasar hanya 187 trade (< 200) dan trade yang terblokir bersih +1,24R, karena kalender MT5 menandai HIGH juga untuk rilis kecil (New Home Sales, EIA, lelang obligasi). Kalender tidak terbaca: entry tidak diblokir berita, satu alert High NEWS_FILTER_OFF per sesi EA. Status filter (ON/OFF/DISABLED) dan event terdekat dicatat di konteks sinyal.
 
 ## Instalasi dan pemasangan
 
@@ -584,7 +588,7 @@ Pengembangan dimulai dari fondasi pengaman, lalu strategi ditambah bertahap agar
 | 1. Fondasi | CAccount, CRiskManager, CPositionManager, CLogger | Uji fungsi BE, partial, trailing, limit risiko lolos |
 | 2. Notifikasi | CNotifier, Telegram, push HP, heartbeat | Semua event di tabel notifikasi terkirim sesuai aturan |
 | 3. Strategi inti | Bias HTF, zona S&D, trigger PA, eksekusi | Backtest dasar 12 simbol × 12 bulan terakhir tanpa lapisan konfirmasi: tanpa error kritis, total ≥ 300 trade dan setiap simbol ≥ 15 trade, semua trade punya signal_id dengan skor lengkap, query kalibrasi menghasilkan data. Profit dinilai di Fase 5–6 |
-| 4. Filter | Berita, sesi, spread, eksposur mata uang | Filter tercatat di tabel signals dengan alasan tolak |
+| 4. Filter | Berita, sesi, spread, eksposur mata uang (spec 14 sesi + spread 1.15, spec 15 eksposur 1.16, spec 16 berita 1.17) | Filter tercatat di tabel signals dengan alasan tolak; backtest dasar dengan semua filter: total ≥ 200 trade dan setiap simbol ≥ 10 trade (selesai 1.17: 215 trade, +0,058R per trade) |
 | 5. Konfirmasi | Fibonacci, trendline, breakout retest, RSI (satu per satu) | Setiap lapisan meningkatkan hasil forward test |
 | 6. Validasi | Forward test dan live akun cent 1–3 bulan | Kriteria penerimaan tahap 3 dan 4 terpenuhi |
 | 7. Lanjutan | Volume profile, filter AI, backoffice online | Diputuskan setelah fase 6 |

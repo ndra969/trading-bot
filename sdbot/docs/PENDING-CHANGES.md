@@ -4,8 +4,10 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+## Done
+
 ### PC-24: Filter berita (input, sumber kalender, degrade)
-- Status: Open
+- Status: Done (2026-10-05, PRD-EA rev 63, PRD-Backoffice rev 19)
 - Tanggal disetujui: 2026-10-05
 - Dokumen: PRD-EA §Pipeline analisis (pre-filter berita), §Parameter input EA, §Notifikasi (tipe alert); PRD-Backoffice §Database (enum `alert_type`)
 - Sumber: spec `ea-16-news` requirements, keputusan 1–6
@@ -16,7 +18,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Enum `alert_type` + `NEWS_FILTER_OFF`.
 
 ### PC-23: Input eksposur mata uang
-- Status: Open
+- Status: Done (2026-10-05, PRD-EA rev 63)
 - Tanggal disetujui: 2026-10-05
 - Dokumen: PRD-EA §Risk management (eksposur per mata uang), §Parameter input EA
 - Sumber: spec `ea-15-currency-exposure` requirements (replay 241 trade backtest berfilter v1.15), keputusan 1–4
@@ -25,7 +27,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Detail tolak `CURRENCY_EXPOSURE`: mata uang, arah, jumlah (contoh `USD short 2/2`). Tanpa kunci antar-instance untuk order yang hampir bersamaan.
 
 ### PC-22: Input sesi dan spread; kriteria backtest dasar Fase 4
-- Status: Open
+- Status: Done (2026-10-05, PRD-EA rev 63)
 - Tanggal disetujui: 2026-10-04
 - Dokumen: PRD-EA §Parameter input EA, §Pipeline analisis (pre-filter), §Roadmap (Fase 4)
 - Sumber: spec `ea-14-session-spread` requirements (spread tick live 7 hari, 12 simbol), keputusan 1–4
@@ -37,7 +39,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Kriteria backtest dasar dengan filter Fase 4: total ≥ 200 trade dan setiap simbol ≥ 10 trade (menggantikan ≥ 300 / ≥ 15 PC-19 untuk backtest berfilter).
 
 ### PC-21: Aturan Fase 4 (pembagian spec, sesi UTC, eksposur, blackout berita, kalender tester)
-- Status: Open
+- Status: Done (2026-10-05, PRD-EA rev 63)
 - Tanggal disetujui: 2026-10-04
 - Dokumen: PRD-EA §Pipeline analisis (pre-filter), §Risk management (eksposur), §Parameter input EA, §Roadmap (Fase 4)
 - Sumber: [fase-4-overview.md](../specs/fase-4-overview.md) §7, keputusan 1–6
@@ -48,8 +50,6 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Eksposur: maks 2 posisi SDBot searah per mata uang di akun, dihitung dengan arah (BUY EURUSD = long EUR + short USD); XAU, XAG, BTC dihitung sebagai mata uang sendiri vs USD.
     - Blackout berita: high ±15 menit, medium tidak diblokir secara default (diubah dari ±30/±10, lihat PC-24), low tidak pernah diblokir; event dipetakan ke mata uang simbol.
     - Di tester, kalender dibaca dari CSV hasil script `ExportCalendar`; tanpa CSV, filter berita mati + satu alert per sesi, entry tidak diblokir.
-
-## Done
 
 ### PC-20: Lot pas dengan rugi broker; request saat pasar tutup
 - Status: Done (2026-10-03, PRD-EA rev 48)

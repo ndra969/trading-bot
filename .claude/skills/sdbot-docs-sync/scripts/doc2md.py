@@ -27,7 +27,8 @@ def inline(el):
             elif c.tag == "code":
                 t = f"`{t}`"
         s += t + (c.tail or "")
-    return s
+    # Run kode bersebelahan (hasil edit per karakter) jadi satu span: `ba``lance` -> `balance`.
+    return s.replace("``", "")
 
 
 def block(el, depth=0):
