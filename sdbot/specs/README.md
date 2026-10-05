@@ -65,7 +65,22 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-4-overv
 | 15 | [ea-15-currency-exposure](ea-15-currency-exposure/) | Eksposur per mata uang dengan arah, `CURRENCY_EXPOSURE` di pre-trade check | 13 | suite ExposureRules ALL PASS, SC-16 PASS | **Done** 2026-10-05 (v1.16; MC-EXP-01 manual tertunda; PC-23) |
 | 16 | [ea-16-news](ea-16-news/) | Kalender live + CSV tester (`ExportCalendar`), blackout per dampak, degrade aman + alert, DoD Fase 4 | 14 | suite NewsRules ALL PASS, SC-17 PASS, backtest dasar dengan filter | **Done** 2026-10-05 (v1.17; MC-NW-01..02 manual tertunda; PC-24) |
 
-Versi EA: 14 = `1.15`, 15 = `1.16`, 16 = `1.17` (Fase 4 selesai).
+Versi EA: 14 = `1.15`, 15 = `1.16`, 16 = `1.17` (Fase 4 selesai). Perbaikan bug sesudahnya: `1.18` (`LOT_BELOW_MIN` palsu pada pair kuotasi non-USD).
+
+## Fase 5 — Konfirmasi
+
+Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overview.md](fase-5-overview.md) (Approved 2026-10-05, PC-25).
+
+| # | Spec | Isi | Butuh | Bukti selesai | Status |
+|---|---|---|---|---|---|
+| 17 | [ea-17-validation-harness](ea-17-validation-harness/) | Backtest in-sample / out-of-sample real ticks, laporan PF, DD, expectancy, dan per nilai komponen | 16 | pytest laporan; acuan IS + OOS v1.19 | **Done** 2026-10-06 (v1.19; acuan sesi DB 901–924: IS 901–912, OOS 913–924; PC-25, PC-26) |
+| 18 | ea-18-fibonacci | Skor Fibonacci level terdekat, mode bayangan | 17 | suite FibRules ALL PASS; laporan IS/OOS | Belum mulai |
+| 19 | ea-19-trendline | Skor trendline dengan kemiringan searah sinyal, mode bayangan | 17 | suite TrendlineRules ALL PASS; laporan IS/OOS | Belum mulai |
+| 20 | ea-20-breakout-retest | Skor breakout & retest, mode bayangan | 17 | suite BreakoutRules ALL PASS; laporan IS/OOS | Belum mulai |
+| 21 | ea-21-rsi-divergence | Skor RSI divergence, mode bayangan | 17 | suite RsiRules ALL PASS; laporan IS/OOS | Belum mulai |
+| 22 | ea-22-score-calibration | Aktivasi komponen terbukti, ambang baru, DoD Fase 5 | 18–21 | backtest IS + OOS ≥ acuan v1.18 di OOS | Belum mulai |
+
+Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, 22 = `1.24` (Fase 5 selesai).
 
 ## Fase berikutnya
 

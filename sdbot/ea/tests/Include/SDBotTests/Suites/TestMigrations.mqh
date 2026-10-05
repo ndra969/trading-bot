@@ -70,6 +70,8 @@ void RunTestMigrations()
    AssertIntEq("TC-DB-01b", "versi DB = SDB_SCHEMA_LATEST", runner.DbVersion(db), SDB_SCHEMA_LATEST);
    AssertIntEq("TC-DB-01c", "schema_migrations berisi semua versi",
                TdbScalarInt(db, "SELECT COUNT(*) FROM schema_migrations"), SDB_SCHEMA_LATEST);
+   AssertTrue("TC-DB-01e", "skema v4 (spec 17): signal_scores.active ada, default 1",
+              SDB_SCHEMA_LATEST == 4 && TdbScalarInt(db, "SELECT COUNT(*) FROM pragma_table_info('signal_scores') WHERE name='active' AND dflt_value='1'") == 1);
    AssertTrue("TC-DB-01d", "tabel skema v1 dibuat (trades, closures, view v_trade_results)",
               TmTableExists(db, "trades") == 1 && TmTableExists(db, "closures") == 1 &&
               TdbScalarInt(db, "SELECT COUNT(*) FROM sqlite_master WHERE type='view' AND name='v_trade_results'") == 1);

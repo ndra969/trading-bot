@@ -4,6 +4,26 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.19 — 2026-10-06 — spec 17 alat ukur in-sample / out-of-sample (Fase 5)
+
+- Skema data v4: `signal_scores.active` (1 = ikut skor gerbang, 0 = komponen bayangan Fase 5), default 1; Logger mengisinya. Strategi tidak berubah dari 1.18. Keputusan PC-26.
+- `ea/tests/baseline/periods.ini`: IS 2024-04-01..2026-07-01 dan OOS 2026-07-01..2026-10-01 dengan OHLC M1, REAL 2026-01-05..2026-10-01 dengan real ticks. Diukur dengan `-ProbeHistory`: bar M1 tester ada sejak 2024-03-26, tetapi real ticks server cent hanya sejak 2026-01-05 (XAUUSDc sejak 2026-08-14). Sebelum itu tester diam-diam memakai tick buatan. Keputusan PC-25 opsi A.
+- `run-ea-tests.ps1`: `-Period IS|OOS|ALL|REAL`, `-FromDate/-ToDate/-Model`, `-ProbeHistory`; pesan tester tentang tick buatan dan histori kosong dikumpulkan per simbol dan ditandai di laporan. Durasi total kini hh:mm:ss.
+- `baseline_report.py`: tabel per periode, profit factor (uang) dan drawdown maks (% balance tertutup, R untuk total), pembanding per (periode, simbol), status kriteria PRD tahap 2–3 sebagai informasi; kriteria jumlah trade hanya untuk periode panjang (bukan OOS/REAL); kelengkapan skor hanya untuk komponen aktif.
+- `component_report.py` (baru): hasil trade per nilai komponen, IS vs OOS, status aktivasi PC-25 (`TERBUKTI` / `TIDAK` / `SAMPEL KURANG`); `--candidates` untuk distribusi nilai per tahap tolak. `tick_history.py` (baru): parser jurnal probe histori.
+- Uji: TS-60..71 (+ TS-65b), TC-DB-01e, TC-SG-24 (active).
+
+Acuan Fase 5 (12 simbol, OHLC M1, sesi DB 901–924):
+
+| Periode | Trade | Win | R/trade | R total | PF | DD maks simbol | DD total |
+|---|---|---|---|---|---|---|---|
+| IS 2024-04..2026-06 | 493 | 50% | +0,029 | +14,12 | 1,06 | 6,9% | 17,0R |
+| OOS 2026-07..2026-10 | 52 | 50% | +0,036 | +1,85 | 1,07 | 1,5% | 8,1R |
+
+Kriteria PRD tahap 2 (PF ≥ 1,3) belum terpenuhi; DD aman. Laporan komponen: ZONE Fresh +0,041R vs Tested +0,001R di IS; tren MTF 0 di IS sekitar impas (+0,001R, 50 trade), jadi angka +0,396R di v1.18 adalah sampel kecil. OOS 3 bulan hanya 52 trade, sehingga hampir semua kelompok nilai "sampel kecil" dan status aktivasi `SAMPEL KURANG`.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-06): build 0 error / 0 warning (5 target); unit 599/599; 26 skenario PASS (SC-00..SC-17b); durasi 15 menit 19 detik. pytest `sdbot/tools` 102/102, `schema.py check` OK (data versi 4).
+
 ### 1.18 — 2026-10-05 — perbaikan: LOT_BELOW_MIN palsu pada pair kuotasi non-USD
 
 - Bug: di akun cent, uang/lot dari `OrderCalcProfit` 1 lot (sekitar $0,3–2) dibulatkan ke sen, galat sampai 0,26%. Untuk lot puluhan, rugi lot akhir bisa di atas batas risiko lebih dari 5 step (`SDB_LOT_FIT_STEPS`), lalu kandidat ditolak `LOT_BELOW_MIN` "lot minimum melebihi risiko" padahal lot minimum jauh di bawah risiko. Terjadi di USDCAD, USDCHF, USDJPY, EURJPY, GBPJPY: 38 kandidat di backtest dasar v1.17.

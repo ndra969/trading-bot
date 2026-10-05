@@ -139,7 +139,7 @@ CREATE TABLE signal_scores (
   signal_id  INTEGER NOT NULL,
   component  TEXT    NOT NULL,
   score      REAL    NOT NULL,
-  max_score  REAL    NOT NULL,
+  max_score  REAL    NOT NULL, active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
   PRIMARY KEY (signal_id, component)
 );
 

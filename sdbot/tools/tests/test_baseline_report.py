@@ -49,7 +49,8 @@ def _db(
                 )
                 for c in comps:
                     conn.execute(
-                        "INSERT INTO signal_scores VALUES (?, ?, 1, 10)", (sig * 10 + k, c)
+                        "INSERT INTO signal_scores (signal_id, component, score, max_score) VALUES (?, ?, 1, 10)",
+                        (sig * 10 + k, c),
                     )
             signal_id = None if (null_signal and pos == 1) else sig * 10
             conn.execute(

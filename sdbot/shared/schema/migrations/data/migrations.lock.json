@@ -13,5 +13,10 @@
     "name": "alert_notify",
     "sha256": "3a35561380ac55de9695d078d276eac62ebe7d371de60b9cbcfc250014ee114f",
     "released": false
+  },
+  "4": {
+    "name": "signal_score_active",
+    "sha256": "fe4b3ea74ea7022289c1a8d1d2a66505ad42727c7a47fef9e2a7227143325479",
+    "released": false
   }
 }

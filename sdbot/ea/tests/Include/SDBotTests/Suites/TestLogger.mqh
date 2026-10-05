@@ -377,8 +377,8 @@ void RunTestLoggerSignal()
    lg.OnSignal(TlSignal(4242424242, SDB_SIGNAL_STATUS_REJECTED, SDB_REJECT_STAGE_NO_PA_TRIGGER));
    bool again = lg.Flush();
    long utc = (long)TL_SERVER_T - TL_OFFSET;
-   AssertTrue("TC-SG-24", "signals id eksplisit + 3 skor; kirim ulang tidak menambah baris; reject_stage kosong = NULL",
-              again && TlCount("signals") == 2 && TlCount("signal_scores") == 6 &&
+   AssertTrue("TC-SG-24", "signals id eksplisit + 3 skor aktif (spec 17: active=1); kirim ulang tidak menambah baris; reject_stage kosong = NULL",
+              again && TlCount("signals") == 2 && TlCount("signal_scores") == 6 && TlCount("signal_scores", "active=1") == 6 &&
               TlInt("SELECT time FROM signals WHERE id=4242424242") == utc &&
               TlText("SELECT reject_stage FROM signals WHERE id=4242424242") == SDB_REJECT_STAGE_NO_PA_TRIGGER &&
               TlCount("signals", "id=4242424243 AND reject_stage IS NULL AND reject_detail IS NULL AND status='ACCEPTED'") == 1 &&

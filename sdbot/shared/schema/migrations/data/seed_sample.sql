@@ -146,3 +146,9 @@ VALUES (101, 'ZONE', 30, 30), (101, 'TREND', 7, 15), (101, 'PA', 7, 10),
 UPDATE trades SET signal_id = 101 WHERE run_key = 3 AND position_id = 2;
 UPDATE trades SET signal_id = 102 WHERE run_key = 3 AND position_id = 3;
 UPDATE trades SET signal_id = 105 WHERE run_key = 4 AND position_id = 2;
+
+-- @version 4
+
+-- Komponen bayangan Fase 5 (spec 17, PC-25): dicatat untuk kandidat 101, tidak ikut score_total.
+INSERT INTO signal_scores (signal_id, component, score, max_score, active)
+VALUES (101, 'FIB', 15, 15, 0);

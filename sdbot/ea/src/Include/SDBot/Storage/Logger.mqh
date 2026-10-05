@@ -119,6 +119,7 @@ struct SdbQueuedEvent
    string            component;       // SDB_Q_SIGNAL_SCORE: SDB_SCORE_COMPONENT_*
    double            score;
    double            maxScore;
+   int               active;          // SDB_Q_SIGNAL_SCORE: 1 ikut skor gerbang, 0 bayangan (skema v4, spec 17)
   };
 
 class CLogger : public ISdbEventSink
@@ -189,7 +190,7 @@ private:
       return false;
      }
 
-   void EnqueueScore(const SignalRecord &s, const string component, const int score, const int maxScore)
+   void EnqueueScore(const SignalRecord &s, const string component, const int score, const int maxScore, const bool active = true)
      {
       SdbQueuedEvent e;
       e.kind = SDB_Q_SIGNAL_SCORE;
@@ -199,6 +200,7 @@ private:
       e.component = component;
       e.score = score;
       e.maxScore = maxScore;
+      e.active = active ? 1 : 0;
       Enqueue(e);
      }
 
@@ -405,7 +407,7 @@ private:
                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULLIF(?9, ''), ?10, ?11, ?12, NULLIF(?13, ''), NULLIF(?14, ''), "
                    "NULLIF(?15, '')) ON CONFLICT (id) DO NOTHING";
          case SDB_Q_SIGNAL_SCORE:
-            return "INSERT INTO signal_scores (signal_id, component, score, max_score) VALUES (?1, ?2, ?3, ?4) "
+            return "INSERT INTO signal_scores (signal_id, component, score, max_score, active) VALUES (?1, ?2, ?3, ?4, ?5) "
                    "ON CONFLICT (signal_id, component) DO NOTHING";
          default:
             return "";
@@ -517,7 +519,7 @@ private:
             return ok;
          case SDB_Q_SIGNAL_SCORE:
             ok = DatabaseBind(st, 0, e.signal.id) && DatabaseBind(st, 1, e.component) &&
-                 DatabaseBind(st, 2, e.score) && DatabaseBind(st, 3, e.maxScore);
+                 DatabaseBind(st, 2, e.score) && DatabaseBind(st, 3, e.maxScore) && DatabaseBind(st, 4, e.active);
             return ok;
         }
       return false;

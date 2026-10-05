@@ -30,6 +30,19 @@
 .PARAMETER CompareFrom
     Bersama -CompareTo: laporan -Baseline menampilkan pembanding per simbol dari sesi DB tester
     (CompareFrom, CompareTo], misalnya backtest dasar Fase 3 tanpa filter.
+.PARAMETER Period
+    Bersama -Baseline: periode bernama dari ea\tests\baseline\periods.ini (spec 17): IS, OOS, ALL
+    (IS lalu OOS, satu laporan), atau REAL (real ticks, cek realisme). Model dan tanggal dari periods.ini;
+    -FromDate/-ToDate/-Model tetap menang. Batas waktu default per run 3600 detik.
+.PARAMETER ProbeHistory
+    Ukur rentang histori tester per simbol (spec 17 Req 5): EA utama per preset pada periode 2015 yang
+    kosong, lalu tools	ick_history.py mengurai baris jurnal "found history data from A to B".
+.PARAMETER FromDate
+    Bersama -Baseline: ganti tanggal awal di BL-*.ini (format yyyy.MM.dd), misalnya 3 bulan terakhir.
+.PARAMETER ToDate
+    Bersama -Baseline: ganti tanggal akhir di BL-*.ini (yyyy.MM.dd).
+.PARAMETER Model
+    Bersama -Baseline: ganti model tester (0 every tick, 1 OHLC M1, 4 every tick real ticks).
 .PARAMETER Symbols
     Batasi -Baseline ke simbol tertentu, misalnya -Symbols EURUSDc,XAUUSDc (kriteria jumlah tetap sama).
 .PARAMETER SkipBuild
@@ -44,10 +57,16 @@ param(
     [string[]]$Scenario = @(),
     [switch]$All,
     [switch]$Baseline,
+    [switch]$ProbeHistory,
+    [ValidateSet('', 'IS', 'OOS', 'ALL', 'REAL')]
+    [string]$Period = '',
     [switch]$ExportCalendar,
     [string[]]$Symbols = @(),
     [int]$CompareFrom = -1,
     [int]$CompareTo = -1,
+    [string]$FromDate = '',
+    [string]$ToDate = '',
+    [int]$Model = -1,
     [switch]$SkipBuild,
     [int]$TimeoutSec = 0,
     [string]$Config = ''
@@ -93,6 +112,25 @@ function Get-AgentLogTail([int]$count) {
     if ($null -eq $log) { return @('(jurnal tester tidak ditemukan)') }
     return @(Get-Content -LiteralPath $log.FullName -Encoding Unicode -Tail $count | ForEach-Object {
             $c = $_ -split "`t"; if ($c.Count -ge 5) { "{0} {1}: {2}" -f $c[2], $c[3], ($c[4..($c.Count - 1)] -join ' ') } else { $_ } })
+}
+
+function Get-TesterDataLines([datetime]$since) {
+    # Pesan tester (bukan log EA) tentang histori dan tick sejak run dimulai: rentang histori, periode tanpa
+    # data, tick buatan (spec 17 Req 1.5, 5.1).
+    $log = Get-ChildItem -Path (Join-Path $script:cfg.TestDataDir 'Tester\logs') -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime | Select-Object -Last 1
+    if ($null -eq $log) { return @() }
+    $from = $since.TimeOfDay.Subtract([TimeSpan]::FromSeconds(1))
+    $out = @()
+    # Baris tester ditulis di awal run lalu tertimbun log EA; ambil ekor yang cukup panjang, saring dengan waktu.
+    foreach ($line in (Get-Content -LiteralPath $log.FullName -Encoding Unicode -Tail 200000)) {
+        if ($line -match '\[SDB\]' -or $line -notmatch 'real ticks begin|every tick generation|no history data|found history data') { continue }
+        $cols = $line -split "`t"
+        $t = [TimeSpan]::Zero
+        if ($cols.Count -ge 5 -and [TimeSpan]::TryParse($cols[2], [ref]$t) -and $t -lt $from) { continue }
+        $out += $(if ($cols.Count -ge 5) { $cols[4..($cols.Count - 1)] -join ' ' } else { $line })
+    }
+    return $out
 }
 
 function Get-SdbErrorLines([datetime]$since) {
@@ -202,6 +240,13 @@ function Invoke-TesterRun($r) {
         $tester['Expert'] = 'SDBot\SDBot.ex5'
         $sc = Read-ScenarioIni $r.Ini
         foreach ($k in $sc.Keys) { $tester[$k] = $sc[$k] }
+        if ($r.Period) {
+            $pd = $script:periods[$r.Period]
+            $tester['FromDate'] = $pd['FromDate']; $tester['ToDate'] = $pd['ToDate']; $tester['Model'] = $pd['Model']
+        }
+        if ($FromDate) { $tester['FromDate'] = $FromDate }
+        if ($ToDate) { $tester['ToDate'] = $ToDate }
+        if ($Model -ge 0) { $tester['Model'] = [string]$Model }
         $setLines = @(Get-Content -LiteralPath $r.Set -Encoding ASCII | Where-Object { $_ -notmatch '^\s*;' })
     }
     elseif ($r.Kind -eq 'scenario') {
@@ -282,6 +327,9 @@ function Invoke-TesterRun($r) {
         # Tidak ada file hasil: penilaian lewat baseline_report.py setelah semua simbol selesai.
         $errs = @(Get-SdbErrorLines $start)
         if ($errs.Count -gt 0) { Add-Content -LiteralPath $script:baselineErrors -Value ($errs | ForEach-Object { "$($r.Id): $_" }) -Encoding UTF8 }
+        $sym = $r.Symbol
+        $data = @(Get-TesterDataLines $start)
+        if ($data.Count -gt 0) { Add-Content -LiteralPath $script:baselineTicks -Value ($data | ForEach-Object { "$sym`t$_" }) -Encoding UTF8 }
         Write-Run ("selesai {0} ({1} detik, {2} baris log ERROR/CRITICAL)" -f $r.Id, $secs, $errs.Count)
         return 0
     }
@@ -403,22 +451,30 @@ function Invoke-Main {
     if ($hasBaseline) {
         $script:baselineErrors = Join-Path $script:tmp 'baseline-errors.txt'
         Set-Content -LiteralPath $script:baselineErrors -Value @() -Encoding UTF8
+        $script:baselineTicks = Join-Path $script:tmp 'baseline-ticks.txt'
+        Set-Content -LiteralPath $script:baselineTicks -Value @() -Encoding UTF8
         if (Test-Path -LiteralPath $dbFile) { $marker = [int](& uv run --project $script:repoRoot python $script:reportPy --db $dbFile --max-session) }
     }
     foreach ($r in $script:runs) {
         $code = Invoke-TesterRun $r
         $summary += [pscustomobject]@{ Run = $r.Id; Code = $code }
     }
-    if ($hasBaseline -and -not ($summary | Where-Object { $_.Code -ne 0 })) {
+    if ($ProbeHistory) {
+        Write-Host ''
+        & uv run --project $script:repoRoot python (Join-Path $PSScriptRoot 'tick_history.py') --journal $script:baselineTicks | ForEach-Object { Write-Host $_ }
+        $summary += [pscustomobject]@{ Run = 'tick-history'; Code = $(if ($LASTEXITCODE -eq 0) { 0 } else { 1 }) }
+    }
+    elseif ($hasBaseline -and -not ($summary | Where-Object { $_.Code -ne 0 })) {
         Write-Host ''
         Write-Run "laporan backtest dasar (sesi > $marker):"
         $cmpArgs = @()
         if ($CompareFrom -ge 0 -and $CompareTo -gt $CompareFrom) { $cmpArgs = @('--compare-from', $CompareFrom, '--compare-to', $CompareTo) }
-        & uv run --project $script:repoRoot python $script:reportPy --db $dbFile --after-session $marker --errors $script:baselineErrors @cmpArgs | ForEach-Object { Write-Host $_ }
+        $perArgs = @('--periods', $script:periodsIni, '--ticks', $script:baselineTicks)
+        & uv run --project $script:repoRoot python $script:reportPy --db $dbFile --after-session $marker --errors $script:baselineErrors @cmpArgs @perArgs | ForEach-Object { Write-Host $_ }
         $summary += [pscustomobject]@{ Run = 'baseline-report'; Code = $(if ($LASTEXITCODE -eq 0) { 0 } else { 1 }) }
     }
     Write-Host ''
-    Write-Run ("durasi total {0:mm\:ss} untuk {1} run" -f ((Get-Date) - $allStart), $summary.Count)
+    Write-Run ("durasi total {0:hh\:mm\:ss} untuk {1} run" -f ((Get-Date) - $allStart), $summary.Count)
     foreach ($s in $summary) {
         $label = switch ($s.Code) { 0 { 'PASS' } 1 { 'FAIL' } 2 { 'ENV ' } 3 { 'TIME' } }
         Write-Run ("{0} {1}" -f $label, $s.Run)
@@ -432,7 +488,7 @@ function Invoke-Main {
 
 try { $script:cfg = Get-Mt5Config -Path $Config }
 catch { Write-Run $_.Exception.Message; exit 2 }
-$script:timeoutSec = $(if ($TimeoutSec -gt 0) { $TimeoutSec } else { $script:cfg.TimeoutSec })
+$script:timeoutSec = $(if ($TimeoutSec -gt 0) { $TimeoutSec } elseif ($Period) { 3600 } else { $script:cfg.TimeoutSec })
 $script:tmp = Join-Path $PSScriptRoot '.tmp'
 if (-not (Test-Path -LiteralPath $script:tmp)) { New-Item -ItemType Directory -Path $script:tmp | Out-Null }
 $script:testerProfiles = Join-Path $script:cfg.TestDataDir 'MQL5\Profiles\Tester'
@@ -442,6 +498,10 @@ $repoEa = $script:repoEa
 $script:repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $script:reportPy = Join-Path $PSScriptRoot 'baseline_report.py'
 
+if ($ProbeHistory) {
+    # Periode 2015 pasti di luar histori; tester lalu menulis rentang histori yang ada (spec 17 Req 5).
+    $Baseline = $true; $FromDate = '2015.01.01'; $ToDate = '2015.01.08'; $Model = 4
+}
 if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All -and -not $Baseline -and -not $ExportCalendar) { $Unit = $true }
 $script:runs = @()
 if ($Unit -or $All) { $script:runs += [pscustomobject]@{ Kind = 'unit'; Id = 'unit'; Ini = $null; Set = $null } }
@@ -459,14 +519,32 @@ foreach ($id in $wanted) {
     $script:runs += [pscustomobject]@{ Kind = 'scenario'; Id = $id; Ini = $ini.FullName; Set = $(if (Test-Path -LiteralPath $set) { $set } else { $null }) }
 }
 
+$script:periodsIni = Join-Path $repoEa 'tests\baseline\periods.ini'
+$script:periods = @{}
+if ($Period) {
+    if (-not $Baseline) { Write-Run '-Period hanya bersama -Baseline.'; exit 2 }
+    if (-not (Test-Path -LiteralPath $script:periodsIni)) { Write-Run "periods.ini tidak ada: $($script:periodsIni)"; exit 2 }
+    $sec = ''
+    foreach ($line in (Get-Content -LiteralPath $script:periodsIni -Encoding UTF8)) {
+        if ($line -match '^\s*\[(\w+)\]') { $sec = $Matches[1]; $script:periods[$sec] = @{}; continue }
+        if ($sec -and $line -match '^\s*(\w+)\s*=\s*(.*?)\s*$') { $script:periods[$sec][$Matches[1]] = $Matches[2] }
+    }
+    foreach ($name in @('IS', 'OOS')) {
+        if (-not $script:periods.ContainsKey($name) -or -not $script:periods[$name]['FromDate']) { Write-Run "periode $name tidak lengkap di periods.ini"; exit 2 }
+    }
+}
 if ($Baseline) {
     $want = @($Symbols | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
-    foreach ($ini in (Get-ChildItem -LiteralPath (Join-Path $repoEa 'tests\baseline') -Filter 'BL-*.ini' -File | Sort-Object Name)) {
-        $sym = $ini.BaseName.Substring(3)
-        if ($want.Count -gt 0 -and $want -notcontains $sym) { continue }
-        $preset = Join-Path $repoEa "src\Presets\SDBot_DAY_$sym.set"
-        if (-not (Test-Path -LiteralPath $preset)) { Write-Run "preset $preset tidak ada"; exit 2 }
-        $script:runs += [pscustomobject]@{ Kind = 'baseline'; Id = "BL-$sym"; Ini = $ini.FullName; Set = $preset }
+    $runPeriods = $(if ($Period -eq 'ALL') { @('IS', 'OOS') } elseif ($Period) { @($Period) } else { @('') })
+    foreach ($pname in $runPeriods) {
+        foreach ($ini in (Get-ChildItem -LiteralPath (Join-Path $repoEa 'tests\baseline') -Filter 'BL-*.ini' -File | Sort-Object Name)) {
+            $sym = $ini.BaseName.Substring(3)
+            if ($want.Count -gt 0 -and $want -notcontains $sym) { continue }
+            $preset = Join-Path $repoEa "src\Presets\SDBot_DAY_$sym.set"
+            if (-not (Test-Path -LiteralPath $preset)) { Write-Run "preset $preset tidak ada"; exit 2 }
+            $id = $(if ($pname) { "BL-$pname-$sym" } else { "BL-$sym" })
+            $script:runs += [pscustomobject]@{ Kind = 'baseline'; Id = $id; Symbol = $sym; Period = $pname; Ini = $ini.FullName; Set = $preset }
+        }
     }
 }
 
