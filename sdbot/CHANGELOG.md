@@ -4,6 +4,16 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.16 — 2026-10-05 — spec 15 eksposur mata uang (Fase 4)
+
+- `Risk/ExposureRules.mqh` (fungsi murni): kaki mata uang berarah per posisi (BUY = dasar long + kuotasi short; XAU, XAG, BTC mata uang sendiri), hitungan posisi searah, penilaian batas. Long dan short dihitung terpisah, sehingga bug bot Python yang mengabaikan arah SELL tidak terulang.
+- Pre-trade check: langkah `CURRENCY_EXPOSURE` (kosong sejak Fase 1) kini aktif, setelah batas kategori dan sebelum margin. Dihitung atas semua posisi SDBot di akun; posisi manual tidak dihitung. Detail tolak misalnya `USD short 2/2`.
+- Input `InpMaxSameDirectionPerCurrency` (2; 0 = mati), preset diperbarui. Keputusan PC-23.
+- Replay 241 trade backtest berfilter v1.15: batas 2 memblokir 8 trade (5 rugi, 3 untung, bersih −0,85R); expectancy +0,035R → +0,040R.
+- Uji: TC-EXP-01..07, TC-RK-16..18 (posisi nyata di GBPUSDc/AUDUSDc, urutan vs batas kategori, posisi manual), SC-16 (harness `HarnessExposureSetup`: BUY EURUSD ditolak sepanjang run, SELL tetap dibuka).
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-05): build 0 error / 0 warning (4 target); unit 585/585; 24 skenario PASS (SC-00..SC-16); durasi 13 menit. pytest `sdbot/tools` 85/85, `schema.py check` OK (data versi 3).
+
 ### 1.15 — 2026-10-04 — spec 14 filter sesi dan spread (Fase 4)
 
 - Lapisan baru `Filters/FilterRules.mqh` (fungsi murni):

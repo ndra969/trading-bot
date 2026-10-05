@@ -1,0 +1,8 @@
+; SC-16: harness membuka BUY GBPUSDc + BUY AUDUSDc (magic SDBot lain) di bar pertama; kandidat BUY EURUSDc harus CURRENCY_EXPOSURE.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-16
+HarnessEveryBars=0
+HarnessPipeline=true
+HarnessExposureSetup=true

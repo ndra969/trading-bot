@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.15"
+#property version   "1.16"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.15"
+#define SDB_HARNESS_EA_VERSION "1.16"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>
@@ -46,6 +46,7 @@ input int                    HarnessAlertBurstAtBar   = 0;     // kirim burst al
 input bool                   HarnessRecordAnalysis    = false; // rekam analisis HTF/MTF tiap bar baru (SC-12)
 input bool                   HarnessRecordZones       = false; // rekam sidik peta zona tiap bar MTF baru (SC-13)
 input bool                   HarnessPipeline          = false; // pipeline sinyal membuka posisi seperti EA utama (SC-14)
+input bool                   HarnessExposureSetup     = false; // bar 1: BUY GBPUSDc + BUY AUDUSDc magic SDBot lain (SC-16)
 input int                    HarnessMarkUsedAtBar     = 0;     // tandai zona valid pertama Used di bar ini (0 = tidak, SC-13)
 
 CSdbApp          *g_app = NULL;
@@ -298,6 +299,28 @@ void MarkFirstValidZone()
      }
   }
 
+// SC-16 (spec 15): dua posisi SDBot short-USD di simbol lain, lot minimum, SL/TP 5000 point (terbuka sepanjang run).
+bool g_exposureSetupDone = false;
+void ExposureSetup()
+  {
+   if(!HarnessExposureSetup || g_exposureSetupDone)
+      return;
+   g_exposureSetupDone = true;
+   string syms[] = {"GBPUSDc", "AUDUSDc"};
+   long magics[] = {2026091902, 2026091907};
+   for(int i = 0; i < 2; i++)
+     {
+      SymbolSelect(syms[i], true);
+      CTrade t;
+      t.SetExpertMagicNumber(magics[i]);
+      double ask = SymbolInfoDouble(syms[i], SYMBOL_ASK), pt = SymbolInfoDouble(syms[i], SYMBOL_POINT);
+      int digits = (int)SymbolInfoInteger(syms[i], SYMBOL_DIGITS);
+      bool ok = t.Buy(SymbolInfoDouble(syms[i], SYMBOL_VOLUME_MIN), syms[i], ask, NormalizeDouble(ask - 5000 * pt, digits),
+                      NormalizeDouble(ask + 5000 * pt, digits), "SC-16 setup");
+      LogInfo("Harness", StringFormat("SC-16 setup BUY %s magic %I64d: %s retcode=%u", syms[i], magics[i], ok ? "ok" : "gagal", t.ResultRetcode()));
+     }
+  }
+
 void HarnessTick()
   {
    if(g_app != NULL)
@@ -340,6 +363,7 @@ void HarnessTick()
    if(g_app != NULL && HarnessAlertBurstAtBar > 0 && g_bar == HarnessAlertBurstAtBar)
       AlertBurst();
    MarkFirstValidZone();
+   ExposureSetup();
   }
 
 // Penarikan saldo terjadwal (spec 05 Req 8.3, SC-07): saat tanpa posisi, agar puncak tidak ikut

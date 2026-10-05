@@ -14,6 +14,7 @@ InpMaxPosForexMajor=5
 InpMaxPosForexCross=3
 InpMaxPosCommodity=1
 InpMaxPosCrypto=1
+InpMaxSameDirectionPerCurrency=2
 InpDailyLossPct=3.0
 InpDDReducePct=10.0
 InpDDStopPct=15.0

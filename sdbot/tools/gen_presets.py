@@ -86,6 +86,7 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpMaxPosForexCross", "3"),
     ("InpMaxPosCommodity", "1"),
     ("InpMaxPosCrypto", "1"),
+    ("InpMaxSameDirectionPerCurrency", "2"),  # spec 15, PC-23
     ("InpDailyLossPct", "3.0"),
     ("InpDDReducePct", "10.0"),
     ("InpDDStopPct", "15.0"),

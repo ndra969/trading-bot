@@ -1184,6 +1184,40 @@ void CheckSc15b(const string id, const CScenarioRecorder &rec)
               trades == 0 && accepted == 0 && spread >= 1 && later == 0);
   }
 
+// SC-16 (spec 15 Req 2.1, 2.4, 4.3): dua posisi SDBot short-USD (GBPUSDc, AUDUSDc) terbuka sepanjang run.
+// Kandidat BUY EURUSDc (short USD ketiga) ditolak CURRENCY_EXPOSURE; arah SELL tetap bisa dibuka.
+void CheckSc16(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
+   long expo = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='CURRENCY_EXPOSURE'");
+   long expoBad = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='CURRENCY_EXPOSURE' AND (direction <> 'BUY' OR "
+                            "reject_detail <> 'USD short 2/2')");
+   long buyAccepted = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED' AND direction='BUY'");
+   long sellAccepted = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED' AND direction='SELL'");
+   // Dicek di OnDeinit, setelah tester menutup semua posisi: pakai histori deal. Setup harus terbuka (2 IN) dan tidak
+   // tertutup SL/TP sebelum akhir run, agar dua kaki short-USD ada sepanjang run.
+   int setupIn = 0, setupEarly = 0;
+   HistorySelect(0, TimeCurrent() + 86400);
+   for(int i = HistoryDealsTotal() - 1; i >= 0; i--)
+     {
+      ulong d = HistoryDealGetTicket(i);
+      long mg = HistoryDealGetInteger(d, DEAL_MAGIC);
+      if(mg != 2026091902 && mg != 2026091907)
+         continue;
+      long entry = HistoryDealGetInteger(d, DEAL_ENTRY);
+      long reason = HistoryDealGetInteger(d, DEAL_REASON);
+      if(entry == DEAL_ENTRY_IN)
+         setupIn++;
+      else if(reason == DEAL_REASON_SL || reason == DEAL_REASON_TP)
+         setupEarly++;
+     }
+   AssertTrue(id + "-exposure", StringFormat("CURRENCY_EXPOSURE %I64d (bukan BUY / detail lain: %I64d); BUY ACCEPTED %I64d", expo, expoBad, buyAccepted),
+              expo >= 1 && expoBad == 0 && buyAccepted == 0);
+   AssertTrue(id + "-other", StringFormat("SELL ACCEPTED %I64d (arah lain tetap bisa); posisi setup dibuka %d/2, tertutup SL/TP sebelum akhir %d",
+                                         sellAccepted, setupIn, setupEarly),
+              sellAccepted >= 1 && setupIn == 2 && setupEarly == 0);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -1227,6 +1261,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc15(id, rec);
    else if(id == "SC-15b")
       CheckSc15b(id, rec);
+   else if(id == "SC-16")
+      CheckSc16(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

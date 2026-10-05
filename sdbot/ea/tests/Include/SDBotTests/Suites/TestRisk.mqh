@@ -277,6 +277,63 @@ void RunTestRiskCloseAllMarketClosed(CTrkRig &r)
               c.closed == 1 && c.failed == 0);
   }
 
+// Posisi pembantu di simbol lain (tester mendukung order multi-simbol): magic SDBot lain atau 0 (manual).
+bool TrkOpenOther(const string symbol, const long magic, const bool isBuy)
+  {
+   if(!SymbolSelect(symbol, true))
+      return false;
+   CTrade t;
+   t.SetExpertMagicNumber(magic);
+   double vol = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+   return isBuy ? t.Buy(vol, symbol) : t.Sell(vol, symbol);
+  }
+
+void TrkCloseOther(const long magic)
+  {
+   CTrade t;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket != 0 && PositionGetInteger(POSITION_MAGIC) == magic)
+         t.PositionClose(ticket);
+     }
+  }
+
+// TC-RK-16..18 (spec 15 Req 1.2, 2.1, 2.2): eksposur dengan posisi nyata di simbol lain.
+void RunTestRiskExposure(CTrkRig &r)
+  {
+   bool opened = TrkOpenOther("GBPUSDc", 2026091902, true) && TrkOpenOther("AUDUSDc", 2026091907, true);
+   string stage = "", detail = "";
+   OrderRequest buy = TrkRequest(_Symbol, true, 300, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN));
+   bool buyOk = r.rm.PreTradeCheck(buy, stage, detail);
+   string buyStage = stage, buyDetail = detail;
+   OrderRequest sell = TrkRequest(_Symbol, false, 300, SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN));
+   stage = "";
+   r.rm.PreTradeCheck(sell, stage, detail);
+   AssertTrue("TC-RK-16", StringFormat("BUY GBPUSD + BUY AUDUSD (SDBot lain): BUY %s %s '%s'; SELL tahap '%s'", _Symbol,
+                                       buyStage, buyDetail, stage),
+              opened && !buyOk && buyStage == SDB_REJECT_STAGE_CURRENCY_EXPOSURE && buyDetail == "USD short 2/2" &&
+              stage != SDB_REJECT_STAGE_CURRENCY_EXPOSURE);
+
+   InputValues tight = r.inputs;
+   tight.maxPosForexMajor = 2;
+   CRiskManager rm2;
+   rm2.Init(_Symbol, GetPointer(r.rs), GetPointer(r.exe), GetPointer(r.acc), tight);
+   stage = "";
+   rm2.PreTradeCheck(buy, stage, detail);
+   AssertTrue("TC-RK-17", "batas forex major 2 dan eksposur penuh: CLASS_POSITION_LIMIT lebih dulu | " + stage + " " + detail,
+              stage == SDB_REJECT_STAGE_CLASS_POSITION_LIMIT);
+   TrkCloseOther(2026091902);
+   TrkCloseOther(2026091907);
+
+   bool manual = TrkOpenOther("GBPUSDc", 0, true) && TrkOpenOther("AUDUSDc", 0, true);
+   stage = "";
+   r.rm.PreTradeCheck(buy, stage, detail);
+   TrkCloseOther(0);
+   AssertTrue("TC-RK-18", "posisi manual (magic 0) tidak dihitung eksposur | tahap '" + stage + "'",
+              manual && stage != SDB_REJECT_STAGE_CURRENCY_EXPOSURE);
+  }
+
 void RunTestRisk()
   {
    TfBeginSuite("Risk");
@@ -297,6 +354,7 @@ void RunTestRisk()
       RunTestRiskManagerFlags(r);
       RunTestRiskLotFits(r);
       RunTestRiskCloseAllMarketClosed(r);
+      RunTestRiskExposure(r);
       RunTestRiskManagerPositions(r);
       RunTestRiskMonitor(r);
       RunTestRiskManagerOtherSymbols();

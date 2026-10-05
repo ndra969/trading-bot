@@ -40,6 +40,7 @@
 #include <SDBotTests/Suites/TestSignalRules.mqh>
 #include <SDBotTests/Suites/TestSignalEngine.mqh>
 #include <SDBotTests/Suites/TestFilterRules.mqh>
+#include <SDBotTests/Suites/TestExposureRules.mqh>
 
 void RunAllSuites()
   {
@@ -77,6 +78,7 @@ void RunAllSuites()
    RunTestSignalRules();
    RunTestSignalEngine();
    RunTestFilterRules();
+   RunTestExposureRules();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

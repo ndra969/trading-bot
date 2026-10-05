@@ -167,6 +167,10 @@
 #define SDB_MIN_TESTER_UTC_OFFSET_H   -12
 #define SDB_MAX_TESTER_UTC_OFFSET_H   14
 
+//--- Eksposur mata uang (spec 15, PC-23)
+#define SDB_DEF_MAX_SAME_DIR_CCY      2        // PRD: maks 2 posisi searah per mata uang; 0 = mati
+#define SDB_MAX_MAX_SAME_DIR_CCY      10
+
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol
 #define SDB_PA_STAR_FIRST_BODY_ATR    0.5      // badan bar pertama bintang > 0,5 ATR
 #define SDB_PA_STAR_MID_RATIO         0.3      // badan bar tengah < 0,3 x badan pertama

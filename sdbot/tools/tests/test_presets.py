@@ -143,3 +143,9 @@ def test_ts54_session_spread_inputs():
         assert v.get("InpSessionNewYork") == "true", symbol
         assert v.get("InpTesterUtcOffsetHours") == "0", symbol
         assert v.get("InpMaxSpreadPoints") == str(spread), symbol
+
+
+def test_ts56_exposure_input():
+    """Spec 15 Req 3.1: batas posisi searah per mata uang = 2 di semua preset (PC-23)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpMaxSameDirectionPerCurrency") == "2", symbol

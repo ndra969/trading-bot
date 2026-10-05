@@ -24,7 +24,8 @@ string TprKnownKeys()
           "InpSwingStrength,InpStructureLookback,InpEmaPeriod,InpEmaSlopeBars,"
           "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
           "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,"
-          "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,";
+          "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,"
+          "InpMaxSameDirectionPerCurrency,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -65,6 +66,7 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpSessionNewYork")        v.sessionNewYork = (value == "true");
    else if(key == "InpMaxSpreadPoints")       v.maxSpreadPoints = (int)StringToInteger(value);
    else if(key == "InpTesterUtcOffsetHours")  v.testerUtcOffsetHours = (int)StringToInteger(value);
+   else if(key == "InpMaxSameDirectionPerCurrency") v.maxSameDirectionPerCurrency = (int)StringToInteger(value);
   }
 
 // "" = lolos; selain itu alasan gagal.

@@ -46,6 +46,7 @@ struct InputValues
    bool              sessionNewYork;
    int               maxSpreadPoints;    // 0 = mati
    int               testerUtcOffsetHours;
+   int               maxSameDirectionPerCurrency; // eksposur (spec 15), 0 = mati
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -107,6 +108,7 @@ InputValues DefaultInputValues()
    v.sessionNewYork = true;
    v.maxSpreadPoints = 0;
    v.testerUtcOffsetHours = 0;
+   v.maxSameDirectionPerCurrency = SDB_DEF_MAX_SAME_DIR_CCY;
    return v;
   }
 
@@ -178,6 +180,7 @@ void IrCheckSignals(const InputValues &v, string &errors)
       IrAdd(errors, "InpMinSlAtr (" + IrNum(v.minSlAtr) + ") harus < InpMaxSlAtr (" + IrNum(v.maxSlAtr) + ")");
    IrCheckRange("InpMaxSpreadPoints", v.maxSpreadPoints, 0, SDB_MAX_MAX_SPREAD_POINTS, errors);
    IrCheckRange("InpTesterUtcOffsetHours", v.testerUtcOffsetHours, SDB_MIN_TESTER_UTC_OFFSET_H, SDB_MAX_TESTER_UTC_OFFSET_H, errors);
+   IrCheckRange("InpMaxSameDirectionPerCurrency", v.maxSameDirectionPerCurrency, 0, SDB_MAX_MAX_SAME_DIR_CCY, errors);
   }
 
 void IrCheckClassLimit(const string name, const int value, string &errors)

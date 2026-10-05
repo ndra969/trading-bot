@@ -4,6 +4,15 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+### PC-23: Input eksposur mata uang
+- Status: Open
+- Tanggal disetujui: 2026-10-05
+- Dokumen: PRD-EA §Risk management (eksposur per mata uang), §Parameter input EA
+- Sumber: spec `ea-15-currency-exposure` requirements (replay 241 trade backtest berfilter v1.15), keputusan 1–4
+- Perubahan:
+    - Input `MaxSameDirectionPerCurrency` (default 2, 0 = mati, 0–10). Dihitung atas semua posisi SDBot di akun, per kaki mata uang dengan arah (BUY = dasar long + kuotasi short); posisi bukan SDBot tidak dihitung; long dan short dihitung terpisah.
+    - Detail tolak `CURRENCY_EXPOSURE`: mata uang, arah, jumlah (contoh `USD short 2/2`). Tanpa kunci antar-instance untuk order yang hampir bersamaan.
+
 ### PC-22: Input sesi dan spread; kriteria backtest dasar Fase 4
 - Status: Open
 - Tanggal disetujui: 2026-10-04

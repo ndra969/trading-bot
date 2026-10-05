@@ -28,6 +28,7 @@ input int                    InpMaxPosForexMajor      = SDB_DEF_MAX_POS_FOREX_MA
 input int                    InpMaxPosForexCross      = SDB_DEF_MAX_POS_FOREX_CROSS; // Maks posisi SDBot forex cross di akun
 input int                    InpMaxPosCommodity       = SDB_DEF_MAX_POS_COMMODITY;   // Maks posisi SDBot komoditas di akun
 input int                    InpMaxPosCrypto          = SDB_DEF_MAX_POS_CRYPTO;      // Maks posisi SDBot crypto di akun
+input int                    InpMaxSameDirectionPerCurrency = SDB_DEF_MAX_SAME_DIR_CCY; // Maks posisi SDBot searah per mata uang (0 = mati)
 input double                 InpDDReducePct           = SDB_DEF_DD_REDUCE_PCT;      // Drawdown: lot x 0.5 (%)
 input double                 InpDDStopPct             = SDB_DEF_DD_STOP_PCT;        // Drawdown: close all + STOPPED (%)
 input bool                   InpResetEmergencyStop    = false;                      // Buka STOPPED (ubah false -> true sekali)
@@ -110,6 +111,7 @@ InputValues CurrentInputs()
    v.sessionNewYork = InpSessionNewYork;
    v.maxSpreadPoints = InpMaxSpreadPoints;
    v.testerUtcOffsetHours = InpTesterUtcOffsetHours;
+   v.maxSameDirectionPerCurrency = InpMaxSameDirectionPerCurrency;
    return v;
   }
 
@@ -126,7 +128,7 @@ string CurrentInputsJson()
                  "InpEmaPeriod", "InpEmaSlopeBars", "InpZoneMinWidthAtr", "InpZoneMaxWidthAtr", "InpZoneMinLegAtr",
                  "InpZoneLegBars", "InpMaxZoneAgeBars", "InpMinConfluenceScore", "InpMinRR", "InpSlBufferAtr",
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
-                 "InpMaxSpreadPoints", "InpTesterUtcOffsetHours"};
+                 "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -173,6 +175,7 @@ string CurrentInputsJson()
    v[40] = JsonBool(InpSessionNewYork);
    v[41] = JsonNum(InpMaxSpreadPoints);
    v[42] = JsonNum(InpTesterUtcOffsetHours);
+   v[43] = JsonNum(InpMaxSameDirectionPerCurrency);
    return CanonicalJson(k, v);
   }
 

@@ -11,6 +11,7 @@
 #include <SDBot/Account/Account.mqh>
 #include <SDBot/Execution/Executor.mqh>
 #include <SDBot/Risk/RiskState.mqh>
+#include <SDBot/Risk/ExposureRules.mqh>
 
 class CRiskManager
   {
@@ -141,7 +142,14 @@ public:
       if(count >= limit)
          return Reject(stage, detail, SDB_REJECT_STAGE_CLASS_POSITION_LIMIT,
                        StringFormat("%s: %d posisi >= batas %d", EnumToString(cls), count, limit));
-      // Eksposur mata uang: Fase 4 (selalu lolos di sini).
+      // Eksposur mata uang dengan arah (spec 15 Req 2.1-2.2): setelah batas kategori, sebelum margin.
+      string legCcy[];
+      int legDir[];
+      CollectSdbotLegs(legCcy, legDir);
+      string expDetail;
+      if(!ExposureAllowed(legCcy, legDir, CurrencyOf(m_symbol, SYMBOL_CURRENCY_BASE), CurrencyOf(m_symbol, SYMBOL_CURRENCY_PROFIT), req.isBuy,
+                          m_in.maxSameDirectionPerCurrency, expDetail))
+         return Reject(stage, detail, SDB_REJECT_STAGE_CURRENCY_EXPOSURE, expDetail);
       double ml = (m_marginOverride >= 0.0) ? m_marginOverride : m_exe.MarginLevelAfter(req);
       if(ml < SDB_MARGIN_BLOCK_PCT)
          return Reject(stage, detail, SDB_REJECT_STAGE_MARGIN_LOW, StringFormat("margin level sesudah order %.0f%% < %.0f%%", ml, SDB_MARGIN_BLOCK_PCT));
@@ -179,6 +187,31 @@ public:
      }
 
    // Req 2.8: kategori posisi dari mata uang simbolnya, di semua simbol.
+   // Mata uang dasar/kuotasi simbol; kosong = tidak menambah eksposur, WARN per simbol per menit (Req 1.4).
+   string CurrencyOf(const string symbol, const ENUM_SYMBOL_INFO_STRING prop)
+     {
+      string c = SymbolInfoString(symbol, prop);
+      if(c == "")
+         LogThrottled(SDB_LOG_WARN, "exposure-ccy-" + symbol, SDB_LOG_THROTTLE_DEFAULT_SEC, "Risk",
+                      "mata uang simbol " + symbol + " tidak terbaca, tidak dihitung di eksposur");
+      return c;
+     }
+
+   // Kaki mata uang semua posisi SDBot di akun, simbol mana pun (Req 1.1-1.3; PC-02).
+   void CollectSdbotLegs(string &ccy[], int &dir[])
+     {
+      ArrayFree(ccy);
+      ArrayFree(dir);
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+        {
+         if(PositionGetTicket(i) == 0 || !IsSdbotMagic(PositionGetInteger(POSITION_MAGIC)))
+            continue;
+         string sym = PositionGetString(POSITION_SYMBOL);
+         bool isBuy = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY);
+         AddLegs(CurrencyOf(sym, SYMBOL_CURRENCY_BASE), CurrencyOf(sym, SYMBOL_CURRENCY_PROFIT), isBuy, ccy, dir);
+        }
+     }
+
    int CountSdbotPositionsInClass(const ENUM_SDB_ASSET_CLASS c)
      {
       int n = 0;
