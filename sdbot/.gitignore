@@ -32,3 +32,6 @@ node_modules/
 # Konfigurasi mesin lokal dan file sementara tools
 *.local.json
 tools/.tmp/
+
+# Fixture data uji (kalender SC-17) wajib ikut repo walau root .gitignore mengabaikan *.csv
+!ea/tests/fixtures/**/*.csv
