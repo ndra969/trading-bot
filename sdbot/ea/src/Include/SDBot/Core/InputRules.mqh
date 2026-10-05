@@ -47,6 +47,10 @@ struct InputValues
    int               maxSpreadPoints;    // 0 = mati
    int               testerUtcOffsetHours;
    int               maxSameDirectionPerCurrency; // eksposur (spec 15), 0 = mati
+   bool              newsFilter;         // filter berita (spec 16)
+   int               newsHighMinutes;
+   int               newsMediumMinutes;
+   string            newsCsvFile;        // hanya tester
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -109,6 +113,10 @@ InputValues DefaultInputValues()
    v.maxSpreadPoints = 0;
    v.testerUtcOffsetHours = 0;
    v.maxSameDirectionPerCurrency = SDB_DEF_MAX_SAME_DIR_CCY;
+   v.newsFilter = true;
+   v.newsHighMinutes = SDB_DEF_NEWS_HIGH_MIN;
+   v.newsMediumMinutes = SDB_DEF_NEWS_MEDIUM_MIN;
+   v.newsCsvFile = SDB_DEF_NEWS_CSV;
    return v;
   }
 
@@ -181,6 +189,8 @@ void IrCheckSignals(const InputValues &v, string &errors)
    IrCheckRange("InpMaxSpreadPoints", v.maxSpreadPoints, 0, SDB_MAX_MAX_SPREAD_POINTS, errors);
    IrCheckRange("InpTesterUtcOffsetHours", v.testerUtcOffsetHours, SDB_MIN_TESTER_UTC_OFFSET_H, SDB_MAX_TESTER_UTC_OFFSET_H, errors);
    IrCheckRange("InpMaxSameDirectionPerCurrency", v.maxSameDirectionPerCurrency, 0, SDB_MAX_MAX_SAME_DIR_CCY, errors);
+   IrCheckRange("InpNewsHighMinutes", v.newsHighMinutes, 0, SDB_MAX_NEWS_MIN, errors);
+   IrCheckRange("InpNewsMediumMinutes", v.newsMediumMinutes, 0, SDB_MAX_NEWS_MIN, errors);
   }
 
 void IrCheckClassLimit(const string name, const int value, string &errors)

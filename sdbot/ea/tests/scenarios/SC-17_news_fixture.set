@@ -1,0 +1,10 @@
+; SC-17: jendela 30/10 eksplisit (default 15/0) agar jendela medium ikut teruji. CSV fixture ea/tests/fixtures/common/sdbot_calendar_sc17.csv (disalin runner ke Common\Files).
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-17
+HarnessEveryBars=0
+HarnessPipeline=true
+InpNewsCsvFile=sdbot_calendar_sc17.csv
+InpNewsHighMinutes=30
+InpNewsMediumMinutes=10

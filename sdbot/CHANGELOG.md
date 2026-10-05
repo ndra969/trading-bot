@@ -4,6 +4,19 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.17 — 2026-10-05 — spec 16 filter berita, Fase 4 selesai
+
+- `Filters/NewsRules.mqh` (fungsi murni): event kalender, baris CSV `epoch,ccy,impact,id,nama`, relevansi mata uang simbol (XAU/XAG/BTC lewat USD), jendela inklusif per dampak, pilihan event saat tumpang tindih (dampak tertinggi lalu terdekat), event terdekat. Hanya jadwal event, tanpa nilai actual.
+- `Filters/NewsFilter.mqh` (`CNewsFilter`): live dari kalender MT5 (−1..+2 hari, muat ulang tiap 15 menit, 60 detik setelah gagal); tester dari `Common\Files\<InpNewsCsvFile>`. Kalender tak terbaca = status OFF, entry tidak diblokir berita, satu alert High `NEWS_FILTER_OFF` per sesi.
+- Pipeline: tahap `NEWS_BLACKOUT` sesudah pre-filter risiko, sebelum sesi dan spread; detail `nama CCY DAMPAK menit`. Konteks sinyal mendapat `news` (ON/OFF/DISABLED) dan `news_next`.
+- Input `InpNewsFilter` (true), `InpNewsHighMinutes` (15), `InpNewsMediumMinutes` (0), `InpNewsCsvFile` (`sdbot_calendar.csv`). PRD semula ±30 menit; dengan ±30/±10 backtest dasar hanya 187 trade (< 200) dan trade yang terblokir bersih +1,24R karena kalender MT5 menandai HIGH juga untuk rilis kecil. Keputusan PC-24.
+- Alat: script `Scripts/SDBot/ExportCalendar.mq5` dan `run-ea-tests.ps1 -ExportCalendar` (18.787 event 2025-01..2026-10); runner menyalin fixture `ea/tests/fixtures/common/` ke Common\Files sebelum skenario. Enum `alert_type` + `NEWS_FILTER_OFF` (data skema tetap v3).
+- Uji: TC-NW-01..11, TC-SG-27, TS-57..59, SC-17 (kalender fixture, jendela 30/10 eksplisit) dan SC-17b (CSV tidak ada: tetap trading, satu alert).
+
+Backtest dasar dengan semua filter Fase 4 (12 simbol, 2025.10.01–2026.10.01, OHLC M1): **LOLOS**, 215 trade (11–31 per simbol), tanpa log ERROR/CRITICAL. Dibanding v1.15: trade 241 → 215, expectancy +0,035R → +0,058R, total R +8,42 → +12,55.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-05): build 0 error / 0 warning (5 target, termasuk `ExportCalendar`); unit 597/597; 26 skenario PASS (SC-00..SC-17b); durasi 14 menit 54 detik. pytest `sdbot/tools` 88/88, `schema.py check` OK (data versi 3).
+
 ### 1.16 — 2026-10-05 — spec 15 eksposur mata uang (Fase 4)
 
 - `Risk/ExposureRules.mqh` (fungsi murni): kaki mata uang berarah per posisi (BUY = dasar long + kuotasi short; XAU, XAG, BTC mata uang sendiri), hitungan posisi searah, penilaian batas. Long dan short dihitung terpisah, sehingga bug bot Python yang mengabaikan arah SELL tidak terulang.

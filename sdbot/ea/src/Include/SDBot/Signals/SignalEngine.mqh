@@ -19,6 +19,7 @@
 #include <SDBot/Analysis/ZoneBook.mqh>
 #include <SDBot/Strategies/PaTrigger.mqh>
 #include <SDBot/Signals/SignalRules.mqh>
+#include <SDBot/Filters/NewsFilter.mqh>
 
 // Hitungan per hari server (Req 6.4): bar yang bukan kandidat tidak punya baris signals.
 struct SdbSignalCounts
@@ -50,6 +51,7 @@ private:
    SdbSignalParams   m_params;
    string            m_style;
    SdbSessionParams  m_sessions;      // filter sesi UTC (spec 14)
+   CNewsFilter      *m_news;          // filter berita (spec 16); NULL = DISABLED
    int               m_testerUtcOffsetH;
    CMarketStructure *m_ms;
    CZoneBook        *m_zb;
@@ -157,6 +159,17 @@ private:
       f.session = SessionText(ses);
       f.sessionAllowed = SessionAllowed(ses, m_sessions);
       f.spreadPoints = (f.point > 0.0) ? (long)MathRound((f.ask - f.bid) / f.point) : 0;
+      f.newsStatus = SDB_NEWS_STATUS_DISABLED;
+      f.newsBlocked = false;
+      f.newsDetail = "";
+      f.newsNext = "";
+      if(m_news != NULL)
+        {
+         m_news.Refresh(TimeTradeServer());
+         f.newsStatus = m_news.Status();
+         f.newsBlocked = m_news.Blocked(m_lastBar, f.newsDetail);
+         f.newsNext = m_news.NearestText(m_lastBar);
+        }
      }
 
    // Lot dan pre-trade check Fase 1, lalu order; zona Used hanya setelah terisi (Req 4.7, 5.1–5.3).
@@ -223,12 +236,13 @@ private:
 
 public:
                      CSignalEngine(void) : m_magic(0), m_ltf(PERIOD_CURRENT), m_ms(NULL), m_zb(NULL), m_pt(NULL), m_rs(NULL),
-                     m_rm(NULL), m_exe(NULL), m_acc(NULL), m_sink(NULL), m_state(NULL), m_login(0), m_runKey(0), m_lastBar(0),
+                     m_rm(NULL), m_exe(NULL), m_acc(NULL), m_sink(NULL), m_news(NULL), m_state(NULL), m_login(0), m_runKey(0), m_lastBar(0),
                      m_day(0) { ZeroMemory(m_counts); }
 
    void Init(const string symbol, const long magic, const ENUM_TIMEFRAMES ltf, const SdbSignalParams &p, CMarketStructure *ms,
              CZoneBook *zb, CPaTrigger *pt, CRiskState *rs, CRiskManager *rm, CExecutor *exe, CAccount *acc,
-             ISdbEventSink *sink, const ENUM_SDB_TRADING_STYLE style, const SdbSessionParams &sessions, const int testerUtcOffsetHours)
+             ISdbEventSink *sink, const ENUM_SDB_TRADING_STYLE style, const SdbSessionParams &sessions, const int testerUtcOffsetHours,
+             CNewsFilter *news)
      {
       m_symbol = symbol;
       m_magic = magic;
@@ -236,6 +250,7 @@ public:
       m_params = p;
       m_style = SdbStyleText(style);
       m_sessions = sessions;
+      m_news = news;
       m_testerUtcOffsetH = testerUtcOffsetHours;
       if(!SessionFilterOn(sessions))
          LogInfo("Signals", "filter sesi mati: ketiga input sesi false, entry diizinkan 24 jam");

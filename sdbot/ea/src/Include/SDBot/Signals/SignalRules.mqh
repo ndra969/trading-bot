@@ -103,6 +103,12 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
       d.detail = f.preDetail;
       return;
      }
+   if(f.newsBlocked)
+     {
+      d.stage = SDB_REJECT_STAGE_NEWS_BLACKOUT;
+      d.detail = f.newsDetail;
+      return;
+     }
    if(!f.sessionAllowed)
      {
       d.stage = SDB_REJECT_STAGE_OUTSIDE_SESSION;
@@ -155,7 +161,7 @@ long SignalIdOf(const long login, const long runKey, const long magic, const dat
 string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const SdbSignalParams &p, const string biasReason)
   {
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
-                 "max_spread", "session"};
+                 "max_spread", "session", "news", "news_next"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -172,6 +178,8 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    v[10] = JsonStr(ZoneStatusText(f.zone.status));
    v[11] = IntegerToString(p.maxSpreadPoints);
    v[12] = JsonStr(f.session);
+   v[13] = JsonStr(f.newsStatus);
+   v[14] = f.newsNext == "" ? "null" : JsonStr(f.newsNext);
    return CanonicalJson(k, v);
   }
 

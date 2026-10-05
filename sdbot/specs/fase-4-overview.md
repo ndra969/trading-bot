@@ -1,6 +1,6 @@
 # Fase 4 — Filter: overview
 
-Status: Approved (2026-10-04)
+Status: Done (2026-10-05)
 Sumber: PRD-EA §Pipeline analisis (pre-filter), §Risk management (eksposur per mata uang), §Parameter input EA (`MaxSpreadPoints`, `NewsBlockMinutes`, `TradingSessions`), §Roadmap Fase 4; [python-bot-lessons.md](python-bot-lessons.md) §2–3; catatan Fase 4 di [README.md](README.md#fase-4--filter-spec-ea-14-filters-news); backtest dasar Fase 3 (12 simbol, 2025-10..2026-10)
 
 Fase 4 menambahkan empat filter PRD di depan entry Fase 3: sesi trading, spread, eksposur mata uang, dan berita. Setiap penolakan tercatat di `signals` dengan alasan, sehingga efek tiap filter terukur.

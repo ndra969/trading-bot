@@ -63,7 +63,7 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-4-overv
 |---|---|---|---|---|---|
 | 14 | [ea-14-session-spread](ea-14-session-spread/) | Lapisan Filters, filter sesi (UTC) dan spread per simbol, tahap tolak di pipeline | 13 | suite FilterRules ALL PASS, SC-15 PASS | **Done** 2026-10-04 (v1.15; backtest dasar berfilter lolos 241 trade; MC-FL-01 manual tertunda; PC-21, PC-22) |
 | 15 | [ea-15-currency-exposure](ea-15-currency-exposure/) | Eksposur per mata uang dengan arah, `CURRENCY_EXPOSURE` di pre-trade check | 13 | suite ExposureRules ALL PASS, SC-16 PASS | **Done** 2026-10-05 (v1.16; MC-EXP-01 manual tertunda; PC-23) |
-| 16 | ea-16-news | Kalender live + CSV tester (`ExportCalendar`), blackout per dampak, degrade aman + alert, DoD Fase 4 | 14 | suite NewsRules ALL PASS, SC-17 PASS, backtest dasar dengan filter | Belum dimulai |
+| 16 | [ea-16-news](ea-16-news/) | Kalender live + CSV tester (`ExportCalendar`), blackout per dampak, degrade aman + alert, DoD Fase 4 | 14 | suite NewsRules ALL PASS, SC-17 PASS, backtest dasar dengan filter | **Done** 2026-10-05 (v1.17; MC-NW-01..02 manual tertunda; PC-24) |
 
 Versi EA: 14 = `1.15`, 15 = `1.16`, 16 = `1.17` (Fase 4 selesai).
 

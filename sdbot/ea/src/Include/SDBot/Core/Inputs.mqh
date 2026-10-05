@@ -65,6 +65,10 @@ input bool                   InpSessionLondon         = true;                   
 input bool                   InpSessionNewYork        = true;                       // Sesi New York 13:00-22:00 UTC (semua false = filter mati)
 input int                    InpMaxSpreadPoints       = 0;                          // Spread maksimum (point; 0 = mati, preset per simbol)
 input int                    InpTesterUtcOffsetHours  = 0;                          // Selisih server-UTC di tester (jam)
+input bool                   InpNewsFilter            = true;                       // Filter berita (kalender MT5; tester: CSV)
+input int                    InpNewsHighMinutes       = SDB_DEF_NEWS_HIGH_MIN;      // Blackout berita high (+- menit, 0 = tidak)
+input int                    InpNewsMediumMinutes     = SDB_DEF_NEWS_MEDIUM_MIN;    // Blackout berita medium (+- menit, 0 = tidak)
+input string                 InpNewsCsvFile           = SDB_DEF_NEWS_CSV;           // CSV kalender di Common\Files (hanya tester)
 
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
@@ -112,6 +116,10 @@ InputValues CurrentInputs()
    v.maxSpreadPoints = InpMaxSpreadPoints;
    v.testerUtcOffsetHours = InpTesterUtcOffsetHours;
    v.maxSameDirectionPerCurrency = InpMaxSameDirectionPerCurrency;
+   v.newsFilter = InpNewsFilter;
+   v.newsHighMinutes = InpNewsHighMinutes;
+   v.newsMediumMinutes = InpNewsMediumMinutes;
+   v.newsCsvFile = InpNewsCsvFile;
    return v;
   }
 
@@ -128,7 +136,8 @@ string CurrentInputsJson()
                  "InpEmaPeriod", "InpEmaSlopeBars", "InpZoneMinWidthAtr", "InpZoneMaxWidthAtr", "InpZoneMinLegAtr",
                  "InpZoneLegBars", "InpMaxZoneAgeBars", "InpMinConfluenceScore", "InpMinRR", "InpSlBufferAtr",
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
-                 "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency"};
+                 "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
+                 "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -176,6 +185,10 @@ string CurrentInputsJson()
    v[41] = JsonNum(InpMaxSpreadPoints);
    v[42] = JsonNum(InpTesterUtcOffsetHours);
    v[43] = JsonNum(InpMaxSameDirectionPerCurrency);
+   v[44] = JsonBool(InpNewsFilter);
+   v[45] = JsonNum(InpNewsHighMinutes);
+   v[46] = JsonNum(InpNewsMediumMinutes);
+   v[47] = JsonStr(InpNewsCsvFile);
    return CanonicalJson(k, v);
   }
 

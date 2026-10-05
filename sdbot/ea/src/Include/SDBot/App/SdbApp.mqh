@@ -56,6 +56,7 @@ private:
    CZoneBook         m_zones;          // zona S&D MTF (spec 11)
    CPaTrigger        m_trigger;        // pola candle LTF (spec 12)
    CSignalEngine     m_signals;        // pipeline sinyal dan entry (spec 13)
+   CNewsFilter       m_news;           // filter berita (spec 16), hanya bila pipeline aktif
    CClosureTracker   m_closureTracker;
    CReconciler       m_reconciler;
    int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
@@ -143,6 +144,15 @@ private:
       sp.minSlAtr = cfg.inputs.minSlAtr;
       sp.maxSlAtr = cfg.inputs.maxSlAtr;
       sp.maxSpreadPoints = cfg.inputs.maxSpreadPoints;
+      if(cfg.signalsOn)
+        {
+         SdbNewsParams np;
+         np.enabled = cfg.inputs.newsFilter;
+         np.highMinutes = cfg.inputs.newsHighMinutes;
+         np.mediumMinutes = cfg.inputs.newsMediumMinutes;
+         m_news.Init(_Symbol, SymbolInfoString(_Symbol, SYMBOL_CURRENCY_BASE), SymbolInfoString(_Symbol, SYMBOL_CURRENCY_PROFIT), np,
+                     MQLInfoInteger(MQL_TESTER) != 0, cfg.inputs.newsCsvFile, m_sink, cfg.inputs.magic);
+        }
       SdbSessionParams ses;
       ses.tokyo = cfg.inputs.sessionTokyo;
       ses.london = cfg.inputs.sessionLondon;
@@ -151,7 +161,7 @@ private:
          LogWarn("App", "InpMaxSpreadPoints 0: filter spread mati (preset per simbol mengisi batasnya)");
       m_signals.Init(_Symbol, cfg.inputs.magic, ltf, sp, GetPointer(m_structure), GetPointer(m_zones), GetPointer(m_trigger),
                      GetPointer(m_riskState), GetPointer(m_riskManager), GetPointer(m_executor), GetPointer(m_account), m_sink,
-                     cfg.style, ses, cfg.inputs.testerUtcOffsetHours);
+                     cfg.style, ses, cfg.inputs.testerUtcOffsetHours, cfg.signalsOn ? GetPointer(m_news) : NULL);
      }
 
    void SendSnapshot()

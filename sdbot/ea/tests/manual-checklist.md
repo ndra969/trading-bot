@@ -45,6 +45,10 @@ Versi EA saat checklist dibuat: 1.06 (Fase 1 selesai). Terminal live: akun cent 
 | MC-PS-04 | spec 06 | Tutup MT5 saat ada posisi, posisi kena TP saat MT5 mati, buka lagi | Closure `TP` tercatat saat init | | | |
 | MC-SG-01 | spec 13 | EA v1.12 di akun cent EURUSDc (risiko minimum) sampai sinyal pertama | Baris `signals` ACCEPTED dengan 3 skor, posisi punya SL/TP dari zona, pesan Telegram masuk | | | |
 | MC-SG-02 | spec 13 | Restart EA di tengah bar M15 setelah kandidat | Tidak ada baris `signals` atau order ganda | | | |
+| MC-FL-01 | spec 14 | EA v1.15+ di akun cent EURUSDc, amati log di luar 08:00–22:00 UTC | Kandidat ditolak `OUTSIDE_SESSION`; jam UTC di detail cocok dengan jam dunia | | | |
+| MC-EXP-01 | spec 15 | Akun cent dengan dua posisi SDBot searah USD terbuka | Kandidat ketiga searah USD tercatat `CURRENCY_EXPOSURE` dengan detail mata uang | | | |
+| MC-NW-01 | spec 16 | EA v1.17 di akun cent menjelang berita USD high | Log menunjukkan kandidat `NEWS_BLACKOUT` dengan nama event; `news_next` terisi di sinyal lain | | | |
+| MC-NW-02 | spec 16 | Start terminal sebelum kalender MT5 sinkron | Satu alert `NEWS_FILTER_OFF`, lalu log INFO saat filter aktif kembali | | | |
 | PRD-01 | PRD uji fungsi wajib | Restart EA saat ada posisi terbuka | Status BE dan partial tetap benar (otomatis: SC-04) | | | |
 | PRD-02 | PRD uji fungsi wajib | Koneksi putus saat ada sinyal | Entry tertahan, alert terkirim | | | |
 | PRD-03 | PRD uji fungsi wajib | Rugi harian 3% tercapai | Entry pause sampai hari server berikutnya (otomatis: SC-02) | | | |

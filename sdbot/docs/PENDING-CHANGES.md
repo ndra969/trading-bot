@@ -4,6 +4,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+### PC-24: Filter berita (input, sumber kalender, degrade)
+- Status: Open
+- Tanggal disetujui: 2026-10-05
+- Dokumen: PRD-EA §Pipeline analisis (pre-filter berita), §Parameter input EA, §Notifikasi (tipe alert); PRD-Backoffice §Database (enum `alert_type`)
+- Sumber: spec `ea-16-news` requirements, keputusan 1–6
+- Perubahan:
+    - Input `NewsBlockMinutes` diganti `NewsFilter` (true), `NewsHighMinutes` (15) dan `NewsMediumMinutes` (0); 0 = dampak itu tidak diblokir. Default 15/0 (bukan PRD ±30) disetujui 2026-10-05 setelah backtest dasar: ±30/±10 hanya menyisakan 187 trade (< 200, PC-22) dan trade yang terblokir bersih +1,24R, karena kalender MT5 menandai HIGH juga untuk rilis kecil (New Home Sales, EIA, lelang obligasi). Kandidat di jendela event berdampak untuk mata uang simbol ditolak `NEWS_BLACKOUT` (detail: event, mata uang, dampak, menit ke rilis); XAU/XAG/BTC hanya kaki USD.
+    - Live: kalender MT5 di-cache dan disegarkan tiap 15 menit. Tester: CSV `Common\Files\sdbot_calendar.csv` dari script `ExportCalendar` (jadwal saja, tanpa nilai `actual`).
+    - Kalender tidak terbaca → entry tidak diblokir, satu alert `NEWS_FILTER_OFF` (High) per sesi EA; status filter (`ON`/`OFF`/`DISABLED`) dan event terdekat dicatat di konteks sinyal.
+    - Enum `alert_type` + `NEWS_FILTER_OFF`.
+
 ### PC-23: Input eksposur mata uang
 - Status: Open
 - Tanggal disetujui: 2026-10-05
@@ -35,7 +46,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Sesi trading dalam UTC (batas bot Python): Tokyo 00:00–08:00, London 08:00–17:00, New York 13:00–22:00; default London + New York (08:00–22:00 UTC). Kandidat di luar sesi ditolak `OUTSIDE_SESSION`.
     - `MaxSpreadPoints` per simbol diambil dari spread live akun cent, bukan dari tester; kandidat dengan spread lebih lebar ditolak `SPREAD_TOO_WIDE`.
     - Eksposur: maks 2 posisi SDBot searah per mata uang di akun, dihitung dengan arah (BUY EURUSD = long EUR + short USD); XAU, XAG, BTC dihitung sebagai mata uang sendiri vs USD.
-    - Blackout berita: high ±30 menit (PRD), medium ±10 menit, low tidak diblokir; event dipetakan ke mata uang simbol.
+    - Blackout berita: high ±15 menit, medium tidak diblokir secara default (diubah dari ±30/±10, lihat PC-24), low tidak pernah diblokir; event dipetakan ke mata uang simbol.
     - Di tester, kalender dibaca dari CSV hasil script `ExportCalendar`; tanpa CSV, filter berita mati + satu alert per sesi, entry tidak diblokir.
 
 ## Done

@@ -191,3 +191,9 @@ def test_ts50_signal_enums(real_schema_dir: Path):
     tp = enums["tp_source"]
     assert tp.values == ["ZONE", "RR"]
     assert tp.columns == ["signals.context_json"]
+
+
+def test_ts57_news_filter_off_alert(real_schema_dir: Path):
+    """Spec 16 Req 4.2: alert proteksi berita mati (PC-24)."""
+    enums = {e.name: e for e in schema.load_enums(real_schema_dir / "enums.md")}
+    assert "NEWS_FILTER_OFF" in enums["alert_type"].values

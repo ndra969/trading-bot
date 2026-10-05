@@ -1,4 +1,4 @@
-# Pipeline sinyal dan entry (spec 13)
+# Pipeline sinyal dan entry (spec 13, filter Fase 4: spec 14–16)
 
 ```mermaid
 flowchart TB
@@ -16,7 +16,8 @@ flowchart TB
     ZN -->|ya| F[fakta kandidat: STOPPED/pause/CanTrade, posisi instance, pola arah bias, TrendScore MTF, bid/ask, stops, ATR H1, zona lawan]
     F --> E[EvaluateSignal: skor ZONE 30/15 + TREND 15/7/0 + PA 10/7/3 dari 55]
     E --> S1{pre-filter risiko} -->|gagal| REJ
-    S1 --> SS{sesi UTC bar diizinkan? Tokyo 00-08, London 08-17, NY 13-22; 22-24 tidak} -->|tidak: OUTSIDE_SESSION| REJ
+    S1 --> NW{status berita ON dan bar dalam jendela event mata uang simbol? HIGH ±30, MEDIUM ±10 menit} -->|ya: NEWS_BLACKOUT| REJ
+    NW --> SS{sesi UTC bar diizinkan? Tokyo 00-08, London 08-17, NY 13-22; 22-24 tidak} -->|tidak: OUTSIDE_SESSION| REJ
     SS --> SPD{spread ask-bid <= InpMaxSpreadPoints? 0 = mati} -->|tidak: SPREAD_TOO_WIDE| REJ
     SPD --> S2{posisi instance terbuka?} -->|ya| REJ
     S2 --> S3{pola PA searah?} -->|tidak| REJ
@@ -31,5 +32,7 @@ flowchart TB
     REJ[SignalRecord REJECTED + tahap pertama yang gagal] --> SK
     ACC --> SK[event sink: signals + 3 signal_scores, id = SHA-256 login/run_key/magic/bar]
 ```
+
+Filter berita (spec 16, [news.md](news.md)) berjalan sebelum sesi dan spread; status OFF atau DISABLED tidak memblokir. Konteks sinyal mencatat `news` (ON/OFF/DISABLED) dan `news_next` (event ≥ medium terdekat dalam 24 jam, atau null).
 
 Satu baris `signals` per kandidat (bar yang menyentuh zona valid searah bias, 4–6 per hari per simbol). Bar tanpa bias atau tanpa zona hanya dihitung dan diringkas di log INFO saat hari server berganti dan saat EA berhenti. ID sinyal dihitung sebelum order sehingga `trades.signal_id` terisi, dan baris yang sama dari restart di bar yang sama ditolak `ON CONFLICT(id) DO NOTHING`. Query kalibrasi: `tools/queries/signal_rejects.sql`, `score_vs_r.sql`, `pattern_vs_r.sql`, `zone_status_vs_r.sql`, `tp_source_vs_r.sql`, `candidates_per_day.sql`.

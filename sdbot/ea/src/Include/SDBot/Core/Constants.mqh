@@ -171,6 +171,13 @@
 #define SDB_DEF_MAX_SAME_DIR_CCY      2        // PRD: maks 2 posisi searah per mata uang; 0 = mati
 #define SDB_MAX_MAX_SAME_DIR_CCY      10
 
+//--- Filter berita (spec 16, PC-24)
+#define SDB_DEF_NEWS_HIGH_MIN         15       // PC-24: +-15 menit (PRD +-30 memblokir ~22% trade backtest, PC-22 gagal)
+#define SDB_DEF_NEWS_MEDIUM_MIN       0        // PC-24: medium tidak diblokir secara default
+#define SDB_MAX_NEWS_MIN              240
+#define SDB_DEF_NEWS_CSV              "sdbot_calendar.csv"
+#define SDB_NEWS_REFRESH_SEC          900      // kalender live dimuat ulang tiap 15 menit
+
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol
 #define SDB_PA_STAR_FIRST_BODY_ATR    0.5      // badan bar pertama bintang > 0,5 ATR
 #define SDB_PA_STAR_MID_RATIO         0.3      // badan bar tengah < 0,3 x badan pertama

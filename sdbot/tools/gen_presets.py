@@ -119,6 +119,11 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpSessionLondon", "true"),
     ("InpSessionNewYork", "true"),
     ("InpTesterUtcOffsetHours", "0"),
+    # Filter berita (spec 16, PC-24): high +-30, medium +-10 menit; CSV kalender untuk tester
+    ("InpNewsFilter", "true"),
+    ("InpNewsHighMinutes", "15"),
+    ("InpNewsMediumMinutes", "0"),
+    ("InpNewsCsvFile", "sdbot_calendar.csv"),
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),

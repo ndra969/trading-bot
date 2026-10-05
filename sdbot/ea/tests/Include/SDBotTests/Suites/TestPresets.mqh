@@ -25,7 +25,7 @@ string TprKnownKeys()
           "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
           "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,"
           "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,"
-          "InpMaxSameDirectionPerCurrency,";
+          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -67,6 +67,10 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpMaxSpreadPoints")       v.maxSpreadPoints = (int)StringToInteger(value);
    else if(key == "InpTesterUtcOffsetHours")  v.testerUtcOffsetHours = (int)StringToInteger(value);
    else if(key == "InpMaxSameDirectionPerCurrency") v.maxSameDirectionPerCurrency = (int)StringToInteger(value);
+   else if(key == "InpNewsFilter")            v.newsFilter = (value == "true");
+   else if(key == "InpNewsHighMinutes")       v.newsHighMinutes = (int)StringToInteger(value);
+   else if(key == "InpNewsMediumMinutes")     v.newsMediumMinutes = (int)StringToInteger(value);
+   else if(key == "InpNewsCsvFile")           v.newsCsvFile = value;
   }
 
 // "" = lolos; selain itu alasan gagal.

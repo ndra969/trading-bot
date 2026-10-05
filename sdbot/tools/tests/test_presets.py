@@ -149,3 +149,34 @@ def test_ts56_exposure_input():
     """Spec 15 Req 3.1: batas posisi searah per mata uang = 2 di semua preset (PC-23)."""
     for symbol in EXPECTED_MAGIC:
         assert _read(symbol).get("InpMaxSameDirectionPerCurrency") == "2", symbol
+
+
+def test_ts58_news_inputs():
+    """Spec 16 Req 1.3: filter berita aktif, high 30, medium 10 menit (PC-24)."""
+    for symbol in EXPECTED_MAGIC:
+        v = _read(symbol)
+        assert v.get("InpNewsFilter") == "true", symbol
+        assert v.get("InpNewsHighMinutes") == "15", symbol
+        assert v.get("InpNewsMediumMinutes") == "0", symbol
+
+
+FIXTURE_SC17 = (
+    Path(__file__).resolve().parents[2]
+    / "ea"
+    / "tests"
+    / "fixtures"
+    / "common"
+    / "sdbot_calendar_sc17.csv"
+)
+
+
+def test_ts59_sc17_calendar_fixture():
+    """Spec 16 Req 6.2: fixture kalender SC-17 berformat epoch,ccy,impact,id,nama, epoch naik."""
+    lines = FIXTURE_SC17.read_text(encoding="ascii").splitlines()
+    assert len(lines) > 100
+    prev = 0
+    for line in lines:
+        epoch, ccy, impact, event_id, name = line.split(",", 4)
+        assert int(epoch) >= prev and len(ccy) == 3 and impact in ("HIGH", "MEDIUM", "LOW")
+        assert event_id.isdigit() and name
+        prev = int(epoch)

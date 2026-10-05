@@ -1218,6 +1218,38 @@ void CheckSc16(const string id, const CScenarioRecorder &rec)
               sellAccepted >= 1 && setupIn == 2 && setupEarly == 0);
   }
 
+// SC-17 (spec 16 Req 1.1–1.4, 2.2): kalender fixture USD HIGH 12:30 (jendela 12:00–13:00) dan EUR MEDIUM 09:00
+// (08:50–09:10) tiap hari kerja. Server tester GMT+0, jadi waktu UTC di signals = waktu server.
+void CheckSc17(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
+   string inWindow = "(((time % 86400) BETWEEN 43200 AND 46800) OR ((time % 86400) BETWEEN 31800 AND 33000))";
+   long blackout = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='NEWS_BLACKOUT'");
+   long blackoutOut = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='NEWS_BLACKOUT' AND (NOT " + inWindow +
+                                " OR reject_detail NOT LIKE 'SC17 %')");
+   AssertTrue(id + "-blackout", StringFormat("%I64d kandidat NEWS_BLACKOUT, di luar jendela / detail lain: %I64d", blackout, blackoutOut),
+              blackout >= 1 && blackoutOut == 0);
+   long acceptedIn = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED' AND " + inWindow);
+   long trades = ScDbCount("SELECT COUNT(*) FROM trades WHERE source='EA' AND session_id IN (" + rec.SessionIdList() + ")");
+   long notOn = ScDbCount("SELECT COUNT(*)" + w + " AND json_extract(context_json, '$.news') <> 'ON'");
+   AssertTrue(id + "-outside", StringFormat("ACCEPTED di jendela %I64d; trade %I64d; konteks news bukan ON %I64d", acceptedIn, trades, notOn),
+              acceptedIn == 0 && trades >= 1 && notOn == 0);
+  }
+
+// SC-17b (spec 16 Req 3.1, 3.3): CSV tidak ada -> tetap trading, tepat satu alert NEWS_FILTER_OFF, konteks OFF.
+void CheckSc17b(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string w = " FROM signals WHERE session_id IN (" + ses + ")";
+   long trades = ScDbCount("SELECT COUNT(*) FROM trades WHERE source='EA' AND session_id IN (" + ses + ")");
+   long alerts = ScDbCount("SELECT COUNT(*) FROM alerts WHERE type='NEWS_FILTER_OFF' AND session_id IN (" + ses + ")");
+   long notOff = ScDbCount("SELECT COUNT(*)" + w + " AND json_extract(context_json, '$.news') <> 'OFF'");
+   long blackout = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='NEWS_BLACKOUT'");
+   AssertTrue(id + "-degrade", StringFormat("trade %I64d, alert NEWS_FILTER_OFF %I64d, konteks bukan OFF %I64d, NEWS_BLACKOUT %I64d",
+                                            trades, alerts, notOff, blackout),
+              trades >= 1 && alerts == 1 && notOff == 0 && blackout == 0);
+  }
+
 void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTransport &tr)
   {
    TfBeginSuite(id == "" ? "(kosong)" : id);
@@ -1263,6 +1295,10 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc15b(id, rec);
    else if(id == "SC-16")
       CheckSc16(id, rec);
+   else if(id == "SC-17")
+      CheckSc17(id, rec);
+   else if(id == "SC-17b")
+      CheckSc17b(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

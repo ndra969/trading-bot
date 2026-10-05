@@ -100,6 +100,10 @@ SdbSignalFacts SgF0()
    f.session = "OVERLAP";
    f.sessionAllowed = true;
    f.spreadPoints = 10;
+   f.newsBlocked = false;
+   f.newsDetail = "";
+   f.newsStatus = "ON";
+   f.newsNext = "";
    return f;
   }
 
@@ -288,7 +292,7 @@ void RunTestSignalMisc()
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"max_active\":55,\"max_spread\":0,\"pa\":\"PIN\",\"rr\":2.60,"
+   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
                    "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
@@ -296,7 +300,7 @@ void RunTestSignalMisc()
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"max_active\":55,\"max_spread\":0,\"pa\":\"NONE\",\"rr\":null,"
+   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
             "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
   }
@@ -336,6 +340,23 @@ void RunTestSignalFilters()
               c.stage == SDB_REJECT_STAGE_OUTSIDE_SESSION);
   }
 
+// TC-SG-27 (spec 16 Req 1.4, EC-10): NEWS_BLACKOUT setelah pre-filter risiko, sebelum sesi.
+void RunTestSignalNews()
+  {
+   SdbSignalFacts f = SgF0();
+   f.newsBlocked = true;
+   f.newsDetail = "Non-Farm Payrolls USD HIGH -12m";
+   SdbDecision a = SgEval(f);
+   f.preStage = SDB_REJECT_STAGE_STOPPED;
+   string s2 = SgEval(f).stage;
+   f.preStage = "";
+   f.sessionAllowed = false;
+   string s3 = SgEval(f).stage;
+   AssertTrue("TC-SG-27", "berita: " + a.stage + " (" + a.detail + "); + STOPPED: " + s2 + "; + luar sesi: " + s3,
+              a.stage == SDB_REJECT_STAGE_NEWS_BLACKOUT && a.detail == "Non-Farm Payrolls USD HIGH -12m" &&
+              s2 == SDB_REJECT_STAGE_STOPPED && s3 == SDB_REJECT_STAGE_NEWS_BLACKOUT);
+  }
+
 void RunTestSignalRules()
   {
    TfBeginSuite("SignalRules");
@@ -344,6 +365,7 @@ void RunTestSignalRules()
    RunTestSignalScores();
    RunTestSignalMisc();
    RunTestSignalFilters();
+   RunTestSignalNews();
    TfEndSuite();
   }
 

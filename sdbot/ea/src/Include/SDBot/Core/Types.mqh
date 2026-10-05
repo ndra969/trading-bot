@@ -452,6 +452,10 @@ struct SdbSignalFacts
    string            session;         // sesi UTC bar (spec 14): TOKYO, LONDON, OVERLAP, NEWYORK, OFF
    bool              sessionAllowed;
    long              spreadPoints;    // ask - bid saat penilaian (point)
+   bool              newsBlocked;     // filter berita (spec 16)
+   string            newsDetail;      // event yang memblokir
+   string            newsStatus;      // ON, OFF, DISABLED
+   string            newsNext;        // event berdampak terdekat 24 jam; "" = tidak ada
   };
 
 struct SdbStops

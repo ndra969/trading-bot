@@ -23,6 +23,10 @@
     Backtest dasar Fase 3 (spec 13 Req 8): EA utama SDBot dengan preset tiap simbol, file
     ea\tests\baseline\BL-<SIMBOL>.ini, lalu tools\baseline_report.py menilai kriteria PC-19
     (total >= 300 trade, >= 15 per simbol, signal_id dan skor lengkap, tanpa log ERROR/CRITICAL).
+.PARAMETER ExportCalendar
+    Jalankan script SDBot\ExportCalendar di terminal uji (perlu login dan kalender MT5 tersinkron),
+    lalu cek Common\Files\sdbot_calendar.csv baru (spec 16 Req 5). Dijalankan sebelum run lain;
+    bila gagal, run lain dibatalkan.
 .PARAMETER CompareFrom
     Bersama -CompareTo: laporan -Baseline menampilkan pembanding per simbol dari sesi DB tester
     (CompareFrom, CompareTo], misalnya backtest dasar Fase 3 tanpa filter.
@@ -40,6 +44,7 @@ param(
     [string[]]$Scenario = @(),
     [switch]$All,
     [switch]$Baseline,
+    [switch]$ExportCalendar,
     [string[]]$Symbols = @(),
     [int]$CompareFrom = -1,
     [int]$CompareTo = -1,
@@ -227,6 +232,11 @@ function Invoke-TesterRun($r) {
 
     # Sandbox MQL5 tidak bisa membaca MQL5\Presets: preset disalin ke Common\Files untuk suite TestPresets (spec 07).
     $presetCopy = Join-Path $script:cfg.CommonFilesDir 'sdbot_presets'
+    # Fixture data skenario (misalnya kalender SC-17, spec 16) disalin ke Common\Files sebelum run.
+    $fixtureDir = Join-Path $script:repoEa 'tests\fixtures\common'
+    if ($r.Kind -eq 'scenario' -and (Test-Path -LiteralPath $fixtureDir)) {
+        Get-ChildItem -LiteralPath $fixtureDir -File | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $script:cfg.CommonFilesDir -Force }
+    }
     if ($r.Kind -eq 'unit') {
         if (Test-Path -LiteralPath $presetCopy) { Remove-Item -LiteralPath $presetCopy -Recurse -Force }
         New-Item -ItemType Directory -Path $presetCopy | Out-Null
@@ -301,6 +311,51 @@ function Invoke-TesterRun($r) {
     return 0
 }
 
+function Invoke-ExportCalendar {
+    # Spec 16 Req 5: script SDBot\ExportCalendar di terminal uji (perlu login + kalender tersinkron)
+    # menulis Common\Files\sdbot_calendar.csv untuk filter berita di tester; terminal ditutup oleh script.
+    $csv = Join-Path $script:cfg.CommonFilesDir 'sdbot_calendar.csv'
+    $status = Join-Path $script:cfg.CommonFilesDir 'sdbot_calendar_status.txt'
+    Remove-Item -LiteralPath $status -Force -ErrorAction SilentlyContinue
+    $presetDir = Join-Path $script:cfg.TestDataDir 'MQL5\Presets'
+    $setName = 'sdbot_export_calendar.set'
+    $setPath = Join-Path $presetDir $setName
+    $iniPath = Join-Path $script:tmp 'export-calendar.ini'
+    Set-Content -LiteralPath $setPath -Value @('InpCloseTerminal=true') -Encoding Unicode
+    $ini = @('[StartUp]', 'Script=SDBot\ExportCalendar', "Symbol=$($script:cfg.TestSymbol)", 'Period=H1', "ScriptParameters=$setName")
+    Set-Content -LiteralPath $iniPath -Value $ini -Encoding Unicode
+    Write-Run "mulai ExportCalendar (batas $($script:timeoutSec) detik)"
+    $start = Get-Date
+    try {
+        $p = Start-Process -FilePath $script:cfg.TestTerminal -ArgumentList "/config:`"$iniPath`"" -PassThru
+        if (-not $p.WaitForExit($script:timeoutSec * 1000)) {
+            Get-TestTerminalProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+            Write-Run "TIMEOUT ExportCalendar setelah $($script:timeoutSec) detik"
+            return 3
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $setPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $iniPath -Force -ErrorAction SilentlyContinue
+    }
+    $secs = [int]((Get-Date) - $start).TotalSeconds
+    if (-not (Test-Path -LiteralPath $status) -or (Get-Item -LiteralPath $status).LastWriteTime -lt $start) {
+        Write-Run "GAGAL ExportCalendar: file status tidak dibuat ($secs detik). Dari log terminal:"
+        Get-TerminalLogReasons $start | ForEach-Object { Write-Host "    $_" }
+        return 1
+    }
+    $text = ([string](Get-Content -LiteralPath $status -Raw)).Trim()
+    Write-Run "ExportCalendar: $text"
+    if ($text -notmatch '^OK ') { return 1 }
+    if (-not (Test-Path -LiteralPath $csv) -or (Get-Item -LiteralPath $csv).LastWriteTime -lt $start) {
+        Write-Run "GAGAL ExportCalendar: $csv tidak diperbarui."
+        return 1
+    }
+    $n = @(Get-Content -LiteralPath $csv | Where-Object { $_ }).Count
+    Write-Run ("LULUS ExportCalendar: {0} baris di {1} ({2} detik)" -f $n, $csv, $secs)
+    return $(if ($n -gt 0) { 0 } else { 1 })
+}
+
 function Invoke-Main {
     if (Get-Process -Name terminal64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -ieq $script:cfg.TestTerminal }) {
         Write-Run "terminal uji sedang terbuka ($($script:cfg.TestTerminal)). Tutup dulu; runner tidak menutupnya sendiri."
@@ -334,6 +389,11 @@ function Invoke-Main {
     }
     $summary = @()
     $allStart = Get-Date
+    if ($ExportCalendar) {
+        $code = Invoke-ExportCalendar
+        $summary += [pscustomobject]@{ Run = 'export-calendar'; Code = $code }
+        if ($code -ne 0) { $script:runs = @() }
+    }
     $dbFile = Join-Path $script:cfg.CommonFilesDir 'sdbot_tester.sqlite'
     $hasBaseline = [bool]($script:runs | Where-Object { $_.Kind -eq 'baseline' })
     $marker = 0
@@ -379,7 +439,7 @@ $repoEa = $script:repoEa
 $script:repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $script:reportPy = Join-Path $PSScriptRoot 'baseline_report.py'
 
-if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All -and -not $Baseline) { $Unit = $true }
+if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All -and -not $Baseline -and -not $ExportCalendar) { $Unit = $true }
 $script:runs = @()
 if ($Unit -or $All) { $script:runs += [pscustomobject]@{ Kind = 'unit'; Id = 'unit'; Ini = $null; Set = $null } }
 $scenarioDir = Join-Path $repoEa 'tests\scenarios'
