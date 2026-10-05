@@ -211,6 +211,9 @@ function Invoke-TesterRun($r) {
         if ($r.Set) {
             $setLines = @(Get-Content -LiteralPath $r.Set -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*InpTestRunId\s*=' })
         }
+        # Skenario tanpa input berita sendiri tidak boleh bergantung pada ada/tidaknya sdbot_calendar.csv hasil
+        # ExportCalendar di Common\Files (hasil beda antar mesin); filter berita dimatikan, SC-17/17b menyetelnya.
+        if (-not ($setLines | Where-Object { $_ -match '^\s*InpNews' })) { $setLines += 'InpNewsFilter=false' }
     }
     $isOpt = ($r.Kind -eq 'scenario') -and $tester.Contains('Optimization') -and ($tester['Optimization'] -ne '0')
     $reportBase = Join-Path $script:cfg.TestDataDir "sdbot_opt_$runId"

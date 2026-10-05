@@ -97,11 +97,12 @@ public:
       if(flag == SDB_LOT_CAPPED_MAX)
          LogWarn("Risk", StringFormat("lot dibatasi SYMBOL_VOLUME_MAX %.2f | %s", lot, d));
       // OrderCalcProfit membulatkan uang ke digit akun, sehingga rugi lot akhir bisa sedikit di atas uang/lot x lot
-      // (temuan SC-14 spec 13, TC-RK-14). Lot diturunkan per step sampai rugi sebenarnya <= batas risiko.
+      // (temuan SC-14 spec 13, TC-RK-14). Galat uang/lot 1 lot (sampai 0,26% di akun cent dengan kuotasi bukan USD)
+      // dikali puluhan lot bisa butuh banyak step (TC-RK-19), jadi lot diturunkan proporsional dulu, lalu per step.
       double step = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP), vMin = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
       double limit = balance * EffRiskPct() / 100.0, loss = 0.0;
       for(int i = 0; i < SDB_LOT_FIT_STEPS && OrderLossMoney(req, lot, loss) && RiskPctOf(loss, balance) > EffRiskPct() + SDB_RISK_EPS; i++)
-         lot = RoundLotDown(lot - step, step);
+         lot = RoundLotDown(MathMin(lot - step, lot * limit / loss), step);
       if(lot < vMin - 1e-9 || !OrderLossMoney(req, lot, loss) || RiskPctOf(loss, balance) > EffRiskPct() + SDB_RISK_EPS)
          return Reject(stage, detail, SDB_REJECT_STAGE_LOT_BELOW_MIN,
                        StringFormat("lot minimum %.2f melebihi risiko %.2f setelah pembulatan uang | %s", vMin, limit, d));

@@ -133,6 +133,55 @@ void RunTestRiskManagerPositions(CTrkRig &r)
    AssertTrue("TC-RK-10", "1 posisi forex major terbuka, batas major 1: ditolak CLASS_POSITION_LIMIT | " + detail, limited);
   }
 
+// TC-RK-19 (bug backtest v1.17: 38 kandidat ditolak LOT_BELOW_MIN palsu): di simbol dengan mata uang kuotasi
+// bukan USD, uang/lot dari OrderCalcProfit 1 lot dibulatkan ke sen (galat sampai 0,26% di akun cent), sehingga lot
+// puluhan perlu turun lebih dari SDB_LOT_FIT_STEPS step. LOT_BELOW_MIN hanya sah bila rugi lot minimum > batas risiko.
+void RunTestRiskLotFitsCross()
+  {
+   string syms[] = {"USDCHFc", "USDCADc", "USDJPYc"};
+   int tried = 0, falseMin = 0, over = 0;
+   string first = "";
+   for(int i = 0; i < ArraySize(syms); i++)
+     {
+      MqlTick t;
+      if(!SymbolSelect(syms[i], true) || !SymbolInfoTick(syms[i], t) || t.ask <= 0.0)
+        {
+         TfInfo("TC-RK-19 dilewati untuk " + syms[i] + ": simbol/harga tidak tersedia di tester");
+         continue;
+        }
+      CTrkRig r;
+      if(!r.Setup(syms[i]))
+         continue;
+      double vMin = SymbolInfoDouble(syms[i], SYMBOL_VOLUME_MIN);
+      for(int b = 0; b < 12; b++)
+         for(int sl = 100; sl <= 400; sl += 13)
+            for(int dir = 0; dir < 2; dir++)
+              {
+               double balance = 9900.0 + b * 31.7;
+               double limit = balance * r.inputs.riskPerTradePct / 100.0;
+               r.rm.SetBalanceForTest(balance);
+               OrderRequest rq = TrkRequest(syms[i], dir == 0, sl, 0.0);
+               double price = (dir == 0) ? t.ask : t.bid, pMin = 0.0, pLot = 0.0;
+               ENUM_ORDER_TYPE ot = (dir == 0) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+               string stage = "", detail = "";
+               tried++;
+               if(r.rm.CalcVolume(rq, stage, detail))
+                 {
+                  if(OrderCalcProfit(ot, syms[i], rq.volume, price, rq.sl, pLot) && -pLot > limit + 1e-9)
+                     over++;
+                  continue;
+                 }
+               if(stage == SDB_REJECT_STAGE_LOT_BELOW_MIN && OrderCalcProfit(ot, syms[i], vMin, price, rq.sl, pMin) && -pMin <= limit &&
+                  falseMin++ == 0)
+                  first = StringFormat("%s sl=%d %s rugi lot min %.2f <= %.2f | %s", syms[i], sl, dir == 0 ? "BUY" : "SELL", -pMin, limit, detail);
+              }
+      r.rm.SetBalanceForTest(0.0);
+     }
+   AssertTrue("TC-RK-19", StringFormat("%d permintaan USDCHF/USDCAD/USDJPY: LOT_BELOW_MIN palsu %d, lot di atas risiko %d %s",
+                                       tried, falseMin, over, first),
+              tried > 0 && falseMin == 0 && over == 0);
+  }
+
 void RunTestRiskManagerOtherSymbols()
   {
    string syms[] = {"XAUUSDc", "BTCUSDc"};
@@ -358,6 +407,7 @@ void RunTestRisk()
       RunTestRiskManagerPositions(r);
       RunTestRiskMonitor(r);
       RunTestRiskManagerOtherSymbols();
+      RunTestRiskLotFitsCross();
      }
    SdbLogCaptureStop();
    GlobalVariablesDeleteAll(prefix);

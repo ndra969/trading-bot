@@ -4,6 +4,17 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.18 — 2026-10-05 — perbaikan: LOT_BELOW_MIN palsu pada pair kuotasi non-USD
+
+- Bug: di akun cent, uang/lot dari `OrderCalcProfit` 1 lot (sekitar $0,3–2) dibulatkan ke sen, galat sampai 0,26%. Untuk lot puluhan, rugi lot akhir bisa di atas batas risiko lebih dari 5 step (`SDB_LOT_FIT_STEPS`), lalu kandidat ditolak `LOT_BELOW_MIN` "lot minimum melebihi risiko" padahal lot minimum jauh di bawah risiko. Terjadi di USDCAD, USDCHF, USDJPY, EURJPY, GBPJPY: 38 kandidat di backtest dasar v1.17.
+- Perbaikan: `CalcVolume` menurunkan lot proporsional (lot × batas ÷ rugi) sebelum turun per step.
+- Uji: TC-RK-19 (USDCHFc/USDCADc/USDJPYc, 1.728 permintaan: sebelum perbaikan 214 tolak palsu).
+- Runner: skenario tanpa input berita sendiri dijalankan dengan `InpNewsFilter=false`, agar hasil tidak bergantung pada `sdbot_calendar.csv` di Common\Files.
+
+Backtest dasar (semua filter Fase 4): **LOLOS**, `LOT_BELOW_MIN` 38 → 0, trade 215 → 248 (11 → 18 USDCHF, 16 → 30 USDCAD, 11 → 16 EURJPY, 16 → 21 GBPJPY, 16 → 18 USDJPY). Total R +12,55 → +3,86 (+0,058R → +0,016R per trade): trade yang sebelumnya tertolak salah justru bersih rugi, jadi angka v1.17 terlalu optimis karena bug ini, bukan karena strategi.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-05): build 0 error / 0 warning (5 target); unit 598/598; 26 skenario PASS (SC-00..SC-17b); durasi 14 menit 57 detik.
+
 ### 1.17 — 2026-10-05 — spec 16 filter berita, Fase 4 selesai
 
 - `Filters/NewsRules.mqh` (fungsi murni): event kalender, baris CSV `epoch,ccy,impact,id,nama`, relevansi mata uang simbol (XAU/XAG/BTC lewat USD), jendela inklusif per dampak, pilihan event saat tumpang tindih (dampak tertinggi lalu terdekat), event terdekat. Hanya jadwal event, tanpa nilai actual.
