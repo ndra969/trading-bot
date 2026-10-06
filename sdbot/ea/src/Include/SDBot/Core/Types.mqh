@@ -464,6 +464,17 @@ struct SdbTrendlineResult
    string            reason;          // "" = ada garis
   };
 
+// Hasil skor breakout & retest satu kandidat (spec 20, Strategies/BreakoutRules.mqh).
+struct SdbBreakoutResult
+  {
+   int               score;           // 0 atau 10
+   double            level;           // 0 = tidak ada
+   int               ageBars;         // bar MTF sejak breakout sampai bar kandidat
+   double            distAtr;         // jarak level ke zona dalam ATR
+   datetime          tBreak;          // waktu bar breakout
+   string            reason;          // "" = ada
+  };
+
 struct SdbSignalFacts
   {
    ENUM_SDB_DIR      dir;             // arah bias HTF = arah kandidat
@@ -492,6 +503,8 @@ struct SdbSignalFacts
    SdbFibResult      fib;
    ENUM_SDB_COMPONENT_MODE tlMode;    // spec 19
    SdbTrendlineResult tl;
+   ENUM_SDB_COMPONENT_MODE boMode;    // spec 20
+   SdbBreakoutResult bo;
   };
 
 struct SdbStops
@@ -513,6 +526,7 @@ struct SdbDecision
    int               paScore;
    int               fibScore;        // spec 18: dicatat di semua mode != OFF, ikut total hanya ACTIVE
    int               tlScore;         // spec 19: sama dengan fibScore
+   int               boScore;         // spec 20
    int               total;
    int               maxActive;
    double            pct;
@@ -543,6 +557,8 @@ struct SignalRecord
    ENUM_SDB_COMPONENT_MODE fibMode;
    int               scoreTrendline;  // spec 19
    ENUM_SDB_COMPONENT_MODE trendlineMode;
+   int               scoreBreakout;   // spec 20
+   ENUM_SDB_COMPONENT_MODE breakoutMode;
   };
 
 // Laporan harian (spec 09 design §4.1-4.2).

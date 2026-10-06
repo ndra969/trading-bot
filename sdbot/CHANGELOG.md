@@ -4,6 +4,24 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.22 — 2026-10-07 — spec 20 skor breakout & retest bayangan (Fase 5)
+
+- `Strategies/BreakoutRules.mqh` (fungsi murni): level = swing fractal H1 sisi sinyal (BUY swing high, SELL swing low) dalam 100 bar; breakout = close pertama sesudah bar konfirmasi swing yang menembus level searah ≥ 0,1 ATR (wick saja tidak dihitung); breakout gagal (close kembali melewati level > 0,2 ATR) membuang level; level di zona ± 0,2 ATR = 10; breakout terbaru dipilih. Bot Python punya layer breakout yang tidak pernah dipanggil; di sini keterhubungannya dibuktikan TC-SG-32 (ACTIVE mengubah `SCORE_TOO_LOW` menjadi lolos) dan SC-20 (nilai 10 dan 0 muncul di pipeline).
+- `Strategies/StrategyMath.mqh`: `DistToZone` dipakai bersama trendline dan breakout.
+- Input `InpScoreBreakoutMode` (OFF / SHADOW / ACTIVE, default SHADOW); konteks `bo_age`, `bo_dist`, `bo_level`; `signal_scores` BREAKOUT (maks 10); maksimum 95 bila Fibonacci, trendline, dan breakout aktif.
+- Uji: TC-BO-01..11, TC-SG-22d, 24d, 31, 32, SC-20.
+
+Backtest IS + OOS (sesi 1091–1114, 1 jam 1 menit): trade dan profit kotor **identik** dengan v1.21. Laporan BREAKOUT bayangan:
+
+| Periode | BO 0 | BO 10 |
+|---|---|---|
+| IS | 304 trade, −0,014R | 189 trade, **+0,097R** |
+| OOS | 38 trade, −0,083R | 14 trade, **+0,356R** |
+
+Komponen pertama Fase 5 yang membedakan hasil searah di IS dan OOS. Status PC-25 `SAMPEL KURANG` karena OOS bernilai 10 baru 14 trade (syarat 20). ACCEPTED bernilai 10 = 37,2% (dalam batas Req 5.3).
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-07): build 0 error / 0 warning (5 target); unit 645/645; 29 skenario PASS (SC-00..SC-20); durasi 19 menit 13 detik. pytest `sdbot/tools` 105/105, `schema.py check` OK (data versi 4).
+
 ### 1.21 — 2026-10-06 — spec 19 skor trendline bayangan (Fase 5)
 
 - `Strategies/TrendlineRules.mqh` (fungsi murni): garis dari pasangan swing fractal H1 terkonfirmasi dalam 100 bar, **hanya searah sinyal** (BUY support naik, SELL resistance turun, kemiringan ≥ 0,02 ATR per bar). Bot Python tanpa filter kemiringan ikut menghitung support turun untuk BUY. Garis patah (close menembus > 0,2 ATR sejak sentuhan pertama) dibuang; proyeksi di bar kandidat wajib di zona ± 0,2 ATR; sentuhan = semua swing sesisi di garis; 3+ sentuhan 15, 2 sentuhan 7.

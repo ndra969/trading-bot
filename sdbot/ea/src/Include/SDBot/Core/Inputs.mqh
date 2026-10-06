@@ -71,6 +71,7 @@ input int                    InpNewsMediumMinutes     = SDB_DEF_NEWS_MEDIUM_MIN;
 input string                 InpNewsCsvFile           = SDB_DEF_NEWS_CSV;           // CSV kalender di Common\Files (hanya tester)
 input ENUM_SDB_COMPONENT_MODE InpScoreFibMode         = SDB_COMPONENT_SHADOW;       // Skor Fibonacci: OFF / SHADOW (dicatat saja) / ACTIVE
 input ENUM_SDB_COMPONENT_MODE InpScoreTrendlineMode   = SDB_COMPONENT_SHADOW;       // Skor trendline searah: OFF / SHADOW / ACTIVE
+input ENUM_SDB_COMPONENT_MODE InpScoreBreakoutMode    = SDB_COMPONENT_SHADOW;       // Skor breakout & retest: OFF / SHADOW / ACTIVE
 
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
@@ -124,6 +125,7 @@ InputValues CurrentInputs()
    v.newsCsvFile = InpNewsCsvFile;
    v.scoreFibMode = InpScoreFibMode;
    v.scoreTrendlineMode = InpScoreTrendlineMode;
+   v.scoreBreakoutMode = InpScoreBreakoutMode;
    return v;
   }
 
@@ -141,7 +143,8 @@ string CurrentInputsJson()
                  "InpZoneLegBars", "InpMaxZoneAgeBars", "InpMinConfluenceScore", "InpMinRR", "InpSlBufferAtr",
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
-                 "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode"};
+                 "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
+                 "InpScoreBreakoutMode"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -195,6 +198,7 @@ string CurrentInputsJson()
    v[47] = JsonStr(InpNewsCsvFile);
    v[48] = JsonStr(EnumToString(InpScoreFibMode));
    v[49] = JsonStr(EnumToString(InpScoreTrendlineMode));
+   v[50] = JsonStr(EnumToString(InpScoreBreakoutMode));
    return CanonicalJson(k, v);
   }
 

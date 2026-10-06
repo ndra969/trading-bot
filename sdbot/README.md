@@ -67,6 +67,7 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Filter | `InpNewsCsvFile` | `sdbot_calendar.csv` di Common\Files (hanya tester; dibuat `ExportCalendar`) | — | spec 16 |
 | Skor | `InpScoreFibMode` | SHADOW (1): skor Fibonacci dicatat di `signal_scores` dengan `active = 0`, tidak ikut skor gerbang; ACTIVE (2) menambah maks 15; OFF (0) tidak dihitung | 0–2 | spec 18 |
 | Skor | `InpScoreTrendlineMode` | SHADOW (1): skor trendline searah (support naik untuk BUY, resistance turun untuk SELL; 3+ sentuhan 15, 2 sentuhan 7) dicatat dengan `active = 0`; ACTIVE (2) ikut skor gerbang, maks +15; OFF (0) tidak dihitung | 0–2 | spec 19 |
+| Skor | `InpScoreBreakoutMode` | SHADOW (1): skor breakout & retest (level swing H1 ditembus close searah sinyal lalu diuji ulang oleh zona = 10) dicatat dengan `active = 0`; ACTIVE (2) ikut skor gerbang, maks +10; OFF (0) tidak dihitung | 0–2 | spec 20 |
 | Notifikasi | `InpTelegramToken` / `InpTelegramChatID` | kosong (isi di `*.local.set` lewat `tools/make_local_presets.py`); kosong = pesan hanya di log | — (tidak masuk `inputs_json`, hanya `InpTelegramConfigured`) | spec 09 |
 | Notifikasi | `InpHeartbeatMinutes` | 60 | 0 (mati) atau 5–1440 | spec 09 |
 | Backoffice | `InpEnableBackoffice` / `InpControlPollSeconds` | true / 2 | — | Fase B5 |

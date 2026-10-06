@@ -99,6 +99,11 @@ void ActiveConfirmations(const SdbSignalFacts &f, int &bonus, int &extraMax)
       bonus += f.tl.score;
       extraMax += SDB_SCORE_MAX_TRENDLINE;
      }
+   if(f.boMode == SDB_COMPONENT_ACTIVE)
+     {
+      bonus += f.bo.score;
+      extraMax += SDB_SCORE_MAX_BREAKOUT;
+     }
   }
 
 // Skor selalu dihitung; tahap tolak pertama dalam urutan PRD (Req 2.2–2.4, 3.1). Lot dan eksekusi di engine.
@@ -116,6 +121,7 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
    // Spec 18-19: komponen konfirmasi dicatat di mode SHADOW, tetapi hanya ACTIVE yang mengubah skor gerbang dan maksimumnya.
    d.fibScore = (f.fibMode == SDB_COMPONENT_OFF) ? 0 : f.fib.score;
    d.tlScore = (f.tlMode == SDB_COMPONENT_OFF) ? 0 : f.tl.score;
+   d.boScore = (f.boMode == SDB_COMPONENT_OFF) ? 0 : f.bo.score;
    int bonus, extraMax;
    ActiveConfirmations(f, bonus, extraMax);
    d.total += bonus;
@@ -186,7 +192,7 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
   {
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
                  "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio", "tl_dist", "tl_slope",
-                 "tl_touches"};
+                 "tl_touches", "bo_age", "bo_dist", "bo_level"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -212,6 +218,10 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    v[17] = tl ? DoubleToString(f.tl.distAtr, 2) : "null";
    v[18] = tl ? DoubleToString(f.tl.slopeAtr, 3) : "null";
    v[19] = tl ? IntegerToString(f.tl.touches) : "null";
+   bool bo = f.boMode != SDB_COMPONENT_OFF && f.bo.level > 0.0;
+   v[20] = bo ? IntegerToString(f.bo.ageBars) : "null";
+   v[21] = bo ? DoubleToString(f.bo.distAtr, 2) : "null";
+   v[22] = bo ? DoubleToString(f.bo.level, f.digits) : "null";
    return CanonicalJson(k, v);
   }
 

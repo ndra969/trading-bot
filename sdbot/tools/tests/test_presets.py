@@ -172,6 +172,12 @@ def test_ts73_score_trendline_mode_shadow():
         assert _read(symbol).get("InpScoreTrendlineMode") == "1", symbol
 
 
+def test_ts74_score_breakout_mode_shadow():
+    """Spec 20 Req 3.1: skor breakout & retest default mode bayangan (PC-25)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpScoreBreakoutMode") == "1", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

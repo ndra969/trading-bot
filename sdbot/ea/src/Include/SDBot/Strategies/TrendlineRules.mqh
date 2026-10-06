@@ -13,6 +13,7 @@
 #include <SDBot/Core/Constants.mqh>
 #include <SDBot/Core/Types.mqh>
 #include <SDBot/Analysis/StructureRules.mqh>
+#include <SDBot/Strategies/StrategyMath.mqh>
 
 #define SDB_TL_REASON_DATA "data kurang"
 #define SDB_TL_REASON_NONE "tidak ada garis"
@@ -51,13 +52,6 @@ bool TlBroken(const MqlRates &r[], const bool support, const int from, const int
    return false;
   }
 
-// Jarak (harga) dari nilai v ke rentang zona; 0 bila di dalam.
-double TlDistToZone(const SdbZone &z, const double v)
-  {
-   double lo = MathMin(z.distal, z.proximal), hi = MathMax(z.distal, z.proximal);
-   return v < lo ? lo - v : (v > hi ? v - hi : 0.0);
-  }
-
 void TlEvaluate(const MqlRates &r[], const SdbZone &z, const bool buy, const int strength, const int lookback, const double atr,
                 SdbTrendlineResult &out)
   {
@@ -87,7 +81,7 @@ void TlEvaluate(const MqlRates &r[], const SdbZone &z, const bool buy, const int
          double slope = (p2 - p1) / (double)(i2 - i1) / atr;
          if(buy ? slope < SDB_TL_MIN_SLOPE_ATR : slope > -SDB_TL_MIN_SLOPE_ATR)
             continue;
-         double dist = TlDistToZone(z, TlValueAt(i1, p1, i2, p2, n));
+         double dist = DistToZone(z, TlValueAt(i1, p1, i2, p2, n));
          if(dist > tol + 1e-12)
             continue;
          int first;

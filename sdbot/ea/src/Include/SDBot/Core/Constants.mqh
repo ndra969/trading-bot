@@ -192,6 +192,12 @@
 #define SDB_TL_SCORE_2                7
 #define SDB_TL_TOL_ATR                0.2      // toleransi sentuhan, patah, dan jarak ke zona
 #define SDB_TL_MIN_SLOPE_ATR          0.02     // ATR per bar MTF; lebih datar = bukan trendline
+
+//--- Skor breakout & retest (spec 20, PRD: retest level yang ditembus = 10)
+#define SDB_SCORE_MAX_BREAKOUT        10
+#define SDB_BO_SCORE                  10
+#define SDB_BO_MIN_BREAK_ATR          0.1      // close wajib melewati level sejauh ini
+#define SDB_BO_TOL_ATR                0.2      // toleransi retest dan breakout gagal
 #define SDB_NEWS_REFRESH_SEC          900      // kalender live dimuat ulang tiap 15 menit
 
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol

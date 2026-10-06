@@ -40,7 +40,7 @@ SdbSessionParams TseSessions()
 void TseInit(CSignalEngine &eng, CMarketStructure &ms, CZoneBook &zb, CPaTrigger &pt, ISdbEventSink *sink, CState &st)
   {
    eng.Init(_Symbol, TSE_MAGIC, PERIOD_M15, TseParams(), GetPointer(ms), GetPointer(zb), GetPointer(pt), NULL, NULL, NULL, NULL,
-            sink, SDB_STYLE_DAY, TseSessions(), 0, NULL, SDB_COMPONENT_SHADOW, SDB_COMPONENT_SHADOW);
+            sink, SDB_STYLE_DAY, TseSessions(), 0, NULL, SDB_COMPONENT_SHADOW, SDB_COMPONENT_SHADOW, SDB_COMPONENT_SHADOW);
    eng.SetState(GetPointer(st), TSE_LOGIN, 0);
   }
 

@@ -44,6 +44,7 @@
 #include <SDBotTests/Suites/TestNewsRules.mqh>
 #include <SDBotTests/Suites/TestFibRules.mqh>
 #include <SDBotTests/Suites/TestTrendlineRules.mqh>
+#include <SDBotTests/Suites/TestBreakoutRules.mqh>
 
 void RunAllSuites()
   {
@@ -85,6 +86,7 @@ void RunAllSuites()
    RunTestNewsRules();
    RunTestFibRules();
    RunTestTrendlineRules();
+   RunTestBreakoutRules();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

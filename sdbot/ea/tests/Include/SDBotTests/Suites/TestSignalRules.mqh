@@ -111,6 +111,9 @@ SdbSignalFacts SgF0()
    f.tlMode = SDB_COMPONENT_OFF;
    ZeroMemory(f.tl);
    f.tl.reason = "";
+   f.boMode = SDB_COMPONENT_OFF;
+   ZeroMemory(f.bo);
+   f.bo.reason = "";
    return f;
   }
 
@@ -299,7 +302,7 @@ void RunTestSignalMisc()
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
+   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
                    "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
@@ -307,7 +310,7 @@ void RunTestSignalMisc()
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
+   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
             "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
 
@@ -320,6 +323,44 @@ void RunTestSignalMisc()
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
    AssertTrue("TC-SG-22b", "konteks Fibonacci bayangan: " + json,
               StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"max_active\":55,") >= 0);
+  }
+
+// TC-SG-22d/31/32 (spec 20 Req 2.3, 3.3, 4.2): konteks breakout; maksimum 95; breakout ACTIVE mengubah tahap tolak.
+void RunTestSignalBreakout()
+  {
+   SdbSignalFacts f = SgF0();
+   f.boMode = SDB_COMPONENT_SHADOW;
+   f.bo.score = 10;
+   f.bo.level = 1.105;
+   f.bo.ageBars = 20;
+   f.bo.distAtr = 0.0;
+   SdbDecision d = SgEval(f);
+   string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-22d", "konteks breakout bayangan: " + json,
+              StringFind(json, "\"bo_age\":20,\"bo_dist\":0.00,\"bo_level\":1.10500,") >= 0 && d.total == 44 && d.maxActive == 55 && d.boScore == 10);
+
+   f = SgF0();
+   f.trendScore = 15;
+   f.fib.score = 15;
+   f.tl.score = 15;
+   f.tl.touches = 3;
+   f.bo.score = 10;
+   f.fibMode = SDB_COMPONENT_ACTIVE;
+   f.tlMode = SDB_COMPONENT_ACTIVE;
+   f.boMode = SDB_COMPONENT_ACTIVE;
+   SdbDecision all = SgEval(f);
+   AssertTrue("TC-SG-31", StringFormat("FIB, TL, BO ACTIVE: %d/%d", all.total, all.maxActive), all.total == 92 && all.maxActive == 95);
+
+   f = SgF0();
+   f.trendScore = 0;                               // 30 + 0 + 7 = 37
+   f.boMode = SDB_COMPONENT_ACTIVE;
+   f.bo.score = 10;
+   SdbDecision pass = SgEval(f);                    // 47/65 = 72,3%
+   f.bo.score = 0;
+   SdbDecision fail = SgEval(f);                    // 37/65 = 56,9%
+   AssertTrue("TC-SG-32", StringFormat("BO ACTIVE 10: %d/%d %.1f%% '%s'; BO ACTIVE 0: %d/%d %.1f%% '%s'", pass.total, pass.maxActive, pass.pct,
+                                       pass.stage, fail.total, fail.maxActive, fail.pct, fail.stage),
+              pass.stage != SDB_REJECT_STAGE_SCORE_TOO_LOW && fail.stage == SDB_REJECT_STAGE_SCORE_TOO_LOW && pass.maxActive == 65);
   }
 
 // TC-SG-22c/30 (spec 19 Req 2.4, 3.2-3.3, EC-10): konteks trendline; maksimum dari semua komponen ACTIVE.
@@ -449,6 +490,7 @@ void RunTestSignalRules()
    RunTestSignalNews();
    RunTestSignalFib();
    RunTestSignalTrendline();
+   RunTestSignalBreakout();
    TfEndSuite();
   }
 

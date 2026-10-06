@@ -363,6 +363,8 @@ SignalRecord TlSignal(const long id, const string status, const string stage)
    s.fibMode = SDB_COMPONENT_OFF;
    s.scoreTrendline = 0;
    s.trendlineMode = SDB_COMPONENT_OFF;
+   s.scoreBreakout = 0;
+   s.breakoutMode = SDB_COMPONENT_OFF;
    return s;
   }
 
@@ -391,9 +393,18 @@ void RunTestLoggerSignal()
    sh.scoreTrendline = 7;
    ac.trendlineMode = SDB_COMPONENT_ACTIVE;
    ac.scoreTrendline = 15;
+   sh.breakoutMode = SDB_COMPONENT_SHADOW;
+   sh.scoreBreakout = 10;
+   ac.breakoutMode = SDB_COMPONENT_ACTIVE;
+   ac.scoreBreakout = 0;
    lg.OnSignal(sh);
    lg.OnSignal(ac);
    lg.Flush();
+   // TC-SG-24d (spec 20 Req 3.2, 3.4): BREAKOUT max 10 dengan active sesuai mode; OFF tanpa baris.
+   AssertTrue("TC-SG-24d", "BREAKOUT bayangan active=0 skor 10 max 10, aktif active=1 skor 0, OFF tanpa baris",
+              TlCount("signal_scores", "signal_id=4242424244 AND component='BREAKOUT' AND score=10 AND max_score=10 AND active=0") == 1 &&
+              TlCount("signal_scores", "signal_id=4242424245 AND component='BREAKOUT' AND score=0 AND active=1") == 1 &&
+              TlCount("signal_scores", "component='BREAKOUT' AND signal_id=4242424242") == 0);
    // TC-SG-24c (spec 19 Req 3.2, 3.4): TRENDLINE dengan active sesuai mode; OFF tanpa baris.
    AssertTrue("TC-SG-24c", "TRENDLINE bayangan active=0 skor 7, aktif active=1 skor 15, OFF tanpa baris",
               TlCount("signal_scores", "signal_id=4242424244 AND component='TRENDLINE' AND score=7 AND max_score=15 AND active=0") == 1 &&
@@ -402,7 +413,7 @@ void RunTestLoggerSignal()
    AssertTrue("TC-SG-24b", "FIB bayangan active=0 skor 11, aktif active=1 skor 15, mode OFF tanpa baris FIB",
               TlCount("signal_scores", "signal_id=4242424244 AND component='FIB' AND score=11 AND max_score=15 AND active=0") == 1 &&
               TlCount("signal_scores", "signal_id=4242424245 AND component='FIB' AND score=15 AND active=1") == 1 &&
-              TlCount("signal_scores", "signal_id=4242424244") == 5 && TlCount("signal_scores", "component='FIB' AND signal_id=4242424242") == 0);
+              TlCount("signal_scores", "signal_id=4242424244") == 6 && TlCount("signal_scores", "component='FIB' AND signal_id=4242424242") == 0);
    long utc = (long)TL_SERVER_T - TL_OFFSET;
    AssertTrue("TC-SG-24", "signals id eksplisit + 3 skor aktif (spec 17: active=1); kirim ulang tidak menambah baris; reject_stage kosong = NULL",
               again && TlCount("signals") == 4 && TlCount("signal_scores", "signal_id IN (4242424242, 4242424243)") == 6 &&

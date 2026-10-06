@@ -126,6 +126,7 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpNewsCsvFile", "sdbot_calendar.csv"),
     ("InpScoreFibMode", "1"),  # SDB_COMPONENT_SHADOW (spec 18)
     ("InpScoreTrendlineMode", "1"),  # SDB_COMPONENT_SHADOW (spec 19)
+    ("InpScoreBreakoutMode", "1"),  # SDB_COMPONENT_SHADOW (spec 20)
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),

@@ -230,6 +230,8 @@ private:
       s.fibMode = f.fibMode;
       s.scoreTrendline = d.tlScore;
       s.trendlineMode = f.tlMode;
+      s.scoreBreakout = d.boScore;
+      s.breakoutMode = f.boMode;
       if(m_sink != NULL)
          m_sink.OnSignal(s);
       string text = StringFormat("%s %s %s zona=%s skor=%d (%.1f%%) pola=%s", TimeToString(t), s.direction, status, f.zone.id, d.total,
@@ -249,9 +251,10 @@ public:
    void Init(const string symbol, const long magic, const ENUM_TIMEFRAMES ltf, const SdbSignalParams &p, CMarketStructure *ms,
              CZoneBook *zb, CPaTrigger *pt, CRiskState *rs, CRiskManager *rm, CExecutor *exe, CAccount *acc,
              ISdbEventSink *sink, const ENUM_SDB_TRADING_STYLE style, const SdbSessionParams &sessions, const int testerUtcOffsetHours,
-             CNewsFilter *news, const ENUM_SDB_COMPONENT_MODE fibMode, const ENUM_SDB_COMPONENT_MODE tlMode)
+             CNewsFilter *news, const ENUM_SDB_COMPONENT_MODE fibMode, const ENUM_SDB_COMPONENT_MODE tlMode,
+             const ENUM_SDB_COMPONENT_MODE boMode)
      {
-      m_conf.Init(fibMode, tlMode, zb, ms);
+      m_conf.Init(fibMode, tlMode, boMode, zb, ms);
       m_symbol = symbol;
       m_magic = magic;
       m_ltf = ltf;
