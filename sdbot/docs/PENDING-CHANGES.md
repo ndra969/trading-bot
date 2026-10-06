@@ -4,8 +4,9 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+## Done
 ### PC-26: Skema data v4, `signal_scores.active`
-- Status: Open
+- Status: Done (2026-10-06, PRD-EA rev 66, PRD-Backoffice rev 21)
 - Tanggal disetujui: 2026-10-05
 - Dokumen: PRD-Backoffice §Database (tabel data EA), PRD-EA §Skor konfluensi
 - Sumber: spec `ea-17-validation-harness` Req 4, migrasi `0004_signal_score_active.sql`
@@ -14,7 +15,7 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - `signals.score_total` hanya menjumlahkan komponen aktif. Backoffice yang menampilkan skor wajib membedakan komponen aktif dan bayangan.
 
 ### PC-25: Aturan Fase 5 (pembagian spec, mode bayangan, in-sample/out-of-sample)
-- Status: Open
+- Status: Done (2026-10-06, PRD-EA rev 66)
 - Tanggal disetujui: 2026-10-05
 - Dokumen: PRD-EA §Skor konfluensi, §Pengujian dan kriteria penerimaan, §Roadmap (Fase 5)
 - Sumber: [fase-5-overview.md](../specs/fase-5-overview.md) §7, keputusan 1–6; backtest dasar v1.18
@@ -25,8 +26,6 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Komponen diaktifkan hanya bila kelompok nilai tertingginya lebih baik dari kelompok 0 di in-sample dan out-of-sample, dengan ≥ 20 trade per kelompok. Tidak ada komponen yang terbukti → semua tetap SHADOW, Fase 5 tetap selesai.
     - Bobot Fase 3 (zona, tren, PA) tidak diubah di Fase 5 kecuali terbukti di out-of-sample (spec 22). Filter candle klimaks (PC-15) dan mode entry Adaptive/Limit ditinjau di spec 22.
     - Data acuan v1.18: 248 trade, +0,016R per trade, profit factor sekitar 1,03; skor total tidak memprediksi profit.
-
-## Done
 
 ### PC-24: Filter berita (input, sumber kalender, degrade)
 - Status: Done (2026-10-05, PRD-EA rev 63, PRD-Backoffice rev 19)

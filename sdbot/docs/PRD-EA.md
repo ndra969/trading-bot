@@ -2,7 +2,7 @@
 
 2026-09-19 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-05). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
+> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-06). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -188,7 +188,7 @@ Kode pola (enum `pa_pattern`): `STAR`, `ENGULF_STRONG`, `PIN`, `ENGULF`, `TWEEZE
 
 Struktur dan MA digabung karena sama-sama mengukur tren, agar tidak dihitung ganda. Semua komponen dinilai sesuai arah sinyal. Ambang 65 adalah titik awal dan ditentukan ulang lewat backtest.
 
-Strategi konfirmasi ditambahkan satu per satu, dan setiap penambahan harus terbukti meningkatkan hasil forward test.
+Strategi konfirmasi ditambahkan satu per satu, dan setiap penambahan harus terbukti meningkatkan hasil forward test. Setiap komponen konfirmasi punya mode OFF / SHADOW / ACTIVE, default SHADOW: nilainya dihitung dan dicatat di `signal_scores` untuk setiap kandidat yang lolos pre-filter (kolom `active` = 0), tetapi hanya komponen ACTIVE yang masuk skor gerbang dan maksimum skor. Komponen diaktifkan hanya bila kelompok nilai tertingginya lebih baik dari kelompok 0 (R per trade) di in-sample dan out-of-sample, masing-masing ≥ 20 trade. Bobot zona, tren, dan PA tidak diubah di Fase 5 kecuali terbukti di out-of-sample.
 
 `MinConfluenceScore` diartikan persen dari skor maksimum komponen yang aktif. Fase 3 hanya punya zona (30), keselarasan tren (15), dan price action (10), jadi maksimum 55 dan ambang default 65% berarti skor ≥ 36. Saat komponen Fase 5 aktif, maksimum kembali 100. Keselarasan tren dinilai di MTF: struktur dan EMA MTF searah sinyal = 15, salah satu = 7, tidak ada = 0. `signals.score_total` menyimpan skor mentah; setiap kandidat mencatat komponen `ZONE`, `TREND`, `PA` di `signal_scores` (enum `score_component`, cadangan `FIB`, `TRENDLINE`, `BREAKOUT`, `RSI`).
 
@@ -555,6 +555,8 @@ EA naik ke akun standar hanya setelah lolos empat tahap pengujian berikut secara
 | 3. Forward test | Periode 12 bulan terakhir yang tidak dipakai optimasi | Profit factor dan DD tidak memburuk lebih dari 30% dibanding backtest |
 | 4. Live akun cent | Akun cent 1–3 bulan, lalu backtest ulang periode yang sama | Tidak ada error kritis, entry/exit cocok dengan backtest, slippage rata-rata tercatat dan wajar |
 
+Periode uji di Strategy Tester akun cent (diukur 2026-10-05): bar M1 tersedia sejak 2024-03-26, tetapi real ticks hanya sejak 2026-01-05 (XAUUSD sejak 2026-08-14); sebelum itu tester memakai tick buatan. Karena itu Fase 5 memakai in-sample 2024-04..2026-06 dan out-of-sample 2026-07..2026-10, keduanya model OHLC M1 agar sebanding (strategi tetap H4/H1/M15; M1 hanya untuk menggerakkan harga di dalam bar), plus periode real ticks 2026-01..2026-10 sebagai cek realisme sebelum aktivasi. Out-of-sample hanya dipakai menilai, tidak untuk menyetel. Target tahap 2 (3+ tahun real ticks) belum bisa dipenuhi data server ini.
+
 Catatan akun cent:
 
 - Mata uang akun USC. Semua aturan risiko berbasis persen, tidak boleh ada nilai tetap dalam dolar di kode.
@@ -589,7 +591,7 @@ Pengembangan dimulai dari fondasi pengaman, lalu strategi ditambah bertahap agar
 | 2. Notifikasi | CNotifier, Telegram, push HP, heartbeat | Semua event di tabel notifikasi terkirim sesuai aturan |
 | 3. Strategi inti | Bias HTF, zona S&D, trigger PA, eksekusi | Backtest dasar 12 simbol × 12 bulan terakhir tanpa lapisan konfirmasi: tanpa error kritis, total ≥ 300 trade dan setiap simbol ≥ 15 trade, semua trade punya signal_id dengan skor lengkap, query kalibrasi menghasilkan data. Profit dinilai di Fase 5–6 |
 | 4. Filter | Berita, sesi, spread, eksposur mata uang (spec 14 sesi + spread 1.15, spec 15 eksposur 1.16, spec 16 berita 1.17) | Filter tercatat di tabel signals dengan alasan tolak; backtest dasar dengan semua filter: total ≥ 200 trade dan setiap simbol ≥ 10 trade (selesai 1.17: 215 trade, +0,058R per trade) |
-| 5. Konfirmasi | Fibonacci, trendline, breakout retest, RSI (satu per satu) | Setiap lapisan meningkatkan hasil forward test |
+| 5. Konfirmasi | Fibonacci, trendline, breakout retest, RSI (satu per satu, mode bayangan dulu): spec 17 alat ukur IS/OOS 1.19, Fibonacci 1.20, trendline 1.21, breakout & retest 1.22, RSI 1.23, aktivasi dan ambang 1.24 | Setiap lapisan meningkatkan hasil forward test; komponen hanya aktif bila terbukti di in-sample dan out-of-sample; acuan 1.19: IS 493 trade PF 1,06, OOS 52 trade PF 1,07 |
 | 6. Validasi | Forward test dan live akun cent 1–3 bulan | Kriteria penerimaan tahap 3 dan 4 terpenuhi |
 | 7. Lanjutan | Volume profile, filter AI, backoffice online | Diputuskan setelah fase 6 |
 
