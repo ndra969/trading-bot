@@ -1,0 +1,7 @@
+; SC-19: trendline dan Fibonacci dicatat sebagai komponen bayangan, skor gerbang tidak berubah.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-19
+HarnessEveryBars=0
+HarnessPipeline=true

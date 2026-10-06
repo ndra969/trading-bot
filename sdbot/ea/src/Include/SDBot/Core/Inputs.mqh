@@ -70,6 +70,7 @@ input int                    InpNewsHighMinutes       = SDB_DEF_NEWS_HIGH_MIN;  
 input int                    InpNewsMediumMinutes     = SDB_DEF_NEWS_MEDIUM_MIN;    // Blackout berita medium (+- menit, 0 = tidak)
 input string                 InpNewsCsvFile           = SDB_DEF_NEWS_CSV;           // CSV kalender di Common\Files (hanya tester)
 input ENUM_SDB_COMPONENT_MODE InpScoreFibMode         = SDB_COMPONENT_SHADOW;       // Skor Fibonacci: OFF / SHADOW (dicatat saja) / ACTIVE
+input ENUM_SDB_COMPONENT_MODE InpScoreTrendlineMode   = SDB_COMPONENT_SHADOW;       // Skor trendline searah: OFF / SHADOW / ACTIVE
 
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
@@ -122,6 +123,7 @@ InputValues CurrentInputs()
    v.newsMediumMinutes = InpNewsMediumMinutes;
    v.newsCsvFile = InpNewsCsvFile;
    v.scoreFibMode = InpScoreFibMode;
+   v.scoreTrendlineMode = InpScoreTrendlineMode;
    return v;
   }
 
@@ -139,7 +141,7 @@ string CurrentInputsJson()
                  "InpZoneLegBars", "InpMaxZoneAgeBars", "InpMinConfluenceScore", "InpMinRR", "InpSlBufferAtr",
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
-                 "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode"};
+                 "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -192,6 +194,7 @@ string CurrentInputsJson()
    v[46] = JsonNum(InpNewsMediumMinutes);
    v[47] = JsonStr(InpNewsCsvFile);
    v[48] = JsonStr(EnumToString(InpScoreFibMode));
+   v[49] = JsonStr(EnumToString(InpScoreTrendlineMode));
    return CanonicalJson(k, v);
   }
 

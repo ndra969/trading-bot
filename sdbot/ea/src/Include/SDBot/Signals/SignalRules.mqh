@@ -84,6 +84,23 @@ bool BuildStops(const SdbSignalFacts &f, const SdbSignalParams &p, SdbStops &s, 
    return true;
   }
 
+// Komponen konfirmasi Fase 5 yang ACTIVE: tambahan skor dan maksimum (PC-25; spec 18, 19). SHADOW hanya dicatat.
+void ActiveConfirmations(const SdbSignalFacts &f, int &bonus, int &extraMax)
+  {
+   bonus = 0;
+   extraMax = 0;
+   if(f.fibMode == SDB_COMPONENT_ACTIVE)
+     {
+      bonus += f.fib.score;
+      extraMax += SDB_SCORE_MAX_FIB;
+     }
+   if(f.tlMode == SDB_COMPONENT_ACTIVE)
+     {
+      bonus += f.tl.score;
+      extraMax += SDB_SCORE_MAX_TRENDLINE;
+     }
+  }
+
 // Skor selalu dihitung; tahap tolak pertama dalam urutan PRD (Req 2.2–2.4, 3.1). Lot dan eksekusi di engine.
 void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecision &d)
   {
@@ -96,13 +113,13 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
    d.paScore = patternOk ? PaScore(f.pattern.code) : 0;
    d.total = d.zoneScore + d.trendScore + d.paScore;
    d.maxActive = SDB_SCORE_MAX_ACTIVE;
-   // Spec 18: Fibonacci dicatat di mode SHADOW, tetapi hanya ACTIVE yang mengubah skor gerbang dan maksimumnya.
+   // Spec 18-19: komponen konfirmasi dicatat di mode SHADOW, tetapi hanya ACTIVE yang mengubah skor gerbang dan maksimumnya.
    d.fibScore = (f.fibMode == SDB_COMPONENT_OFF) ? 0 : f.fib.score;
-   if(f.fibMode == SDB_COMPONENT_ACTIVE)
-     {
-      d.total += d.fibScore;
-      d.maxActive += SDB_SCORE_MAX_FIB;
-     }
+   d.tlScore = (f.tlMode == SDB_COMPONENT_OFF) ? 0 : f.tl.score;
+   int bonus, extraMax;
+   ActiveConfirmations(f, bonus, extraMax);
+   d.total += bonus;
+   d.maxActive += extraMax;
    d.pct = ScorePct(d.total, d.maxActive);
    if(f.preStage != "")
      {
@@ -168,7 +185,8 @@ long SignalIdOf(const long login, const long runKey, const long magic, const dat
 string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const SdbSignalParams &p, const string biasReason)
   {
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
-                 "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio"};
+                 "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio", "tl_dist", "tl_slope",
+                 "tl_touches"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -190,6 +208,10 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    bool fib = f.fibMode != SDB_COMPONENT_OFF && f.fib.ratio >= 0.0;
    v[15] = fib && f.fib.level > 0.0 ? DoubleToString(f.fib.level, 3) : "null";
    v[16] = fib ? DoubleToString(f.fib.ratio, 3) : "null";
+   bool tl = f.tlMode != SDB_COMPONENT_OFF && f.tl.touches > 0;
+   v[17] = tl ? DoubleToString(f.tl.distAtr, 2) : "null";
+   v[18] = tl ? DoubleToString(f.tl.slopeAtr, 3) : "null";
+   v[19] = tl ? IntegerToString(f.tl.touches) : "null";
    return CanonicalJson(k, v);
   }
 

@@ -1239,6 +1239,27 @@ void CheckSc18(const string id, const CScenarioRecorder &rec)
               pos >= 1 && zero >= 1 && noRatio == 0);
   }
 
+// SC-19 (spec 19 Req 1.1, 2.4, 3.2, 3.5): setiap sinyal punya FIB dan TRENDLINE bayangan (active=0), score_total tetap
+// ZONE + TREND + PA, TRENDLINE 0 dan > 0 sama-sama ada, tl_touches >= 2 untuk setiap TRENDLINE > 0.
+void CheckSc19(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals s WHERE s.session_id IN (" + rec.SessionIdList() + ")";
+   string tl = "(SELECT c.score FROM signal_scores c WHERE c.signal_id = s.id AND c.component='TRENDLINE' AND c.active=0)";
+   string fib = "(SELECT c.score FROM signal_scores c WHERE c.signal_id = s.id AND c.component='FIB' AND c.active=0)";
+   long sig = ScDbCount("SELECT COUNT(*)" + w);
+   long missing = ScDbCount("SELECT COUNT(*)" + w + " AND (" + tl + " IS NULL OR " + fib + " IS NULL)");
+   long badTotal = ScDbCount("SELECT COUNT(*)" + w + " AND s.score_total <> (SELECT SUM(c.score) FROM signal_scores c WHERE c.signal_id = s.id "
+                             "AND c.component IN ('ZONE','TREND','PA'))");
+   AssertTrue(id + "-shadow", StringFormat("%I64d sinyal; tanpa FIB/TRENDLINE bayangan %I64d; score_total beda dari ZONE+TREND+PA %I64d", sig,
+                                           missing, badTotal),
+              sig >= 1 && missing == 0 && badTotal == 0);
+   long pos = ScDbCount("SELECT COUNT(*)" + w + " AND " + tl + " > 0");
+   long zero = ScDbCount("SELECT COUNT(*)" + w + " AND " + tl + " = 0");
+   long badTouch = ScDbCount("SELECT COUNT(*)" + w + " AND " + tl + " > 0 AND COALESCE(json_extract(s.context_json, '$.tl_touches'), 0) < 2");
+   AssertTrue(id + "-values", StringFormat("TRENDLINE > 0: %I64d, = 0: %I64d, > 0 dengan tl_touches < 2: %I64d", pos, zero, badTouch),
+              pos >= 1 && zero >= 1 && badTouch == 0);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1320,6 +1341,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc17b(id, rec);
    else if(id == "SC-18")
       CheckSc18(id, rec);
+   else if(id == "SC-19")
+      CheckSc19(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

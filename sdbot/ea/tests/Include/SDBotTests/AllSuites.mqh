@@ -43,6 +43,7 @@
 #include <SDBotTests/Suites/TestExposureRules.mqh>
 #include <SDBotTests/Suites/TestNewsRules.mqh>
 #include <SDBotTests/Suites/TestFibRules.mqh>
+#include <SDBotTests/Suites/TestTrendlineRules.mqh>
 
 void RunAllSuites()
   {
@@ -83,6 +84,7 @@ void RunAllSuites()
    RunTestExposureRules();
    RunTestNewsRules();
    RunTestFibRules();
+   RunTestTrendlineRules();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

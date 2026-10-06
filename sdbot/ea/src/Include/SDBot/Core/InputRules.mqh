@@ -52,6 +52,7 @@ struct InputValues
    int               newsMediumMinutes;
    string            newsCsvFile;        // hanya tester
    ENUM_SDB_COMPONENT_MODE scoreFibMode;  // spec 18: skor Fibonacci OFF / SHADOW / ACTIVE
+   ENUM_SDB_COMPONENT_MODE scoreTrendlineMode; // spec 19
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -119,6 +120,7 @@ InputValues DefaultInputValues()
    v.newsMediumMinutes = SDB_DEF_NEWS_MEDIUM_MIN;
    v.newsCsvFile = SDB_DEF_NEWS_CSV;
    v.scoreFibMode = SDB_COMPONENT_SHADOW;
+   v.scoreTrendlineMode = SDB_COMPONENT_SHADOW;
    return v;
   }
 
@@ -194,6 +196,7 @@ void IrCheckSignals(const InputValues &v, string &errors)
    IrCheckRange("InpNewsHighMinutes", v.newsHighMinutes, 0, SDB_MAX_NEWS_MIN, errors);
    IrCheckRange("InpNewsMediumMinutes", v.newsMediumMinutes, 0, SDB_MAX_NEWS_MIN, errors);
    IrCheckRange("InpScoreFibMode", (int)v.scoreFibMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
+   IrCheckRange("InpScoreTrendlineMode", (int)v.scoreTrendlineMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
   }
 
 void IrCheckClassLimit(const string name, const int value, string &errors)

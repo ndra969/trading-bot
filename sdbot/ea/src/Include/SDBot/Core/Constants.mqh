@@ -185,6 +185,13 @@
 #define SDB_FIB_TOLERANCE             0.05     // jarak rasio saat skor turun ke 0
 #define SDB_FIB_MIN_RATIO             0.236    // di bawahnya zona terlalu dangkal di leg
 #define SDB_FIB_MAX_RATIO             1.0      // di atasnya zona di luar leg
+
+//--- Skor trendline (spec 19, PRD: 3+ sentuhan searah = 15, 2 = 7)
+#define SDB_SCORE_MAX_TRENDLINE       15
+#define SDB_TL_SCORE_3                15
+#define SDB_TL_SCORE_2                7
+#define SDB_TL_TOL_ATR                0.2      // toleransi sentuhan, patah, dan jarak ke zona
+#define SDB_TL_MIN_SLOPE_ATR          0.02     // ATR per bar MTF; lebih datar = bukan trendline
 #define SDB_NEWS_REFRESH_SEC          900      // kalender live dimuat ulang tiap 15 menit
 
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol

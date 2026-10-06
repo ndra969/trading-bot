@@ -452,6 +452,18 @@ struct SdbFibResult
    string            reason;          // "" = dihitung
   };
 
+// Hasil skor trendline satu kandidat (spec 19, Strategies/TrendlineRules.mqh).
+struct SdbTrendlineResult
+  {
+   int               score;           // 0, 7, 15
+   int               touches;         // 0 = tidak ada garis
+   double            slopeAtr;        // ATR per bar MTF (+ naik, - turun)
+   double            distAtr;         // jarak proyeksi ke zona dalam ATR (0 = di dalam zona)
+   datetime          t1;              // titik pembentuk pertama
+   datetime          t2;              // titik pembentuk kedua
+   string            reason;          // "" = ada garis
+  };
+
 struct SdbSignalFacts
   {
    ENUM_SDB_DIR      dir;             // arah bias HTF = arah kandidat
@@ -478,6 +490,8 @@ struct SdbSignalFacts
    string            newsNext;        // event berdampak terdekat 24 jam; "" = tidak ada
    ENUM_SDB_COMPONENT_MODE fibMode;   // spec 18
    SdbFibResult      fib;
+   ENUM_SDB_COMPONENT_MODE tlMode;    // spec 19
+   SdbTrendlineResult tl;
   };
 
 struct SdbStops
@@ -498,6 +512,7 @@ struct SdbDecision
    int               trendScore;
    int               paScore;
    int               fibScore;        // spec 18: dicatat di semua mode != OFF, ikut total hanya ACTIVE
+   int               tlScore;         // spec 19: sama dengan fibScore
    int               total;
    int               maxActive;
    double            pct;
@@ -526,6 +541,8 @@ struct SignalRecord
    int               scorePa;
    int               scoreFib;        // spec 18
    ENUM_SDB_COMPONENT_MODE fibMode;
+   int               scoreTrendline;  // spec 19
+   ENUM_SDB_COMPONENT_MODE trendlineMode;
   };
 
 // Laporan harian (spec 09 design §4.1-4.2).

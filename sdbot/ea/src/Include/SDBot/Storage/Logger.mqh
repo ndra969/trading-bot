@@ -832,6 +832,8 @@ public:
       EnqueueScore(s, SDB_SCORE_COMPONENT_PA, s.scorePa, SDB_SCORE_MAX_PA);
       if(s.fibMode != SDB_COMPONENT_OFF)
          EnqueueScore(s, SDB_SCORE_COMPONENT_FIB, s.scoreFib, SDB_SCORE_MAX_FIB, s.fibMode == SDB_COMPONENT_ACTIVE);
+      if(s.trendlineMode != SDB_COMPONENT_OFF)
+         EnqueueScore(s, SDB_SCORE_COMPONENT_TRENDLINE, s.scoreTrendline, SDB_SCORE_MAX_TRENDLINE, s.trendlineMode == SDB_COMPONENT_ACTIVE);
      }
 
    void OnDeal(const DealRecord &d)

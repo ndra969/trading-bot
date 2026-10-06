@@ -166,6 +166,12 @@ def test_ts72_score_fib_mode_shadow():
         assert _read(symbol).get("InpScoreFibMode") == "1", symbol
 
 
+def test_ts73_score_trendline_mode_shadow():
+    """Spec 19 Req 3.1: skor trendline default mode bayangan (PC-25)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpScoreTrendlineMode") == "1", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

@@ -4,6 +4,24 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.21 — 2026-10-06 — spec 19 skor trendline bayangan (Fase 5)
+
+- `Strategies/TrendlineRules.mqh` (fungsi murni): garis dari pasangan swing fractal H1 terkonfirmasi dalam 100 bar, **hanya searah sinyal** (BUY support naik, SELL resistance turun, kemiringan ≥ 0,02 ATR per bar). Bot Python tanpa filter kemiringan ikut menghitung support turun untuk BUY. Garis patah (close menembus > 0,2 ATR sejak sentuhan pertama) dibuang; proyeksi di bar kandidat wajib di zona ± 0,2 ATR; sentuhan = semua swing sesisi di garis; 3+ sentuhan 15, 2 sentuhan 7.
+- `Strategies/Confirmations.mqh` (`CConfirmations`): komponen konfirmasi Fase 5 dalam satu kelas, satu salinan bar H1 untuk semua komponen. Fibonacci dipindah dari engine tanpa perubahan perilaku (distribusi FIB identik). `ActiveConfirmations` menjumlahkan komponen ACTIVE ke skor dan maksimum (55 / 70 / 85).
+- Input `InpScoreTrendlineMode` (OFF / SHADOW / ACTIVE, default SHADOW); konteks `tl_dist`, `tl_slope`, `tl_touches`; `signal_scores` TRENDLINE.
+- Uji: TC-TL-01..11 (termasuk support turun untuk BUY = 0), TC-SG-22c, 24c, 30, SC-19.
+
+Backtest IS + OOS (sesi 1027–1051, 1 jam 35 menit, sebelumnya 1 jam 10 menit): trade dan profit kotor **identik** dengan v1.20. Laporan TRENDLINE bayangan:
+
+| Periode | TL 0 | TL 7 | TL 15 |
+|---|---|---|---|
+| IS | 199 trade, +0,045R | 119, +0,020R | 175, +0,016R |
+| OOS | 22, +0,476R | 12, −0,326R | 18, −0,261R |
+
+Garis searah ditemukan pada 59% kandidat ACCEPTED (35% bernilai 15), dalam batas Req 4.3, tetapi trade dengan trendline **tidak lebih baik** di IS dan lebih buruk di OOS. Status PC-25: `SAMPEL KURANG`; arah data tidak mendukung aktivasi.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-06): build 0 error / 0 warning (5 target); unit 630/630; 28 skenario PASS (SC-00..SC-19); durasi 18 menit 13 detik. pytest `sdbot/tools` 104/104, `schema.py check` OK (data versi 4).
+
 ### 1.20 — 2026-10-06 — spec 18 skor Fibonacci bayangan (Fase 5)
 
 - `Strategies/FibRules.mqh` (fungsi murni): leg = impuls penuh yang memuat zona (ekstrem `StructureLookback` bar H1 sebelum candle swing zona sampai ekstrem sesudahnya, hanya bar tertutup); rasio retracement batas dekat zona; level **terdekat** dari 0.382 / 0.5 / 0.618 / 0.786 (tie ke level lebih dalam), nilai dasar 8 / 15 / 15 / 8, dikurangi linear sampai jarak 0,05; leg < 1,5 ATR atau rasio di luar 0,236–1,0 = 0. Bot Python memilih level dengan skor tertinggi sehingga 0.618 penuh di ~83% setup; di sini skor penuh hanya 0,6% dari ACCEPTED.

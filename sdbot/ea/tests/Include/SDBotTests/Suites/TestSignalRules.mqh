@@ -108,6 +108,9 @@ SdbSignalFacts SgF0()
    ZeroMemory(f.fib);
    f.fib.ratio = -1.0;
    f.fib.reason = "";
+   f.tlMode = SDB_COMPONENT_OFF;
+   ZeroMemory(f.tl);
+   f.tl.reason = "";
    return f;
   }
 
@@ -297,7 +300,7 @@ void RunTestSignalMisc()
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
    string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
-                   "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
+                   "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
    f = SgF0();
@@ -305,7 +308,7 @@ void RunTestSignalMisc()
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
    expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
-            "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
+            "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
 
    f = SgF0();
@@ -317,6 +320,40 @@ void RunTestSignalMisc()
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
    AssertTrue("TC-SG-22b", "konteks Fibonacci bayangan: " + json,
               StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"max_active\":55,") >= 0);
+  }
+
+// TC-SG-22c/30 (spec 19 Req 2.4, 3.2-3.3, EC-10): konteks trendline; maksimum dari semua komponen ACTIVE.
+void RunTestSignalTrendline()
+  {
+   SdbSignalFacts f = SgF0();
+   f.tlMode = SDB_COMPONENT_SHADOW;
+   f.tl.score = 15;
+   f.tl.touches = 3;
+   f.tl.slopeAtr = 0.05;
+   f.tl.distAtr = 0.0;
+   SdbDecision d = SgEval(f);
+   string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-22c", "konteks trendline bayangan: " + json,
+              StringFind(json, "\"tl_dist\":0.00,\"tl_slope\":0.050,\"tl_touches\":3,") >= 0 && d.total == 44 && d.maxActive == 55);
+
+   f = SgF0();
+   f.trendScore = 15;
+   f.fib.score = 15;
+   f.fib.ratio = 0.5;
+   f.fib.level = 0.5;
+   f.tl.score = 15;
+   f.tl.touches = 3;
+   f.fibMode = SDB_COMPONENT_SHADOW;
+   f.tlMode = SDB_COMPONENT_SHADOW;
+   SdbDecision ss = SgEval(f);
+   f.fibMode = SDB_COMPONENT_ACTIVE;
+   SdbDecision as = SgEval(f);
+   f.tlMode = SDB_COMPONENT_ACTIVE;
+   SdbDecision aa = SgEval(f);
+   AssertTrue("TC-SG-30", StringFormat("SHADOW/SHADOW %d/%d, ACTIVE/SHADOW %d/%d, ACTIVE/ACTIVE %d/%d (tl %d)", ss.total, ss.maxActive, as.total,
+                                       as.maxActive, aa.total, aa.maxActive, aa.tlScore),
+              ss.total == 52 && ss.maxActive == 55 && as.total == 67 && as.maxActive == 70 && aa.total == 82 && aa.maxActive == 85 &&
+              ss.tlScore == 15);
   }
 
 // TC-SG-28/29 (spec 18 Req 3.2-3.4): FIB hanya ikut skor gerbang dan maksimum pada mode ACTIVE.
@@ -411,6 +448,7 @@ void RunTestSignalRules()
    RunTestSignalFilters();
    RunTestSignalNews();
    RunTestSignalFib();
+   RunTestSignalTrendline();
    TfEndSuite();
   }
 

@@ -75,7 +75,7 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overv
 |---|---|---|---|---|---|
 | 17 | [ea-17-validation-harness](ea-17-validation-harness/) | Backtest in-sample / out-of-sample real ticks, laporan PF, DD, expectancy, dan per nilai komponen | 16 | pytest laporan; acuan IS + OOS v1.19 | **Done** 2026-10-06 (v1.19; acuan sesi DB 901–924: IS 901–912, OOS 913–924; PC-25, PC-26) |
 | 18 | [ea-18-fibonacci](ea-18-fibonacci/) | Skor Fibonacci level terdekat, mode bayangan | 17 | suite FibRules ALL PASS; laporan IS/OOS | **Done** 2026-10-06 (v1.20; trade identik dengan acuan; FIB SAMPEL KURANG; sesi 964–987) |
-| 19 | ea-19-trendline | Skor trendline dengan kemiringan searah sinyal, mode bayangan | 17 | suite TrendlineRules ALL PASS; laporan IS/OOS | Belum mulai |
+| 19 | [ea-19-trendline](ea-19-trendline/) | Skor trendline dengan kemiringan searah sinyal, mode bayangan | 17 | suite TrendlineRules ALL PASS; laporan IS/OOS | **Done** 2026-10-06 (v1.21; trade identik; TRENDLINE tidak lebih baik, SAMPEL KURANG; sesi 1027–1051) |
 | 20 | ea-20-breakout-retest | Skor breakout & retest, mode bayangan | 17 | suite BreakoutRules ALL PASS; laporan IS/OOS | Belum mulai |
 | 21 | ea-21-rsi-divergence | Skor RSI divergence, mode bayangan | 17 | suite RsiRules ALL PASS; laporan IS/OOS | Belum mulai |
 | 22 | ea-22-score-calibration | Aktivasi komponen terbukti, ambang baru, DoD Fase 5 | 18–21 | backtest IS + OOS ≥ acuan v1.18 di OOS | Belum mulai |

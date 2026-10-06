@@ -25,7 +25,7 @@ string TprKnownKeys()
           "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
           "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,"
           "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,"
-          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,InpScoreFibMode,";
+          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,InpScoreFibMode,InpScoreTrendlineMode,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -72,6 +72,7 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpNewsMediumMinutes")     v.newsMediumMinutes = (int)StringToInteger(value);
    else if(key == "InpNewsCsvFile")           v.newsCsvFile = value;
    else if(key == "InpScoreFibMode")          v.scoreFibMode = (ENUM_SDB_COMPONENT_MODE)StringToInteger(value);
+   else if(key == "InpScoreTrendlineMode")    v.scoreTrendlineMode = (ENUM_SDB_COMPONENT_MODE)StringToInteger(value);
   }
 
 // "" = lolos; selain itu alasan gagal.

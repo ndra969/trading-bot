@@ -14,8 +14,11 @@ flowchart TB
     B -->|BUY/SELL| ZN{bar menyentuh zona valid searah? TouchedZone: Fresh lalu terbaru}
     ZN -->|tidak| CZ[hitung tanpa_zona] --> Z
     ZN -->|ya| F[fakta kandidat: STOPPED/pause/CanTrade, posisi instance, pola arah bias, TrendScore MTF, bid/ask, stops, ATR H1, zona lawan]
-    F --> FB[FibEvaluate bila InpScoreFibMode != OFF: impuls H1 = ekstrem 100 bar sebelum swing zona -> ekstrem sesudahnya; rasio batas dekat; level terdekat 0.382/0.5/0.618/0.786 -> 8/15/15/8 dikurangi linear sampai jarak 0,05]
-    FB --> E[EvaluateSignal: skor ZONE 30/15 + TREND 15/7/0 + PA 10/7/3 dari 55; FIB ikut skor dan maksimum (70) hanya bila ACTIVE]
+    F --> CF[CConfirmations.Evaluate: bar H1 tertutup cache zona]
+    CF --> FB[FibEvaluate bila InpScoreFibMode != OFF: impuls H1 = ekstrem 100 bar sebelum swing zona -> ekstrem sesudahnya; rasio batas dekat; level terdekat 0.382/0.5/0.618/0.786 -> 8/15/15/8 dikurangi linear sampai jarak 0,05]
+    CF --> TL[TlEvaluate bila InpScoreTrendlineMode != OFF: pasangan swing fractal 100 bar; BUY support naik / SELL resistance turun >= 0,02 ATR per bar; tidak patah; proyeksi di zona +- 0,2 ATR; 3+ sentuhan 15, 2 sentuhan 7]
+    FB --> E[EvaluateSignal: skor ZONE 30/15 + TREND 15/7/0 + PA 10/7/3 dari 55; komponen ACTIVE menambah skor dan maksimum (FIB 15, TRENDLINE 15)]
+    TL --> E
     E --> S1{pre-filter risiko} -->|gagal| REJ
     S1 --> NW{status berita ON dan bar dalam jendela event mata uang simbol? HIGH ±30, MEDIUM ±10 menit} -->|ya: NEWS_BLACKOUT| REJ
     NW --> SS{sesi UTC bar diizinkan? Tokyo 00-08, London 08-17, NY 13-22; 22-24 tidak} -->|tidak: OUTSIDE_SESSION| REJ
@@ -34,7 +37,7 @@ flowchart TB
     ACC --> SK[event sink: signals + 3 signal_scores, id = SHA-256 login/run_key/magic/bar]
 ```
 
-Komponen Fibonacci (spec 18) berjalan dalam mode bayangan secara default: skornya dicatat di `signal_scores` dengan `active = 0` dan di konteks (`fib_level`, `fib_ratio`), tetapi tidak mengubah skor gerbang atau entry. Aktivasi diputuskan dari data IS/OOS (PC-25, spec 22).
+Komponen Fibonacci (spec 18) dan trendline (spec 19) berjalan dalam mode bayangan secara default: skornya dicatat di `signal_scores` dengan `active = 0` dan di konteks (`fib_level`, `fib_ratio`, `tl_dist`, `tl_slope`, `tl_touches`), tetapi tidak mengubah skor gerbang atau entry. Aktivasi diputuskan dari data IS/OOS (PC-25, spec 22).
 
 Filter berita (spec 16, [news.md](news.md)) berjalan sebelum sesi dan spread; status OFF atau DISABLED tidak memblokir. Konteks sinyal mencatat `news` (ON/OFF/DISABLED) dan `news_next` (event ≥ medium terdekat dalam 24 jam, atau null).
 

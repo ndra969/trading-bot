@@ -18,7 +18,7 @@
 #include <SDBot/Analysis/MarketStructure.mqh>
 #include <SDBot/Analysis/ZoneBook.mqh>
 #include <SDBot/Strategies/PaTrigger.mqh>
-#include <SDBot/Strategies/FibRules.mqh>
+#include <SDBot/Strategies/Confirmations.mqh>
 #include <SDBot/Signals/SignalRules.mqh>
 #include <SDBot/Filters/NewsFilter.mqh>
 
@@ -54,7 +54,7 @@ private:
    SdbSessionParams  m_sessions;      // filter sesi UTC (spec 14)
    CNewsFilter      *m_news;          // filter berita (spec 16); NULL = DISABLED
    int               m_testerUtcOffsetH;
-   ENUM_SDB_COMPONENT_MODE m_fibMode; // spec 18
+   CConfirmations    m_conf;          // spec 18-19: komponen konfirmasi Fase 5
    CMarketStructure *m_ms;
    CZoneBook        *m_zb;
    CPaTrigger       *m_pt;
@@ -172,28 +172,7 @@ private:
          f.newsBlocked = m_news.Blocked(m_lastBar, f.newsDetail);
          f.newsNext = m_news.NearestText(m_lastBar);
         }
-      CollectFib(zone, f);
-     }
-
-   // Spec 18: leg dari cache bar MTF tertutup yang sama dengan pembentuk zona (tanpa lookahead).
-   void CollectFib(const SdbZone &zone, SdbSignalFacts &f)
-     {
-      f.fibMode = m_fibMode;
-      f.fib.ratio = -1.0;
-      f.fib.reason = "";
-      if(m_fibMode == SDB_COMPONENT_OFF || m_zb == NULL || m_ms == NULL)
-         return;
-      MqlRates r[];
-      SdbZoneParams zp;
-      m_zb.Params(zp);
-      SdbStructureParams sp;
-      m_ms.Params(sp);
-      if(m_zb.Rates(r) <= 0)
-        {
-         f.fib.reason = SDB_FIB_REASON_DATA;
-         return;
-        }
-      FibEvaluate(r, zone, zp.minLegAtr, sp.lookback, f.fib);
+      m_conf.Evaluate(zone, bias.dir, f.atrMtf, f);
      }
 
    // Lot dan pre-trade check Fase 1, lalu order; zona Used hanya setelah terisi (Req 4.7, 5.1–5.3).
@@ -249,6 +228,8 @@ private:
       s.scorePa = d.paScore;
       s.scoreFib = d.fibScore;
       s.fibMode = f.fibMode;
+      s.scoreTrendline = d.tlScore;
+      s.trendlineMode = f.tlMode;
       if(m_sink != NULL)
          m_sink.OnSignal(s);
       string text = StringFormat("%s %s %s zona=%s skor=%d (%.1f%%) pola=%s", TimeToString(t), s.direction, status, f.zone.id, d.total,
@@ -268,9 +249,9 @@ public:
    void Init(const string symbol, const long magic, const ENUM_TIMEFRAMES ltf, const SdbSignalParams &p, CMarketStructure *ms,
              CZoneBook *zb, CPaTrigger *pt, CRiskState *rs, CRiskManager *rm, CExecutor *exe, CAccount *acc,
              ISdbEventSink *sink, const ENUM_SDB_TRADING_STYLE style, const SdbSessionParams &sessions, const int testerUtcOffsetHours,
-             CNewsFilter *news, const ENUM_SDB_COMPONENT_MODE fibMode)
+             CNewsFilter *news, const ENUM_SDB_COMPONENT_MODE fibMode, const ENUM_SDB_COMPONENT_MODE tlMode)
      {
-      m_fibMode = fibMode;
+      m_conf.Init(fibMode, tlMode, zb, ms);
       m_symbol = symbol;
       m_magic = magic;
       m_ltf = ltf;
