@@ -160,6 +160,12 @@ def test_ts58_news_inputs():
         assert v.get("InpNewsMediumMinutes") == "0", symbol
 
 
+def test_ts72_score_fib_mode_shadow():
+    """Spec 18 Req 3.1: skor Fibonacci default mode bayangan (PC-25)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpScoreFibMode") == "1", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

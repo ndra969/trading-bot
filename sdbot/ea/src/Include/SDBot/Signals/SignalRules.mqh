@@ -96,6 +96,13 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
    d.paScore = patternOk ? PaScore(f.pattern.code) : 0;
    d.total = d.zoneScore + d.trendScore + d.paScore;
    d.maxActive = SDB_SCORE_MAX_ACTIVE;
+   // Spec 18: Fibonacci dicatat di mode SHADOW, tetapi hanya ACTIVE yang mengubah skor gerbang dan maksimumnya.
+   d.fibScore = (f.fibMode == SDB_COMPONENT_OFF) ? 0 : f.fib.score;
+   if(f.fibMode == SDB_COMPONENT_ACTIVE)
+     {
+      d.total += d.fibScore;
+      d.maxActive += SDB_SCORE_MAX_FIB;
+     }
    d.pct = ScorePct(d.total, d.maxActive);
    if(f.preStage != "")
      {
@@ -161,7 +168,7 @@ long SignalIdOf(const long login, const long runKey, const long magic, const dat
 string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const SdbSignalParams &p, const string biasReason)
   {
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
-                 "max_spread", "session", "news", "news_next"};
+                 "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -180,6 +187,9 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    v[12] = JsonStr(f.session);
    v[13] = JsonStr(f.newsStatus);
    v[14] = f.newsNext == "" ? "null" : JsonStr(f.newsNext);
+   bool fib = f.fibMode != SDB_COMPONENT_OFF && f.fib.ratio >= 0.0;
+   v[15] = fib && f.fib.level > 0.0 ? DoubleToString(f.fib.level, 3) : "null";
+   v[16] = fib ? DoubleToString(f.fib.ratio, 3) : "null";
    return CanonicalJson(k, v);
   }
 

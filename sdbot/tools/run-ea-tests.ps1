@@ -167,6 +167,15 @@ function Read-ScenarioIni([string]$path) {
     return $keys
 }
 
+function Get-TestTerminalMain {
+    Get-Process -Name terminal64 -ErrorAction SilentlyContinue | Where-Object { $_.Path -ieq $script:cfg.TestTerminal }
+}
+
+function Get-MaxSession {
+    if (-not (Test-Path -LiteralPath $script:dbFile)) { return 0 }
+    return [int](& uv run --project $script:repoRoot python $script:reportPy --db $script:dbFile --max-session)
+}
+
 function Get-DbStamp([string]$path) {
     if (-not (Test-Path -LiteralPath $path)) { return 'tidak ada' }
     $f = Get-Item -LiteralPath $path
@@ -293,6 +302,16 @@ function Invoke-TesterRun($r) {
             ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $presetCopy }
     }
 
+    # Bug 2026-10-06: terminal uji dari run sebelumnya belum tertutup, sehingga Start-Process hanya meneruskan
+    # /config ke instance itu dan langsung kembali; run "selesai" 1 detik tanpa backtest. Tunggu dulu terminal mati.
+    $deadline = (Get-Date).AddSeconds(120)
+    while ((Get-TestTerminalMain) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+    if (Get-TestTerminalMain) {
+        Write-Run "ENV $($r.Id): terminal uji masih terbuka 120 detik sesudah run sebelumnya; run tidak dimulai."
+        Remove-Item -LiteralPath $setPath, $iniPath -Force -ErrorAction SilentlyContinue
+        return 2
+    }
+    $sesBefore = $(if ($r.Kind -eq 'baseline') { Get-MaxSession } else { 0 })
     Write-Run ("mulai {0} (run {1}, {2} {3} {4}..{5}, batas {6} detik)" -f $r.Id, $runId, $tester['Symbol'], $tester['Period'], $tester['FromDate'], $tester['ToDate'], $script:timeoutSec)
     $start = Get-Date
     $timedOut = $false
@@ -325,6 +344,11 @@ function Invoke-TesterRun($r) {
     }
     if ($r.Kind -eq 'baseline') {
         # Tidak ada file hasil: penilaian lewat baseline_report.py setelah semua simbol selesai.
+        if ((Get-MaxSession) -le $sesBefore) {
+            Write-Run "GAGAL $($r.Id): tester tidak membuat sesi DB ($secs detik); backtest tidak berjalan. Dari log terminal:"
+            Get-TerminalLogReasons $start | ForEach-Object { Write-Host "    $_" }
+            return 1
+        }
         $errs = @(Get-SdbErrorLines $start)
         if ($errs.Count -gt 0) { Add-Content -LiteralPath $script:baselineErrors -Value ($errs | ForEach-Object { "$($r.Id): $_" }) -Encoding UTF8 }
         $sym = $r.Symbol
@@ -446,6 +470,7 @@ function Invoke-Main {
         if ($code -ne 0) { $script:runs = @() }
     }
     $dbFile = Join-Path $script:cfg.CommonFilesDir 'sdbot_tester.sqlite'
+    $script:dbFile = $dbFile
     $hasBaseline = [bool]($script:runs | Where-Object { $_.Kind -eq 'baseline' })
     $marker = 0
     if ($hasBaseline) {

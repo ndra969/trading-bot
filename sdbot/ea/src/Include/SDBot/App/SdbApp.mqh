@@ -161,7 +161,8 @@ private:
          LogWarn("App", "InpMaxSpreadPoints 0: filter spread mati (preset per simbol mengisi batasnya)");
       m_signals.Init(_Symbol, cfg.inputs.magic, ltf, sp, GetPointer(m_structure), GetPointer(m_zones), GetPointer(m_trigger),
                      GetPointer(m_riskState), GetPointer(m_riskManager), GetPointer(m_executor), GetPointer(m_account), m_sink,
-                     cfg.style, ses, cfg.inputs.testerUtcOffsetHours, cfg.signalsOn ? GetPointer(m_news) : NULL);
+                     cfg.style, ses, cfg.inputs.testerUtcOffsetHours, cfg.signalsOn ? GetPointer(m_news) : NULL,
+                     cfg.inputs.scoreFibMode);
      }
 
    void SendSnapshot()

@@ -359,6 +359,8 @@ SignalRecord TlSignal(const long id, const string status, const string stage)
    s.scoreZone = 30;
    s.scoreTrend = 7;
    s.scorePa = 0;
+   s.scoreFib = 0;
+   s.fibMode = SDB_COMPONENT_OFF;
    return s;
   }
 
@@ -376,9 +378,24 @@ void RunTestLoggerSignal()
    lg.Flush();
    lg.OnSignal(TlSignal(4242424242, SDB_SIGNAL_STATUS_REJECTED, SDB_REJECT_STAGE_NO_PA_TRIGGER));
    bool again = lg.Flush();
+   // TC-SG-24b (spec 18 Req 3.2, 3.4, 3.5): FIB dicatat dengan active sesuai mode; OFF tidak dicatat.
+   SignalRecord sh = TlSignal(4242424244, SDB_SIGNAL_STATUS_REJECTED, SDB_REJECT_STAGE_SCORE_TOO_LOW);
+   sh.fibMode = SDB_COMPONENT_SHADOW;
+   sh.scoreFib = 11;
+   SignalRecord ac = TlSignal(4242424245, SDB_SIGNAL_STATUS_REJECTED, SDB_REJECT_STAGE_SCORE_TOO_LOW);
+   ac.fibMode = SDB_COMPONENT_ACTIVE;
+   ac.scoreFib = 15;
+   lg.OnSignal(sh);
+   lg.OnSignal(ac);
+   lg.Flush();
+   AssertTrue("TC-SG-24b", "FIB bayangan active=0 skor 11, aktif active=1 skor 15, mode OFF tanpa baris FIB",
+              TlCount("signal_scores", "signal_id=4242424244 AND component='FIB' AND score=11 AND max_score=15 AND active=0") == 1 &&
+              TlCount("signal_scores", "signal_id=4242424245 AND component='FIB' AND score=15 AND active=1") == 1 &&
+              TlCount("signal_scores", "signal_id=4242424244") == 4 && TlCount("signal_scores", "component='FIB' AND signal_id=4242424242") == 0);
    long utc = (long)TL_SERVER_T - TL_OFFSET;
    AssertTrue("TC-SG-24", "signals id eksplisit + 3 skor aktif (spec 17: active=1); kirim ulang tidak menambah baris; reject_stage kosong = NULL",
-              again && TlCount("signals") == 2 && TlCount("signal_scores") == 6 && TlCount("signal_scores", "active=1") == 6 &&
+              again && TlCount("signals") == 4 && TlCount("signal_scores", "signal_id IN (4242424242, 4242424243)") == 6 &&
+              TlCount("signal_scores", "signal_id IN (4242424242, 4242424243) AND active=1") == 6 &&
               TlInt("SELECT time FROM signals WHERE id=4242424242") == utc &&
               TlText("SELECT reject_stage FROM signals WHERE id=4242424242") == SDB_REJECT_STAGE_NO_PA_TRIGGER &&
               TlCount("signals", "id=4242424243 AND reject_stage IS NULL AND reject_detail IS NULL AND status='ACCEPTED'") == 1 &&

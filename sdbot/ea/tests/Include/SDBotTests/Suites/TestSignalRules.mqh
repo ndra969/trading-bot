@@ -104,6 +104,10 @@ SdbSignalFacts SgF0()
    f.newsDetail = "";
    f.newsStatus = "ON";
    f.newsNext = "";
+   f.fibMode = SDB_COMPONENT_OFF;
+   ZeroMemory(f.fib);
+   f.fib.ratio = -1.0;
+   f.fib.reason = "";
    return f;
   }
 
@@ -292,7 +296,7 @@ void RunTestSignalMisc()
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
+   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
                    "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
@@ -300,9 +304,49 @@ void RunTestSignalMisc()
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
+   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
             "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
+
+   f = SgF0();
+   f.fibMode = SDB_COMPONENT_SHADOW;
+   f.fib.score = 11;
+   f.fib.ratio = 0.63;
+   f.fib.level = 0.618;
+   d = SgEval(f);
+   json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-22b", "konteks Fibonacci bayangan: " + json,
+              StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"max_active\":55,") >= 0);
+  }
+
+// TC-SG-28/29 (spec 18 Req 3.2-3.4): FIB hanya ikut skor gerbang dan maksimum pada mode ACTIVE.
+void RunTestSignalFib()
+  {
+   SdbSignalFacts f = SgF0();
+   f.trendScore = 15;
+   f.fib.score = 15;
+   f.fib.ratio = 0.5;
+   f.fib.level = 0.5;
+   f.fibMode = SDB_COMPONENT_OFF;
+   SdbDecision off = SgEval(f);
+   f.fibMode = SDB_COMPONENT_SHADOW;
+   SdbDecision sh = SgEval(f);
+   f.fibMode = SDB_COMPONENT_ACTIVE;
+   SdbDecision ac = SgEval(f);
+   AssertTrue("TC-SG-28", StringFormat("OFF %d/%d '%s', SHADOW %d/%d '%s', ACTIVE %d/%d (fib %d)", off.total, off.maxActive, off.stage,
+                                       sh.total, sh.maxActive, sh.stage, ac.total, ac.maxActive, ac.fibScore),
+              off.total == 52 && off.maxActive == 55 && sh.total == 52 && sh.maxActive == 55 && sh.stage == off.stage &&
+              sh.fibScore == 15 && ac.total == 67 && ac.maxActive == 70);
+
+   f = SgF0();
+   f.trendScore = 0;                               // 30 + 0 + 7 = 37
+   f.fibMode = SDB_COMPONENT_SHADOW;
+   SdbDecision pass = SgEval(f);
+   f.fibMode = SDB_COMPONENT_ACTIVE;               // fib 0: 37/70 = 52,9% < 65%
+   SdbDecision fail = SgEval(f);
+   AssertTrue("TC-SG-29", StringFormat("37/55 = %.1f%% '%s'; ACTIVE fib 0: %d/%d = %.1f%% '%s'", pass.pct, pass.stage, fail.total,
+                                       fail.maxActive, fail.pct, fail.stage),
+              pass.stage != SDB_REJECT_STAGE_SCORE_TOO_LOW && fail.stage == SDB_REJECT_STAGE_SCORE_TOO_LOW);
   }
 
 // TC-SG-25/26 (spec 14 Req 2.2, 3.1): sesi dan spread setelah pre-filter risiko, sebelum POSITION_OPEN.
@@ -366,6 +410,7 @@ void RunTestSignalRules()
    RunTestSignalMisc();
    RunTestSignalFilters();
    RunTestSignalNews();
+   RunTestSignalFib();
    TfEndSuite();
   }
 

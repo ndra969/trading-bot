@@ -1220,6 +1220,25 @@ void CheckSc16(const string id, const CScenarioRecorder &rec)
 
 // SC-17 (spec 16 Req 1.1–1.4, 2.2): kalender fixture USD HIGH 12:30 (jendela 12:00–13:00) dan EUR MEDIUM 09:00
 // (08:50–09:10) tiap hari kerja. Server tester GMT+0, jadi waktu UTC di signals = waktu server.
+// SC-18 (spec 18 Req 1.1, 2.6, 3.2, 3.5): setiap sinyal punya FIB bayangan (active=0), score_total = ZONE + TREND + PA,
+// FIB bernilai > 0 dan = 0 sama-sama muncul, rasio di konteks ada untuk setiap FIB > 0.
+void CheckSc18(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals s WHERE s.session_id IN (" + rec.SessionIdList() + ")";
+   string fib = "(SELECT c.score FROM signal_scores c WHERE c.signal_id = s.id AND c.component='FIB' AND c.active=0)";
+   long sig = ScDbCount("SELECT COUNT(*)" + w);
+   long noFib = ScDbCount("SELECT COUNT(*)" + w + " AND " + fib + " IS NULL");
+   long badTotal = ScDbCount("SELECT COUNT(*)" + w + " AND s.score_total <> (SELECT SUM(c.score) FROM signal_scores c WHERE c.signal_id = s.id "
+                             "AND c.component IN ('ZONE','TREND','PA'))");
+   AssertTrue(id + "-shadow", StringFormat("%I64d sinyal; tanpa FIB bayangan %I64d; score_total beda dari ZONE+TREND+PA %I64d", sig, noFib, badTotal),
+              sig >= 1 && noFib == 0 && badTotal == 0);
+   long pos = ScDbCount("SELECT COUNT(*)" + w + " AND " + fib + " > 0");
+   long zero = ScDbCount("SELECT COUNT(*)" + w + " AND " + fib + " = 0");
+   long noRatio = ScDbCount("SELECT COUNT(*)" + w + " AND " + fib + " > 0 AND json_extract(s.context_json, '$.fib_ratio') IS NULL");
+   AssertTrue(id + "-values", StringFormat("FIB > 0: %I64d, FIB = 0: %I64d, FIB > 0 tanpa fib_ratio: %I64d", pos, zero, noRatio),
+              pos >= 1 && zero >= 1 && noRatio == 0);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1299,6 +1318,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc17(id, rec);
    else if(id == "SC-17b")
       CheckSc17b(id, rec);
+   else if(id == "SC-18")
+      CheckSc18(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

@@ -830,6 +830,8 @@ public:
       EnqueueScore(s, SDB_SCORE_COMPONENT_ZONE, s.scoreZone, SDB_SCORE_MAX_ZONE);
       EnqueueScore(s, SDB_SCORE_COMPONENT_TREND, s.scoreTrend, SDB_SCORE_MAX_TREND);
       EnqueueScore(s, SDB_SCORE_COMPONENT_PA, s.scorePa, SDB_SCORE_MAX_PA);
+      if(s.fibMode != SDB_COMPONENT_OFF)
+         EnqueueScore(s, SDB_SCORE_COMPONENT_FIB, s.scoreFib, SDB_SCORE_MAX_FIB, s.fibMode == SDB_COMPONENT_ACTIVE);
      }
 
    void OnDeal(const DealRecord &d)

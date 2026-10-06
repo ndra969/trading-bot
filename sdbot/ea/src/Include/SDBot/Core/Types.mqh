@@ -22,6 +22,14 @@ enum ENUM_SDB_SEVERITY
    SDB_SEV_CRITICAL = 3
   };
 
+// Mode komponen skor konfirmasi Fase 5 (PC-25): OFF tidak dihitung, SHADOW dicatat active=0, ACTIVE ikut skor gerbang.
+enum ENUM_SDB_COMPONENT_MODE
+  {
+   SDB_COMPONENT_OFF = 0,
+   SDB_COMPONENT_SHADOW = 1,
+   SDB_COMPONENT_ACTIVE = 2
+  };
+
 enum ENUM_SDB_TRADING_STYLE
   {
    SDB_STYLE_SCALPING = 0,
@@ -432,6 +440,18 @@ struct SdbSignalParams
    int               maxSpreadPoints; // 0 = filter spread mati (spec 14)
   };
 
+// Hasil skor Fibonacci satu kandidat (spec 18, Strategies/FibRules.mqh).
+struct SdbFibResult
+  {
+   int               score;           // 0..SDB_SCORE_MAX_FIB
+   double            ratio;           // rasio retracement batas dekat; -1 = tidak dihitung
+   double            level;           // level terdekat; 0 = tidak ada
+   double            dist;            // |ratio - level|
+   double            legStart;        // batas jauh zona
+   double            legEnd;          // ekstrem impuls
+   string            reason;          // "" = dihitung
+  };
+
 struct SdbSignalFacts
   {
    ENUM_SDB_DIR      dir;             // arah bias HTF = arah kandidat
@@ -456,6 +476,8 @@ struct SdbSignalFacts
    string            newsDetail;      // event yang memblokir
    string            newsStatus;      // ON, OFF, DISABLED
    string            newsNext;        // event berdampak terdekat 24 jam; "" = tidak ada
+   ENUM_SDB_COMPONENT_MODE fibMode;   // spec 18
+   SdbFibResult      fib;
   };
 
 struct SdbStops
@@ -475,6 +497,7 @@ struct SdbDecision
    int               zoneScore;
    int               trendScore;
    int               paScore;
+   int               fibScore;        // spec 18: dicatat di semua mode != OFF, ikut total hanya ACTIVE
    int               total;
    int               maxActive;
    double            pct;
@@ -501,6 +524,8 @@ struct SignalRecord
    int               scoreZone;
    int               scoreTrend;
    int               scorePa;
+   int               scoreFib;        // spec 18
+   ENUM_SDB_COMPONENT_MODE fibMode;
   };
 
 // Laporan harian (spec 09 design §4.1-4.2).

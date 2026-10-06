@@ -155,6 +155,9 @@ public:
    ENUM_TIMEFRAMES Timeframe() const { return m_tf; }
    void Params(SdbZoneParams &out) const { out = m_params; }
 
+   // Bar MTF tertutup yang dipakai Rebuild(); zone.swingIdx menunjuk ke array ini (Fibonacci, spec 18).
+   int Rates(MqlRates &out[]) const { return m_cache.Copy(out); }
+
    int Zones(SdbZone &out[]) const
      {
       ArrayFree(out);

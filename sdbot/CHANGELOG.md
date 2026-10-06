@@ -4,6 +4,18 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.20 — 2026-10-06 — spec 18 skor Fibonacci bayangan (Fase 5)
+
+- `Strategies/FibRules.mqh` (fungsi murni): leg = impuls penuh yang memuat zona (ekstrem `StructureLookback` bar H1 sebelum candle swing zona sampai ekstrem sesudahnya, hanya bar tertutup); rasio retracement batas dekat zona; level **terdekat** dari 0.382 / 0.5 / 0.618 / 0.786 (tie ke level lebih dalam), nilai dasar 8 / 15 / 15 / 8, dikurangi linear sampai jarak 0,05; leg < 1,5 ATR atau rasio di luar 0,236–1,0 = 0. Bot Python memilih level dengan skor tertinggi sehingga 0.618 penuh di ~83% setup; di sini skor penuh hanya 0,6% dari ACCEPTED.
+- Rencana awal (leg dari batas jauh zona sendiri) hanya mengukur lebar zona: di SC-18 rasio selalu 0,60–0,93. Diganti impuls penuh atas persetujuan user.
+- Input `InpScoreFibMode` (OFF / SHADOW / ACTIVE, default SHADOW); enum `ENUM_SDB_COMPONENT_MODE` untuk komponen Fase 5 berikutnya. SHADOW mencatat `signal_scores` FIB dengan `active = 0` dan konteks `fib_level`, `fib_ratio`, tanpa mengubah skor gerbang; ACTIVE menaikkan maksimum ke 70.
+- Runner: bug run "selesai" 1 detik tanpa backtest saat terminal uji dari run sebelumnya belum tertutup (Start-Process hanya meneruskan /config ke instance itu). Kini runner menunggu terminal uji mati sebelum setiap run (maks 120 detik, lalu ENV) dan menandai backtest GAGAL bila tidak ada sesi DB baru.
+- Uji: TC-FIB-01..13, TC-SG-22b, 24b, 28, 29, SC-18, TS-72.
+
+Backtest IS + OOS (sesi 964–987): trade **identik** dengan acuan v1.19 di semua simbol (IS 493, PF 1,06; OOS 52, PF 1,07); satu-satunya selisih adalah swap XAU (−21,69 vs −21,91 USC, tarif swap server berubah). Laporan FIB bayangan: IS FIB 0 = 392 trade +0,032R, FIB > 0 = 101 trade sekitar +0,015R; OOS FIB 0 = 37 trade −0,152R, FIB > 0 = 15 trade sekitar +0,57R. Status aktivasi PC-25: `SAMPEL KURANG` (nilai 15 hanya 3 trade). Usulan untuk spec 22: membandingkan FIB > 0 vs 0, bukan nilai tertinggi vs 0.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-06): build 0 error / 0 warning (5 target); unit 616/616; 27 skenario PASS (SC-00..SC-18); durasi 16 menit 35 detik. pytest `sdbot/tools` 103/103, `schema.py check` OK (data versi 4).
+
 ### 1.19 — 2026-10-06 — spec 17 alat ukur in-sample / out-of-sample (Fase 5)
 
 - Skema data v4: `signal_scores.active` (1 = ikut skor gerbang, 0 = komponen bayangan Fase 5), default 1; Logger mengisinya. Strategi tidak berubah dari 1.18. Keputusan PC-26.

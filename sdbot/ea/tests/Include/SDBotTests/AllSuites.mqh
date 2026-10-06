@@ -42,6 +42,7 @@
 #include <SDBotTests/Suites/TestFilterRules.mqh>
 #include <SDBotTests/Suites/TestExposureRules.mqh>
 #include <SDBotTests/Suites/TestNewsRules.mqh>
+#include <SDBotTests/Suites/TestFibRules.mqh>
 
 void RunAllSuites()
   {
@@ -81,6 +82,7 @@ void RunAllSuites()
    RunTestFilterRules();
    RunTestExposureRules();
    RunTestNewsRules();
+   RunTestFibRules();
   }
 
 #endif // SDB_SDBOTTESTS_ALLSUITES_MQH

@@ -176,6 +176,15 @@
 #define SDB_DEF_NEWS_MEDIUM_MIN       0        // PC-24: medium tidak diblokir secara default
 #define SDB_MAX_NEWS_MIN              240
 #define SDB_DEF_NEWS_CSV              "sdbot_calendar.csv"
+
+//--- Skor Fibonacci (spec 18, PRD skor konfluensi): level terdekat, pengurangan linear sesuai jarak
+#define SDB_SCORE_MAX_FIB             15
+#define SDB_FIB_LEVELS                4        // 0.382, 0.5, 0.618, 0.786
+#define SDB_FIB_SCORE_HIGH            15       // level 0.5 / 0.618
+#define SDB_FIB_SCORE_LOW             8        // level 0.382 / 0.786
+#define SDB_FIB_TOLERANCE             0.05     // jarak rasio saat skor turun ke 0
+#define SDB_FIB_MIN_RATIO             0.236    // di bawahnya zona terlalu dangkal di leg
+#define SDB_FIB_MAX_RATIO             1.0      // di atasnya zona di luar leg
 #define SDB_NEWS_REFRESH_SEC          900      // kalender live dimuat ulang tiap 15 menit
 
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol
