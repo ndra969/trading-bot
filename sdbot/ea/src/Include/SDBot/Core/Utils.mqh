@@ -126,6 +126,11 @@ void LogWarn(const string module, const string msg)     { SdbLog(SDB_LOG_WARN, m
 void LogError(const string module, const string msg)    { SdbLog(SDB_LOG_ERROR, module, msg); }
 void LogCritical(const string module, const string msg) { SdbLog(SDB_LOG_CRITICAL, module, msg); }
 
+// Jam throttle log: detik waktu nyata monoton sejak sistem start. Bukan TimeLocal(): di Strategy Tester TimeLocal()
+// mengikuti waktu simulasi, sehingga "sekali per menit" menjadi sekali per menit simulasi (bug 2026-10-07: 42 ribu WARN
+// "histori kurang" dalam backtest 2 bulan). Nilainya hanya untuk selisih, bukan tanggal.
+datetime SdbThrottleNow() { return (datetime)(GetTickCount64() / 1000); }
+
 // Untuk pesan yang bisa berulang tiap tick/detik (misalnya "trading tidak diizinkan").
 void LogThrottled(const ENUM_SDB_LOG_LEVEL level, const string key, const int intervalSec,
                   const string module, const string msg)
@@ -133,7 +138,7 @@ void LogThrottled(const ENUM_SDB_LOG_LEVEL level, const string key, const int in
    if(level < g_sdbLogLevel)
       return;
    int suppressed = 0;
-   if(g_sdbLogThrottle.Allow(key, TimeLocal(), intervalSec, suppressed))
+   if(g_sdbLogThrottle.Allow(key, SdbThrottleNow(), intervalSec, suppressed))
       SdbLog(level, module, FormatSuppressed(msg, suppressed));
   }
 

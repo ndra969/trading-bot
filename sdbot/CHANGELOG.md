@@ -4,6 +4,15 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.24 — 2026-10-07 — perbaikan: spam log di Strategy Tester
+
+- Bug: `LogThrottled` memakai `TimeLocal()`, yang di Strategy Tester mengikuti waktu simulasi. Pesan "sekali per menit" tercetak sekali per menit simulasi: backtest IS + OOS v1.23 menulis 676 ribu WARN "histori kurang ... analisis ditunda" selama pemanasan histori H4.
+- Perbaikan: jam throttle `SdbThrottleNow()` = waktu nyata monoton (`GetTickCount64`). Berlaku untuk semua pemanggil `LogThrottled`; di live perilaku sama.
+- Bukti: run EURUSDc 2024-04..2024-06 OHLC M1: WARN 42.151 → 4, baris jurnal 48.820 → 6.673. Uji TC-CU-17.
+- `periods.ini`: catatan bahwa IS efektif mulai 2024-05-01..05-13 untuk sebagian besar simbol (pemanasan H4 sejak histori 2024-03-26; BTC dan XAU sejak April).
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-07): build 0 error / 0 warning; unit 661/661; 30 skenario PASS (SC-00..SC-21); durasi 30 menit 41 detik (dijalankan bersamaan dengan pengecekan lain).
+
 ### 1.23 — 2026-10-07 — spec 21 skor RSI divergence bayangan (Fase 5)
 
 - `Strategies/RsiRules.mqh` (fungsi murni): divergence reguler di dua swing sinyal terakhir H1 (BUY lower low harga + higher low RSI, SELL cerminannya), selisih RSI ≥ 2, swing kedua ≤ 20 bar dari kandidat = 5. RSI **hanya skor**, tidak pernah tahap tolak; bot Python memakai RSI sebagai gerbang (6.773 penolakan vs 6 kontribusi).

@@ -259,6 +259,15 @@ void RunTestCoreUtilsLogAndUtil()
 
    AssertStrEq("TC-CU-16", "ErrText memberi kode error", ErrText(4756), "err=4756");
 
+   // TC-CU-17 (bug 2026-10-07: 676 ribu WARN "histori kurang" dalam backtest): jam throttle log = waktu nyata
+   // monoton, bukan TimeLocal() yang di Strategy Tester mengikuti waktu simulasi.
+   datetime th1 = SdbThrottleNow();
+   datetime th2 = SdbThrottleNow();
+   bool tester = MQLInfoInteger(MQL_TESTER) != 0;
+   AssertTrue("TC-CU-17", StringFormat("jam throttle %I64d -> %I64d, TimeLocal %s, tester %s", (long)th1, (long)th2, TimeToString(TimeLocal()),
+                                       tester ? "ya" : "tidak"),
+              th2 >= th1 && (!tester || MathAbs((double)((long)th1 - (long)TimeLocal())) > 86400.0 * 365));
+
    // TC-LG-01: level INFO tidak mencetak DEBUG; baris yang dicetak mengikuti format.
    SdbSetLogLevel(SDB_LOG_INFO);
    SdbLogCaptureStart();

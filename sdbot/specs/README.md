@@ -80,7 +80,7 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overv
 | 21 | [ea-21-rsi-divergence](ea-21-rsi-divergence/) | Skor RSI divergence, mode bayangan | 17 | suite RsiRules ALL PASS; laporan IS/OOS | **Done** 2026-10-07 (v1.23; entry identik, lot bergeser 1 step karena swap; RSI jarang, IS lebih buruk, SAMPEL KURANG; sesi 1157–1180) |
 | 22 | ea-22-score-calibration | Aktivasi komponen terbukti, ambang baru, DoD Fase 5 | 18–21 | backtest IS + OOS ≥ acuan v1.18 di OOS | Belum mulai |
 
-Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, 22 = `1.24` (Fase 5 selesai).
+Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, perbaikan throttle log `1.24`, 22 = `1.25` (Fase 5 selesai).
 
 ## Fase berikutnya
 
