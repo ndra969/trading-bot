@@ -120,7 +120,65 @@ def _cell(g: Group | None, min_n: int) -> str:
     )
 
 
-def render(groups: dict[tuple[str, str], list[Group]], min_n: int = MIN_N) -> str:
+def merge_groups(
+    parts: list[dict[tuple[str, str], list[Group]]]
+) -> dict[tuple[str, str], list[Group]]:
+    """Gabung hasil group_trades beberapa rentang sesi (misalnya IS+OOS dan REAL yang tidak berurutan)."""
+    acc: dict[tuple[str, str, float], Group] = {}
+    for part in parts:
+        for (comp, period), groups in part.items():
+            for g in groups:
+                t = acc.setdefault(
+                    (comp, period, g.score), Group(comp, g.active, g.score, 0, 0, 0.0)
+                )
+                t.n += g.n
+                t.wins += g.wins
+                t.total_r += g.total_r
+                t.active = t.active or g.active
+    out: dict[tuple[str, str], list[Group]] = defaultdict(list)
+    for (comp, period, _), g in sorted(acc.items()):
+        out[(comp, period)].append(g)
+    return dict(out)
+
+
+MIN_IS_V2 = 50  # spec 22 Req 1.2
+MIN_OOS_V2 = 10
+
+
+def pos_zero(groups: list[Group]) -> tuple[Group, Group]:
+    """Gabungan kelompok nilai > 0 dan kelompok nilai 0 (spec 22 aturan v2)."""
+    pos = Group("", False, 1.0, 0, 0, 0.0)
+    zero = Group("", False, 0.0, 0, 0, 0.0)
+    for g in groups:
+        t = pos if g.score > 0 else zero
+        t.n += g.n
+        t.wins += g.wins
+        t.total_r += g.total_r
+    return pos, zero
+
+
+def verdict_v2(
+    is_g: list[Group],
+    oos_g: list[Group],
+    real_g: list[Group] | None,
+    min_is: int = MIN_IS_V2,
+    min_oos: int = MIN_OOS_V2,
+) -> str:
+    """Spec 22 Req 1: nilai > 0 lebih baik dari 0 di IS dan OOS (sampel minimum), dan tidak lebih buruk di REAL."""
+    ip, iz = pos_zero(is_g)
+    op, oz = pos_zero(oos_g)
+    if min(ip.n, iz.n) < min_is or min(op.n, oz.n) < min_oos:
+        return "SAMPEL KURANG"
+    if not (ip.r_per_trade > iz.r_per_trade and op.r_per_trade > oz.r_per_trade):
+        return "TIDAK"
+    if real_g:
+        rp, rz = pos_zero(real_g)
+        if rp.n and rz.n and rp.r_per_trade < rz.r_per_trade:
+            return "TIDAK"
+    return "TERBUKTI"
+
+
+def render(groups: dict[tuple[str, str], list[Group]], min_n: int = MIN_N, rule: str = "v2") -> str:
     comps = sorted({c for c, _ in groups})
     periods = [p for p in PERIOD_ORDER if any(per == p for _, per in groups)]
     head = f"{'nilai':>6} " + " ".join(f"{p + ' n  win%  R/trade  R':>24}" for p in periods)
@@ -134,8 +192,22 @@ def render(groups: dict[tuple[str, str], list[Group]], min_n: int = MIN_N) -> st
             lines.append(
                 f"{score:>6g} " + " ".join(_cell(by[p].get(score), min_n) for p in periods)
             )
-        status = verdict(groups.get((comp, "IS"), []), groups.get((comp, "OOS"), []), min_n)
-        lines.append(f"status aktivasi (PC-25): {status}")
+        if rule == "pc25":
+            status = verdict(groups.get((comp, "IS"), []), groups.get((comp, "OOS"), []), min_n)
+            lines.append(f"status aktivasi (PC-25): {status}")
+        else:
+            parts = []
+            for p in periods:
+                pz, zz = pos_zero(groups.get((comp, p), []))
+                parts.append(
+                    f"{p}: >0 n={pz.n} R/tr {pz.r_per_trade:+.3f} vs 0 n={zz.n} R/tr {zz.r_per_trade:+.3f}"
+                )
+            lines.append("> 0 vs 0 | " + " | ".join(parts))
+            real = groups.get((comp, "REAL"))
+            status = verdict_v2(groups.get((comp, "IS"), []), groups.get((comp, "OOS"), []), real)
+            lines.append(
+                f"status aktivasi (v2, IS >= {MIN_IS_V2} / OOS >= {MIN_OOS_V2}, REAL tidak memburuk): {status}"
+            )
         lines.append("")
     lines.append(f"* = sampel kecil (< {min_n} trade)")
     return "\n".join(lines)
@@ -167,17 +239,29 @@ def render_candidates(dist: dict[tuple[str, str], dict[float, int]]) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--db", required=True, type=Path)
-    ap.add_argument("--sessions", required=True, help="rentang id sesi A-B (inklusif)")
+    ap.add_argument(
+        "--sessions", required=True, help="rentang id sesi A-B (inklusif), beberapa dipisah koma"
+    )
     ap.add_argument("--periods", type=Path)
     ap.add_argument("--min-n", type=int, default=MIN_N)
     ap.add_argument("--candidates", action="store_true")
+    ap.add_argument(
+        "--rule",
+        choices=("v2", "pc25"),
+        default="v2",
+        help="aturan aktivasi (spec 22 v2, atau PC-25 lama)",
+    )
     args = ap.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     try:
-        first, last = (int(x) for x in args.sessions.split("-", 1))
+        ranges = [
+            tuple(int(x) for x in part.split("-", 1)) for part in args.sessions.split(",") if part
+        ]
+        if not ranges or any(len(r) != 2 for r in ranges):
+            raise ValueError
     except ValueError:
-        print("[component] --sessions harus berbentuk A-B")
+        print("[component] --sessions harus berbentuk A-B[,C-D...]")
         return 2
     try:
         conn = sqlite3.connect(f"file:{args.db.as_posix()}?mode=ro", uri=True)
@@ -186,12 +270,23 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         if args.candidates:
-            print(render_candidates(candidate_distribution(conn, first, last)))
+            dist: dict[tuple[str, str], dict[float, int]] = defaultdict(dict)
+            for first, last in ranges:
+                for key, vals in candidate_distribution(conn, first, last).items():
+                    for score, n in vals.items():
+                        dist[key][score] = dist[key].get(score, 0) + n
+            print(render_candidates(dict(dist)))
         else:
             periods = (
                 load_periods(args.periods)[0] if args.periods and args.periods.exists() else []
             )
-            print(render(group_trades(conn, first, last, periods), args.min_n))
+            print(
+                render(
+                    merge_groups([group_trades(conn, a, b, periods) for a, b in ranges]),
+                    args.min_n,
+                    args.rule,
+                )
+            )
     finally:
         conn.close()
     return 0

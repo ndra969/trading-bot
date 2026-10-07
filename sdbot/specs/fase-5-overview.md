@@ -1,6 +1,6 @@
 # Fase 5 — Konfirmasi: overview
 
-Status: Approved (2026-10-05)
+Status: Done (2026-10-08)
 Sumber: PRD-EA §Skor konfluensi, §Pengujian dan kriteria penerimaan (tahap 2–3), §Roadmap Fase 5, §Temuan review (mode entry Adaptive); [python-bot-lessons.md](python-bot-lessons.md) §1; PC-15 (filter candle klimaks ke Fase 5); backtest dasar v1.18 (12 simbol, 2025-10..2026-10, OHLC M1, sesi DB 868–879)
 
 Fase 5 menambahkan empat komponen skor konfirmasi PRD: Fibonacci (15), trendline (15), breakout & retest (10), dan RSI divergence (5). PRD meminta komponen ditambah satu per satu, dan masing-masing harus terbukti memperbaiki hasil forward test. Karena itu setiap komponen lebih dulu dicatat tanpa memengaruhi entry (mode bayangan), lalu diaktifkan hanya bila data out-of-sample mendukung.

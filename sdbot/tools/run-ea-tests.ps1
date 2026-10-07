@@ -43,6 +43,8 @@
     Bersama -Baseline: ganti tanggal akhir di BL-*.ini (yyyy.MM.dd).
 .PARAMETER Model
     Bersama -Baseline: ganti model tester (0 every tick, 1 OHLC M1, 4 every tick real ticks).
+.PARAMETER SetInput
+    Bersama -Baseline: ganti input preset, misalnya -SetInput 'InpMinConfluenceScore=60','InpScoreBreakoutMode=2' (spec 22).
 .PARAMETER Symbols
     Batasi -Baseline ke simbol tertentu, misalnya -Symbols EURUSDc,XAUUSDc (kriteria jumlah tetap sama).
 .PARAMETER SkipBuild
@@ -67,6 +69,7 @@ param(
     [string]$FromDate = '',
     [string]$ToDate = '',
     [int]$Model = -1,
+    [string[]]$SetInput = @(),
     [switch]$SkipBuild,
     [int]$TimeoutSec = 0,
     [string]$Config = ''
@@ -257,6 +260,11 @@ function Invoke-TesterRun($r) {
         if ($ToDate) { $tester['ToDate'] = $ToDate }
         if ($Model -ge 0) { $tester['Model'] = [string]$Model }
         $setLines = @(Get-Content -LiteralPath $r.Set -Encoding ASCII | Where-Object { $_ -notmatch '^\s*;' })
+        # Spec 22: -SetInput 'Kunci=nilai' mengganti kunci preset yang sama (sapuan ambang, aktivasi komponen).
+        foreach ($kv in @($SetInput | ForEach-Object { $_ -split ',' } | Where-Object { $_ -match '=' })) {
+            $key = ($kv -split '=', 2)[0].Trim()
+            $setLines = @($setLines | Where-Object { $_ -notmatch ('^\s*' + [regex]::Escape($key) + '\s*=') }) + $kv.Trim()
+        }
     }
     elseif ($r.Kind -eq 'scenario') {
         $tester['Expert'] = 'SDBotTests\SDBotHarness.ex5'

@@ -4,6 +4,18 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+### PC-27: Hasil Fase 5 — aturan aktivasi v2, tidak ada komponen aktif
+- Status: Open
+- Tanggal disetujui: 2026-10-08
+- Dokumen: PRD-EA §Skor konfluensi, §Pengujian dan kriteria penerimaan, §Roadmap (Fase 5)
+- Sumber: spec `ea-22-score-calibration` (sesi DB 1260–1355), keputusan user 2026-10-07 (lanjut prosedur)
+- Perubahan:
+    - Aturan aktivasi komponen konfirmasi (menggantikan aturan PC-25): kelompok bernilai > 0 vs 0 (R per trade), lebih baik di in-sample (≥ 50 trade per kelompok) **dan** out-of-sample (≥ 10), dan tidak lebih buruk di periode real ticks 2026-01..10. Lolos aturan ini belum cukup: konfigurasi akhir wajib divalidasi (PF out-of-sample ≥ acuan).
+    - Hasil: hanya breakout & retest yang lolos aturan (IS +0,097R vs −0,014R; OOS +0,356R vs −0,082R; real ticks +0,151R vs −0,152R), tetapi saat diaktifkan (maksimum 65, ambang 60% dari sapuan IS) hasil memburuk di semua periode (OOS PF 0,97 vs 1,07; real ticks PF 0,74 vs 0,91), karena komposisi trade berubah. Keputusan: keempat komponen tetap mode bayangan (dicatat untuk data live), ambang tetap 65% dari 55.
+    - Strategi dasar dengan real ticks Jan–Okt 2026: 167 trade, −0,045R per trade, PF 0,91. Target PRD tahap 2 (PF ≥ 1,3) belum tercapai; perbaikan strategi inti (zona, tren, exit) menjadi pekerjaan berikutnya dengan disiplin IS → OOS → real ticks.
+    - Filter candle klimaks (PC-15) dan mode entry Adaptive/Limit tidak diterapkan di Fase 5; ditinjau bersama perbaikan strategi inti.
+    - Fase 5 selesai 2026-10-08 (EA 1.24).
+
 ## Done
 ### PC-26: Skema data v4, `signal_scores.active`
 - Status: Done (2026-10-06, PRD-EA rev 66, PRD-Backoffice rev 21)

@@ -4,6 +4,16 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### Fase 5 selesai — 2026-10-08 — spec 22 aktivasi komponen (tanpa perubahan EA, tetap 1.24)
+
+- `component_report.py --rule v2` (default): kelompok > 0 vs 0 per periode IS / OOS / REAL; TERBUKTI bila lebih baik di IS (≥ 50 trade) dan OOS (≥ 10) dan tidak lebih buruk di real ticks. `--sessions` menerima beberapa rentang. `run-ea-tests.ps1 -SetInput 'Kunci=nilai',...` untuk backtest dasar. Uji TS-76..80.
+- Data real ticks (REAL 2026-01..10, sesi 1260–1271): strategi dasar 167 trade, −0,045R per trade, PF 0,91.
+- Keputusan aktivasi (aturan v2): hanya breakout & retest TERBUKTI (IS +0,097R vs −0,014R; OOS +0,356R vs −0,082R; REAL +0,151R vs −0,152R). Fibonacci dan trendline TIDAK, RSI sampel kurang.
+- Sapuan ambang IS dengan breakout ACTIVE: 55% 610 trade +0,002R; **60%** 506 +0,001R (terpilih, aturan terkunci); 65% 431 −0,011R; 70% 317 +0,030R (jumlah trade kurang).
+- Validasi akhir breakout ACTIVE + ambang 60%: IS +0,001R PF 1,01; OOS −0,016R PF 0,97 (< acuan 1,07); REAL −0,148R PF 0,74 (acuan 0,91). **Gagal**: aktivasi mengubah komposisi trade sehingga keunggulan breakout di mode bayangan tidak terbawa. Semua komponen tetap SHADOW, ambang tetap 65%; default EA dan preset tidak berubah. Keputusan PC-27.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-08): build 0 error / 0 warning (5 target); unit 661/661; 30 skenario PASS (SC-00..SC-21); durasi 21 menit 53 detik. pytest `sdbot/tools` 111/111, `schema.py check` OK (data versi 4).
+
 ### 1.24 — 2026-10-07 — perbaikan: spam log di Strategy Tester
 
 - Bug: `LogThrottled` memakai `TimeLocal()`, yang di Strategy Tester mengikuti waktu simulasi. Pesan "sekali per menit" tercetak sekali per menit simulasi: backtest IS + OOS v1.23 menulis 676 ribu WARN "histori kurang ... analisis ditunda" selama pemanasan histori H4.

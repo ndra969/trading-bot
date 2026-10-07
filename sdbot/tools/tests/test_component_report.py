@@ -125,3 +125,60 @@ def test_ts69_candidates_distribution(tmp_path: Path) -> None:
     assert dist[("FIB", "NO_PA_TRIGGER")] == {8.0: 2}
     text = cr.render_candidates(dist)
     assert "NO_PA_TRIGGER" in text and "FIB" in text
+
+
+def _v(score: float, n: int, total_r: float) -> cr.Group:
+    return cr.Group("BREAKOUT", False, score, n, n // 2, total_r)
+
+
+def test_ts76_verdict_v2_proven() -> None:
+    is_g = [_v(0, 300, -3.0), _v(10, 60, 6.0)]
+    oos_g = [_v(0, 40, -2.0), _v(10, 12, 3.0)]
+    real_g = [_v(0, 30, 0.0), _v(10, 8, 1.0)]
+    assert cr.verdict_v2(is_g, oos_g, real_g) == "TERBUKTI"
+    assert cr.verdict_v2(is_g, oos_g, None) == "TERBUKTI"
+
+
+def test_ts77_verdict_v2_small_oos() -> None:
+    is_g = [_v(0, 300, -3.0), _v(10, 60, 6.0)]
+    oos_g = [_v(0, 40, -2.0), _v(10, 8, 3.0)]
+    assert cr.verdict_v2(is_g, oos_g, None) == "SAMPEL KURANG"
+    # beberapa nilai > 0 digabung: 7 + 8 = 15 trade
+    oos_multi = [_v(0, 40, -2.0), _v(7, 7, 1.0), _v(15, 8, 2.0)]
+    assert (
+        cr.verdict_v2([_v(0, 300, -3.0), _v(7, 30, 1.0), _v(15, 30, 4.0)], oos_multi, None)
+        == "TERBUKTI"
+    )
+
+
+def test_ts78_verdict_v2_real_worse() -> None:
+    is_g = [_v(0, 300, -3.0), _v(10, 60, 6.0)]
+    oos_g = [_v(0, 40, -2.0), _v(10, 12, 3.0)]
+    real_bad = [_v(0, 30, 3.0), _v(10, 8, -2.0)]
+    assert cr.verdict_v2(is_g, oos_g, real_bad) == "TIDAK"
+    oos_bad = [_v(0, 40, 4.0), _v(10, 12, -1.0)]
+    assert cr.verdict_v2(is_g, oos_bad, None) == "TIDAK"
+
+
+def test_ts79_render_v2_summary(tmp_path: Path) -> None:
+    db = _db(tmp_path)
+    ini = tmp_path / "p.ini"
+    ini.write_text(PERIODS, encoding="utf-8")
+    conn = sqlite3.connect(db)
+    groups = cr.group_trades(conn, 0, 10, cr.load_periods(ini)[0])
+    conn.close()
+    text = cr.render(groups, rule="v2")
+    assert "> 0 vs 0" in text
+    assert "IS: >0 n=2" in text and "0 n=1" in text
+    assert "status aktivasi (v2" in text
+
+
+def test_ts80_render_pc25_still_available(tmp_path: Path) -> None:
+    db = _db(tmp_path)
+    ini = tmp_path / "p.ini"
+    ini.write_text(PERIODS, encoding="utf-8")
+    conn = sqlite3.connect(db)
+    groups = cr.group_trades(conn, 0, 10, cr.load_periods(ini)[0])
+    conn.close()
+    text = cr.render(groups, rule="pc25")
+    assert "status aktivasi (PC-25)" in text and "> 0 vs 0" not in text

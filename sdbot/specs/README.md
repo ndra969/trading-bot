@@ -69,7 +69,7 @@ Versi EA: 14 = `1.15`, 15 = `1.16`, 16 = `1.17` (Fase 4 selesai). Perbaikan bug 
 
 ## Fase 5 — Konfirmasi
 
-Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overview.md](fase-5-overview.md) (Approved 2026-10-05, PC-25).
+Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overview.md](fase-5-overview.md) (Done 2026-10-08, PC-25, PC-27).
 
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
@@ -78,9 +78,9 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overv
 | 19 | [ea-19-trendline](ea-19-trendline/) | Skor trendline dengan kemiringan searah sinyal, mode bayangan | 17 | suite TrendlineRules ALL PASS; laporan IS/OOS | **Done** 2026-10-06 (v1.21; trade identik; TRENDLINE tidak lebih baik, SAMPEL KURANG; sesi 1027–1051) |
 | 20 | [ea-20-breakout-retest](ea-20-breakout-retest/) | Skor breakout & retest, mode bayangan | 17 | suite BreakoutRules ALL PASS; laporan IS/OOS | **Done** 2026-10-07 (v1.22; trade identik; BREAKOUT +0,097R vs −0,014R IS, +0,356R vs −0,083R OOS, SAMPEL KURANG; sesi 1091–1114) |
 | 21 | [ea-21-rsi-divergence](ea-21-rsi-divergence/) | Skor RSI divergence, mode bayangan | 17 | suite RsiRules ALL PASS; laporan IS/OOS | **Done** 2026-10-07 (v1.23; entry identik, lot bergeser 1 step karena swap; RSI jarang, IS lebih buruk, SAMPEL KURANG; sesi 1157–1180) |
-| 22 | ea-22-score-calibration | Aktivasi komponen terbukti, ambang baru, DoD Fase 5 | 18–21 | backtest IS + OOS ≥ acuan v1.18 di OOS | Belum mulai |
+| 22 | [ea-22-score-calibration](ea-22-score-calibration/) | Aktivasi komponen terbukti, ambang baru, DoD Fase 5 | 18–21 | backtest IS + OOS ≥ acuan v1.18 di OOS | **Done** 2026-10-08 (tanpa perubahan EA, tetap 1.24; breakout lolos aturan v2 tetapi aktivasi memperburuk IS/OOS/REAL; semua SHADOW; PC-27) |
 
-Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, perbaikan throttle log `1.24`, 22 = `1.25` (Fase 5 selesai).
+Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, perbaikan throttle log `1.24`; spec 22 tanpa perubahan EA (Fase 5 selesai di 1.24, 2026-10-08).
 
 ## Fase berikutnya
 
