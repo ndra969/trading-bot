@@ -54,6 +54,7 @@ struct InputValues
    ENUM_SDB_COMPONENT_MODE scoreFibMode;  // spec 18: skor Fibonacci OFF / SHADOW / ACTIVE
    ENUM_SDB_COMPONENT_MODE scoreTrendlineMode; // spec 19
    ENUM_SDB_COMPONENT_MODE scoreBreakoutMode;  // spec 20
+   ENUM_SDB_COMPONENT_MODE scoreRsiMode;       // spec 21
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -123,6 +124,7 @@ InputValues DefaultInputValues()
    v.scoreFibMode = SDB_COMPONENT_SHADOW;
    v.scoreTrendlineMode = SDB_COMPONENT_SHADOW;
    v.scoreBreakoutMode = SDB_COMPONENT_SHADOW;
+   v.scoreRsiMode = SDB_COMPONENT_SHADOW;
    return v;
   }
 
@@ -200,6 +202,7 @@ void IrCheckSignals(const InputValues &v, string &errors)
    IrCheckRange("InpScoreFibMode", (int)v.scoreFibMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
    IrCheckRange("InpScoreTrendlineMode", (int)v.scoreTrendlineMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
    IrCheckRange("InpScoreBreakoutMode", (int)v.scoreBreakoutMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
+   IrCheckRange("InpScoreRsiMode", (int)v.scoreRsiMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
   }
 
 void IrCheckClassLimit(const string name, const int value, string &errors)

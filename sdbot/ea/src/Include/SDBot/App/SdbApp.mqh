@@ -60,6 +60,7 @@ private:
    CClosureTracker   m_closureTracker;
    CReconciler       m_reconciler;
    int               m_atrHandle;      // ATR trailing di LTF gaya trading (spec 06 Req 4.3)
+   int               m_rsiHandle;      // RSI(14) MTF untuk skor divergence (spec 21); INVALID_HANDLE = tidak dipakai
    bool              m_storageOpened;
    bool              m_stateReady;
    bool              m_timerSet;
@@ -157,13 +158,20 @@ private:
       ses.tokyo = cfg.inputs.sessionTokyo;
       ses.london = cfg.inputs.sessionLondon;
       ses.newYork = cfg.inputs.sessionNewYork;
+      // Spec 21: handle RSI dibuat sekali bila komponen tidak OFF; gagal = degrade aman (skor RSI 0), bukan INIT_FAILED.
+      if(cfg.signalsOn && cfg.inputs.scoreRsiMode != SDB_COMPONENT_OFF)
+        {
+         m_rsiHandle = iRSI(_Symbol, mtf, SDB_RSI_PERIOD, PRICE_CLOSE);
+         if(m_rsiHandle == INVALID_HANDLE)
+            LogWarn("App", "handle iRSI tidak bisa dibuat, skor RSI 0 | " + ErrText(GetLastError()));
+        }
       if(cfg.inputs.maxSpreadPoints <= 0 && MQLInfoInteger(MQL_TESTER) == 0)
          LogWarn("App", "InpMaxSpreadPoints 0: filter spread mati (preset per simbol mengisi batasnya)");
       m_signals.Init(_Symbol, cfg.inputs.magic, ltf, sp, GetPointer(m_structure), GetPointer(m_zones), GetPointer(m_trigger),
                      GetPointer(m_riskState), GetPointer(m_riskManager), GetPointer(m_executor), GetPointer(m_account), m_sink,
                      cfg.style, ses, cfg.inputs.testerUtcOffsetHours, cfg.signalsOn ? GetPointer(m_news) : NULL,
                      cfg.inputs.scoreFibMode, cfg.inputs.scoreTrendlineMode,
-                     cfg.inputs.scoreBreakoutMode);
+                     cfg.inputs.scoreBreakoutMode, cfg.inputs.scoreRsiMode, m_rsiHandle);
      }
 
    void SendSnapshot()
@@ -309,7 +317,7 @@ private:
      }
 
 public:
-                     CSdbApp(void) : m_sink(NULL), m_transport(NULL), m_notifyOn(false), m_startSent(false), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
+                     CSdbApp(void) : m_sink(NULL), m_transport(NULL), m_notifyOn(false), m_startSent(false), m_riskReady(false), m_atrHandle(INVALID_HANDLE), m_rsiHandle(INVALID_HANDLE), m_storageOpened(false), m_stateReady(false), m_timerSet(false),
                      m_deinitDone(false), m_lastSnapshot(0), m_lastTouch(0) {}
 
    // Urutan init (Req 6.1). observer: perekam harness / sink uji, menerima event di samping Logger.
@@ -435,6 +443,9 @@ public:
       if(m_atrHandle != INVALID_HANDLE)
          IndicatorRelease(m_atrHandle);
       m_atrHandle = INVALID_HANDLE;
+      if(m_rsiHandle != INVALID_HANDLE)
+         IndicatorRelease(m_rsiHandle);
+      m_rsiHandle = INVALID_HANDLE;
       if(m_notifyOn)
         {
          if(m_startSent)

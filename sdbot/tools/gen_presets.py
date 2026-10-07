@@ -127,6 +127,7 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpScoreFibMode", "1"),  # SDB_COMPONENT_SHADOW (spec 18)
     ("InpScoreTrendlineMode", "1"),  # SDB_COMPONENT_SHADOW (spec 19)
     ("InpScoreBreakoutMode", "1"),  # SDB_COMPONENT_SHADOW (spec 20)
+    ("InpScoreRsiMode", "1"),  # SDB_COMPONENT_SHADOW (spec 21)
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),
     ("InpTelegramChatID", ""),

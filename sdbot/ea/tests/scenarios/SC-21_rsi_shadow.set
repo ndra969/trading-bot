@@ -1,0 +1,7 @@
+; SC-21: keempat komponen konfirmasi (Fibonacci, trendline, breakout, RSI) dicatat sebagai bayangan; RSI bukan gerbang.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-21
+HarnessEveryBars=0
+HarnessPipeline=true

@@ -178,6 +178,12 @@ def test_ts74_score_breakout_mode_shadow():
         assert _read(symbol).get("InpScoreBreakoutMode") == "1", symbol
 
 
+def test_ts75_score_rsi_mode_shadow():
+    """Spec 21 Req 4.1: skor RSI divergence default mode bayangan (PC-25)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpScoreRsiMode") == "1", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

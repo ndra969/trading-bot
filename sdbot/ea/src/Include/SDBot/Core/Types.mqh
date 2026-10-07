@@ -475,6 +475,17 @@ struct SdbBreakoutResult
    string            reason;          // "" = ada
   };
 
+// Hasil skor RSI divergence satu kandidat (spec 21, Strategies/RsiRules.mqh).
+struct SdbRsiResult
+  {
+   int               score;           // 0 atau 5
+   bool              have;            // ada dua swing sinyal
+   double            rsiDiff;         // poin RSI, + = searah divergence
+   double            priceDiffAtr;    // |harga swing 2 - swing 1| / ATR
+   int               ageBars;         // n - indeks swing kedua
+   string            reason;          // "" = ada dua swing
+  };
+
 struct SdbSignalFacts
   {
    ENUM_SDB_DIR      dir;             // arah bias HTF = arah kandidat
@@ -505,6 +516,8 @@ struct SdbSignalFacts
    SdbTrendlineResult tl;
    ENUM_SDB_COMPONENT_MODE boMode;    // spec 20
    SdbBreakoutResult bo;
+   ENUM_SDB_COMPONENT_MODE rsiMode;   // spec 21
+   SdbRsiResult      rsi;
   };
 
 struct SdbStops
@@ -527,6 +540,7 @@ struct SdbDecision
    int               fibScore;        // spec 18: dicatat di semua mode != OFF, ikut total hanya ACTIVE
    int               tlScore;         // spec 19: sama dengan fibScore
    int               boScore;         // spec 20
+   int               rsiScore;        // spec 21 (hanya skor, tidak pernah tahap tolak)
    int               total;
    int               maxActive;
    double            pct;
@@ -559,6 +573,8 @@ struct SignalRecord
    ENUM_SDB_COMPONENT_MODE trendlineMode;
    int               scoreBreakout;   // spec 20
    ENUM_SDB_COMPONENT_MODE breakoutMode;
+   int               scoreRsi;        // spec 21
+   ENUM_SDB_COMPONENT_MODE rsiMode;
   };
 
 // Laporan harian (spec 09 design §4.1-4.2).

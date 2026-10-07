@@ -4,6 +4,24 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.23 — 2026-10-07 — spec 21 skor RSI divergence bayangan (Fase 5)
+
+- `Strategies/RsiRules.mqh` (fungsi murni): divergence reguler di dua swing sinyal terakhir H1 (BUY lower low harga + higher low RSI, SELL cerminannya), selisih RSI ≥ 2, swing kedua ≤ 20 bar dari kandidat = 5. RSI **hanya skor**, tidak pernah tahap tolak; bot Python memakai RSI sebagai gerbang (6.773 penolakan vs 6 kontribusi).
+- Handle `iRSI(MTF, 14)` milik `CSdbApp` (pola ATR trailing): dibuat bila sinyal aktif dan `InpScoreRsiMode` bukan OFF, dilepas di `OnDeinit`; gagal = WARN dan skor RSI 0, EA tetap jalan. `RsiCopyAligned` menyalin RSI berdasarkan waktu bar cache zona (wajib tepat n nilai); data tidak sejajar = skor 0 dengan WARN paling sering sekali sehari.
+- Input `InpScoreRsiMode` (OFF / SHADOW / ACTIVE, default SHADOW); konteks `rsi_age`, `rsi_diff`, `rsi_pdiff`; `signal_scores` RSI (maks 5); maksimum 100 bila keempat komponen aktif (PRD).
+- Uji: TC-RSI-01..11 (TC-RSI-11 memakai handle nyata di tester), TC-SG-22e, 24e, 33, 34 (RSI tidak mengubah tahap tolak), SC-21.
+
+Backtest IS + OOS (sesi 1157–1180, 1 jam 13 menit): waktu entry, arah, SL/TP, dan harga close identik dengan v1.22. Tarif swap server berubah lagi, sehingga saldo bergeser beberapa sen dan sebagian lot berbeda satu step (misalnya 53,94 → 53,95); profit total berbeda sen. Laporan RSI bayangan:
+
+| Periode | RSI 0 | RSI 5 |
+|---|---|---|
+| IS | 477 trade, +0,039R | 16 trade, −0,274R |
+| OOS | 50 trade, −0,015R | 2 trade, +1,314R |
+
+Divergence jarang (ACCEPTED bernilai 5 = 3,3%, kandidat 3,9%). Status PC-25 `SAMPEL KURANG`; di IS justru lebih buruk.
+
+Regresi (`run-ea-tests.ps1 -All`, 2026-10-07): build 0 error / 0 warning (5 target); unit 660/660; 30 skenario PASS (SC-00..SC-21); durasi 19 menit 58 detik. pytest `sdbot/tools` 106/106, `schema.py check` OK (data versi 4).
+
 ### 1.22 — 2026-10-07 — spec 20 skor breakout & retest bayangan (Fase 5)
 
 - `Strategies/BreakoutRules.mqh` (fungsi murni): level = swing fractal H1 sisi sinyal (BUY swing high, SELL swing low) dalam 100 bar; breakout = close pertama sesudah bar konfirmasi swing yang menembus level searah ≥ 0,1 ATR (wick saja tidak dihitung); breakout gagal (close kembali melewati level > 0,2 ATR) membuang level; level di zona ± 0,2 ATR = 10; breakout terbaru dipilih. Bot Python punya layer breakout yang tidak pernah dipanggil; di sini keterhubungannya dibuktikan TC-SG-32 (ACTIVE mengubah `SCORE_TOO_LOW` menjadi lolos) dan SC-20 (nilai 10 dan 0 muncul di pipeline).

@@ -27,11 +27,13 @@ flowchart TB
     ST --> OK([INIT_SUCCEEDED])
 ```
 
+Modul sinyal (bila sinyal aktif): struktur, zona, trigger PA, filter berita, lalu handle `iRSI(MTF, 14)` bila `InpScoreRsiMode` bukan OFF (spec 21). Handle RSI yang gagal dibuat hanya menghasilkan WARN; skor RSI menjadi 0 dan EA tetap jalan.
+
 `EnsureState` (juga dicoba ulang dari timer selama akun PENDING): `CState` → `CRiskState` (nilai awal aman) → `CRiskMonitor.OnStateReady` (baseline operasi saldo, `STATE_RESET`, reset emergency, operasi saldo tertunda) → snapshot akun dengan puncak equity → `CReconciler.Run` (posisi terbuka `RECONCILED`, deal yang terlewat).
 
 ```mermaid
 flowchart LR
     D([OnDeinit]) --> X{sudah deinit?}
     X -->|ya| Z([selesai])
-    X -->|tidak| K[EventKillTimer] --> L[log alasan] --> I[IndicatorRelease ATR] --> DR[SendStop, Drain: Critical lalu stop maks 2 detik, lepas lease pemimpin] --> ES[EndSession alasan] --> C[CLogger.Close: flush terakhir] --> Z
+    X -->|tidak| K[EventKillTimer] --> L[log alasan] --> I[IndicatorRelease ATR dan RSI] --> DR[SendStop, Drain: Critical lalu stop maks 2 detik, lepas lease pemimpin] --> ES[EndSession alasan] --> C[CLogger.Close: flush terakhir] --> Z
 ```

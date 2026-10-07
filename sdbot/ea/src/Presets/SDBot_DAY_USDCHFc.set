@@ -50,6 +50,7 @@ InpNewsCsvFile=sdbot_calendar.csv
 InpScoreFibMode=1
 InpScoreTrendlineMode=1
 InpScoreBreakoutMode=1
+InpScoreRsiMode=1
 InpTelegramToken=
 InpTelegramChatID=
 InpHeartbeatMinutes=60

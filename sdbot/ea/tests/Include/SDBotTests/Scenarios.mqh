@@ -1281,6 +1281,27 @@ void CheckSc20(const string id, const CScenarioRecorder &rec)
               ten >= 1 && zero >= 1 && noLevel == 0);
   }
 
+// SC-21 (spec 21 Req 1.1, 3.2, 4.2): empat komponen bayangan untuk setiap sinyal; score_total tetap ZONE + TREND + PA;
+// RSI 5 dan 0 sama-sama muncul; tidak ada penolakan yang menyebut RSI (RSI bukan gerbang; daftar reject_stage dijaga CHECK skema).
+void CheckSc21(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals s WHERE s.session_id IN (" + rec.SessionIdList() + ")";
+   string rsi = "(SELECT c.score FROM signal_scores c WHERE c.signal_id = s.id AND c.component='RSI' AND c.active=0)";
+   long sig = ScDbCount("SELECT COUNT(*)" + w);
+   long missing = ScDbCount("SELECT COUNT(*)" + w + " AND (SELECT COUNT(*) FROM signal_scores c WHERE c.signal_id = s.id AND c.active=0 "
+                            "AND c.component IN ('FIB','TRENDLINE','BREAKOUT','RSI')) <> 4");
+   long badTotal = ScDbCount("SELECT COUNT(*)" + w + " AND s.score_total <> (SELECT SUM(c.score) FROM signal_scores c WHERE c.signal_id = s.id "
+                             "AND c.component IN ('ZONE','TREND','PA'))");
+   AssertTrue(id + "-shadow", StringFormat("%I64d sinyal; tanpa 4 komponen bayangan %I64d; score_total beda dari ZONE+TREND+PA %I64d", sig,
+                                           missing, badTotal),
+              sig >= 1 && missing == 0 && badTotal == 0);
+   long five = ScDbCount("SELECT COUNT(*)" + w + " AND " + rsi + " = 5");
+   long zero = ScDbCount("SELECT COUNT(*)" + w + " AND " + rsi + " = 0");
+   long gate = ScDbCount("SELECT COUNT(*)" + w + " AND (UPPER(COALESCE(s.reject_stage, '')) LIKE '%RSI%' OR UPPER(COALESCE(s.reject_detail, '')) LIKE '%RSI%')");
+   AssertTrue(id + "-values", StringFormat("RSI 5: %I64d, 0: %I64d, penolakan menyebut RSI: %I64d", five, zero, gate),
+              five >= 1 && zero >= 1 && gate == 0);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1366,6 +1387,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc19(id, rec);
    else if(id == "SC-20")
       CheckSc20(id, rec);
+   else if(id == "SC-21")
+      CheckSc21(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

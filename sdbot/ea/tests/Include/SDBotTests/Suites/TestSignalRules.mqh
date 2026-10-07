@@ -114,6 +114,9 @@ SdbSignalFacts SgF0()
    f.boMode = SDB_COMPONENT_OFF;
    ZeroMemory(f.bo);
    f.bo.reason = "";
+   f.rsiMode = SDB_COMPONENT_OFF;
+   ZeroMemory(f.rsi);
+   f.rsi.reason = "";
    return f;
   }
 
@@ -302,7 +305,7 @@ void RunTestSignalMisc()
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,"
+   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
                    "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
@@ -310,7 +313,7 @@ void RunTestSignalMisc()
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,"
+   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
             "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
 
@@ -323,6 +326,48 @@ void RunTestSignalMisc()
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
    AssertTrue("TC-SG-22b", "konteks Fibonacci bayangan: " + json,
               StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"max_active\":55,") >= 0);
+  }
+
+// TC-SG-22e/33/34 (spec 21 Req 2.5, 3, 4.3): konteks RSI; maksimum 100; RSI tidak pernah mengubah tahap tolak di SHADOW.
+void RunTestSignalRsi()
+  {
+   SdbSignalFacts f = SgF0();
+   f.rsiMode = SDB_COMPONENT_SHADOW;
+   f.rsi.score = 5;
+   f.rsi.have = true;
+   f.rsi.rsiDiff = 5.0;
+   f.rsi.priceDiffAtr = 1.0;
+   f.rsi.ageBars = 10;
+   SdbDecision d = SgEval(f);
+   string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-22e", "konteks RSI bayangan: " + json,
+              StringFind(json, "\"rsi_age\":10,\"rsi_diff\":5.0,\"rsi_pdiff\":1.00,") >= 0 && d.total == 44 && d.rsiScore == 5);
+
+   f = SgF0();
+   f.trendScore = 15;
+   f.fib.score = 15;
+   f.tl.score = 15;
+   f.tl.touches = 3;
+   f.bo.score = 10;
+   f.rsi.score = 5;
+   f.fibMode = SDB_COMPONENT_ACTIVE;
+   f.tlMode = SDB_COMPONENT_ACTIVE;
+   f.boMode = SDB_COMPONENT_ACTIVE;
+   f.rsiMode = SDB_COMPONENT_ACTIVE;
+   SdbDecision all = SgEval(f);
+   AssertTrue("TC-SG-33", StringFormat("4 komponen ACTIVE: %d/%d", all.total, all.maxActive), all.total == 97 && all.maxActive == 100);
+
+   f = SgF0();
+   f.rsiMode = SDB_COMPONENT_SHADOW;
+   f.rsi.score = 0;
+   string p0 = SgEval(f).stage;
+   f.rsi.score = 5;
+   string p5 = SgEval(f).stage;
+   f.zone.status = SDB_ZONE_TESTED;
+   f.trendScore = 0;                               // 15 + 0 + 7 = 22/55: SCORE_TOO_LOW
+   string low = SgEval(f).stage;
+   AssertTrue("TC-SG-34", "RSI bayangan 0/5: '" + p0 + "' / '" + p5 + "'; skor rendah + RSI 5: " + low,
+              p0 == p5 && p0 != SDB_REJECT_STAGE_SCORE_TOO_LOW && low == SDB_REJECT_STAGE_SCORE_TOO_LOW);
   }
 
 // TC-SG-22d/31/32 (spec 20 Req 2.3, 3.3, 4.2): konteks breakout; maksimum 95; breakout ACTIVE mengubah tahap tolak.
@@ -491,6 +536,7 @@ void RunTestSignalRules()
    RunTestSignalFib();
    RunTestSignalTrendline();
    RunTestSignalBreakout();
+   RunTestSignalRsi();
    TfEndSuite();
   }
 

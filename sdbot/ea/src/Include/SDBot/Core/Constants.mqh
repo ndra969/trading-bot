@@ -198,6 +198,13 @@
 #define SDB_BO_SCORE                  10
 #define SDB_BO_MIN_BREAK_ATR          0.1      // close wajib melewati level sejauh ini
 #define SDB_BO_TOL_ATR                0.2      // toleransi retest dan breakout gagal
+
+//--- Skor RSI divergence (spec 21, PRD: divergence searah = 5; hanya skor, bukan gerbang)
+#define SDB_SCORE_MAX_RSI             5
+#define SDB_RSI_SCORE                 5
+#define SDB_RSI_PERIOD                14
+#define SDB_RSI_MIN_DIFF              2.0      // poin RSI
+#define SDB_RSI_MAX_AGE               20       // bar MTF dari swing kedua ke kandidat; lebih lama = basi
 #define SDB_NEWS_REFRESH_SEC          900      // kalender live dimuat ulang tiap 15 menit
 
 //--- Trigger price action (spec 12 design §3.3, PC-18): ambang relatif ATR(14) LTF dari ukuran M15 12 simbol

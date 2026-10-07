@@ -104,6 +104,11 @@ void ActiveConfirmations(const SdbSignalFacts &f, int &bonus, int &extraMax)
       bonus += f.bo.score;
       extraMax += SDB_SCORE_MAX_BREAKOUT;
      }
+   if(f.rsiMode == SDB_COMPONENT_ACTIVE)
+     {
+      bonus += f.rsi.score;
+      extraMax += SDB_SCORE_MAX_RSI;
+     }
   }
 
 // Skor selalu dihitung; tahap tolak pertama dalam urutan PRD (Req 2.2–2.4, 3.1). Lot dan eksekusi di engine.
@@ -122,6 +127,7 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
    d.fibScore = (f.fibMode == SDB_COMPONENT_OFF) ? 0 : f.fib.score;
    d.tlScore = (f.tlMode == SDB_COMPONENT_OFF) ? 0 : f.tl.score;
    d.boScore = (f.boMode == SDB_COMPONENT_OFF) ? 0 : f.bo.score;
+   d.rsiScore = (f.rsiMode == SDB_COMPONENT_OFF) ? 0 : f.rsi.score;   // RSI tidak punya tahap tolak (spec 21 Req 3)
    int bonus, extraMax;
    ActiveConfirmations(f, bonus, extraMax);
    d.total += bonus;
@@ -192,7 +198,7 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
   {
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
                  "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio", "tl_dist", "tl_slope",
-                 "tl_touches", "bo_age", "bo_dist", "bo_level"};
+                 "tl_touches", "bo_age", "bo_dist", "bo_level", "rsi_age", "rsi_diff", "rsi_pdiff"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -222,6 +228,10 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    v[20] = bo ? IntegerToString(f.bo.ageBars) : "null";
    v[21] = bo ? DoubleToString(f.bo.distAtr, 2) : "null";
    v[22] = bo ? DoubleToString(f.bo.level, f.digits) : "null";
+   bool rs = f.rsiMode != SDB_COMPONENT_OFF && f.rsi.have;
+   v[23] = rs ? IntegerToString(f.rsi.ageBars) : "null";
+   v[24] = rs ? DoubleToString(f.rsi.rsiDiff, 1) : "null";
+   v[25] = rs ? DoubleToString(f.rsi.priceDiffAtr, 2) : "null";
    return CanonicalJson(k, v);
   }
 
