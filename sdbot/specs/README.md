@@ -89,7 +89,7 @@ Use case, hipotesis, aturan uji, dan keputusan: [fase-5b-overview.md](fase-5b-ov
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
 | 23 | [ea-23-fresh-zones](ea-23-fresh-zones/) | H1: entry hanya dari zona Fresh | 22 | IS/OOS/REAL vs acuan v1.24 | **Done** 2026-10-08 (v1.25; H1 DITERIMA: IS +0,046R PF 1,10, OOS +0,156R PF 1,36, REAL +0,030R PF 1,06; PC-29) |
-| 24 | ea-24-breakeven-tuning | H2: breakeven lebih awal (0,5 / 0,75 / 1,0R) | 23 | IS/OOS/REAL vs acuan sesudah 23 | Belum mulai |
+| 24 | [ea-24-breakeven-tuning](ea-24-breakeven-tuning/) | H2: breakeven lebih awal (0,5 / 0,75 / 1,0R) | 23 | IS/OOS/REAL vs acuan v1.25 | **Done** 2026-10-08 (H2 DITOLAK: IS BE 0,5 +0,023R, BE 0,75 +0,021R vs acuan +0,046R; trailing dini memotong winner; EA tetap 1.25; alat `exit_report.py`) |
 | 25 | ea-25-session-window | H3: jendela entry dipersempit | 24 | IS/OOS/REAL vs acuan sesudah 24 | Belum mulai |
 
 ## Fase berikutnya

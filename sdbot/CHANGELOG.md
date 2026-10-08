@@ -4,6 +4,12 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### Spec 24 breakeven lebih awal (H2 ditolak) — 2026-10-08 — tanpa perubahan EA, tetap 1.25
+
+- Alat `tools/exit_report.py`: per rentang sesi, trade, R per trade, PF, jumlah dan R rata-rata per alasan tutup, SL yang sempat MFE ≥ 0,5R, jumlah `MODIFY_FAILED`. Uji TS-84..87.
+- IS (acuan v1.25, `InpBreakevenR` 1,0: 341 trade, +0,046R, PF 1,10): BE 0,5 342 trade, +0,023R, PF 1,07; BE 0,75 342 trade, +0,021R, PF 1,05. Tidak ada varian lebih baik, OOS/REAL tidak dijalankan; default tetap 1,0.
+- Penyebab: BE lebih awal memotong SL (166 → 117 pada 0,5) tetapi trailing ATR yang mulai sesudah BE ikut aktif lebih awal dan memotong winner (TRAIL_STOP 97 × +0,90R → 78 × +0,62R, TP 45 → 31). Memisahkan pemicu trailing dari BE butuh perubahan kode dan PRD; kandidat spec terpisah.
+
 ### 1.25 — 2026-10-08 — spec 23 entry hanya dari zona Fresh (H1 diterima)
 
 - Input `InpAllowTestedZones` (default `false`): kandidat dari zona Tested ditolak `NO_VALID_ZONE` dengan detail `zona TESTED (InpAllowTestedZones=false)`, sesudah pre-filter risiko dan sebelum berita; skor tetap dicatat. `inputs_json` 53 kunci; preset 12 simbol. Uji TC-SG-35..37, TC-SU-04c, TS-81, SC-22.
