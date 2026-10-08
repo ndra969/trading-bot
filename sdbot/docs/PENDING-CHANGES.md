@@ -4,19 +4,9 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
-### PC-28: Fase 5b perbaikan strategi inti (pembagian spec, aturan uji, kriteria jumlah trade)
-- Status: Open
-- Tanggal disetujui: 2026-10-08
-- Dokumen: PRD-EA §Roadmap (Fase 5b sebelum Fase 6), §Pengujian dan kriteria penerimaan
-- Sumber: [fase-5b-overview.md](../specs/fase-5b-overview.md) §3–§6, keputusan 1–5
-- Perubahan:
-    - Fase 5b (sesudah Fase 5, sebelum Fase 6): tiga perbaikan strategi inti diuji berurutan dan kumulatif. Spec 23: entry hanya dari zona Fresh (1.25). Spec 24: breakeven lebih awal (1.26). Spec 25: jendela entry dipersempit (1.27).
-    - Aturan uji: pengembangan dan pemilihan varian hanya di in-sample; varian terpilih wajib lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; yang gagal tidak diterapkan dan dicatat.
-    - Kriteria jumlah trade backtest dasar Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol (menggantikan PC-22 untuk filter kualitas Fase 5b).
-    - Filter arah dan bobot tren tidak diubah di Fase 5b. Mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24.
-
+## Done
 ### PC-29: Entry hanya dari zona Fresh (spec 23, H1 diterima)
-- Status: Open
+- Status: Done (2026-10-08, PRD-EA rev 71)
 - Tanggal disetujui: 2026-10-08 (aturan keputusan spec 23 Req 3.1, disetujui bersama spec)
 - Dokumen: PRD-EA §Aturan zona Supply & Demand, §Parameter input EA
 - Sumber: spec `ea-23-fresh-zones` task 3; sesi IS 1396–1407, OOS 1408–1419, REAL 1420–1431
@@ -26,7 +16,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Bukti (OHLC M1 IS/OOS, real ticks REAL; acuan v1.24): IS 341 trade +0,046R PF 1,10 (acuan 493, +0,029R, 1,06); OOS 37 trade +0,156R PF 1,36 (acuan 52, +0,036R, 1,07); REAL 116 trade +0,030R PF 1,06 (acuan 167, −0,045R, 0,91).
     - Acuan Fase 5b berikutnya (spec 24) = v1.25 dengan zona Fresh saja.
 
-## Done
+### PC-28: Fase 5b perbaikan strategi inti (pembagian spec, aturan uji, kriteria jumlah trade)
+- Status: Done (2026-10-08, PRD-EA rev 71)
+- Tanggal disetujui: 2026-10-08
+- Dokumen: PRD-EA §Roadmap (Fase 5b sebelum Fase 6), §Pengujian dan kriteria penerimaan
+- Sumber: [fase-5b-overview.md](../specs/fase-5b-overview.md) §3–§6, keputusan 1–5
+- Perubahan:
+    - Fase 5b (sesudah Fase 5, sebelum Fase 6): tiga perbaikan strategi inti diuji berurutan dan kumulatif. Spec 23: entry hanya dari zona Fresh (1.25). Spec 24: breakeven lebih awal (1.26). Spec 25: jendela entry dipersempit (1.27).
+    - Aturan uji: pengembangan dan pemilihan varian hanya di in-sample; varian terpilih wajib lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; yang gagal tidak diterapkan dan dicatat.
+    - Kriteria jumlah trade backtest dasar Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol (menggantikan PC-22 untuk filter kualitas Fase 5b).
+    - Filter arah dan bobot tren tidak diubah di Fase 5b. Mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24.
+
 ### PC-27: Hasil Fase 5 — aturan aktivasi v2, tidak ada komponen aktif
 - Status: Done (2026-10-08, PRD-EA rev 68)
 - Tanggal disetujui: 2026-10-08

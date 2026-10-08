@@ -146,7 +146,7 @@ Kandidat = bar LTF tertutup yang menyentuh zona valid searah bias HTF. Setiap ka
 
 - Zona dideteksi di MTF dari swing terkonfirmasi (Fractals dengan jeda bar), bukan ZigZag yang bisa repaint.
 - Status zona: Fresh (belum disentuh), Tested (1 sentuhan), Invalid (ditembus close), Used (sudah dipakai entry).
-- Zona Fresh bernilai tertinggi. Zona dengan 2 sentuhan atau lebih dianggap lemah dan tidak dipakai.
+- Zona Fresh bernilai tertinggi. Zona dengan 2 sentuhan atau lebih dianggap lemah dan tidak dipakai. Entry hanya dari zona Fresh (sejak 1.25, `AllowTestedZones` = false): zona Tested tetap dipetakan dan diberi skor 15, tetapi kandidatnya ditolak `NO_VALID_ZONE` sesudah pre-filter risiko dan sebelum filter berita. Bukti: real ticks Jan–Okt 2026 +0,030R per trade PF 1,06 (dengan zona Tested −0,045R, PF 0,91).
 - Usia maksimal zona dalam jumlah bar MTF (default 100 bar), bukan jam.
 - Satu zona hanya boleh menghasilkan satu entry.
 - Zona dihitung ulang dari histori saat `OnInit`, tidak dimuat dari DB, agar backtest tidak bocor data.
@@ -417,6 +417,7 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Entry | `MinConfluenceScore` | 65 (% dari skor maksimum komponen aktif; Fase 3: 55, jadi skor ≥ 36) |
 | Entry | `MinRR` | 2.0 (TP ke zona lawan terdekat, atau 2R bila tidak ada) |
 | Entry | `MaxZoneAgeBars` | 100 |
+| Entry | `AllowTestedZones` | false (entry hanya dari zona Fresh; true = zona Tested boleh, untuk eksperimen) |
 | Entry | SlBufferAtr | 0.1 × ATR(14) MTF di luar batas jauh zona (SELL + spread) |
 | Entry | MinSlAtr / MaxSlAtr | 0.3 / 3.0 × ATR(14) MTF (jarak SL minimal juga ≥ stops level + spread) |
 | Analisis | SwingStrength / StructureLookback | 2 (1–5) / 100 bar (20–500) |
@@ -557,6 +558,8 @@ EA naik ke akun standar hanya setelah lolos empat tahap pengujian berikut secara
 
 Periode uji di Strategy Tester akun cent (diukur 2026-10-05): bar M1 tersedia sejak 2024-03-26, tetapi real ticks hanya sejak 2026-01-05 (XAUUSD sejak 2026-08-14); sebelum itu tester memakai tick buatan. Karena itu Fase 5 memakai in-sample 2024-04..2026-06 dan out-of-sample 2026-07..2026-10, keduanya model OHLC M1 agar sebanding (strategi tetap H4/H1/M15; M1 hanya untuk menggerakkan harga di dalam bar), plus periode real ticks 2026-01..2026-10 sebagai cek realisme sebelum aktivasi. Out-of-sample hanya dipakai menilai, tidak untuk menyetel. Target tahap 2 (3+ tahun real ticks) belum bisa dipenuhi data server ini.
 
+Aturan uji Fase 5b: varian dikembangkan dan dipilih hanya di in-sample. Varian terpilih wajib lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; yang gagal tidak diterapkan dan hasilnya dicatat. Kriteria jumlah trade backtest dasar Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol (menggantikan kriteria filter kualitas Fase 4 untuk Fase 5b).
+
 Catatan akun cent:
 
 - Mata uang akun USC. Semua aturan risiko berbasis persen, tidak boleh ada nilai tetap dalam dolar di kode.
@@ -592,6 +595,7 @@ Pengembangan dimulai dari fondasi pengaman, lalu strategi ditambah bertahap agar
 | 3. Strategi inti | Bias HTF, zona S&D, trigger PA, eksekusi | Backtest dasar 12 simbol × 12 bulan terakhir tanpa lapisan konfirmasi: tanpa error kritis, total ≥ 300 trade dan setiap simbol ≥ 15 trade, semua trade punya signal_id dengan skor lengkap, query kalibrasi menghasilkan data. Profit dinilai di Fase 5–6 |
 | 4. Filter | Berita, sesi, spread, eksposur mata uang (spec 14 sesi + spread 1.15, spec 15 eksposur 1.16, spec 16 berita 1.17) | Filter tercatat di tabel signals dengan alasan tolak; backtest dasar dengan semua filter: total ≥ 200 trade dan setiap simbol ≥ 10 trade (selesai 1.17: 215 trade, +0,058R per trade) |
 | 5. Konfirmasi | Fibonacci, trendline, breakout retest, RSI (satu per satu, mode bayangan dulu): spec 17 alat ukur IS/OOS 1.19, Fibonacci 1.20, trendline 1.21, breakout & retest 1.22, RSI 1.23, aktivasi dan ambang 1.24 | Setiap lapisan meningkatkan hasil forward test; komponen hanya aktif bila terbukti di in-sample, out-of-sample, dan real ticks. Selesai 2026-10-08 (EA 1.24): tidak ada komponen yang memperbaiki hasil saat diaktifkan, semua tetap bayangan; strategi dasar real ticks Jan–Okt 2026 PF 0,91, perbaikan strategi inti menyusul |
+| 5b. Perbaikan strategi inti | Tiga perbaikan diuji berurutan dan kumulatif: spec 23 entry hanya dari zona Fresh (1.25), spec 24 breakeven lebih awal (1.26), spec 25 jendela entry dipersempit (1.27). Filter arah dan bobot tren tidak diubah; mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24 | Setiap perbaikan diterapkan hanya bila lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; backtest dasar ≥ 150 trade per 12 bulan dan ≥ 6 trade per simbol. Spec 23 diterima 2026-10-08 (1.25): real ticks +0,030R PF 1,06, sebelumnya −0,045R PF 0,91 |
 | 6. Validasi | Forward test dan live akun cent 1–3 bulan | Kriteria penerimaan tahap 3 dan 4 terpenuhi |
 | 7. Lanjutan | Volume profile, filter AI, backoffice online | Diputuskan setelah fase 6 |
 
