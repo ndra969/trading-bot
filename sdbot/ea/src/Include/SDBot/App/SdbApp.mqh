@@ -145,6 +145,7 @@ private:
       sp.minSlAtr = cfg.inputs.minSlAtr;
       sp.maxSlAtr = cfg.inputs.maxSlAtr;
       sp.maxSpreadPoints = cfg.inputs.maxSpreadPoints;
+      sp.allowTestedZones = cfg.inputs.allowTestedZones;
       if(cfg.signalsOn)
         {
          SdbNewsParams np;

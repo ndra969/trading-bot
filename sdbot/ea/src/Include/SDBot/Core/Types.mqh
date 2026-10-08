@@ -438,6 +438,7 @@ struct SdbSignalParams
    double            minSlAtr;
    double            maxSlAtr;
    int               maxSpreadPoints; // 0 = filter spread mati (spec 14)
+   bool              allowTestedZones; // spec 23: false = zona Tested ditolak NO_VALID_ZONE
   };
 
 // Hasil skor Fibonacci satu kandidat (spec 18, Strategies/FibRules.mqh).

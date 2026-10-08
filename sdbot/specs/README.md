@@ -80,7 +80,7 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overv
 | 21 | [ea-21-rsi-divergence](ea-21-rsi-divergence/) | Skor RSI divergence, mode bayangan | 17 | suite RsiRules ALL PASS; laporan IS/OOS | **Done** 2026-10-07 (v1.23; entry identik, lot bergeser 1 step karena swap; RSI jarang, IS lebih buruk, SAMPEL KURANG; sesi 1157–1180) |
 | 22 | [ea-22-score-calibration](ea-22-score-calibration/) | Aktivasi komponen terbukti, ambang baru, DoD Fase 5 | 18–21 | backtest IS + OOS ≥ acuan v1.18 di OOS | **Done** 2026-10-08 (tanpa perubahan EA, tetap 1.24; breakout lolos aturan v2 tetapi aktivasi memperburuk IS/OOS/REAL; semua SHADOW; PC-27) |
 
-Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, perbaikan throttle log `1.24`; spec 22 tanpa perubahan EA (Fase 5 selesai di 1.24, 2026-10-08).
+Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, perbaikan throttle log `1.24`; spec 22 tanpa perubahan EA (Fase 5 selesai di 1.24, 2026-10-08); 23 = `1.25`.
 
 ## Fase 5b — Perbaikan strategi inti
 
@@ -88,7 +88,7 @@ Use case, hipotesis, aturan uji, dan keputusan: [fase-5b-overview.md](fase-5b-ov
 
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
-| 23 | [ea-23-fresh-zones](ea-23-fresh-zones/) | H1: entry hanya dari zona Fresh | 22 | IS/OOS/REAL vs acuan v1.24 | Requirements + design Approved, tasks Draft |
+| 23 | [ea-23-fresh-zones](ea-23-fresh-zones/) | H1: entry hanya dari zona Fresh | 22 | IS/OOS/REAL vs acuan v1.24 | **Done** 2026-10-08 (v1.25; H1 DITERIMA: IS +0,046R PF 1,10, OOS +0,156R PF 1,36, REAL +0,030R PF 1,06; PC-29) |
 | 24 | ea-24-breakeven-tuning | H2: breakeven lebih awal (0,5 / 0,75 / 1,0R) | 23 | IS/OOS/REAL vs acuan sesudah 23 | Belum mulai |
 | 25 | ea-25-session-window | H3: jendela entry dipersempit | 24 | IS/OOS/REAL vs acuan sesudah 24 | Belum mulai |
 

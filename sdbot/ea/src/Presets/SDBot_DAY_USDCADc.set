@@ -51,6 +51,7 @@ InpScoreFibMode=1
 InpScoreTrendlineMode=1
 InpScoreBreakoutMode=1
 InpScoreRsiMode=1
+InpAllowTestedZones=false
 InpTelegramToken=
 InpTelegramChatID=
 InpHeartbeatMinutes=60

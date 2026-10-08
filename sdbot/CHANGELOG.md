@@ -4,6 +4,12 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.25 — 2026-10-08 — spec 23 entry hanya dari zona Fresh (H1 diterima)
+
+- Input `InpAllowTestedZones` (default `false`): kandidat dari zona Tested ditolak `NO_VALID_ZONE` dengan detail `zona TESTED (InpAllowTestedZones=false)`, sesudah pre-filter risiko dan sebelum berita; skor tetap dicatat. `inputs_json` 53 kunci; preset 12 simbol. Uji TC-SG-35..37, TC-SU-04c, TS-81, SC-22.
+- Hasil (acuan v1.24): IS 341 trade, +0,046R per trade, PF 1,10 (acuan 493, +0,029R, 1,06); OOS 37 trade, +0,156R, PF 1,36 (acuan 52, +0,036R, 1,07); REAL 116 trade, +0,030R, PF 1,06 (acuan 167, −0,045R, 0,91). Lebih baik di ketiga periode, jadi default diubah (PC-29).
+- Per simbol IS masih timpang: GBPUSDc +0,466R dan USDJPYc +0,330R; GBPJPYc −0,530R dan EURJPYc −0,188R.
+
 ### Fase 5 selesai — 2026-10-08 — spec 22 aktivasi komponen (tanpa perubahan EA, tetap 1.24)
 
 - `component_report.py --rule v2` (default): kelompok > 0 vs 0 per periode IS / OOS / REAL; TERBUKTI bila lebih baik di IS (≥ 50 trade) dan OOS (≥ 10) dan tidak lebih buruk di real ticks. `--sessions` menerima beberapa rentang. `run-ea-tests.ps1 -SetInput 'Kunci=nilai',...` untuk backtest dasar. Uji TS-76..80.

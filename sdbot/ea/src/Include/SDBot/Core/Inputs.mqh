@@ -73,6 +73,7 @@ input ENUM_SDB_COMPONENT_MODE InpScoreFibMode         = SDB_COMPONENT_SHADOW;   
 input ENUM_SDB_COMPONENT_MODE InpScoreTrendlineMode   = SDB_COMPONENT_SHADOW;       // Skor trendline searah: OFF / SHADOW / ACTIVE
 input ENUM_SDB_COMPONENT_MODE InpScoreBreakoutMode    = SDB_COMPONENT_SHADOW;       // Skor breakout & retest: OFF / SHADOW / ACTIVE
 input ENUM_SDB_COMPONENT_MODE InpScoreRsiMode         = SDB_COMPONENT_SHADOW;       // Skor RSI divergence (bukan gerbang): OFF / SHADOW / ACTIVE
+input bool                   InpAllowTestedZones      = SDB_DEF_ALLOW_TESTED_ZONES; // Entry dari zona Tested (false = hanya zona Fresh)
 
 input group "Notifikasi"
 input string                 InpTelegramToken         = "";                         // Token bot Telegram (isi di *.local.set, jangan di-commit)
@@ -128,6 +129,7 @@ InputValues CurrentInputs()
    v.scoreTrendlineMode = InpScoreTrendlineMode;
    v.scoreBreakoutMode = InpScoreBreakoutMode;
    v.scoreRsiMode = InpScoreRsiMode;
+   v.allowTestedZones = InpAllowTestedZones;
    return v;
   }
 
@@ -146,7 +148,7 @@ string CurrentInputsJson()
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
                  "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
-                 "InpScoreBreakoutMode", "InpScoreRsiMode"};
+                 "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -202,6 +204,7 @@ string CurrentInputsJson()
    v[49] = JsonStr(EnumToString(InpScoreTrendlineMode));
    v[50] = JsonStr(EnumToString(InpScoreBreakoutMode));
    v[51] = JsonStr(EnumToString(InpScoreRsiMode));
+   v[52] = JsonBool(InpAllowTestedZones);
    return CanonicalJson(k, v);
   }
 

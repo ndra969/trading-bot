@@ -15,6 +15,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Kriteria jumlah trade backtest dasar Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol (menggantikan PC-22 untuk filter kualitas Fase 5b).
     - Filter arah dan bobot tren tidak diubah di Fase 5b. Mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24.
 
+### PC-29: Entry hanya dari zona Fresh (spec 23, H1 diterima)
+- Status: Open
+- Tanggal disetujui: 2026-10-08 (aturan keputusan spec 23 Req 3.1, disetujui bersama spec)
+- Dokumen: PRD-EA §Aturan zona Supply & Demand, §Parameter input EA
+- Sumber: spec `ea-23-fresh-zones` task 3; sesi IS 1396–1407, OOS 1408–1419, REAL 1420–1431
+- Perubahan:
+    - Entry hanya dari zona Fresh. Zona Tested tetap dipetakan dan diberi skor 15, tetapi kandidat dari zona Tested ditolak `NO_VALID_ZONE` (sesudah pre-filter risiko, sebelum berita).
+    - Input baru `InpAllowTestedZones` (bool, default `false`); `true` mengembalikan perilaku sebelumnya untuk eksperimen.
+    - Bukti (OHLC M1 IS/OOS, real ticks REAL; acuan v1.24): IS 341 trade +0,046R PF 1,10 (acuan 493, +0,029R, 1,06); OOS 37 trade +0,156R PF 1,36 (acuan 52, +0,036R, 1,07); REAL 116 trade +0,030R PF 1,06 (acuan 167, −0,045R, 0,91).
+    - Acuan Fase 5b berikutnya (spec 24) = v1.25 dengan zona Fresh saja.
+
 ## Done
 ### PC-27: Hasil Fase 5 — aturan aktivasi v2, tidak ada komponen aktif
 - Status: Done (2026-10-08, PRD-EA rev 68)

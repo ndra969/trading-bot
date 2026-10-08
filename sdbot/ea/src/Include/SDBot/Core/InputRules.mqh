@@ -55,6 +55,7 @@ struct InputValues
    ENUM_SDB_COMPONENT_MODE scoreTrendlineMode; // spec 19
    ENUM_SDB_COMPONENT_MODE scoreBreakoutMode;  // spec 20
    ENUM_SDB_COMPONENT_MODE scoreRsiMode;       // spec 21
+   bool              allowTestedZones;   // spec 23: false = zona Tested ditolak NO_VALID_ZONE
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -125,6 +126,7 @@ InputValues DefaultInputValues()
    v.scoreTrendlineMode = SDB_COMPONENT_SHADOW;
    v.scoreBreakoutMode = SDB_COMPONENT_SHADOW;
    v.scoreRsiMode = SDB_COMPONENT_SHADOW;
+   v.allowTestedZones = SDB_DEF_ALLOW_TESTED_ZONES;
    return v;
   }
 

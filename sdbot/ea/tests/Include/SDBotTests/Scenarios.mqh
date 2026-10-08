@@ -1302,6 +1302,26 @@ void CheckSc21(const string id, const CScenarioRecorder &rec)
               five >= 1 && zero >= 1 && gate == 0);
   }
 
+// SC-22 (spec 23 Req 1.2, 1.5): InpAllowTestedZones=false -> tidak ada ACCEPTED dari zona TESTED; ada NO_VALID_ZONE
+// yang menyebut TESTED; setiap sinyal tetap punya skor ZONE, TREND, dan PA.
+void CheckSc22(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals s WHERE s.session_id IN (" + rec.SessionIdList() + ")";
+   long sig = ScDbCount("SELECT COUNT(*)" + w);
+   long accTested = ScDbCount("SELECT COUNT(*)" + w + " AND s.status='ACCEPTED' AND json_extract(s.context_json, '$.zone_status') = 'TESTED'");
+   long rejTested = ScDbCount("SELECT COUNT(*)" + w + " AND s.reject_stage='NO_VALID_ZONE' AND s.reject_detail LIKE '%TESTED%'");
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND s.status='ACCEPTED'");
+   AssertTrue(id + "-gate", StringFormat("%I64d sinyal; ACCEPTED %I64d (dari TESTED %I64d); NO_VALID_ZONE TESTED %I64d", sig, accepted, accTested,
+                                         rejTested),
+              sig >= 1 && accTested == 0 && rejTested >= 1);
+   long missing = ScDbCount("SELECT COUNT(*)" + w + " AND (SELECT COUNT(*) FROM signal_scores c WHERE c.signal_id = s.id "
+                            "AND c.component IN ('ZONE','TREND','PA')) <> 3");
+   long badZone = ScDbCount("SELECT COUNT(*)" + w + " AND s.reject_stage='NO_VALID_ZONE' AND s.reject_detail LIKE '%TESTED%' AND "
+                            "(SELECT c.score FROM signal_scores c WHERE c.signal_id = s.id AND c.component='ZONE') <> 15");
+   AssertTrue(id + "-scores", StringFormat("tanpa skor ZONE/TREND/PA lengkap %I64d; tolak TESTED dengan ZONE <> 15: %I64d", missing, badZone),
+              missing == 0 && badZone == 0);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1389,6 +1409,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc20(id, rec);
    else if(id == "SC-21")
       CheckSc21(id, rec);
+   else if(id == "SC-22")
+      CheckSc22(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

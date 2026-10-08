@@ -139,6 +139,13 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
       d.detail = f.preDetail;
       return;
      }
+   // Spec 23: zona valid adalah gerbang, jadi dinilai sebelum berita, sesi, dan spread; skor sudah terisi.
+   if(!p.allowTestedZones && f.zone.status == SDB_ZONE_TESTED)
+     {
+      d.stage = SDB_REJECT_STAGE_NO_VALID_ZONE;
+      d.detail = "zona TESTED (InpAllowTestedZones=false)";
+      return;
+     }
    if(f.newsBlocked)
      {
       d.stage = SDB_REJECT_STAGE_NEWS_BLACKOUT;

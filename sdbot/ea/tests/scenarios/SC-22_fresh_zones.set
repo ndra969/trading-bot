@@ -1,0 +1,8 @@
+; SC-22: InpAllowTestedZones=false; tidak ada ACCEPTED dari zona TESTED, penolakan NO_VALID_ZONE menyebut TESTED, skor tetap lengkap.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpAllowTestedZones=false
+HarnessScenario=SC-22
+HarnessEveryBars=0
+HarnessPipeline=true

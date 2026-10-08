@@ -1,6 +1,6 @@
 # Design — Entry hanya dari zona Fresh (H1)
 
-Status: Approved (2026-10-08)
+Status: Done (2026-10-08)
 Requirements: [requirements.md](requirements.md) (Approved 2026-10-08; tahap tolak `NO_VALID_ZONE`, tanpa migrasi skema)
 
 ## 1. Overview

@@ -184,6 +184,12 @@ def test_ts75_score_rsi_mode_shadow():
         assert _read(symbol).get("InpScoreRsiMode") == "1", symbol
 
 
+def test_ts81_allow_tested_zones():
+    """Spec 23 Req 1.1, 3.2: InpAllowTestedZones=false di preset (H1 diterima, PC-29)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpAllowTestedZones") == "false", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

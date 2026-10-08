@@ -1,6 +1,6 @@
 # Requirements — Entry hanya dari zona Fresh (H1)
 
-Status: Approved (2026-10-08)
+Status: Done (2026-10-08)
 Use case: UC-60, UC-63 ([fase-5b-overview.md](../fase-5b-overview.md))
 Asal: PRD-EA §Aturan zona Supply & Demand (Fresh 30, Tested 15; ≥ 2 sentuhan tidak dipakai), §Skor konfluensi; PC-28 (aturan uji Fase 5b); diagnosis Fase 5 (Fresh +0,041 / +0,157 / +0,030R; Tested +0,001 / −0,264 / −0,216R di IS / OOS / REAL)
 Butuh: spec 22 (alat IS/OOS/REAL, `-SetInput`), perbaikan 1.24

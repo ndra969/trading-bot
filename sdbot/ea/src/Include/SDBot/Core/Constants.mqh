@@ -176,6 +176,7 @@
 #define SDB_DEF_NEWS_MEDIUM_MIN       0        // PC-24: medium tidak diblokir secara default
 #define SDB_MAX_NEWS_MIN              240
 #define SDB_DEF_NEWS_CSV              "sdbot_calendar.csv"
+#define SDB_DEF_ALLOW_TESTED_ZONES    false  // spec 23 (H1 diterima, PC-29): entry hanya dari zona Fresh
 
 //--- Skor Fibonacci (spec 18, PRD skor konfluensi): level terdekat, pengurangan linear sesuai jarak
 #define SDB_SCORE_MAX_FIB             15

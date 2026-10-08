@@ -25,6 +25,7 @@ SdbSignalParams TseParams()
    p.minSlAtr = v.minSlAtr;
    p.maxSlAtr = v.maxSlAtr;
    p.maxSpreadPoints = v.maxSpreadPoints;
+   p.allowTestedZones = v.allowTestedZones;
    return p;
   }
 

@@ -25,7 +25,7 @@ string TprKnownKeys()
           "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
           "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,"
           "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,"
-          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,InpScoreFibMode,InpScoreTrendlineMode,InpScoreBreakoutMode,InpScoreRsiMode,";
+          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,InpScoreFibMode,InpScoreTrendlineMode,InpScoreBreakoutMode,InpScoreRsiMode,InpAllowTestedZones,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -75,6 +75,7 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpScoreTrendlineMode")    v.scoreTrendlineMode = (ENUM_SDB_COMPONENT_MODE)StringToInteger(value);
    else if(key == "InpScoreBreakoutMode")     v.scoreBreakoutMode = (ENUM_SDB_COMPONENT_MODE)StringToInteger(value);
    else if(key == "InpScoreRsiMode")          v.scoreRsiMode = (ENUM_SDB_COMPONENT_MODE)StringToInteger(value);
+   else if(key == "InpAllowTestedZones")      v.allowTestedZones = (value == "true");
   }
 
 // "" = lolos; selain itu alasan gagal.

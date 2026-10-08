@@ -24,7 +24,8 @@ flowchart TB
     BO --> E
     RS --> E
     E --> S1{pre-filter risiko} -->|gagal| REJ
-    S1 --> NW{status berita ON dan bar dalam jendela event mata uang simbol? HIGH ±30, MEDIUM ±10 menit} -->|ya: NEWS_BLACKOUT| REJ
+    S1 --> ZT{InpAllowTestedZones = false dan zona TESTED?} -->|ya: NO_VALID_ZONE| REJ
+    ZT --> NW{status berita ON dan bar dalam jendela event mata uang simbol? HIGH ±30, MEDIUM ±10 menit} -->|ya: NEWS_BLACKOUT| REJ
     NW --> SS{sesi UTC bar diizinkan? Tokyo 00-08, London 08-17, NY 13-22; 22-24 tidak} -->|tidak: OUTSIDE_SESSION| REJ
     SS --> SPD{spread ask-bid <= InpMaxSpreadPoints? 0 = mati} -->|tidak: SPREAD_TOO_WIDE| REJ
     SPD --> S2{posisi instance terbuka?} -->|ya| REJ
@@ -42,6 +43,8 @@ flowchart TB
 ```
 
 Komponen Fibonacci (spec 18), trendline (spec 19), breakout & retest (spec 20), dan RSI divergence (spec 21) berjalan dalam mode bayangan secara default: skornya dicatat di `signal_scores` dengan `active = 0` dan di konteks (`fib_level`, `fib_ratio`, `tl_dist`, `tl_slope`, `tl_touches`, `bo_age`, `bo_dist`, `bo_level`, `rsi_age`, `rsi_diff`, `rsi_pdiff`), tetapi tidak mengubah skor gerbang atau entry. Aktivasi diputuskan dari data IS/OOS (PC-25, spec 22).
+
+Gerbang zona Tested (spec 23): bila `InpAllowTestedZones = false`, kandidat dari zona TESTED ditolak `NO_VALID_ZONE` sesudah pre-filter risiko dan sebelum berita, dengan skor tetap dicatat. Default `false` sejak 1.25 (H1 diterima, PC-29); `true` mengembalikan perilaku 1.24.
 
 Filter berita (spec 16, [news.md](news.md)) berjalan sebelum sesi dan spread; status OFF atau DISABLED tidak memblokir. Konteks sinyal mencatat `news` (ON/OFF/DISABLED) dan `news_next` (event ≥ medium terdekat dalam 24 jam, atau null).
 

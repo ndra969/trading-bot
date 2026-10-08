@@ -58,6 +58,7 @@ SdbSignalParams SgP0()
    p.minSlAtr = 0.3;
    p.maxSlAtr = 3.0;
    p.maxSpreadPoints = 0;
+   p.allowTestedZones = true;
    return p;
   }
 
@@ -328,6 +329,43 @@ void RunTestSignalMisc()
               StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"max_active\":55,") >= 0);
   }
 
+// TC-SG-35..37 (spec 23 Req 1.2-1.5, EC-03/04): zona TESTED ditolak NO_VALID_ZONE bila InpAllowTestedZones=false,
+// sesudah pre-filter risiko dan sebelum berita; skor tetap dihitung.
+void RunTestSignalTestedZones()
+  {
+   SdbSignalParams p = SgP0();
+   p.allowTestedZones = false;
+   SdbSignalFacts f = SgF0();
+   f.zone.status = SDB_ZONE_TESTED;
+   SdbDecision d;
+   EvaluateSignal(f, p, d);
+   AssertTrue("TC-SG-35", "TESTED + false: '" + d.stage + "' (" + d.detail + ") skor " + IntegerToString(d.total),
+              d.stage == SDB_REJECT_STAGE_NO_VALID_ZONE && StringFind(d.detail, "TESTED") >= 0 && d.zoneScore == 15 && d.total > 0);
+
+   SdbSignalFacts fresh = SgF0();
+   SdbDecision df;
+   EvaluateSignal(fresh, p, df);
+   SdbSignalParams on = SgP0();
+   SdbDecision dt, ref;
+   EvaluateSignal(f, on, dt);
+   SgP0();
+   EvaluateSignal(f, SgP0(), ref);
+   AssertTrue("TC-SG-36", "FRESH + false: '" + df.stage + "'; TESTED + true: '" + dt.stage + "'",
+              df.stage != SDB_REJECT_STAGE_NO_VALID_ZONE && dt.stage != SDB_REJECT_STAGE_NO_VALID_ZONE && dt.stage == ref.stage);
+
+   SdbSignalFacts st = f;
+   st.preStage = SDB_REJECT_STAGE_STOPPED;
+   SdbDecision ds;
+   EvaluateSignal(st, p, ds);
+   SdbSignalFacts nw = f;
+   nw.newsBlocked = true;
+   nw.newsDetail = "NFP USD HIGH 0m";
+   SdbDecision dn;
+   EvaluateSignal(nw, p, dn);
+   AssertTrue("TC-SG-37", "STOPPED + TESTED: '" + ds.stage + "'; TESTED + berita: '" + dn.stage + "'",
+              ds.stage == SDB_REJECT_STAGE_STOPPED && dn.stage == SDB_REJECT_STAGE_NO_VALID_ZONE);
+  }
+
 // TC-SG-22e/33/34 (spec 21 Req 2.5, 3, 4.3): konteks RSI; maksimum 100; RSI tidak pernah mengubah tahap tolak di SHADOW.
 void RunTestSignalRsi()
   {
@@ -537,6 +575,7 @@ void RunTestSignalRules()
    RunTestSignalTrendline();
    RunTestSignalBreakout();
    RunTestSignalRsi();
+   RunTestSignalTestedZones();
    TfEndSuite();
   }
 
