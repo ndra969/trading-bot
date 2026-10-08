@@ -4,8 +4,9 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+## Done
 ### PC-27: Hasil Fase 5 — aturan aktivasi v2, tidak ada komponen aktif
-- Status: Open
+- Status: Done (2026-10-08, PRD-EA rev 68)
 - Tanggal disetujui: 2026-10-08
 - Dokumen: PRD-EA §Skor konfluensi, §Pengujian dan kriteria penerimaan, §Roadmap (Fase 5)
 - Sumber: spec `ea-22-score-calibration` (sesi DB 1260–1355), keputusan user 2026-10-07 (lanjut prosedur)
@@ -16,7 +17,6 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
     - Filter candle klimaks (PC-15) dan mode entry Adaptive/Limit tidak diterapkan di Fase 5; ditinjau bersama perbaikan strategi inti.
     - Fase 5 selesai 2026-10-08 (EA 1.24).
 
-## Done
 ### PC-26: Skema data v4, `signal_scores.active`
 - Status: Done (2026-10-06, PRD-EA rev 66, PRD-Backoffice rev 21)
 - Tanggal disetujui: 2026-10-05
