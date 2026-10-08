@@ -82,6 +82,16 @@ Use case, pembagian spec, arsitektur, strategi uji, dan keputusan: [fase-5-overv
 
 Versi EA: 17 = `1.19`, 18 = `1.20`, 19 = `1.21`, 20 = `1.22`, 21 = `1.23`, perbaikan throttle log `1.24`; spec 22 tanpa perubahan EA (Fase 5 selesai di 1.24, 2026-10-08).
 
+## Fase 5b — Perbaikan strategi inti
+
+Use case, hipotesis, aturan uji, dan keputusan: [fase-5b-overview.md](fase-5b-overview.md) (Approved 2026-10-08, PC-28).
+
+| # | Spec | Isi | Butuh | Bukti selesai | Status |
+|---|---|---|---|---|---|
+| 23 | [ea-23-fresh-zones](ea-23-fresh-zones/) | H1: entry hanya dari zona Fresh | 22 | IS/OOS/REAL vs acuan v1.24 | Requirements + design Approved, tasks Draft |
+| 24 | ea-24-breakeven-tuning | H2: breakeven lebih awal (0,5 / 0,75 / 1,0R) | 23 | IS/OOS/REAL vs acuan sesudah 23 | Belum mulai |
+| 25 | ea-25-session-window | H3: jendela entry dipersempit | 24 | IS/OOS/REAL vs acuan sesudah 24 | Belum mulai |
+
 ## Fase berikutnya
 
 Spec detail (requirements, design, tasks) dibuat saat fase sebelumnya selesai. Catatan awal di bawah memastikan hal penting dari PRD dan dari bot Python tidak hilang, dan Fase 1 sudah menyiapkan tempatnya.

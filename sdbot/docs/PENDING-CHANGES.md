@@ -4,6 +4,17 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+### PC-28: Fase 5b perbaikan strategi inti (pembagian spec, aturan uji, kriteria jumlah trade)
+- Status: Open
+- Tanggal disetujui: 2026-10-08
+- Dokumen: PRD-EA §Roadmap (Fase 5b sebelum Fase 6), §Pengujian dan kriteria penerimaan
+- Sumber: [fase-5b-overview.md](../specs/fase-5b-overview.md) §3–§6, keputusan 1–5
+- Perubahan:
+    - Fase 5b (sesudah Fase 5, sebelum Fase 6): tiga perbaikan strategi inti diuji berurutan dan kumulatif. Spec 23: entry hanya dari zona Fresh (1.25). Spec 24: breakeven lebih awal (1.26). Spec 25: jendela entry dipersempit (1.27).
+    - Aturan uji: pengembangan dan pemilihan varian hanya di in-sample; varian terpilih wajib lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; yang gagal tidak diterapkan dan dicatat.
+    - Kriteria jumlah trade backtest dasar Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol (menggantikan PC-22 untuk filter kualitas Fase 5b).
+    - Filter arah dan bobot tren tidak diubah di Fase 5b. Mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24.
+
 ## Done
 ### PC-27: Hasil Fase 5 — aturan aktivasi v2, tidak ada komponen aktif
 - Status: Done (2026-10-08, PRD-EA rev 68)

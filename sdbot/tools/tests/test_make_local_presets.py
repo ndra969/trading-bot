@@ -17,6 +17,8 @@ PRESET = (
     "InpTelegramToken=\n"
     "InpTelegramChatID=\n"
     "InpHeartbeatMinutes=60\n"
+    "InpAllowLiveTrading=false\n"
+    "InpRiskPerTradePct=0.5\n"
 )
 
 
@@ -90,3 +92,21 @@ def test_ts45_output_never_contains_token(repo: Path, capsys: pytest.CaptureFixt
     out = capsys.readouterr()
     assert TOKEN not in out.out + out.err
     assert "123456" not in out.out + out.err
+
+
+def test_ts82_live_and_risk_overrides(repo: Path):
+    """Pengumpulan data akun cent (2026-10-08): --live dan --risk mengisi preset pribadi saja."""
+    assert _run(repo, "--live", "--risk", "0.1") == 0
+    text = (repo / "Presets" / "SDBot_DAY_EURUSDc.local.set").read_text(encoding="ascii")
+    assert "InpAllowLiveTrading=true" in text and "InpRiskPerTradePct=0.1" in text
+    repo_preset = (repo / "Presets" / "SDBot_DAY_EURUSDc.set").read_text(encoding="ascii")
+    assert "InpAllowLiveTrading=false" in repo_preset and "InpRiskPerTradePct=0.5" in repo_preset
+    assert (
+        _run(repo, "--risk", "5") == 1
+    )  # di luar 0 < x <= 1: ditolak, tidak ada yang ditulis ulang
+
+
+def test_ts83_default_keeps_safe_values(repo: Path):
+    assert _run(repo) == 0
+    text = (repo / "Presets" / "SDBot_DAY_GBPUSDc.local.set").read_text(encoding="ascii")
+    assert "InpAllowLiveTrading=false" in text and "InpRiskPerTradePct=0.5" in text
