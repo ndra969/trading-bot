@@ -100,6 +100,8 @@ SdbSignalFacts SgF0()
    f.oppositeProximal = 0.0;
    f.session = "OVERLAP";
    f.sessionAllowed = true;
+   f.sessionInWindow = true;
+   f.sessionEndHour = 22;
    f.spreadPoints = 10;
    f.newsBlocked = false;
    f.newsDetail = "";
@@ -515,6 +517,7 @@ void RunTestSignalFilters()
   {
    SdbSignalFacts f = SgF0();
    f.sessionAllowed = false;
+   f.sessionInWindow = false;
    f.session = "OFF";
    string s1 = SgEval(f).stage;
    string d1 = SgEval(f).detail;
@@ -562,6 +565,32 @@ void RunTestSignalNews()
               s2 == SDB_REJECT_STAGE_STOPPED && s3 == SDB_REJECT_STAGE_NEWS_BLACKOUT);
   }
 
+// TC-SG-38 (spec 25 Req 1.2, EC-09): sesi diizinkan tetapi lewat jam akhir -> OUTSIDE_SESSION dengan jam_akhir;
+// sesi mati -> detail tanpa jam_akhir; berita lebih dulu dari sesi.
+void RunTestSignalEndHour()
+  {
+   SdbSignalFacts f = SgF0();
+   f.session = "NEWYORK";
+   f.sessionAllowed = false;
+   f.sessionInWindow = true;
+   f.sessionEndHour = 17;
+   SdbDecision a = SgEval(f);
+   SdbSignalFacts off = SgF0();
+   off.session = "TOKYO";
+   off.sessionAllowed = false;
+   off.sessionInWindow = false;
+   off.sessionEndHour = 17;
+   SdbDecision b = SgEval(off);
+   SdbSignalFacts nw = f;
+   nw.newsBlocked = true;
+   nw.newsDetail = "CPI USD HIGH 5m";
+   SdbDecision c = SgEval(nw);
+   AssertTrue("TC-SG-38", "lewat jam akhir: " + a.stage + " (" + a.detail + "); sesi mati: (" + b.detail + "); + berita: " + c.stage,
+              a.stage == SDB_REJECT_STAGE_OUTSIDE_SESSION && StringFind(a.detail, "sesi=NEWYORK") >= 0 &&
+              StringFind(a.detail, "jam_akhir=17") >= 0 && b.stage == SDB_REJECT_STAGE_OUTSIDE_SESSION &&
+              StringFind(b.detail, "jam_akhir") < 0 && c.stage == SDB_REJECT_STAGE_NEWS_BLACKOUT);
+  }
+
 void RunTestSignalRules()
   {
    TfBeginSuite("SignalRules");
@@ -576,6 +605,7 @@ void RunTestSignalRules()
    RunTestSignalBreakout();
    RunTestSignalRsi();
    RunTestSignalTestedZones();
+   RunTestSignalEndHour();
    TfEndSuite();
   }
 

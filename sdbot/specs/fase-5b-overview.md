@@ -1,6 +1,6 @@
 # Fase 5b — Perbaikan strategi inti: overview
 
-Status: Approved (2026-10-08)
+Status: Done (2026-10-09)
 Sumber: diagnosis sesudah Fase 5 (spec 22, PC-27; sesi DB 1157–1180 untuk IS/OOS v1.23 dan 1260–1271 untuk REAL v1.24); PRD-EA §Aturan zona, §Position management, §Parameter input; PC-21 (sesi UTC); PRD §Pengujian (tahap 2–3); permintaan user 2026-10-07: hasil backtest jelek berarti strategi dan spec diperbaiki
 
 Fase 5 menunjukkan bahwa komponen konfirmasi tidak memperbaiki hasil. Strategi dasarnya sendiri belum profitable dengan real ticks: Jan–Okt 2026, 167 trade, −0,045R per trade, PF 0,91. Fase 5b menguji tiga perbaikan pada strategi inti, satu per satu, dengan disiplin yang sama dengan Fase 5:
@@ -72,3 +72,15 @@ Usulan saya dalam kurung.
 3. **Kriteria jumlah trade Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol** (IS 26 bulan: ≥ 325 total, ≥ 13 per simbol). Dengan H1 saja, IS sekitar 340 trade. Alternatif: tetap PC-22; H1 hampir pasti gagal hanya karena jumlah, bukan kualitas.
 4. **Filter arah dan bobot tren tidak disentuh** (alasan di §1).
 5. **Mode entry Adaptive/Limit dan filter klimaks ditinjau sesudah spec 24.** Keduanya bisa jadi spec 26 bila data entry masih menunjukkan masalah.
+
+## 7. Hasil Fase 5b (selesai 2026-10-09)
+
+| Spec | Hipotesis | IS (R/trade) | OOS | REAL | Keputusan |
+|---|---|---|---|---|---|
+| 23 | H1 zona Fresh saja | +0,046 vs +0,029 | +0,156 vs +0,036 | +0,030 vs −0,045 | **Diterima** (1.25, PC-29) |
+| 24 | H2 breakeven 0,5 / 0,75R | +0,023 / +0,021 vs +0,046 | — | — | Ditolak di IS (trailing ikut aktif lebih awal) |
+| 25 | H3 jam akhir entry 19 UTC | +0,066 vs +0,046 | +0,125 vs +0,156 | +0,064 vs +0,030 | Ditolak (OOS lebih buruk; input tetap ada, 1.26) |
+
+Konfigurasi akhir: zona Fresh saja, breakeven 1R, sesi London + New York sampai 22 UTC. Dibanding acuan v1.24, real ticks berubah dari −0,045R (PF 0,91) menjadi +0,030R (PF 1,06); PF masih di bawah target PRD tahap 2 (1,3).
+
+Kandidat sesudah Fase 5b: pemicu trailing yang terpisah dari BE (temuan spec 24), mode entry Limit/Adaptive dan filter candle klimaks (keputusan 5), serta jam akhir entry yang diuji ulang bila data OOS bertambah.

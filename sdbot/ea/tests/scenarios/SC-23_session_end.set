@@ -1,0 +1,8 @@
+; SC-23: InpSessionEndHourUtc=17; tidak ada ACCEPTED dengan jam bar UTC >= 17, ada OUTSIDE_SESSION jam_akhir=17, posisi tetap ditutup sesudah 17:00.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpSessionEndHourUtc=17
+HarnessScenario=SC-23
+HarnessEveryBars=0
+HarnessPipeline=true

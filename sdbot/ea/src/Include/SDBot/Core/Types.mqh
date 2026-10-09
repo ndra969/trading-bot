@@ -506,6 +506,8 @@ struct SdbSignalFacts
    double            oppositeProximal;
    string            session;         // sesi UTC bar (spec 14): TOKYO, LONDON, OVERLAP, NEWYORK, OFF
    bool              sessionAllowed;
+   bool              sessionInWindow; // spec 25: sesi diizinkan tanpa memperhitungkan jam akhir
+   int               sessionEndHour;  // spec 25: InpSessionEndHourUtc
    long              spreadPoints;    // ask - bid saat penilaian (point)
    bool              newsBlocked;     // filter berita (spec 16)
    string            newsDetail;      // event yang memblokir

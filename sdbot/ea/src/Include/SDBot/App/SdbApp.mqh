@@ -159,6 +159,7 @@ private:
       ses.tokyo = cfg.inputs.sessionTokyo;
       ses.london = cfg.inputs.sessionLondon;
       ses.newYork = cfg.inputs.sessionNewYork;
+      ses.endHourUtc = cfg.inputs.sessionEndHourUtc;
       // Spec 21: handle RSI dibuat sekali bila komponen tidak OFF; gagal = degrade aman (skor RSI 0), bukan INIT_FAILED.
       if(cfg.signalsOn && cfg.inputs.scoreRsiMode != SDB_COMPONENT_OFF)
         {

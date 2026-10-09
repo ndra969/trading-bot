@@ -1322,6 +1322,21 @@ void CheckSc22(const string id, const CScenarioRecorder &rec)
               missing == 0 && badZone == 0);
   }
 
+// SC-23 (spec 25 Req 1.2, 1.6): InpSessionEndHourUtc=17 -> tidak ada ACCEPTED dengan jam bar UTC >= 17 (tester offset 0);
+// ada OUTSIDE_SESSION dengan jam_akhir=17; posisi tetap dikelola sampai tutup sesudah 17:00 UTC.
+void CheckSc23(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string w = " FROM signals WHERE session_id IN (" + ses + ")";
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED'");
+   long acceptedLate = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED' AND (time % 86400) >= 61200");
+   long endReject = ScDbCount("SELECT COUNT(*)" + w + " AND reject_stage='OUTSIDE_SESSION' AND reject_detail LIKE '%jam_akhir=17%'");
+   AssertTrue(id + "-gate", StringFormat("ACCEPTED %I64d (jam >= 17: %I64d); OUTSIDE_SESSION jam_akhir=17: %I64d", accepted, acceptedLate, endReject),
+              accepted >= 1 && acceptedLate == 0 && endReject >= 1);
+   long lateClose = ScDbCount("SELECT COUNT(*) FROM closures WHERE session_id IN (" + ses + ") AND (closed_at % 86400) >= 61200");
+   AssertTrue(id + "-manage", StringFormat("posisi ditutup sesudah 17:00 UTC: %I64d", lateClose), lateClose >= 1);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1411,6 +1426,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc21(id, rec);
    else if(id == "SC-22")
       CheckSc22(id, rec);
+   else if(id == "SC-23")
+      CheckSc23(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

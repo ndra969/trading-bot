@@ -156,6 +156,8 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
      {
       d.stage = SDB_REJECT_STAGE_OUTSIDE_SESSION;
       d.detail = "sesi=" + f.session;
+      if(f.sessionInWindow)   // sesinya boleh, yang menolak jam akhir entry (spec 25)
+         d.detail += " jam_akhir=" + IntegerToString(f.sessionEndHour);
       return;
      }
    if(!SpreadAllowed(f.spreadPoints, p.maxSpreadPoints))

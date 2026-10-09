@@ -44,6 +44,7 @@ struct InputValues
    bool              sessionTokyo;       // filter sesi dan spread (spec 14)
    bool              sessionLondon;
    bool              sessionNewYork;
+   int               sessionEndHourUtc;  // spec 25: entry hanya bila jam bar UTC < nilai ini
    int               maxSpreadPoints;    // 0 = mati
    int               testerUtcOffsetHours;
    int               maxSameDirectionPerCurrency; // eksposur (spec 15), 0 = mati
@@ -115,6 +116,7 @@ InputValues DefaultInputValues()
    v.sessionTokyo = false;
    v.sessionLondon = true;
    v.sessionNewYork = true;
+   v.sessionEndHourUtc = SDB_DEF_SESSION_END_HOUR;
    v.maxSpreadPoints = 0;
    v.testerUtcOffsetHours = 0;
    v.maxSameDirectionPerCurrency = SDB_DEF_MAX_SAME_DIR_CCY;
@@ -198,6 +200,7 @@ void IrCheckSignals(const InputValues &v, string &errors)
       IrAdd(errors, "InpMinSlAtr (" + IrNum(v.minSlAtr) + ") harus < InpMaxSlAtr (" + IrNum(v.maxSlAtr) + ")");
    IrCheckRange("InpMaxSpreadPoints", v.maxSpreadPoints, 0, SDB_MAX_MAX_SPREAD_POINTS, errors);
    IrCheckRange("InpTesterUtcOffsetHours", v.testerUtcOffsetHours, SDB_MIN_TESTER_UTC_OFFSET_H, SDB_MAX_TESTER_UTC_OFFSET_H, errors);
+   IrCheckRange("InpSessionEndHourUtc", v.sessionEndHourUtc, SDB_MIN_SESSION_END_HOUR, SDB_MAX_SESSION_END_HOUR, errors);
    IrCheckRange("InpMaxSameDirectionPerCurrency", v.maxSameDirectionPerCurrency, 0, SDB_MAX_MAX_SAME_DIR_CCY, errors);
    IrCheckRange("InpNewsHighMinutes", v.newsHighMinutes, 0, SDB_MAX_NEWS_MIN, errors);
    IrCheckRange("InpNewsMediumMinutes", v.newsMediumMinutes, 0, SDB_MAX_NEWS_MIN, errors);

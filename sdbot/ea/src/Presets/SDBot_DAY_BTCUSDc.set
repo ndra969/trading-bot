@@ -42,6 +42,7 @@ InpMaxSlAtr=3.0
 InpSessionTokyo=false
 InpSessionLondon=true
 InpSessionNewYork=true
+InpSessionEndHourUtc=22
 InpTesterUtcOffsetHours=0
 InpNewsFilter=true
 InpNewsHighMinutes=15

@@ -35,6 +35,7 @@ SdbSessionParams TseSessions()
    s.tokyo = true;   // semua sesi: bar uji jatuh di jam berapa pun
    s.london = true;
    s.newYork = true;
+   s.endHourUtc = SDB_DEF_SESSION_END_HOUR;
    return s;
   }
 

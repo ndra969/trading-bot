@@ -4,6 +4,23 @@ Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit
 
 ## Open
 
+### PC-30: Kriteria jumlah trade khusus H3 (jendela entry)
+- Status: Open
+- Tanggal disetujui: 2026-10-09
+- Dokumen: PRD-EA §Pengujian dan kriteria penerimaan (paragraf aturan uji Fase 5b)
+- Sumber: spec `ea-25-session-window` requirements, keputusan 1 (opsi B)
+- Perubahan:
+    - Tambahan sesudah kriteria jumlah trade Fase 5b: "Untuk H3 (jendela entry, spec 25) kriteria jumlah trade backtest dasar adalah ≥ 120 trade per 12 bulan (IS ≥ 260) dan ≥ 13 per simbol, karena pemotongan jam entry pasti mengurangi trade; keputusan tetap ditentukan out-of-sample dan real ticks."
+
+### PC-31: Input jam akhir entry (spec 25, H3 ditolak)
+- Status: Open
+- Tanggal disetujui: 2026-10-09
+- Dokumen: PRD-EA §Parameter input EA, §Roadmap (baris 5b)
+- Sumber: spec `ea-25-session-window` task 4; sesi IS 1498–1521, OOS 1522–1533, REAL 1534–1545
+- Perubahan:
+    - Tabel input, baris baru sesudah sesi: `| Filter | SessionEndHourUtc | 22 (jam UTC terakhir entry, 9–22; bar dengan jam ≥ nilai ini ditolak OUTSIDE_SESSION; 22 = tanpa pemotongan) |`.
+    - Baris Roadmap 5b, kolom "Selesai jika", tambahan: "Spec 24 (breakeven 0,5/0,75R) ditolak di in-sample: trailing ikut aktif lebih awal dan memotong winner. Spec 25 (jam akhir entry 19 UTC) ditolak: real ticks +0,064R vs +0,030R, tetapi out-of-sample +0,125R vs +0,156R. Konfigurasi akhir Fase 5b = 1.25 (zona Fresh saja), EA 1.26 hanya menambah input."
+
 ## Done
 ### PC-29: Entry hanya dari zona Fresh (spec 23, H1 diterima)
 - Status: Done (2026-10-08, PRD-EA rev 71)

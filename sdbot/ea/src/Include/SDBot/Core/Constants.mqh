@@ -166,6 +166,9 @@
 #define SDB_MAX_MAX_SPREAD_POINTS     100000   // 0 = filter spread mati
 #define SDB_MIN_TESTER_UTC_OFFSET_H   -12
 #define SDB_MAX_TESTER_UTC_OFFSET_H   14
+#define SDB_DEF_SESSION_END_HOUR      22     // spec 25: jam UTC terakhir entry (22 = tanpa pemotongan)
+#define SDB_MIN_SESSION_END_HOUR      9
+#define SDB_MAX_SESSION_END_HOUR      22
 
 //--- Eksposur mata uang (spec 15, PC-23)
 #define SDB_DEF_MAX_SAME_DIR_CCY      2        // PRD: maks 2 posisi searah per mata uang; 0 = mati

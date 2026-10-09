@@ -4,6 +4,12 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.26 — 2026-10-09 — spec 25 jam akhir entry (H3 ditolak, default tidak berubah)
+
+- Input `InpSessionEndHourUtc` (9–22, default 22): bila filter sesi aktif, bar dengan jam UTC ≥ nilai ini ditolak `OUTSIDE_SESSION` dengan detail `jam_akhir=H`; posisi terbuka tetap dikelola. `SessionAllowedAt` (murni), `inputs_json` 54 kunci, preset `InpSessionEndHourUtc=22`. Uji TC-FL-09..12, TC-SG-38, TC-SU-04c, TS-89, SC-23.
+- IS (acuan 1.25: 341 trade, +0,046R, PF 1,10): jam akhir 17 280 trade +0,068R PF 1,15; jam akhir 19 318 trade +0,066R PF 1,14 (terpilih, selisih < 0,01R). Kriteria jumlah trade khusus H3 (PC-30): IS ≥ 260, ≥ 13 per simbol.
+- Jam akhir 19: REAL 107 trade +0,064R PF 1,14 (acuan +0,030R, 1,06), tetapi OOS 35 trade +0,125R PF 1,27 (acuan +0,156R, 1,36), karena dua winner OOS sesudah 19:00 terpotong. H3 ditolak; default tetap 22, perilaku sama dengan 1.25. Input tersedia untuk eksperimen.
+
 ### Spec 24 breakeven lebih awal (H2 ditolak) — 2026-10-08 — tanpa perubahan EA, tetap 1.25
 
 - Alat `tools/exit_report.py`: per rentang sesi, trade, R per trade, PF, jumlah dan R rata-rata per alasan tutup, SL yang sempat MFE ≥ 0,5R, jumlah `MODIFY_FAILED`. Uji TS-84..87.

@@ -63,6 +63,7 @@ input group "Filter"
 input bool                   InpSessionTokyo          = false;                      // Sesi Tokyo 00:00-08:00 UTC
 input bool                   InpSessionLondon         = true;                       // Sesi London 08:00-17:00 UTC
 input bool                   InpSessionNewYork        = true;                       // Sesi New York 13:00-22:00 UTC (semua false = filter mati)
+input int                    InpSessionEndHourUtc     = SDB_DEF_SESSION_END_HOUR;   // Jam UTC terakhir entry (9-22; 22 = tanpa pemotongan)
 input int                    InpMaxSpreadPoints       = 0;                          // Spread maksimum (point; 0 = mati, preset per simbol)
 input int                    InpTesterUtcOffsetHours  = 0;                          // Selisih server-UTC di tester (jam)
 input bool                   InpNewsFilter            = true;                       // Filter berita (kalender MT5; tester: CSV)
@@ -118,6 +119,7 @@ InputValues CurrentInputs()
    v.sessionTokyo = InpSessionTokyo;
    v.sessionLondon = InpSessionLondon;
    v.sessionNewYork = InpSessionNewYork;
+   v.sessionEndHourUtc = InpSessionEndHourUtc;
    v.maxSpreadPoints = InpMaxSpreadPoints;
    v.testerUtcOffsetHours = InpTesterUtcOffsetHours;
    v.maxSameDirectionPerCurrency = InpMaxSameDirectionPerCurrency;
@@ -148,7 +150,7 @@ string CurrentInputsJson()
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
                  "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
-                 "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones"};
+                 "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones", "InpSessionEndHourUtc"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -205,6 +207,7 @@ string CurrentInputsJson()
    v[50] = JsonStr(EnumToString(InpScoreBreakoutMode));
    v[51] = JsonStr(EnumToString(InpScoreRsiMode));
    v[52] = JsonBool(InpAllowTestedZones);
+   v[53] = JsonNum(InpSessionEndHourUtc);
    return CanonicalJson(k, v);
   }
 

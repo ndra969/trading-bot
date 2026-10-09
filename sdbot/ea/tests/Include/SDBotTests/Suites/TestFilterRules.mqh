@@ -9,12 +9,13 @@
 #include <SDBot/Core/InputRules.mqh>
 #include <SDBot/Filters/FilterRules.mqh>
 
-SdbSessionParams TflSessions(const bool tokyo, const bool london, const bool newYork)
+SdbSessionParams TflSessions(const bool tokyo, const bool london, const bool newYork, const int endHour = 22)
   {
    SdbSessionParams p;
    p.tokyo = tokyo;
    p.london = london;
    p.newYork = newYork;
+   p.endHourUtc = endHour;
    return p;
   }
 
@@ -86,6 +87,39 @@ void RunTestFilterRules()
    edges = edges && ValidateInputValues(v, false, err);
    AssertTrue("TC-FL-08", StringFormat("input sesi/spread/offset: default lolos, batas tepi lolos, di luar ditolak (gagal %d)", bad),
               defaults && edges && bad == 0);
+
+   // TC-FL-09..12 (spec 25 Req 1.1-1.5): jam akhir entry.
+   SdbSessionParams e17 = TflSessions(false, true, true, 17);
+   AssertTrue("TC-FL-09", "akhir 17: 16:59:59 ya, 17:00 tidak, 13:00 ya, 07:00 (Tokyo mati) tidak",
+              SessionAllowedAt(61199, e17) && !SessionAllowedAt(61200, e17) && SessionAllowedAt(46800, e17) &&
+              !SessionAllowedAt(25200, e17));
+   SdbSessionParams e22 = TflSessions(false, true, true, 22);
+   SdbSessionParams t22 = TflSessions(true, false, true, 22);
+   int diff = 0;
+   for(int h = 0; h < 24; h++)
+     {
+      int sec = h * 3600 + 1799;
+      if(SessionAllowedAt(sec, e22) != SessionAllowed(SessionOfUtc(sec), e22) ||
+         SessionAllowedAt(sec, t22) != SessionAllowed(SessionOfUtc(sec), t22))
+         diff++;
+     }
+   AssertIntEq("TC-FL-10", "akhir 22 identik dengan aturan sesi lama untuk jam 0-23", diff, 0);
+   AssertTrue("TC-FL-11", "filter sesi mati + akhir 17: 18:00 tetap diizinkan",
+              SessionAllowedAt(64800, TflSessions(false, false, false, 17)));
+   int badEnd = 0;
+   int vals[] = {9, 22, 8, 23};
+   for(int i = 0; i < 4; i++)
+     {
+      v = DefaultInputValues();
+      v.sessionEndHourUtc = vals[i];
+      err = "";
+      bool ok = ValidateInputValues(v, false, err);
+      if(i < 2 ? !ok : (ok || StringFind(err, "InpSessionEndHourUtc") < 0))
+         badEnd++;
+     }
+   v = DefaultInputValues();
+   AssertTrue("TC-FL-12", StringFormat("InpSessionEndHourUtc default 22, 9/22 lolos, 8/23 ditolak (gagal %d)", badEnd),
+              v.sessionEndHourUtc == 22 && badEnd == 0);
    TfEndSuite();
   }
 

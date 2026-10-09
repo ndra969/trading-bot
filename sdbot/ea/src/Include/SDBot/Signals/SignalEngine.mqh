@@ -157,9 +157,12 @@ private:
       SdbZone opp;
       f.haveOpposite = m_zb.OppositeZone(bias.dir, bias.dir == SDB_DIR_BULL ? f.ask : f.bid, opp);
       f.oppositeProximal = f.haveOpposite ? opp.proximal : 0.0;
-      ENUM_SDB_SESSION ses = SessionOfUtc(UtcSecOfDay(m_lastBar, UtcOffsetNow()));
+      int utcSec = UtcSecOfDay(m_lastBar, UtcOffsetNow());
+      ENUM_SDB_SESSION ses = SessionOfUtc(utcSec);
       f.session = SessionText(ses);
-      f.sessionAllowed = SessionAllowed(ses, m_sessions);
+      f.sessionInWindow = SessionAllowed(ses, m_sessions);
+      f.sessionAllowed = SessionAllowedAt(utcSec, m_sessions);
+      f.sessionEndHour = m_sessions.endHourUtc;
       f.spreadPoints = (f.point > 0.0) ? (long)MathRound((f.ask - f.bid) / f.point) : 0;
       f.newsStatus = SDB_NEWS_STATUS_DISABLED;
       f.newsBlocked = false;

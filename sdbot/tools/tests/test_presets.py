@@ -190,6 +190,12 @@ def test_ts81_allow_tested_zones():
         assert _read(symbol).get("InpAllowTestedZones") == "false", symbol
 
 
+def test_ts89_session_end_hour():
+    """Spec 25 Req 1.1: InpSessionEndHourUtc di preset; nilai sementara 22 sampai keputusan H3."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpSessionEndHourUtc") == "22", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

@@ -118,6 +118,7 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpSessionTokyo", "false"),
     ("InpSessionLondon", "true"),
     ("InpSessionNewYork", "true"),
+    ("InpSessionEndHourUtc", "22"),  # spec 25: sementara, mengikuti keputusan H3
     ("InpTesterUtcOffsetHours", "0"),
     # Filter berita (spec 16, PC-24): high +-30, medium +-10 menit; CSV kalender untuk tester
     ("InpNewsFilter", "true"),
