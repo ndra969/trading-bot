@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //| TestStructure.mqh — swing, BOS, EMA, bias, skor tren; fungsi murni
 //| di atas array bar urut waktu naik (spec 10 design §3.1, §6.1;
-//| TC-MS-01..21). Bar dibangun tangan agar hasil bisa dihitung manual.
+//| TC-MS-01..24). Bar dibangun tangan agar hasil bisa dihitung manual.
 //+------------------------------------------------------------------+
 #ifndef SDB_SUITES_TESTSTRUCTURE_MQH
 #define SDB_SUITES_TESTSTRUCTURE_MQH
@@ -178,8 +178,8 @@ void RunTestStructureEma()
               EmaDirectionOf(0.9, d, 3) == SDB_DIR_BEAR && EmaDirectionOf(0.9, e, 3) == SDB_DIR_NONE);
 
    AssertTrue("TC-MS-16", "bias: sama = arah itu, beda / NONE = NONE",
-              BiasOf(SDB_DIR_BULL, SDB_DIR_BULL) == SDB_DIR_BULL && BiasOf(SDB_DIR_BEAR, SDB_DIR_BEAR) == SDB_DIR_BEAR &&
-              BiasOf(SDB_DIR_BULL, SDB_DIR_BEAR) == SDB_DIR_NONE && BiasOf(SDB_DIR_NONE, SDB_DIR_BULL) == SDB_DIR_NONE);
+              BiasOf(SDB_DIR_BULL, SDB_DIR_BULL, SDB_BIAS_AND_EMA) == SDB_DIR_BULL && BiasOf(SDB_DIR_BEAR, SDB_DIR_BEAR, SDB_BIAS_AND_EMA) == SDB_DIR_BEAR &&
+              BiasOf(SDB_DIR_BULL, SDB_DIR_BEAR, SDB_BIAS_AND_EMA) == SDB_DIR_NONE && BiasOf(SDB_DIR_NONE, SDB_DIR_BULL, SDB_BIAS_AND_EMA) == SDB_DIR_NONE);
 
    AssertTrue("TC-MS-17", "skor tren MTF: 15 / 7 / 0, sinyal SELL dengan MTF BEAR = 15",
               TrendScore(SDB_DIR_BULL, MsTf(SDB_DIR_BULL, SDB_DIR_BULL)) == 15 && TrendScore(SDB_DIR_BULL, MsTf(SDB_DIR_BULL, SDB_DIR_NONE)) == 7 &&
@@ -224,12 +224,86 @@ void RunTestStructureEma()
               a1.ema == a2.ema && a1.emaDir == a2.emaDir && a1.st.swings > 0);
   }
 
+
+// Tabel design spec 27 §3.1: baris = struktur, kolom = EMA, urutan BULL, NONE, BEAR.
+ENUM_SDB_DIR MsDirAt(const int i) { return i == 0 ? SDB_DIR_BULL : (i == 1 ? SDB_DIR_NONE : SDB_DIR_BEAR); }
+
+SdbTfAnalysis MsHtf(const bool ready, const ENUM_SDB_DIR st, const ENUM_SDB_DIR ema)
+  {
+   SdbTfAnalysis a;
+   ZeroMemory(a);
+   a.ready = ready;
+   a.st.dir = st;
+   a.emaDir = ema;
+   return a;
+  }
+
+// Bandingkan 9 kombinasi satu mode dengan tabel arah (B/N/S = BULL/NONE/BEAR) dan alasan.
+bool MsBiasTable(const ENUM_SDB_BIAS_MODE mode, const string dirs, const string &reasons[], string &why)
+  {
+   for(int s = 0; s < 3; s++)
+      for(int e = 0; e < 3; e++)
+        {
+         int k = s * 3 + e;
+         ushort c = StringGetCharacter(dirs, k);
+         ENUM_SDB_DIR want = c == 'B' ? SDB_DIR_BULL : (c == 'S' ? SDB_DIR_BEAR : SDB_DIR_NONE);
+         ENUM_SDB_DIR got = BiasOf(MsDirAt(s), MsDirAt(e), mode);
+         string reason = BiasReasonOf(MsHtf(true, MsDirAt(s), MsDirAt(e)), mode);
+         if(got != want || reason != reasons[k] || ((reason == SDB_BIAS_OK) != (got != SDB_DIR_NONE)))
+           {
+            why = StringFormat("mode=%d st=%d ema=%d: bias %d (harap %d), alasan %s (harap %s)", mode, MsDirAt(s), MsDirAt(e),
+                               got, want, reason, reasons[k]);
+            return false;
+           }
+        }
+   why = "";
+   return true;
+  }
+
+void RunTestStructureBiasModes()
+  {
+   string why;
+   string andR[] = {"OK", "EMA", "CONFLICT", "STRUCTURE", "STRUCTURE", "STRUCTURE", "CONFLICT", "EMA", "OK"};
+   AssertTrue("TC-MS-22", "AND_EMA: 9 kombinasi sama dengan aturan lama " + why, MsBiasTable(SDB_BIAS_AND_EMA, "BNNNNNNNS", andR, why));
+
+   string notR[] = {"OK", "OK", "CONFLICT", "STRUCTURE", "STRUCTURE", "STRUCTURE", "CONFLICT", "OK", "OK"};
+   bool notOk = MsBiasTable(SDB_BIAS_NOT_OPPOSED, "BBNNNNNSS", notR, why);
+   string notWhy = why;
+   string onlyR[] = {"OK", "OK", "OK", "STRUCTURE", "STRUCTURE", "STRUCTURE", "OK", "OK", "OK"};
+   bool onlyOk = MsBiasTable(SDB_BIAS_STRUCTURE_ONLY, "BBBNNNSSS", onlyR, why);
+   AssertTrue("TC-MS-23", "NOT_OPPOSED: EMA datar tidak memblokir, berlawanan = NONE; STRUCTURE_ONLY: arah struktur " + notWhy + why,
+              notOk && onlyOk);
+
+   bool data = true;
+   for(int m = 0; m <= 2; m++)
+      data = data && BiasReasonOf(MsHtf(false, SDB_DIR_BULL, SDB_DIR_BULL), (ENUM_SDB_BIAS_MODE)m) == SDB_BIAS_DATA;
+   // TC-MS-25 (spec 27 Req 2.3): kebutuhan histori dari periode EMA yang dipakai; 120 bar cukup untuk 21, tidak untuk 50.
+   MqlRates r[];
+   for(int i = 0; i < 120; i++)
+     {
+      double base = 1.10 + 0.002 * MathSin(i / 7.0) + 0.0001 * i;
+      MsAdd(r, base + 0.0008, base - 0.0008, base + 0.0002 * MathCos(i));
+     }
+   SdbStructureParams p21 = MsParams();
+   p21.emaPeriod = 21;
+   SdbTfAnalysis a21, a50;
+   AnalyzeTf(r, p21, a21);
+   AnalyzeTf(r, MsParams(), a50);
+   AssertTrue("TC-MS-25", StringFormat("BarsNeeded EMA 21 = %d (105), EMA 50 = %d (154); 120 bar: EMA 21 siap, EMA 50 belum",
+                                       BarsNeeded(2, 100, 21, 3), BarsNeeded(2, 100, 50, 3)),
+              BarsNeeded(2, 100, 21, 3) == 105 && BarsNeeded(2, 100, 50, 3) == 154 && a21.ready && !a50.ready &&
+              BiasReasonOf(a50, SDB_BIAS_STRUCTURE_ONLY) == SDB_BIAS_DATA);
+
+   AssertTrue("TC-MS-24", "histori kurang: DATA di semua mode; OK hanya bila bias ada (diperiksa di TC-MS-22/23)", data);
+  }
+
 void RunTestStructure()
   {
    TfBeginSuite("Structure");
    RunTestStructureSwings();
    RunTestStructureBos();
    RunTestStructureEma();
+   RunTestStructureBiasModes();
    TfEndSuite();
   }
 

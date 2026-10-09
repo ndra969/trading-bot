@@ -1,0 +1,9 @@
+; SC-27: InpBiasMode=2 (STRUCTURE_ONLY), InpBiasEmaPeriod=21; >= 1 ACCEPTED, semua kandidat bias_reason=OK, inputs_json memuat kedua nilai.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpBiasMode=2
+InpBiasEmaPeriod=21
+HarnessScenario=SC-27
+HarnessEveryBars=0
+HarnessPipeline=true

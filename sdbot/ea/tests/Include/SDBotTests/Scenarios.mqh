@@ -959,8 +959,10 @@ void CheckSc11(const string id, const CScenarioRecorder &rec, const CFakeTranspo
   }
 
 // Satu sampel dibanding analisis dari histori: CopyRates berbasis waktu (bar <= waktu sampel), jumlah sama.
-bool ScSampleMatches(const SdbAnalysisSample &s, const SdbStructureParams &p, string &why)
+bool ScSampleMatches(const SdbAnalysisSample &s, const SdbStructureParams &htfP, const SdbStructureParams &mtfP,
+                     const ENUM_SDB_BIAS_MODE mode, string &why)
   {
+   SdbStructureParams p = (s.tf == PERIOD_H4) ? htfP : mtfP;
    int need = BarsNeeded(p.strength, p.lookback, p.emaPeriod, p.slopeBars);
    MqlRates r[];
    ArraySetAsSeries(r, false);
@@ -971,7 +973,7 @@ bool ScSampleMatches(const SdbAnalysisSample &s, const SdbStructureParams &p, st
      }
    SdbTfAnalysis a;
    AnalyzeTf(r, p, a);
-   int bias = (s.tf == PERIOD_H4) ? (int)BiasOf(a.st.dir, a.emaDir) : 0;
+   int bias = (s.tf == PERIOD_H4) ? (int)BiasOf(a.st.dir, a.emaDir, mode) : 0;
    bool ok = a.ready == s.ready && (int)a.st.dir == s.structDir && MathAbs(a.st.bosLevel - s.bosLevel) < 1e-9 &&
              a.st.bosTime == s.bosTime && (int)a.emaDir == s.emaDir && MathAbs(a.ema - s.ema) < 1e-8 && bias == s.bias;
    if(!ok)
@@ -990,6 +992,8 @@ void CheckSc12(const string id, const CScenarioRecorder &rec)
    p.lookback = in.structureLookback;
    p.emaPeriod = in.emaPeriod;
    p.slopeBars = in.emaSlopeBars;
+   SdbStructureParams hp = p;
+   hp.emaPeriod = EffectiveBiasEmaPeriod(in);
    int htf = 0, mtf = 0, bad = 0, afterRestart = 0, bull = 0, bear = 0, dup = 0;
    string firstBad = "";
    datetime firstHtf = 0, lastHtf = 0, prevHtf = 0, prevMtf = 0;
@@ -998,7 +1002,7 @@ void CheckSc12(const string id, const CScenarioRecorder &rec)
       SdbAnalysisSample s;
       rec.SampleAt(i, s);
       string why = "";
-      if(!ScSampleMatches(s, p, why) && bad++ == 0)
+      if(!ScSampleMatches(s, hp, p, in.biasMode, why) && bad++ == 0)
          firstBad = why;
       if(rec.RestartAt() > 0 && s.recordedAt > rec.RestartAt())
          afterRestart++;
@@ -1337,6 +1341,21 @@ void CheckSc23(const string id, const CScenarioRecorder &rec)
    AssertTrue(id + "-manage", StringFormat("posisi ditutup sesudah 17:00 UTC: %I64d", lateClose), lateClose >= 1);
   }
 
+// SC-27 (spec 27 Req 1.4, 1.6, 2.4): mode bias STRUCTURE_ONLY + EMA bias 21 tercatat, kandidat hanya lahir dengan bias OK.
+void CheckSc27(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string w = " FROM signals WHERE session_id IN (" + ses + ")";
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status='ACCEPTED'");
+   long candidates = ScDbCount("SELECT COUNT(*)" + w);
+   long notOk = ScDbCount("SELECT COUNT(*)" + w + " AND COALESCE(json_extract(context_json, '$.bias_reason'), '') <> 'OK'");
+   AssertTrue(id + "-gate", StringFormat("kandidat %I64d, ACCEPTED %I64d, bias_reason bukan OK %I64d", candidates, accepted, notOk),
+              accepted >= 1 && notOk == 0);
+   long inputs = ScDbCount("SELECT COUNT(*) FROM sessions WHERE id IN (" + ses + ") AND inputs_json LIKE "
+                           "'%\"InpBiasMode\":\"SDB_BIAS_STRUCTURE_ONLY\"%' AND inputs_json LIKE '%\"InpBiasEmaPeriod\":21%'");
+   AssertTrue(id + "-inputs", StringFormat("sesi dengan InpBiasMode STRUCTURE_ONLY dan InpBiasEmaPeriod 21: %I64d", inputs), inputs >= 1);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1428,6 +1447,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc22(id, rec);
    else if(id == "SC-23")
       CheckSc23(id, rec);
+   else if(id == "SC-27")
+      CheckSc27(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

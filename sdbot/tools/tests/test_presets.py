@@ -196,6 +196,14 @@ def test_ts89_session_end_hour():
         assert _read(symbol).get("InpSessionEndHourUtc") == "22", symbol
 
 
+def test_ts91_bias_inputs():
+    """Spec 27 Req 2.4, 4.3: InpBiasMode=0 (AND_EMA) dan InpBiasEmaPeriod=21 di preset (H5 diterima)."""
+    for symbol in EXPECTED_MAGIC:
+        preset = _read(symbol)
+        assert preset.get("InpBiasMode") == "0", symbol
+        assert preset.get("InpBiasEmaPeriod") == "21", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

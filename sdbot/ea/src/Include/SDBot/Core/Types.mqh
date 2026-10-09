@@ -30,6 +30,15 @@ enum ENUM_SDB_COMPONENT_MODE
    SDB_COMPONENT_ACTIVE = 2
   };
 
+// Aturan bias HTF (spec 27): AND_EMA = PRD (struktur dan EMA searah); NOT_OPPOSED = struktur, EMA hanya veto bila
+// berlawanan; STRUCTURE_ONLY = arah struktur saja.
+enum ENUM_SDB_BIAS_MODE
+  {
+   SDB_BIAS_AND_EMA = 0,
+   SDB_BIAS_NOT_OPPOSED = 1,
+   SDB_BIAS_STRUCTURE_ONLY = 2
+  };
+
 enum ENUM_SDB_TRADING_STYLE
   {
    SDB_STYLE_SCALPING = 0,

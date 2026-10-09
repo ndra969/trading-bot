@@ -92,6 +92,16 @@ Use case, hipotesis, aturan uji, dan keputusan: [fase-5b-overview.md](fase-5b-ov
 | 24 | [ea-24-breakeven-tuning](ea-24-breakeven-tuning/) | H2: breakeven lebih awal (0,5 / 0,75 / 1,0R) | 23 | IS/OOS/REAL vs acuan v1.25 | **Done** 2026-10-08 (H2 DITOLAK: IS BE 0,5 +0,023R, BE 0,75 +0,021R vs acuan +0,046R; trailing dini memotong winner; EA tetap 1.25; alat `exit_report.py`) |
 | 25 | [ea-25-session-window](ea-25-session-window/) | H3: jendela entry dipersempit (`InpSessionEndHourUtc` 17 / 19) | 24 | IS/OOS/REAL vs acuan v1.25 | **Done** 2026-10-09 (v1.26; H3 DITOLAK: jam akhir 19 IS +0,066R, REAL +0,064R, tetapi OOS +0,125R < +0,156R; default tetap 22; PC-30, PC-31) |
 | 26 | [ea-26-trailing-width](ea-26-trailing-width/) | H4: trailing lebih longgar (`InpTrailATRMult` 3 / 4; lanjutan Fase 5b) | 25 | IS/OOS/REAL vs acuan 1.25 | **Done** 2026-10-09 (H4 DITOLAK: mult 4,0 IS +0,064R, tetapi OOS +0,116R < +0,156R dan REAL +0,019R < +0,030R; default tetap 2,0) |
+| 27 | [ea-27-bias-responsive](ea-27-bias-responsive/) | H5: bias HTF lebih responsif (`InpBiasMode` struktur saja / struktur tanpa veto EMA datar, `InpBiasEmaPeriod` 21) | 26 | IS/OOS/REAL vs acuan 1.25 | **Done** 2026-10-10 (v1.28; H5 DITERIMA: EMA bias 21 IS +0,079R PF 1,17, OOS +0,163R PF 1,39, REAL +0,081R PF 1,18; struktur saja dan tanpa veto ditolak di IS) |
+
+## Fase 5c — Riset sumber profit
+
+Use case, pembagian, dan keputusan: [fase-5c-overview.md](fase-5c-overview.md) (Approved 2026-10-09). Nomor 28–30 dipakai Fase 6 ([fase-6-overview.md](fase-6-overview.md)).
+
+| # | Spec | Isi | Butuh | Bukti selesai | Status |
+|---|---|---|---|---|---|
+| 31 | [ea-31-candidate-outcomes](ea-31-candidate-outcomes/) | Telemetri zona/trendline di `context_json`, simulator hasil kandidat (terkalibrasi), laporan faktor profit dan per tahap tolak | 27 | kalibrasi lolos; laporan IS/OOS/REAL | Approved 2026-10-09, menunggu spec 27 |
+| 32 | ea-32-trendline-setups | Lab tiga setup trendline H1 + PA M15 (pantulan tanpa zona, + zona, break-retest) | 31 | laporan IS/OOS/REAL per setup dan simbol; keputusan | Belum mulai |
 
 ## Fase berikutnya
 

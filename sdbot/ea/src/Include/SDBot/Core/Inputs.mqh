@@ -46,6 +46,8 @@ input int                    InpSwingStrength         = SDB_DEF_SWING_STRENGTH; 
 input int                    InpStructureLookback     = SDB_DEF_STRUCTURE_LOOKBACK; // Jendela struktur/BOS (bar, 20-500)
 input int                    InpEmaPeriod             = SDB_DEF_EMA_PERIOD;         // Periode EMA tren (10-400)
 input int                    InpEmaSlopeBars          = SDB_DEF_EMA_SLOPE_BARS;     // Kemiringan EMA dibanding N bar (1-20)
+input ENUM_SDB_BIAS_MODE     InpBiasMode              = SDB_DEF_BIAS_MODE;          // Bias HTF: struktur+EMA / struktur tanpa veto EMA datar / struktur saja
+input int                    InpBiasEmaPeriod         = SDB_DEF_BIAS_EMA_PERIOD;    // Periode EMA HTF untuk bias (21; 0 = InpEmaPeriod, 10-400)
 input double                 InpZoneMinWidthAtr       = SDB_DEF_ZONE_MIN_WIDTH_ATR; // Lebar zona minimum (x ATR MTF)
 input double                 InpZoneMaxWidthAtr       = SDB_DEF_ZONE_MAX_WIDTH_ATR; // Lebar zona maksimum (x ATR MTF)
 input double                 InpZoneMinLegAtr         = SDB_DEF_ZONE_MIN_LEG_ATR;   // Gerak keluar minimum (x ATR MTF)
@@ -106,6 +108,8 @@ InputValues CurrentInputs()
    v.structureLookback = InpStructureLookback;
    v.emaPeriod = InpEmaPeriod;
    v.emaSlopeBars = InpEmaSlopeBars;
+   v.biasMode = InpBiasMode;
+   v.biasEmaPeriod = InpBiasEmaPeriod;
    v.zoneMinWidthAtr = InpZoneMinWidthAtr;
    v.zoneMaxWidthAtr = InpZoneMaxWidthAtr;
    v.zoneMinLegAtr = InpZoneMinLegAtr;
@@ -150,7 +154,8 @@ string CurrentInputsJson()
                  "InpMinSlAtr", "InpMaxSlAtr", "InpSessionTokyo", "InpSessionLondon", "InpSessionNewYork",
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
                  "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
-                 "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones", "InpSessionEndHourUtc"};
+                 "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones", "InpSessionEndHourUtc",
+                 "InpBiasMode", "InpBiasEmaPeriod"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -208,6 +213,8 @@ string CurrentInputsJson()
    v[51] = JsonStr(EnumToString(InpScoreRsiMode));
    v[52] = JsonBool(InpAllowTestedZones);
    v[53] = JsonNum(InpSessionEndHourUtc);
+   v[54] = JsonStr(EnumToString(InpBiasMode));
+   v[55] = JsonNum(InpBiasEmaPeriod);
    return CanonicalJson(k, v);
   }
 

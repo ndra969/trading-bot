@@ -20,6 +20,10 @@ MFE_HALF = 0.5
 
 Ranges = list[tuple[int, int]]
 
+# Trade strategi yang sudah tutup dengan R: definisi sama untuk exit_report dan trade_diff (spec 27).
+CLOSED_EA_FROM = "closures c JOIN trades t ON t.login = c.login AND t.run_key = c.run_key AND t.position_id = c.position_id"
+CLOSED_EA_WHERE = "t.source = 'EA' AND c.r_result IS NOT NULL"
+
 
 @dataclass
 class ExitSummary:
@@ -80,9 +84,8 @@ def exit_summary(conn: sqlite3.Connection, ranges: Ranges) -> ExitSummary:
     s = ExitSummary()
     cond, params = _where("t.session_id", ranges)
     rows = conn.execute(
-        "SELECT c.reason, c.r_result, c.net_profit, c.mfe_r FROM closures c JOIN trades t ON t.login = c.login "
-        "AND t.run_key = c.run_key AND t.position_id = c.position_id "
-        f"WHERE t.source = 'EA' AND c.r_result IS NOT NULL AND {cond}",
+        f"SELECT c.reason, c.r_result, c.net_profit, c.mfe_r FROM {CLOSED_EA_FROM} "
+        f"WHERE {CLOSED_EA_WHERE} AND {cond}",
         params,
     ).fetchall()
     sums: dict[str, list[float]] = {}

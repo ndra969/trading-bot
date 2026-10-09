@@ -4,6 +4,19 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.28 — 2026-10-10 — spec 27 EMA bias HTF 21 (H5 diterima)
+
+- Default `InpBiasEmaPeriod` 21: bias HTF memakai EMA 21 H4 (struktur dan EMA tetap harus searah), EMA MTF untuk skor tren tetap 50. Preset 12 simbol ikut.
+- IS (acuan 1.25: 341 trade, +0,046R, PF 1,10): EMA bias 21 356 trade, +0,079R, PF 1,17, DD 7,2%. OOS 41 trade, +0,163R, PF 1,39 (acuan +0,156R, 1,36). REAL 126 trade, +0,081R, PF 1,18 (acuan +0,030R, 1,06).
+- Dibanding acuan (`trade_diff.py`): IS 22 trade rugi hilang (−0,137R) dan 37 trade baru (+0,251R); REAL 16 trade baru +0,389R. Bias lebih cepat mengikuti pembalikan tren HTF (temuan live 8–9 Okt: EUR/NZD/AUD dan XAU).
+- Varian yang ditolak di IS: `STRUCTURE_ONLY` 440 trade +0,039R; `NOT_OPPOSED` 364 trade +0,024R (trade tambahan bias longgar rugi).
+
+### 1.27 — 2026-10-10 — spec 27 input mode bias HTF
+
+- Input `InpBiasMode` (`SDB_BIAS_AND_EMA` default / `SDB_BIAS_NOT_OPPOSED` / `SDB_BIAS_STRUCTURE_ONLY`) dan `InpBiasEmaPeriod` (0 = `InpEmaPeriod`, 10–400). `CMarketStructure` memakai parameter HTF (EMA bias) dan MTF (EMA tren) terpisah; log perubahan bias menyebut `mode=`. `inputs_json` 56 kunci.
+- `BiasReasonOf` pindah ke `StructureRules.mqh` (fungsi murni). Uji TC-MS-22..26, TC-IR-03, SC-27; TS-91.
+- Alat `tools/trade_diff.py`: trade varian vs acuan per simbol + waktu bar sinyal + arah (sama, baru, hilang) dengan R per trade (TS-92, TS-93). Definisi trade tutup dipakai bersama dengan `exit_report.py`.
+
 ### Spec 26 trailing lebih longgar (H4 ditolak) — 2026-10-09 — tanpa perubahan EA, tetap 1.26
 
 - `exit_report.py`: kolom MFE dan give-back rata-rata trade TRAIL_STOP (TS-90). Acuan 1.25: trade trailing sempat +1,62R, terealisasi +0,90R (give-back 0,72R).

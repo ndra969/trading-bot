@@ -9,7 +9,7 @@ flowchart TB
     GV -->|tidak| CL[set GV SIGBAR = bar, flush]
     CL --> ST{bar lebih tua dari 2 x LTF / analisis belum siap?}
     ST -->|ya| Z
-    ST -->|tidak| B{bias HTF?}
+    ST -->|tidak| B{bias HTF?<br/>InpBiasMode: struktur+EMA / tanpa veto EMA datar / struktur saja}
     B -->|NONE| CB[hitung tanpa_bias] --> Z
     B -->|BUY/SELL| ZN{bar menyentuh zona valid searah? TouchedZone: Fresh lalu terbaru}
     ZN -->|tidak| CZ[hitung tanpa_zona] --> Z

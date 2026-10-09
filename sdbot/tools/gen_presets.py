@@ -102,6 +102,8 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpStructureLookback", "100"),
     ("InpEmaPeriod", "50"),
     ("InpEmaSlopeBars", "3"),
+    ("InpBiasMode", "0"),  # spec 27: SDB_BIAS_AND_EMA sampai keputusan H5
+    ("InpBiasEmaPeriod", "21"),  # spec 27 H5 diterima: EMA bias HTF 21 (0 = ikut InpEmaPeriod)
     # Zona S&D (spec 11, PC-17): default dari ukuran histori H1 12 simbol
     ("InpZoneMinWidthAtr", "0.3"),
     ("InpZoneMaxWidthAtr", "2.0"),

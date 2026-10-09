@@ -3,6 +3,16 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-32: Mode bias HTF dan EMA bias 21 (spec 27, H5 diterima)
+- Status: Open
+- Tanggal disetujui: 2026-10-10 (aturan keputusan spec 27 Req 4.2, disetujui bersama spec 2026-10-09)
+- Dokumen: PRD-EA §Struktur dan bias HTF, §Parameter input EA, §Roadmap (baris 5b)
+- Sumber: spec `ea-27-bias-responsive` task 6–7; sesi IS 1679–1714, OOS 1715–1726, REAL 1727–1738
+- Perubahan:
+    - §Struktur dan bias HTF: "Bias HTF bullish/bearish hanya bila arah struktur dan arah EMA HTF sama" tetap, dengan tambahan: periode EMA HTF untuk bias diatur terpisah dari EMA tren MTF (default 21); EMA MTF untuk skor tren tetap 50.
+    - Tabel input, baris baru di Analisis: `| Analisis | BiasMode | AND_EMA (struktur dan EMA HTF searah; NOT_OPPOSED dan STRUCTURE_ONLY hanya untuk eksperimen) |` dan `| Analisis | BiasEmaPeriod | 21 (periode EMA HTF untuk bias; 0 = sama dengan EmaPeriod; 10–400) |`.
+    - Bukti (acuan 1.25): IS 356 trade +0,079R PF 1,17 (acuan 341, +0,046R, 1,10); OOS 41 trade +0,163R PF 1,39 (acuan 37, +0,156R, 1,36); REAL 126 trade +0,081R PF 1,18 (acuan 116, +0,030R, 1,06). Struktur saja (+0,039R) dan tanpa veto EMA datar (+0,024R) ditolak di IS.
+    - Baris Roadmap 5b, kolom "Selesai jika", tambahan: "Spec 27 (EMA bias HTF 21, dari temuan live) diterima: real ticks +0,081R PF 1,18. Konfigurasi akhir = 1.28."
 
 ## Done
 ### PC-31: Input jam akhir entry (spec 25, H3 ditolak)

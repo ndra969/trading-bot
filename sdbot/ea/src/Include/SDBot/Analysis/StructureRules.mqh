@@ -12,6 +12,12 @@
 #include <SDBot/Core/Types.mqh>
 #include <SDBot/Core/Constants.mqh>
 
+#define SDB_BIAS_OK        "OK"
+#define SDB_BIAS_STRUCTURE "STRUCTURE"   // struktur HTF netral
+#define SDB_BIAS_EMA       "EMA"         // arah EMA HTF netral
+#define SDB_BIAS_CONFLICT  "CONFLICT"    // struktur dan EMA berlawanan
+#define SDB_BIAS_DATA      "DATA"        // histori HTF kurang
+
 // High lebih tinggi dari n bar kiri (ketat) dan tidak lebih rendah dari n bar kanan: pada high sama persis,
 // hanya bar lebih awal yang menjadi swing (Req 2.2).
 bool IsSwingHigh(const MqlRates &r[], const int i, const int n)
@@ -159,9 +165,28 @@ ENUM_SDB_DIR EmaDirectionOf(const double close, const double &ema[], const int s
    return SDB_DIR_NONE;
   }
 
-ENUM_SDB_DIR BiasOf(const ENUM_SDB_DIR structureDir, const ENUM_SDB_DIR emaDir)
+// Bias HTF per mode (spec 27 design §3.1). Struktur NONE selalu NONE.
+ENUM_SDB_DIR BiasOf(const ENUM_SDB_DIR structureDir, const ENUM_SDB_DIR emaDir, const ENUM_SDB_BIAS_MODE mode)
   {
-   return (structureDir != SDB_DIR_NONE && structureDir == emaDir) ? structureDir : SDB_DIR_NONE;
+   if(structureDir == SDB_DIR_NONE)
+      return SDB_DIR_NONE;
+   if(mode == SDB_BIAS_STRUCTURE_ONLY)
+      return structureDir;
+   if(mode == SDB_BIAS_NOT_OPPOSED)
+      return (emaDir == SDB_DIR_NONE || emaDir == structureDir) ? structureDir : SDB_DIR_NONE;
+   return (structureDir == emaDir) ? structureDir : SDB_DIR_NONE;
+  }
+
+// Alasan bias untuk telemetri (spec 10 Req 5.4): OK tepat bila BiasOf memberi arah (spec 27 Req 1.6).
+string BiasReasonOf(const SdbTfAnalysis &htf, const ENUM_SDB_BIAS_MODE mode)
+  {
+   if(!htf.ready)
+      return SDB_BIAS_DATA;
+   if(htf.st.dir == SDB_DIR_NONE)
+      return SDB_BIAS_STRUCTURE;
+   if(BiasOf(htf.st.dir, htf.emaDir, mode) != SDB_DIR_NONE)
+      return SDB_BIAS_OK;
+   return (htf.emaDir == SDB_DIR_NONE) ? SDB_BIAS_EMA : SDB_BIAS_CONFLICT;
   }
 
 // Keselarasan tren di MTF (PRD 15 poin): struktur dan EMA searah = 15, salah satu = 7 (Req 6.1).

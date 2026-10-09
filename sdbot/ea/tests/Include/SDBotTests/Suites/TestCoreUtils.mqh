@@ -157,6 +157,35 @@ void RunTestCoreUtilsInputs()
    v.emaPeriod = 10;
    v.emaSlopeBars = 20;
    bool edgesOk = ValidateInputValues(v, false, err);
+   // TC-IR-03 (spec 27 Req 1.7, 2.1): mode bias 0..2, periode EMA bias 0 atau 10..400, periode efektif.
+   InputValues b = DefaultInputValues();
+   bool biasDefaults = b.biasMode == SDB_BIAS_AND_EMA && b.biasEmaPeriod == 21 && EffectiveBiasEmaPeriod(b) == 21;
+   int badBias = 0;
+   int okModes[] = {0, 1, 2};
+   for(int i = 0; i < 3; i++)
+     {
+      b = DefaultInputValues();
+      b.biasMode = (ENUM_SDB_BIAS_MODE)okModes[i];
+      if(!ValidateInputValues(b, false, err))
+         badBias++;
+     }
+   b = DefaultInputValues();
+   b.biasMode = (ENUM_SDB_BIAS_MODE)3;
+   if(ValidateInputValues(b, false, err) || !CuContains(err, "InpBiasMode"))
+      badBias++;
+   int periods[] = {0, 10, 400, 5, 401};
+   for(int i = 0; i < 5; i++)
+     {
+      b = DefaultInputValues();
+      b.biasEmaPeriod = periods[i];
+      bool ok = ValidateInputValues(b, false, err);
+      if(i < 3 ? !ok : (ok || !CuContains(err, "InpBiasEmaPeriod")))
+         badBias++;
+     }
+   b = DefaultInputValues();
+   b.biasEmaPeriod = 0;
+   AssertTrue("TC-IR-03", StringFormat("bias: default AND_EMA/21 (H5 diterima), 0 = ikut InpEmaPeriod (50), mode 0-2 dan periode 0/10/400 lolos, 3 dan 5/401 ditolak (gagal %d)", badBias),
+              biasDefaults && badBias == 0 && EffectiveBiasEmaPeriod(b) == 50);
    // TC-SU-32 (spec 11 Req 5.2): input zona, default dari ukuran histori, min < max.
    InputValues z = DefaultInputValues();
    bool zoneDefaults = MathAbs(z.zoneMinWidthAtr - 0.3) < 1e-9 && MathAbs(z.zoneMaxWidthAtr - 2.0) < 1e-9 &&

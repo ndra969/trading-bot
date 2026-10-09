@@ -31,7 +31,7 @@ void RunTestMarketStructure()
    p.emaPeriod = 50;
    p.slopeBars = 3;
    CMarketStructure ms;
-   ms.Init(_Symbol, PERIOD_H4, PERIOD_H1, p);
+   ms.Init(_Symbol, PERIOD_H4, PERIOD_H1, p, p, SDB_BIAS_AND_EMA);
    ms.OnTick();
    SdbTfAnalysis h, m;
    SdbBias b;
@@ -45,6 +45,22 @@ void RunTestMarketStructure()
    AssertTrue("TC-MSX-03", StringFormat("struktur H4/H1: siap sesuai histori (bar H4 %d, butuh %d, bias %d %s)",
                                         Bars(_Symbol, PERIOD_H4), need, b.dir, b.reason),
               ms.HtfTimeframe() == PERIOD_H4 && ms.MtfTimeframe() == PERIOD_H1 && consistent && !ms.OnTick());
+
+   // TC-MS-26 (spec 27 Req 2.2): EMA bias 21 hanya mengubah HTF; MTF identik dengan EMA 50.
+   SdbStructureParams p21 = p;
+   p21.emaPeriod = 21;
+   CMarketStructure ms21;
+   ms21.Init(_Symbol, PERIOD_H4, PERIOD_H1, p21, p, SDB_BIAS_STRUCTURE_ONLY);
+   ms21.OnTick();
+   SdbTfAnalysis h21, m21;
+   ms21.Htf(h21);
+   ms21.Mtf(m21);
+   SdbStructureParams mp;
+   ms21.Params(mp);
+   bool mtfSame = m21.ready == m.ready && m21.ema == m.ema && m21.emaDir == m.emaDir && m21.st.dir == m.st.dir;
+   bool htfDiff = !h21.ready || !h.ready || h21.ema != h.ema;
+   AssertTrue("TC-MS-26", StringFormat("HTF EMA 21 %.5f vs 50 %.5f; MTF sama; Params() = MTF; BarsRequired %d", h21.ema, h.ema, ms21.BarsRequired()),
+              mtfSame && htfDiff && mp.emaPeriod == 50 && ms21.BarsRequired() == need);
    TfEndSuite();
   }
 

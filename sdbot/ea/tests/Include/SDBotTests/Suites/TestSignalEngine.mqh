@@ -67,7 +67,7 @@ void RunTestSignalEngine()
    zp.maxAge = v.maxZoneAgeBars;
    zp.strength = v.swingStrength;
    CMarketStructure ms;
-   ms.Init(_Symbol, PERIOD_H4, PERIOD_H1, sp);
+   ms.Init(_Symbol, PERIOD_H4, PERIOD_H1, sp, sp, v.biasMode);
    CZoneBook zb;
    zb.Init(_Symbol, PERIOD_H1, zp, TSE_MAGIC);
    CPaTrigger pt;

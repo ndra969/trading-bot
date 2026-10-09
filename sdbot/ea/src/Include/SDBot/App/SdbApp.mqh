@@ -128,7 +128,9 @@ private:
       p.lookback = cfg.inputs.structureLookback;
       p.emaPeriod = cfg.inputs.emaPeriod;
       p.slopeBars = cfg.inputs.emaSlopeBars;
-      m_structure.Init(_Symbol, htf, mtf, p);
+      SdbStructureParams hp = p;
+      hp.emaPeriod = EffectiveBiasEmaPeriod(cfg.inputs);   // spec 27: EMA bias HTF terpisah dari EMA tren MTF
+      m_structure.Init(_Symbol, htf, mtf, hp, p, cfg.inputs.biasMode);
       SdbZoneParams zp;
       zp.minWidthAtr = cfg.inputs.zoneMinWidthAtr;
       zp.maxWidthAtr = cfg.inputs.zoneMaxWidthAtr;

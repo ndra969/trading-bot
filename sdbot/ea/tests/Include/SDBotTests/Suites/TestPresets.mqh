@@ -25,7 +25,7 @@ string TprKnownKeys()
           "InpZoneMinWidthAtr,InpZoneMaxWidthAtr,InpZoneMinLegAtr,InpZoneLegBars,InpMaxZoneAgeBars,"
           "InpMinConfluenceScore,InpMinRR,InpSlBufferAtr,InpMinSlAtr,InpMaxSlAtr,"
           "InpSessionTokyo,InpSessionLondon,InpSessionNewYork,InpMaxSpreadPoints,InpTesterUtcOffsetHours,"
-          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,InpScoreFibMode,InpScoreTrendlineMode,InpScoreBreakoutMode,InpScoreRsiMode,InpAllowTestedZones,InpSessionEndHourUtc,";
+          "InpMaxSameDirectionPerCurrency,InpNewsFilter,InpNewsHighMinutes,InpNewsMediumMinutes,InpNewsCsvFile,InpScoreFibMode,InpScoreTrendlineMode,InpScoreBreakoutMode,InpScoreRsiMode,InpAllowTestedZones,InpSessionEndHourUtc,InpBiasMode,InpBiasEmaPeriod,";
   }
 
 void TprApply(InputValues &v, const string key, const string value)
@@ -48,6 +48,8 @@ void TprApply(InputValues &v, const string key, const string value)
    else if(key == "InpMaxPosCrypto")          v.maxPosCrypto = (int)StringToInteger(value);
    else if(key == "InpHeartbeatMinutes")      v.heartbeatMinutes = (int)StringToInteger(value);
    else if(key == "InpSwingStrength")         v.swingStrength = (int)StringToInteger(value);
+   else if(key == "InpBiasMode")              v.biasMode = (ENUM_SDB_BIAS_MODE)StringToInteger(value);
+   else if(key == "InpBiasEmaPeriod")         v.biasEmaPeriod = (int)StringToInteger(value);
    else if(key == "InpStructureLookback")     v.structureLookback = (int)StringToInteger(value);
    else if(key == "InpEmaPeriod")             v.emaPeriod = (int)StringToInteger(value);
    else if(key == "InpEmaSlopeBars")          v.emaSlopeBars = (int)StringToInteger(value);

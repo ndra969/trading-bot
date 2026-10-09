@@ -57,6 +57,8 @@ struct InputValues
    ENUM_SDB_COMPONENT_MODE scoreBreakoutMode;  // spec 20
    ENUM_SDB_COMPONENT_MODE scoreRsiMode;       // spec 21
    bool              allowTestedZones;   // spec 23: false = zona Tested ditolak NO_VALID_ZONE
+   ENUM_SDB_BIAS_MODE biasMode;          // spec 27: aturan gabung struktur dan EMA HTF
+   int               biasEmaPeriod;      // spec 27: periode EMA HTF untuk bias, 0 = emaPeriod
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -129,6 +131,8 @@ InputValues DefaultInputValues()
    v.scoreBreakoutMode = SDB_COMPONENT_SHADOW;
    v.scoreRsiMode = SDB_COMPONENT_SHADOW;
    v.allowTestedZones = SDB_DEF_ALLOW_TESTED_ZONES;
+   v.biasMode = SDB_DEF_BIAS_MODE;
+   v.biasEmaPeriod = SDB_DEF_BIAS_EMA_PERIOD;
    return v;
   }
 
@@ -170,6 +174,15 @@ void IrCheckAnalysis(const InputValues &v, string &errors)
    IrCheckRange("InpStructureLookback", v.structureLookback, SDB_MIN_STRUCTURE_LOOKBACK, SDB_MAX_STRUCTURE_LOOKBACK, errors);
    IrCheckRange("InpEmaPeriod", v.emaPeriod, SDB_MIN_EMA_PERIOD, SDB_MAX_EMA_PERIOD, errors);
    IrCheckRange("InpEmaSlopeBars", v.emaSlopeBars, SDB_MIN_EMA_SLOPE_BARS, SDB_MAX_EMA_SLOPE_BARS, errors);
+   IrCheckRange("InpBiasMode", (int)v.biasMode, SDB_BIAS_AND_EMA, SDB_BIAS_STRUCTURE_ONLY, errors);
+   if(v.biasEmaPeriod != 0)
+      IrCheckRange("InpBiasEmaPeriod", v.biasEmaPeriod, SDB_MIN_EMA_PERIOD, SDB_MAX_EMA_PERIOD, errors);
+  }
+
+// Periode EMA HTF untuk bias (spec 27 Req 2.1): 0 berarti ikut InpEmaPeriod.
+int EffectiveBiasEmaPeriod(const InputValues &v)
+  {
+   return v.biasEmaPeriod == 0 ? v.emaPeriod : v.biasEmaPeriod;
   }
 
 void IrCheckRangeD(const string name, const double value, const double lo, const double hi, string &errors)

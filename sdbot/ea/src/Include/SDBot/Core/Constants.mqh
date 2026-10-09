@@ -114,6 +114,8 @@
 #define SDB_DEF_EMA_PERIOD            50       // PRD: EMA 50
 #define SDB_MIN_EMA_PERIOD            10
 #define SDB_MAX_EMA_PERIOD            400
+#define SDB_DEF_BIAS_MODE             SDB_BIAS_AND_EMA // spec 27: aturan PRD (struktur dan EMA HTF searah)
+#define SDB_DEF_BIAS_EMA_PERIOD       21       // spec 27 H5 diterima: EMA bias HTF 21 (0 = ikut InpEmaPeriod)
 #define SDB_DEF_EMA_SLOPE_BARS        3
 #define SDB_MIN_EMA_SLOPE_BARS        1
 #define SDB_MAX_EMA_SLOPE_BARS        20
