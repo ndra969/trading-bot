@@ -4,6 +4,12 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### Spec 26 trailing lebih longgar (H4 ditolak) — 2026-10-09 — tanpa perubahan EA, tetap 1.26
+
+- `exit_report.py`: kolom MFE dan give-back rata-rata trade TRAIL_STOP (TS-90). Acuan 1.25: trade trailing sempat +1,62R, terealisasi +0,90R (give-back 0,72R).
+- IS (acuan `InpTrailATRMult` 2,0: +0,046R, PF 1,10): 3,0 +0,045R PF 1,09; 4,0 +0,064R PF 1,13 (terpilih; TP 45 → 65, BE_STOP 33 → 65, TRAIL_STOP 97 → 44).
+- Mult 4,0: OOS +0,116R PF 1,26 (acuan +0,156R, 1,36), REAL +0,019R PF 1,04 (acuan +0,030R, 1,06). H4 ditolak; default tetap 2,0.
+
 ### 1.26 — 2026-10-09 — spec 25 jam akhir entry (H3 ditolak, default tidak berubah)
 
 - Input `InpSessionEndHourUtc` (9–22, default 22): bila filter sesi aktif, bar dengan jam UTC ≥ nilai ini ditolak `OUTSIDE_SESSION` dengan detail `jam_akhir=H`; posisi terbuka tetap dikelola. `SessionAllowedAt` (murni), `inputs_json` 54 kunci, preset `InpSessionEndHourUtc=22`. Uji TC-FL-09..12, TC-SG-38, TC-SU-04c, TS-89, SC-23.

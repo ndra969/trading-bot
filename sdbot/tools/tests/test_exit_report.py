@@ -111,3 +111,27 @@ def test_ts87_bad_format_and_empty(db: Path, capsys: pytest.CaptureFixture[str])
     out = capsys.readouterr().out
     assert "kosong" in out and "a" in out
     assert er.main(["--db", str(db.parent / "tidak_ada.sqlite"), "--runs", "a=1-1"]) == 1
+
+
+def test_ts90_trail_mfe_and_giveback(db: Path) -> None:
+    """Spec 26 Req 1.2: MFE dan give-back rata-rata trade TRAIL_STOP; MFE kosong diabaikan."""
+    with sqlite3.connect(db) as conn:
+        _session(conn, 4)
+        for pos, (reason, r, mfe) in enumerate(
+            [
+                ("TRAIL_STOP", 1.0, 2.0),
+                ("TRAIL_STOP", 0.5, 1.5),
+                ("TRAIL_STOP", 0.8, None),
+                ("TP", 2.0, 2.0),
+            ],
+            start=1,
+        ):
+            _trade(conn, 4, pos, reason, r, mfe)
+        s = er.exit_summary(conn, [(4, 4)])
+        none = er.exit_summary(conn, [(2, 3)])
+    assert s.trail_mfe_avg == pytest.approx(1.75)
+    assert s.trail_giveback_avg == pytest.approx(1.0)
+    assert none.trail_mfe_avg is None and none.trail_giveback_avg is None
+    out = er.render([("trail", s), ("tanpa", none)])
+    assert "GIVEBACK" in out and "+1.75" in out and "+1.00" in out
+    assert out.splitlines()[-1].rstrip().endswith("-")

@@ -80,7 +80,8 @@ Usulan saya dalam kurung.
 | 23 | H1 zona Fresh saja | +0,046 vs +0,029 | +0,156 vs +0,036 | +0,030 vs −0,045 | **Diterima** (1.25, PC-29) |
 | 24 | H2 breakeven 0,5 / 0,75R | +0,023 / +0,021 vs +0,046 | — | — | Ditolak di IS (trailing ikut aktif lebih awal) |
 | 25 | H3 jam akhir entry 19 UTC | +0,066 vs +0,046 | +0,125 vs +0,156 | +0,064 vs +0,030 | Ditolak (OOS lebih buruk; input tetap ada, 1.26) |
+| 26 | H4 trailing ATR × 4 (lanjutan) | +0,064 vs +0,046 | +0,116 vs +0,156 | +0,019 vs +0,030 | Ditolak (OOS dan REAL lebih buruk) |
 
 Konfigurasi akhir: zona Fresh saja, breakeven 1R, sesi London + New York sampai 22 UTC. Dibanding acuan v1.24, real ticks berubah dari −0,045R (PF 0,91) menjadi +0,030R (PF 1,06); PF masih di bawah target PRD tahap 2 (1,3).
 
-Kandidat sesudah Fase 5b: pemicu trailing yang terpisah dari BE (temuan spec 24), mode entry Limit/Adaptive dan filter candle klimaks (keputusan 5), serta jam akhir entry yang diuji ulang bila data OOS bertambah.
+Kandidat sesudah Fase 5b: pemicu trailing yang terpisah dari BE (temuan spec 24; trailing lebih longgar saja ditolak di spec 26), mode entry Limit/Adaptive dan filter candle klimaks (keputusan 5), serta jam akhir entry yang diuji ulang bila data OOS bertambah.

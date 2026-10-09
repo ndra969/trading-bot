@@ -30,6 +30,8 @@ class ExitSummary:
     reasons: dict[str, tuple[int, float]] = field(default_factory=dict)
     sl_mfe_half: int = 0
     modify_failed: int | None = 0
+    trail_mfe_avg: float | None = None  # spec 26: MFE rata-rata TRAIL_STOP
+    trail_giveback_avg: float | None = None  # spec 26: MFE - R hasil rata-rata TRAIL_STOP
 
     @property
     def r_per_trade(self) -> float | None:
@@ -84,6 +86,8 @@ def exit_summary(conn: sqlite3.Connection, ranges: Ranges) -> ExitSummary:
         params,
     ).fetchall()
     sums: dict[str, list[float]] = {}
+    trail_mfe: list[float] = []
+    trail_give: list[float] = []
     for reason, r, net, mfe in rows:
         s.trades += 1
         s.total_r += float(r)
@@ -97,7 +101,13 @@ def exit_summary(conn: sqlite3.Connection, ranges: Ranges) -> ExitSummary:
         acc[1] += float(r)
         if reason == "SL" and mfe is not None and mfe >= MFE_HALF:
             s.sl_mfe_half += 1
+        if reason == "TRAIL_STOP" and mfe is not None:
+            trail_mfe.append(float(mfe))
+            trail_give.append(float(mfe) - float(r))
     s.reasons = {k: (int(n), total / n) for k, (n, total) in sums.items()}
+    if trail_mfe:
+        s.trail_mfe_avg = sum(trail_mfe) / len(trail_mfe)
+        s.trail_giveback_avg = sum(trail_give) / len(trail_give)
     if _has_table(conn, "position_events"):
         cond_e, params_e = _where("session_id", ranges)
         s.modify_failed = conn.execute(
@@ -118,7 +128,7 @@ def render(summaries: list[tuple[str, ExitSummary]]) -> str:
     head = f"{'run':<10} {'trade':>6} {'R/trade':>8} {'PF':>5}"
     for k in keys:
         head += f" {k + ' n':>13} {'R':>6}"
-    head += f" {'SL MFE>=0.5':>12} {'MOD_FAIL':>9}"
+    head += f" {'SL MFE>=0.5':>12} {'MOD_FAIL':>9} {'TRAIL MFE':>10} {'GIVEBACK':>9}"
     lines = [head, "-" * len(head)]
     for name, s in summaries:
         line = f"{name:<10} {s.trades:>6} {_num(s.r_per_trade, '+.3f'):>8} {_num(s.pf, '.2f'):>5}"
@@ -126,6 +136,7 @@ def render(summaries: list[tuple[str, ExitSummary]]) -> str:
             n, avg = s.reasons.get(k, (0, None))
             line += f" {n:>13} {_num(avg, '+.2f'):>6}"
         line += f" {s.sl_mfe_half:>12} {_num(s.modify_failed, 'd'):>9}"
+        line += f" {_num(s.trail_mfe_avg, '+.2f'):>10} {_num(s.trail_giveback_avg, '+.2f'):>9}"
         lines.append(line)
     return "\n".join(lines)
 
