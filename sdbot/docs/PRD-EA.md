@@ -2,7 +2,7 @@
 
 2026-09-19 · @indra
 
-> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-08). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
+> Sumber: Claude Docs https://claude.ai/code/artifact/9602635e-5c86-4d25-abe9-420a45a9ad24 (disalin ke repo 2026-10-09). Dokumen di claude.ai adalah versi induk; salinan ini acuan saat coding. Jangan diedit langsung: catat perubahan di `sdbot/docs/PENDING-CHANGES.md` (skill `sdbot-docs-sync`).
 
 ## Ringkasan dan tujuan
 
@@ -427,6 +427,7 @@ Konfigurasi YAML diganti input EA, disimpan sebagai file `.set` per gaya trading
 | Filter | `MaxSpreadPoints` | per simbol, 3 × median spread live akun cent (EURUSD 24, GBPUSD 30, USDJPY 30, USDCHF 39, AUDUSD 27, USDCAD 48, NZDUSD 42, EURJPY 48, GBPJPY 66, XAUUSD 720, XAGUSD 90, BTCUSD 3000); 0 = mati |
 | Filter | `NewsFilter` / `NewsHighMinutes` / `NewsMediumMinutes` | true / 15 / 0 menit sebelum dan sesudah rilis (0 = dampak itu tidak diblokir, 0–240); event mata uang simbol, XAU/XAG/BTC lewat USD |
 | Filter | `SessionTokyo` / `SessionLondon` / `SessionNewYork` | false / true / true (UTC: Tokyo 00–08, London 08–17, New York 13–22; 22–24 di luar sesi; semua false = filter mati) |
+| Filter | `SessionEndHourUtc` | 22 (jam UTC terakhir entry, 9–22; bar dengan jam ≥ nilai ini ditolak OUTSIDE_SESSION; 22 = tanpa pemotongan) |
 | Filter | `TesterUtcOffsetHours` | 0 (selisih server–UTC di Strategy Tester; live dihitung dari TimeTradeServer − TimeGMT) |
 | Filter | `NewsCsvFile` | sdbot_calendar.csv di Common\Files (hanya tester; dibuat script ExportCalendar) |
 | Risiko | `RiskPerTradePct` | 0.5 |
@@ -560,6 +561,8 @@ Periode uji di Strategy Tester akun cent (diukur 2026-10-05): bar M1 tersedia se
 
 Aturan uji Fase 5b: varian dikembangkan dan dipilih hanya di in-sample. Varian terpilih wajib lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; yang gagal tidak diterapkan dan hasilnya dicatat. Kriteria jumlah trade backtest dasar Fase 5b: ≥ 150 per 12 bulan dan ≥ 6 per simbol (menggantikan kriteria filter kualitas Fase 4 untuk Fase 5b).
 
+Untuk H3 (jendela entry, spec 25) kriteria jumlah trade backtest dasar adalah ≥ 120 trade per 12 bulan (IS ≥ 260) dan ≥ 13 per simbol, karena pemotongan jam entry pasti mengurangi trade; keputusan tetap ditentukan out-of-sample dan real ticks.
+
 Catatan akun cent:
 
 - Mata uang akun USC. Semua aturan risiko berbasis persen, tidak boleh ada nilai tetap dalam dolar di kode.
@@ -595,7 +598,7 @@ Pengembangan dimulai dari fondasi pengaman, lalu strategi ditambah bertahap agar
 | 3. Strategi inti | Bias HTF, zona S&D, trigger PA, eksekusi | Backtest dasar 12 simbol × 12 bulan terakhir tanpa lapisan konfirmasi: tanpa error kritis, total ≥ 300 trade dan setiap simbol ≥ 15 trade, semua trade punya signal_id dengan skor lengkap, query kalibrasi menghasilkan data. Profit dinilai di Fase 5–6 |
 | 4. Filter | Berita, sesi, spread, eksposur mata uang (spec 14 sesi + spread 1.15, spec 15 eksposur 1.16, spec 16 berita 1.17) | Filter tercatat di tabel signals dengan alasan tolak; backtest dasar dengan semua filter: total ≥ 200 trade dan setiap simbol ≥ 10 trade (selesai 1.17: 215 trade, +0,058R per trade) |
 | 5. Konfirmasi | Fibonacci, trendline, breakout retest, RSI (satu per satu, mode bayangan dulu): spec 17 alat ukur IS/OOS 1.19, Fibonacci 1.20, trendline 1.21, breakout & retest 1.22, RSI 1.23, aktivasi dan ambang 1.24 | Setiap lapisan meningkatkan hasil forward test; komponen hanya aktif bila terbukti di in-sample, out-of-sample, dan real ticks. Selesai 2026-10-08 (EA 1.24): tidak ada komponen yang memperbaiki hasil saat diaktifkan, semua tetap bayangan; strategi dasar real ticks Jan–Okt 2026 PF 0,91, perbaikan strategi inti menyusul |
-| 5b. Perbaikan strategi inti | Tiga perbaikan diuji berurutan dan kumulatif: spec 23 entry hanya dari zona Fresh (1.25), spec 24 breakeven lebih awal (1.26), spec 25 jendela entry dipersempit (1.27). Filter arah dan bobot tren tidak diubah; mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24 | Setiap perbaikan diterapkan hanya bila lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; backtest dasar ≥ 150 trade per 12 bulan dan ≥ 6 trade per simbol. Spec 23 diterima 2026-10-08 (1.25): real ticks +0,030R PF 1,06, sebelumnya −0,045R PF 0,91 |
+| 5b. Perbaikan strategi inti | Tiga perbaikan diuji berurutan dan kumulatif: spec 23 entry hanya dari zona Fresh (1.25), spec 24 breakeven lebih awal (1.26), spec 25 jendela entry dipersempit (1.27). Filter arah dan bobot tren tidak diubah; mode entry Adaptive/Limit dan filter candle klimaks ditinjau sesudah spec 24 | Setiap perbaikan diterapkan hanya bila lebih baik dari acuan saat itu (R per trade) di in-sample dan tidak lebih buruk di out-of-sample dan real ticks; backtest dasar ≥ 150 trade per 12 bulan dan ≥ 6 trade per simbol. Spec 23 diterima 2026-10-08 (1.25): real ticks +0,030R PF 1,06, sebelumnya −0,045R PF 0,91. Spec 24 (breakeven 0,5/0,75R) ditolak di in-sample: trailing ikut aktif lebih awal dan memotong winner. Spec 25 (jam akhir entry 19 UTC) ditolak: real ticks +0,064R vs +0,030R, tetapi out-of-sample +0,125R vs +0,156R. Konfigurasi akhir Fase 5b = 1.25 (zona Fresh saja), EA 1.26 hanya menambah input |
 | 6. Validasi | Forward test dan live akun cent 1–3 bulan | Kriteria penerimaan tahap 3 dan 4 terpenuhi |
 | 7. Lanjutan | Volume profile, filter AI, backoffice online | Diputuskan setelah fase 6 |
 
