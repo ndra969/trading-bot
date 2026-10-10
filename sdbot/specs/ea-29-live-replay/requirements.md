@@ -1,6 +1,6 @@
 # Requirements — Replay tester periode live (spec 29)
 
-Status: Approved (2026-10-09)
+Status: Done (2026-10-10)
 Use case: UC-71, UC-72 ([fase-6-overview.md](../fase-6-overview.md))
 Asal: PRD-EA §Pengujian dan kriteria penerimaan tahap 4 ("entry/exit cocok dengan backtest"), §Data dan database; overview Fase 6 keputusan 4 dan 5 (kecocokan kandidat dan trade, sekitar 2 minggu live)
 Butuh: spec 28 (`live_report.py`: scope sesi dan celah sesi); tester tidak dipakai sesi lain saat replay dijalankan (batas CPU, satu agen)

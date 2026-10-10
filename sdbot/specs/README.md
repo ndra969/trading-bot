@@ -110,7 +110,7 @@ Use case, pembagian, dan keputusan: [fase-6-overview.md](fase-6-overview.md) (Ap
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
 | 28 | [ea-28-live-report](ea-28-live-report/) | `live_report.py`: ringkasan DB live (R, eksekusi, kandidat, alert, sesi) | live 1.25 | TS-120–127; laporan DB live | **Done** 2026-10-10 |
-| 29 | [ea-29-live-replay](ea-29-live-replay/) | `live_compare.py` + `run-live-replay.ps1`: replay tester periode live, kecocokan kandidat dan trade | 28 | TS-128–133; replay pertama | Task 1–3 selesai; replay pertama menunggu hari trading penuh |
+| 29 | [ea-29-live-replay](ea-29-live-replay/) | `live_compare.py` + `run-live-replay.ps1`: replay tester periode live, kecocokan kandidat dan trade | 28 | TS-128–134; replay pertama | **Done** 2026-10-10 (replay 2026-10-09 v1.25: 58/58 kandidat cocok; trade belum ada) |
 | 30 | ea-30-acceptance | Laporan penerimaan tahap 3 dan 4, keputusan 2.00 | 29 | laporan | Belum mulai |
 
 ## Fase berikutnya

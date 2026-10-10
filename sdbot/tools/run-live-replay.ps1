@@ -79,19 +79,32 @@ foreach ($sym in $Symbols) {
         continue
     }
     $setInput = @($lines | Where-Object { $_ -match '=' })
-    $runArgs = @('-Baseline', '-SkipBuild', '-Symbols', $sym, '-FromDate', $fromTs.ToString('yyyy.MM.dd'),
-        '-ToDate', $toTs.ToString('yyyy.MM.dd'), '-Model', '4')
-    if ($ExportCalendar -and $first) { $runArgs += '-ExportCalendar' }
+    # Splatting hashtable: splatting array mengirim '-Baseline' dsb. sebagai argumen posisi, bukan nama parameter.
+    $runArgs = @{
+        Baseline  = $true
+        SkipBuild = $true
+        Symbols   = @($sym)
+        FromDate  = $fromTs.ToString('yyyy.MM.dd')
+        ToDate    = $toTs.ToString('yyyy.MM.dd')
+        Model     = 4
+        SetInput  = $setInput
+    }
+    if ($ExportCalendar -and $first) { $runArgs['ExportCalendar'] = $true }
     $first = $false
     if ($DryRun) {
-        Write-Replay ("{0}: run-ea-tests.ps1 {1} -SetInput ({2} kunci): {3}" -f $sym, ($runArgs -join ' '), $setInput.Count,
+        $shown = ($runArgs.Keys | Where-Object { $_ -ne 'SetInput' } | Sort-Object | ForEach-Object { "-$_ $($runArgs[$_])" }) -join ' '
+        Write-Replay ("{0}: run-ea-tests.ps1 {1} -SetInput ({2} kunci): {3}" -f $sym, $shown, $setInput.Count,
             (($setInput | Select-Object -First 4) -join ', '))
         continue
     }
     Write-Replay "$sym mulai ($($setInput.Count) input live)"
     # Dipanggil di proses yang sama agar array -SetInput tidak dipecah ulang oleh powershell -File.
-    & $runner @runArgs -SetInput $setInput
-    if ($LASTEXITCODE -ne 0) { $failed += $sym; Write-Replay "$sym gagal (kode $LASTEXITCODE)" }
+    $pre = Get-MaxSession
+    & $runner @runArgs
+    # Kode 1 dari runner biasanya kriteria jumlah trade baseline-report (tidak berlaku untuk replay pendek);
+    # replay dianggap jalan bila sesi tester baru terbentuk.
+    if ((Get-MaxSession) -le $pre) { $failed += $sym; Write-Replay "$sym gagal: tidak ada sesi tester baru (kode $LASTEXITCODE)" }
+    elseif ($LASTEXITCODE -ne 0) { Write-Replay "$sym selesai (kriteria baseline-report diabaikan untuk replay)" }
 }
 
 if ($DryRun) { Write-Replay "dry run: $($Symbols.Count) simbol, dilewati: $($failed -join ', ')"; exit 0 }

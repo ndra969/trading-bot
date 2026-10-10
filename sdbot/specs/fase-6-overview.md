@@ -14,7 +14,7 @@ Fase 6 selesai bila kriteria PRD tahap 3 dan 4 terpenuhi, atau bila ada keputusa
 
 | Tahap PRD | Arti di Fase 6 | Bukti |
 |---|---|---|
-| 3. Forward test | Periode live (tidak pernah dipakai menyetel) dibandingkan dengan backtest acuan | PF dan DD live tidak memburuk lebih dari 30% dibanding backtest IS 1.25 (PF 1,10, DD 6,3%); dinilai dalam R karena risk live 0,1% dan backtest 0,5% |
+| 3. Forward test | Periode live (tidak pernah dipakai menyetel) dibandingkan dengan backtest acuan | PF dan DD live tidak memburuk lebih dari 30% dibanding backtest IS versi yang sedang live (1.28: PF 1,17, DD 7,2%; 1.25: PF 1,10, DD 6,3%); dinilai dalam R karena risk live 0,1% dan backtest 0,5% |
 | 4. Live akun cent | Sekitar 2 minggu live, lalu replay tester periode yang sama | Tidak ada error kritis; kandidat dan trade live cocok dengan replay tester; slippage rata-rata tercatat dan wajar |
 
 Di luar Fase 6:
@@ -81,7 +81,7 @@ Usulan saya dalam kurung.
 
 1. **Tiga spec (28 laporan live, 29 replay, 30 penerimaan)**, berurutan. Alternatifnya satu spec besar; lebih cepat, tetapi alat laporan bisa dipakai lebih dulu bila dipisah.
 2. **Penilaian dalam R, bukan uang**, karena risk live 0,1% dan backtest 0,5%. Kriteria "tidak memburuk > 30%" diterapkan ke PF dan DD dalam R.
-3. **Acuan tahap 3 = backtest IS 1.25** (PF 1,10, DD 6,3%; DD dalam R dihitung ulang oleh `live_report.py`). Alternatifnya REAL 1.25 (PF 1,06): lebih realistis, tetapi periode REAL ikut dipakai memilih H1.
+3. **Acuan tahap 3 = backtest IS versi yang sedang live** (1.28: PF 1,17, DD 7,2%; sebelumnya 1.25: PF 1,10, DD 6,3%; DD dalam R dihitung ulang oleh `live_report.py`). Disesuaikan 2026-10-10 sesudah spec 27. Alternatifnya REAL 1.25 (PF 1,06): lebih realistis, tetapi periode REAL ikut dipakai memilih H1.
 4. **Kecocokan replay (tahap 4), usulan ambang:** ≥ 95% kandidat live punya pasangan di replay dengan tahap tolak sama (dan sebaliknya); ≥ 90% trade live berpasangan; ≥ 90% pasangan punya alasan tutup sama; selisih R rata-rata ≤ 0,1R. Angka final ditetapkan di requirements spec 29.
 5. **Tahap 4 sesudah sekitar 2 minggu, tahap 3 berjalan di belakang** (disetujui 2026-10-09, menggantikan usulan "minimal 1 bulan"):
    - Tahap 4 dinilai dari kandidat, bukan hanya trade. Live mencatat sekitar 100+ kandidat per hari, jadi 2 minggu cukup untuk menemukan bug perilaku. Syaratnya ambang keputusan 4, minimal sekitar 10 trade berpasangan, dan tidak ada error kritis.

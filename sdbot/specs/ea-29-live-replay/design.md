@@ -1,6 +1,6 @@
 # Design — Replay tester periode live (spec 29)
 
-Status: Approved (2026-10-09)
+Status: Done (2026-10-10)
 Requirements: [requirements.md](requirements.md) (Approved 2026-10-09)
 
 ## 1. Overview
@@ -63,7 +63,7 @@ Skrip berakhir dengan mencetak `replay=<min>-<max>`. Tester hanya dijalankan bil
 
 Catatan versi (ditemukan saat task 1, 2026-10-09):
 - `--version` di `inputs` dan `compare` membatasi sesi live ke satu versi. Live v1.25 dimulai 2026-10-09 07:39 UTC, sebelumnya 1.24, jadi tanpa filter periode itu ditolak sebagai input berubah.
-- Replay memakai EA hasil build saat itu (1.26 atau lebih baru). Input yang tidak ada di `inputs_json` live memakai default versi replay; `compare` mendaftarnya lewat `extra_inputs` agar perbedaan default terlihat.
+- Replay memakai EA hasil build saat itu (1.28 per 2026-10-10). Input yang tidak ada di `inputs_json` live diisi `LEGACY_INPUTS`, nilai yang meniru perilaku sebelum input itu ada (`InpAllowTestedZones=true`, `InpSessionEndHourUtc=22`, `InpBiasMode=0`, `InpBiasEmaPeriod=0`). Tanpa ini, replay periode 1.25 akan memakai EMA bias 21 dari 1.28 dan tidak sebanding. Nilai live selalu menang. `extra_inputs` tetap mendaftar kunci yang masih tersisa (input baru yang belum ada di tabel). Setiap input baru di EA wajib ditambahkan ke `LEGACY_INPUTS` bila mengubah perilaku.
 
 ## 4. Penanganan error
 
@@ -83,6 +83,7 @@ Catatan versi (ditemukan saat task 1, 2026-10-09):
 | TS-130 | `pair_candidates`: 4 kandidat live, 4 replay; satu beda tahap (SCORE vs PA) = tidak dikenal, satu beda (SPREAD vs ACCEPTED) = dikenal, satu hanya-live di luar jendela live → diabaikan, satu hanya-replay di dalam jendela | hitungan dan persentase sesuai | 2.1–2.3 |
 | TS-131 | `pair_trades`: selisih buka 10 menit → berpasangan; 20 menit → tidak; trade live dibuka sebelum periode → dikecualikan; alasan tutup beda → dihitung | sesuai | 3.1, 3.2 |
 | TS-132 | `assess`: data di atas ambang → LOLOS; kandidat 94% → TIDAK; 5 pasangan trade → SAMPEL KURANG | sesuai | 4.1, 4.2 |
+| TS-134 | `LEGACY_INPUTS`: sesi live tanpa input bias dan jam akhir → `InpBiasMode=0`, `InpBiasEmaPeriod=0`, `InpSessionEndHourUtc=22`; nilai live (`InpAllowTestedZones=false`) tidak ditimpa | sesuai | 1.1 |
 | TS-133 | `extra_inputs`: replay punya `InpSessionEndHourUtc=22` yang tidak ada di live → terdaftar; CLI: `compare` DB tester tidak ada → 1; `--replay 5-1` → 2; `inputs` dengan dua hash → 3; `--out` sama dengan stdout | sesuai | 4.3 |
 | RUN-01 | `run-live-replay.ps1 -DryRun` untuk periode live v1.25 | mencetak 12 perintah dengan `-SetInput` lengkap | 1.1–1.3 |
 | RUN-02 | Replay sebenarnya + `compare` (sesudah tester bebas) | laporan tercatat; setiap ketidakcocokan diberi penjelasan | 2–4 |

@@ -20,6 +20,14 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parent
 TYPES_MQH = TOOLS.parent / "ea" / "src" / "Include" / "SDBot" / "Core" / "Types.mqh"
 DROP_KEYS = ("InpAllowLiveTrading", "InpRiskPerTradePct", "InpTelegramConfigured")
+# Input yang ditambahkan sesudah versi live tertentu, dengan nilai yang meniru perilaku sebelum input itu ada.
+# Replay memakai EA hasil build terbaru; tanpa ini kunci yang tidak ada di inputs_json live memakai default baru.
+LEGACY_INPUTS = {
+    "InpAllowTestedZones": "true",  # 1.25 (spec 23); sebelumnya zona Tested boleh
+    "InpSessionEndHourUtc": "22",  # 1.26 (spec 25); 22 = tanpa pemotongan
+    "InpBiasMode": "0",  # 1.27 (spec 27); SDB_BIAS_AND_EMA
+    "InpBiasEmaPeriod": "0",  # 1.27/1.28 (spec 27); 0 = ikut InpEmaPeriod (EMA 50)
+}
 ENUM_RE = re.compile(r"\b(SDB_[A-Z0-9_]+)\s*=\s*(-?\d+)")
 
 
@@ -71,7 +79,10 @@ def replay_inputs(
             f"{symbol}: input berubah di tengah periode ({parts}); pecah periodenya"
         )
     data = json.loads(rows[0][1])
-    return [f"{k}={_value(v, enums)}" for k, v in sorted(data.items()) if k not in DROP_KEYS]
+    values = {k: _value(v, enums) for k, v in data.items() if k not in DROP_KEYS}
+    for k, v in LEGACY_INPUTS.items():
+        values.setdefault(k, v)
+    return [f"{k}={v}" for k, v in sorted(values.items())]
 
 
 KNOWN_DIFF = ("SPREAD_TOO_WIDE", "NEWS_BLACKOUT")
@@ -333,9 +344,13 @@ def render(
     live_v, rep_v = versions
     if live_v != rep_v:
         lines.append(f"PERINGATAN versi: live {sorted(live_v)} vs replay {sorted(rep_v)}")
-        lines += [
-            f"  input hanya di replay (default versi replay): {k}={v}" for k, v in extras.items()
-        ]
+        for k, v in extras.items():
+            how = (
+                "diisi nilai lama (meniru versi live)"
+                if k in LEGACY_INPUTS
+                else "DEFAULT VERSI REPLAY, cek"
+            )
+            lines.append(f"  input hanya di replay, {how}: {k}={v}")
     lines.append(
         f"== Kandidat: live {cands.n_live}, replay {cands.n_replay}, tahap sama {cands.same}"
     )

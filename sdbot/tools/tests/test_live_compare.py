@@ -209,3 +209,25 @@ def test_ts133_extra_inputs_and_cli(
         == 0
     )
     assert out.read_text(encoding="utf-8").strip() == capsys.readouterr().out.strip()
+
+
+def test_ts134_legacy_inputs(tmp_path: Path, types_file: Path) -> None:
+    """Spec 29 (penyesuaian v1.28): input yang belum ada di sesi live diisi nilai perilaku lama, bukan default baru."""
+    db = _db(tmp_path / "live.sqlite")
+    conn = sqlite3.connect(db)
+    _session(
+        conn, 1, "EURUSDc", T0
+    )  # INPUTS: punya InpAllowTestedZones, tanpa input bias dan jam akhir
+    conn.commit()
+    d = dict(
+        x.split("=", 1)
+        for x in lc.replay_inputs(conn, "EURUSDc", T0, T0 + H, lc.enum_values(types_file))
+    )
+    conn.close()
+    assert (
+        d["InpBiasMode"] == "0"
+        and d["InpBiasEmaPeriod"] == "0"
+        and d["InpSessionEndHourUtc"] == "22"
+    )
+    assert d["InpAllowTestedZones"] == "false"  # nilai live menang atas nilai lama
+    assert "InpAllowTestedZones" in lc.LEGACY_INPUTS

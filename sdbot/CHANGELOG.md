@@ -9,6 +9,7 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 - `tools/live_report.py`: ringkasan DB live per periode (read-only): hasil dalam R (PF uang dan R, DD R), alasan tutup, posisi terbuka, slippage dan spread, kandidat per tahap, alert (daftar HIGH/CRITICAL), sesi dan celah > 30 menit. Uji TS-120..127. DB live 2026-10-09 v1.25: 12 sesi, 0 trade, 56 kandidat (54 `NO_VALID_ZONE` dari zona Tested).
 - `tools/live_compare.py`: `inputs` (input replay dari `inputs_json` sesi live, enum ke angka, `--version`), `compare` (pasangan kandidat per simbol/bar/arah dengan perbedaan spread/berita dipisahkan; pasangan trade ±15 menit; empat ambang tahap 4; peringatan beda versi). Uji TS-128..133.
 - `tools/run-live-replay.ps1`: replay tester per simbol dengan input live (real ticks), menolak jalan bila terminal tester hidup.
+- `LEGACY_INPUTS` (TS-134): input yang belum ada di sesi live diisi nilai perilaku lama agar replay dengan EA terbaru (1.28) sebanding. Replay pertama 2026-10-09 (v1.25): 58 dari 58 kandidat cocok tahapnya; belum ada trade.
 
 ## EA
 
