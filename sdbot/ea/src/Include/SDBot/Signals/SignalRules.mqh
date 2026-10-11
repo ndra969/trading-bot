@@ -207,7 +207,8 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
   {
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
                  "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio", "tl_dist", "tl_slope",
-                 "tl_touches", "bo_age", "bo_dist", "bo_level", "rsi_age", "rsi_diff", "rsi_pdiff"};
+                 "tl_touches", "bo_age", "bo_dist", "bo_level", "rsi_age", "rsi_diff", "rsi_pdiff",
+                 "zone_prox", "zone_dist", "opp_prox", "bid", "ask"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -241,6 +242,12 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    v[23] = rs ? IntegerToString(f.rsi.ageBars) : "null";
    v[24] = rs ? DoubleToString(f.rsi.rsiDiff, 1) : "null";
    v[25] = rs ? DoubleToString(f.rsi.priceDiffAtr, 2) : "null";
+   // Spec 31 Req 1.1: harga untuk menghitung SL/TP kandidat yang ditolak sebelum tahap SL/TP.
+   v[26] = DoubleToString(f.zone.proximal, f.digits);
+   v[27] = DoubleToString(f.zone.distal, f.digits);
+   v[28] = f.haveOpposite ? DoubleToString(f.oppositeProximal, f.digits) : "null";
+   v[29] = DoubleToString(f.bid, f.digits);
+   v[30] = DoubleToString(f.ask, f.digits);
    return CanonicalJson(k, v);
   }
 

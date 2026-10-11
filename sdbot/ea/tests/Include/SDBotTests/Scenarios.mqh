@@ -1356,6 +1356,25 @@ void CheckSc27(const string id, const CScenarioRecorder &rec)
    AssertTrue(id + "-inputs", StringFormat("sesi dengan InpBiasMode STRUCTURE_ONLY dan InpBiasEmaPeriod 21: %I64d", inputs), inputs >= 1);
   }
 
+// SC-31 (spec 31 Req 1.1, 2.1): setiap kandidat membawa harga zona dan bid/ask; distal di sisi SL; SL ACCEPTED di luar distal.
+void CheckSc31(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
+   string zp = "json_extract(context_json, '$.zone_prox')", zd = "json_extract(context_json, '$.zone_dist')";
+   long candidates = ScDbCount("SELECT COUNT(*)" + w);
+   long missing = ScDbCount("SELECT COUNT(*)" + w + " AND (" + zp + " IS NULL OR " + zd + " IS NULL OR json_extract(context_json, '$.bid') IS NULL"
+                            " OR json_extract(context_json, '$.ask') IS NULL)");
+   long wrongSide = ScDbCount("SELECT COUNT(*)" + w + " AND ((direction = 'BUY' AND " + zd + " > " + zp + ") OR (direction = 'SELL' AND " + zd +
+                              " < " + zp + "))");
+   AssertTrue(id + "-keys", StringFormat("kandidat %I64d, tanpa harga %I64d, distal salah sisi %I64d", candidates, missing, wrongSide),
+              candidates >= 1 && missing == 0 && wrongSide == 0);
+   string sl = "json_extract(context_json, '$.sl')";
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status = 'ACCEPTED'");
+   long slInside = ScDbCount("SELECT COUNT(*)" + w + " AND status = 'ACCEPTED' AND ((direction = 'BUY' AND " + sl + " >= " + zd +
+                             ") OR (direction = 'SELL' AND " + sl + " <= " + zd + "))");
+   AssertTrue(id + "-sl", StringFormat("ACCEPTED %I64d, SL tidak di luar distal %I64d", accepted, slInside), accepted >= 1 && slInside == 0);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1449,6 +1468,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc23(id, rec);
    else if(id == "SC-27")
       CheckSc27(id, rec);
+   else if(id == "SC-31")
+      CheckSc31(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

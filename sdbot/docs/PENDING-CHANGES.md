@@ -3,6 +3,14 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-33: Telemetri harga kandidat di context_json (spec 31)
+- Status: Open
+- Tanggal disetujui: 2026-10-09 (requirements spec 31)
+- Dokumen: PRD-EA §Telemetri sinyal (paragraf `context_json`)
+- Sumber: spec `ea-31-candidate-outcomes` task 1
+- Perubahan:
+    - Kalimat `context_json` ditambah: "batas proximal dan distal zona (`zone_prox`, `zone_dist`), proximal zona lawan (`opp_prox`, null bila tidak ada), serta bid dan ask saat kandidat dinilai, untuk setiap kandidat termasuk yang ditolak sebelum tahap SL/TP".
+
 ### PC-32: Mode bias HTF dan EMA bias 21 (spec 27, H5 diterima)
 - Status: Open
 - Tanggal disetujui: 2026-10-10 (aturan keputusan spec 27 Req 4.2, disetujui bersama spec 2026-10-09)

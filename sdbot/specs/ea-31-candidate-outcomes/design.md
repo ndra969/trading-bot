@@ -1,12 +1,12 @@
 # Design — Hasil kandidat dan faktor profit
 
-Status: Approved (2026-10-09)
+Status: Done (2026-10-11)
 Requirements: [requirements.md](requirements.md) (Approved 2026-10-09)
 
 ## 1. Overview
 
 - **EA (1.29, telemetri saja).** `SignalContextJson` menambah lima kunci: `zone_prox`, `zone_dist`, `opp_prox`, `bid`, `ask`. Semua sudah ada di `SdbSignalFacts` (`f.zone`, `f.oppositeProximal`/`f.haveOpposite`, `f.bid`/`f.ask`), jadi engine tidak berubah. Kunci trendline (`tl_dist`, `tl_slope`, `tl_touches`) sudah ada.
-- **Ekspor bar.** Script baru `Scripts/SDBot/ExportBars.mq5` di terminal uji menulis bar M1 (bid) dan spread per simbol ke CSV di Common/Files. Runner mendapat switch `-ExportBars`, dengan pola yang sama dengan `-ExportCalendar`.
+- **Ekspor bar.** EA alat `Experts/SDBot/ExportBars.mq5` dijalankan di Strategy Tester per simbol dan menulis bar M1 (bid) dan spread ke CSV di Common/Files. Runner mendapat switch `-ExportBars`.
 - **Simulator.** `tools/outcome_sim.py` meniru `BuildStops` dan `CPositionManager` di atas bar M1: entry, SL/TP, BE, partial, trailing. Hasilnya untuk setiap kandidat ditulis ke file hasil (CSV) agar laporan tidak menghitung ulang.
 - **Kalibrasi.** Sub-perintah `calibrate` mensimulasikan kandidat ACCEPTED dan membandingkannya dengan `closures` lewat `trades.signal_id`.
 - **Laporan.** `tools/factor_report.py` membaca hasil simulasi + DB, lalu menampilkan bucket faktor dengan tanda konsistensi dan tabel per tahap tolak.
@@ -16,7 +16,7 @@ Requirements: [requirements.md](requirements.md) (Approved 2026-10-09)
 ```mermaid
 flowchart LR
     SR[Signals/SignalRules.mqh<br/>SignalContextJson + 5 kunci] --> TDB[(sdbot_tester.sqlite)]
-    EB[Scripts/SDBot/ExportBars.mq5] --> CSV[(Common/Files/sdbot_bars/SIMBOL_M1.csv)]
+    EB[Experts/SDBot/ExportBars.mq5<br/>di Strategy Tester] --> CSV[(Common/Files/sdbot_bars/SIMBOL_M1.csv)]
     CSV --> BL[outcome_sim.load_bars<br/>cache .npz]
     TDB --> OS[outcome_sim.py simulate / calibrate]
     BL --> OS
@@ -25,7 +25,7 @@ flowchart LR
     TDB --> FR
 ```
 
-Lapisan EA tidak berubah: `SignalRules` (Signals) tetap fungsi murni yang hanya menulis teks JSON. Script `ExportBars` hanya membaca harga dan menulis file. Script tidak memakai `CTrade` dan tidak menyentuh DB.
+Lapisan EA tidak berubah: `SignalRules` (Signals) tetap fungsi murni yang hanya menulis teks JSON. EA `ExportBars` hanya membaca harga dan menulis file. EA ini tidak memakai `CTrade` dan tidak menyentuh DB.
 
 ## 3. Komponen dan antarmuka
 
@@ -34,11 +34,11 @@ Lapisan EA tidak berubah: `SignalRules` (Signals) tetap fungsi murni yang hanya 
 | Komponen | Perubahan | Murni | Kriteria |
 |---|---|---|---|
 | `Signals/SignalRules.mqh` | `SignalContextJson`: `zone_prox`, `zone_dist` (`f.zone`), `opp_prox` (`f.haveOpposite ? f.oppositeProximal : null`), `bid`, `ask`; semua `DoubleToString(x, f.digits)`; urutan kanonik tetap dari `CanonicalJson` | ya | 1.1, 1.2, 1.4 |
-| `Scripts/SDBot/ExportBars.mq5` | input `InpSymbols` (daftar dipisah koma, default 12 simbol preset), `InpFrom`, `InpTo`, `InpCloseTerminal`; per simbol `CopyRates(M1)` dalam potongan 100.000 bar, tulis `sdbot_bars\<SIMBOL>_M1.csv` (`time,open,high,low,close,spread`) dan file status | — | 2.1 |
-| `tools/run-ea-tests.ps1` | switch `-ExportBars` (+ `-FromDate`/`-ToDate`), fungsi `Invoke-ExportBars` meniru `Invoke-ExportCalendar`; menolak jalan bila terminal uji sedang dipakai | — | 2.1 |
+| `Experts/SDBot/ExportBars.mq5` (deviasi 2026-10-10, lihat catatan) | EA alat riset, hanya di Strategy Tester (OHLC M1): setiap bar M1 tertutup (bid) + spread ditulis ke `sdbot_bars\<SIMBOL>_M1.csv` (`# symbol=.. point=.. digits=..`, header, `time,open,high,low,close,spread`) dan status OK/PARTIAL; tidak trading, tidak DB | — | 2.1 |
+| `tools/run-ea-tests.ps1` | switch `-ExportBars` (+ `-Symbols`, `-FromDate`/`-ToDate`, default 2024.03.26..hari ini): satu run tester per simbol baseline (`Kind = export`), dinilai dari file status; runner sudah menolak jalan bila terminal uji terbuka | — | 2.1 |
 | Versi | 1.29 (EA + harness), CHANGELOG | — | 1.3 |
 
-Script memakai terminal uji, jadi tidak bisa berjalan bersamaan dengan backtest. Runner memeriksa proses terminal uji sebelum mulai.
+**Catatan deviasi (2026-10-10):** design awal memakai script `CopyRates` di terminal uji. `CopyRates` di terminal dibatasi pengaturan "Max bars in chart" (umumnya 100.000 bar), sedangkan M1 30 bulan sekitar 900.000 bar per simbol. EA di Strategy Tester tidak terbatas oleh itu dan memakai data yang sama persis dengan backtest. Ekspor tetap memakai terminal uji, jadi tidak bisa bersamaan dengan backtest.
 
 ### 3.2 `tools/outcome_sim.py`
 
@@ -165,7 +165,7 @@ ID TS mulai 100 agar tidak bentrok dengan spec 27 (TS-91..93) dan Fase 6 yang se
 
 1. **BE/trailing berlaku mulai bar M1 berikutnya** (§3.2 langkah 2d). Lebih sederhana dan konservatif daripada menebak urutan tick. Kalibrasi menentukan apakah ini cukup.
 2. **Aturan exit dibaca dari `inputs_json` sesi**, bukan konstanta. Simulasi otomatis mengikuti konfigurasi run, termasuk varian spec 27.
-3. **Ekspor bar lewat script di terminal uji + cache `.npz`.** CSV M1 12 simbol × ~30 bulan berukuran sekitar 350 MB. Cache dibuat sekali, dan file bar tidak di-commit.
+3. **Ekspor bar lewat EA `ExportBars` di Strategy Tester (deviasi dari script, §3.1) + cache `.npz`.** CSV M1 12 simbol × ~30 bulan berukuran sekitar 350 MB. Cache dibuat sekali, dan file bar tidak di-commit.
 4. **Bucket faktor seperti tabel §3.3.** Batasnya dipilih sebelum melihat hasil agar tidak disetel ke data.
 5. **Simulasi kandidat sendiri-sendiri** (tanpa batas 1 posisi per instance). Laporan tahap `POSITION_OPEN` ditandai sebagai kandidat yang memang tidak mungkin dientry.
 6. **ID TS mulai 100.**

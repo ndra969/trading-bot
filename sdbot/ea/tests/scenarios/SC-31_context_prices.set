@@ -1,0 +1,7 @@
+; SC-31: setiap kandidat punya zone_prox, zone_dist, bid, ask; zone_dist di sisi SL; SL ACCEPTED di luar zone_dist.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-31
+HarnessEveryBars=0
+HarnessPipeline=true

@@ -308,16 +308,16 @@ void RunTestSignalMisc()
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   string expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"PIN\",\"rr\":2.60,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
-                   "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_status\":\"FRESH\"}";
+   string expect = "{\"ask\":1.10090,\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bid\":1.10080,\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"opp_prox\":1.10350,\"pa\":\"PIN\",\"rr\":2.60,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
+                   "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_dist\":1.10000,\"zone_prox\":1.10060,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
    f = SgF0();
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   expect = "{\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"pa\":\"NONE\",\"rr\":null,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
-            "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":null,\"tp_source\":null,\"zone_status\":\"FRESH\"}";
+   expect = "{\"ask\":1.10090,\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bid\":1.10080,\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"opp_prox\":null,\"pa\":\"NONE\",\"rr\":null,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
+            "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":null,\"tp_source\":null,\"zone_dist\":1.10000,\"zone_prox\":1.10060,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
 
    f = SgF0();
@@ -591,6 +591,42 @@ void RunTestSignalEndHour()
               StringFind(b.detail, "jam_akhir") < 0 && c.stage == SDB_REJECT_STAGE_NEWS_BLACKOUT);
   }
 
+// TC-SG-39..40 (spec 31 Req 1.1, 1.2): harga zona, zona lawan, bid/ask di konteks setiap kandidat, dinormalisasi ke digit simbol.
+void RunTestSignalContextPrices()
+  {
+   SdbSignalFacts f = SgF0();
+   f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);   // ditolak sebelum SL/TP: harga tetap tercatat
+   SdbDecision d = SgEval(f);
+   string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-39", "kandidat NO_PA_TRIGGER membawa zona, bid/ask; tanpa zona lawan opp_prox null: " + json,
+              d.stage == SDB_REJECT_STAGE_NO_PA_TRIGGER && StringFind(json, "\"ask\":1.10090,") >= 0 && StringFind(json, "\"bid\":1.10080,") >= 0 &&
+              StringFind(json, "\"opp_prox\":null,") >= 0 && StringFind(json, "\"zone_dist\":1.10000,\"zone_prox\":1.10060,") >= 0);
+
+   SdbSignalFacts j = SgF0();
+   j.digits = 3;
+   j.point = 0.001;
+   j.zone.distal = 157.88249;
+   j.zone.proximal = 158.0;
+   j.bid = 158.12345;
+   j.ask = 158.13456;
+   j.haveOpposite = true;
+   j.oppositeProximal = 159.5004;
+   string jj = SignalContextJson(j, SgEval(j), SgP0(), SDB_BIAS_OK);
+   SdbSignalFacts x = SgF0();
+   x.digits = 2;
+   x.point = 0.01;
+   x.zone.distal = 4143.399;
+   x.zone.proximal = 4150.0;
+   x.bid = 4160.126;
+   x.ask = 4160.444;
+   string xj = SignalContextJson(x, SgEval(x), SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-40", "JPY 3 digit dan XAU 2 digit: " + jj + " | " + xj,
+              StringFind(jj, "\"zone_dist\":157.882,\"zone_prox\":158.000,") >= 0 && StringFind(jj, "\"bid\":158.123,") >= 0 &&
+              StringFind(jj, "\"ask\":158.135,") >= 0 && StringFind(jj, "\"opp_prox\":159.500,") >= 0 &&
+              StringFind(xj, "\"zone_dist\":4143.40,\"zone_prox\":4150.00,") >= 0 && StringFind(xj, "\"bid\":4160.13,") >= 0 &&
+              StringFind(xj, "\"ask\":4160.44,") >= 0);
+  }
+
 void RunTestSignalRules()
   {
    TfBeginSuite("SignalRules");
@@ -606,6 +642,7 @@ void RunTestSignalRules()
    RunTestSignalRsi();
    RunTestSignalTestedZones();
    RunTestSignalEndHour();
+   RunTestSignalContextPrices();
    TfEndSuite();
   }
 

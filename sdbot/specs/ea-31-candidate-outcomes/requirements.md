@@ -1,6 +1,6 @@
 # Requirements — Hasil kandidat dan faktor profit
 
-Status: Approved (2026-10-09)
+Status: Done (2026-10-11)
 Use case: UC-80, UC-81, UC-83 ([fase-5c-overview.md](../fase-5c-overview.md))
 Asal: PRD-EA §Telemetri sinyal (`context_json`), §Aturan entry (SL di luar zona + buffer, TP ke zona lawan, R:R ≥ 2), §Position management (BE 1R, partial 1,5R 50%, trailing ATR(14) × 2), §Pengujian; `python-bot-lessons.md` (skor tidak prediktif); permintaan user 2026-10-09
 Butuh: spec 27 (selesai; acuan konfigurasi tergantung keputusan H5)

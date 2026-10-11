@@ -100,7 +100,7 @@ Use case, pembagian, dan keputusan: [fase-5c-overview.md](fase-5c-overview.md) (
 
 | # | Spec | Isi | Butuh | Bukti selesai | Status |
 |---|---|---|---|---|---|
-| 31 | [ea-31-candidate-outcomes](ea-31-candidate-outcomes/) | Telemetri zona/trendline di `context_json`, simulator hasil kandidat (terkalibrasi), laporan faktor profit dan per tahap tolak | 27 | kalibrasi lolos; laporan IS/OOS/REAL | Approved 2026-10-09, menunggu spec 27 |
+| 31 | [ea-31-candidate-outcomes](ea-31-candidate-outcomes/) | Telemetri zona/trendline di `context_json`, simulator hasil kandidat (terkalibrasi), laporan faktor profit dan per tahap tolak | 27 | kalibrasi lolos; laporan IS/OOS/REAL | **Done** 2026-10-11 (v1.29; simulator cocok 98–99%; gerbang utama membuang kandidat rugi; profit dari jam 13–17 UTC, TP zona, pin bar; trendline di zona dan EURJPY/GBPJPY rugi) |
 | 32 | ea-32-trendline-setups | Lab tiga setup trendline H1 + PA M15 (pantulan tanpa zona, + zona, break-retest) | 31 | laporan IS/OOS/REAL per setup dan simbol; keputusan | Belum mulai |
 
 ## Fase 6 — Validasi live akun cent

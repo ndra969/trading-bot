@@ -89,3 +89,23 @@ Usulan saya dalam kurung.
 2. **Faktor yang dilaporkan:** status zona, skor trendline dan jarak ke garis, pola PA, jam/sesi UTC, persen skor, alasan bias, arah, R:R rencana, rezim ATR, simbol.
 3. **Definisi "konsisten":** arah selisih terhadap rata-rata sama di IS, OOS, dan REAL, masing-masing dengan ≥ 10 trade per bucket.
 4. **Trendline lab memakai aturan `TrendlineRules` yang sama** (swing H1, kekuatan 2, toleransi 0,2 ATR, kemiringan minimal), agar hasil bisa langsung dipindah ke EA.
+
+## 7. Temuan spec 31 (2026-10-11, konfigurasi 1.28/1.29)
+
+Simulator terkalibrasi: alasan tutup cocok 98–99% di IS/OOS/REAL; real ticks sedikit optimis (+0,036R per trade, terutama 2 dari 126 trade).
+
+**Gerbang tidak terlalu ketat.** Kandidat yang ditolak di tahap utama rugi di ketiga periode (R/trade hipotetis, satu kandidat per zona per hari): NO_PA_TRIGGER −0,09 s/d −0,18; zona TESTED −0,14 s/d −0,22; di luar sesi −0,08 s/d −0,18; berita −0,07 s/d −0,09. Kandidat yang diterima: +0,04 / +0,18 / +0,04.
+
+**Yang konsisten membuat trade untung** (trade nyata, ketiga periode):
+- jam 13–17 UTC (overlap London–New York);
+- TP ke zona lawan (bukan 2R tetap) dan R:R rencana 2–3;
+- pola pin bar;
+- BUY (SELL negatif di real ticks);
+- zona tanpa trendline di dekatnya.
+
+**Yang konsisten merugikan:**
+- trendline tepat di zona (≤ 0,1 ATR; untuk semua kandidat: 3+ sentuhan −0,19 s/d −0,38R): berlawanan dengan dugaan awal bahwa trendline + PA adalah setup terbaik. Spec 32 tetap menguji pantulan trendline tanpa syarat zona, karena itu setup yang berbeda;
+- skor ≥ 85% (skor tidak prediktif, sama dengan temuan bot Python);
+- cross JPY EURJPY dan GBPJPY: zona paling sering gagal, untuk semua kandidat.
+
+Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase 5b): TP selalu ke zona lawan atau R:R minimum lebih tinggi, filter jam overlap, trendline di zona sebagai penolakan, dan aturan khusus cross JPY.

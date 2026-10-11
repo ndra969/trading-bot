@@ -45,6 +45,10 @@
     Bersama -Baseline: ganti model tester (0 every tick, 1 OHLC M1, 4 every tick real ticks).
 .PARAMETER SetInput
     Bersama -Baseline: ganti input preset, misalnya -SetInput 'InpMinConfluenceScore=60','InpScoreBreakoutMode=2' (spec 22).
+.PARAMETER ExportBars
+    Spec 31: EA SDBot\ExportBars di Strategy Tester per simbol baseline (BL-*.ini, bisa dibatasi -Symbols)
+    menulis bar M1 + spread ke Common\Files\sdbot_bars\<SIMBOL>_M1.csv untuk tools\outcome_sim.py.
+    Rentang default 2024.03.26..hari ini (OHLC M1), bisa diganti -FromDate/-ToDate.
 .PARAMETER Symbols
     Batasi -Baseline ke simbol tertentu, misalnya -Symbols EURUSDc,XAUUSDc (kriteria jumlah tetap sama).
 .PARAMETER SkipBuild
@@ -63,6 +67,7 @@ param(
     [ValidateSet('', 'IS', 'OOS', 'ALL', 'REAL')]
     [string]$Period = '',
     [switch]$ExportCalendar,
+    [switch]$ExportBars,
     [string[]]$Symbols = @(),
     [int]$CompareFrom = -1,
     [int]$CompareTo = -1,
@@ -266,6 +271,17 @@ function Invoke-TesterRun($r) {
             $setLines = @($setLines | Where-Object { $_ -notmatch ('^\s*' + [regex]::Escape($key) + '\s*=') }) + $kv.Trim()
         }
     }
+    elseif ($r.Kind -eq 'export') {
+        # Spec 31: bar M1 dari data tester (OHLC M1 = bar M1 histori), tanpa trading dan tanpa DB.
+        $tester['Expert'] = 'SDBot\ExportBars.ex5'
+        $sc = Read-ScenarioIni $r.Ini
+        foreach ($k in $sc.Keys) { $tester[$k] = $sc[$k] }
+        $tester['FromDate'] = $(if ($FromDate) { $FromDate } else { '2024.03.26' })
+        $tester['ToDate'] = $(if ($ToDate) { $ToDate } else { (Get-Date).ToString('yyyy.MM.dd') })
+        $tester['Model'] = '1'
+        $exStatus = Join-Path $script:cfg.CommonFilesDir "sdbot_bars\$($r.Symbol)_status.txt"
+        Remove-Item -LiteralPath $exStatus -Force -ErrorAction SilentlyContinue
+    }
     elseif ($r.Kind -eq 'scenario') {
         $tester['Expert'] = 'SDBotTests\SDBotHarness.ex5'
         $sc = Read-ScenarioIni $r.Ini
@@ -287,7 +303,7 @@ function Invoke-TesterRun($r) {
     }
     $tester['ExpertParameters'] = "$runId.set"
     $tester['ShutdownTerminal'] = '1'
-    if ($r.Kind -ne 'baseline') { $setLines += "InpTestRunId=$runId" }
+    if ($r.Kind -notin @('baseline', 'export')) { $setLines += "InpTestRunId=$runId" }
     Set-Content -LiteralPath $setPath -Value $setLines -Encoding Unicode
 
     # [Experts] Enabled=0: EA di chart terminal uji (jika ada) tidak ikut jalan selama run.
@@ -349,6 +365,17 @@ function Invoke-TesterRun($r) {
     if ($isOpt) {
         Remove-Item -LiteralPath $resultFile -Force -ErrorAction SilentlyContinue
         return Test-OptimizationRun $r $reportBase $dbPath $dbBefore $secs
+    }
+    if ($r.Kind -eq 'export') {
+        $exStatus = Join-Path $script:cfg.CommonFilesDir "sdbot_bars\$($r.Symbol)_status.txt"
+        if (-not (Test-Path -LiteralPath $exStatus)) {
+            Write-Run "GAGAL $($r.Id): file status tidak dibuat ($secs detik). Dari log terminal:"
+            Get-TerminalLogReasons $start | ForEach-Object { Write-Host "    $_" }
+            return 1
+        }
+        $text = ([string](Get-Content -LiteralPath $exStatus -Raw)).Trim()
+        Write-Run ("{0} {1}: {2} ({3} detik)" -f $(if ($text -match '^OK ') { 'LULUS' } else { 'GAGAL' }), $r.Id, $text, $secs)
+        return $(if ($text -match '^OK ') { 0 } else { 1 })
     }
     if ($r.Kind -eq 'baseline') {
         # Tidak ada file hasil: penilaian lewat baseline_report.py setelah semua simbol selesai.
@@ -521,7 +548,7 @@ function Invoke-Main {
 
 try { $script:cfg = Get-Mt5Config -Path $Config }
 catch { Write-Run $_.Exception.Message; exit 2 }
-$script:timeoutSec = $(if ($TimeoutSec -gt 0) { $TimeoutSec } elseif ($Period) { 3600 } else { $script:cfg.TimeoutSec })
+$script:timeoutSec = $(if ($TimeoutSec -gt 0) { $TimeoutSec } elseif ($Period -or $ExportBars) { 3600 } else { $script:cfg.TimeoutSec })
 $script:tmp = Join-Path $PSScriptRoot '.tmp'
 if (-not (Test-Path -LiteralPath $script:tmp)) { New-Item -ItemType Directory -Path $script:tmp | Out-Null }
 $script:testerProfiles = Join-Path $script:cfg.TestDataDir 'MQL5\Profiles\Tester'
@@ -535,7 +562,7 @@ if ($ProbeHistory) {
     # Periode 2015 pasti di luar histori; tester lalu menulis rentang histori yang ada (spec 17 Req 5).
     $Baseline = $true; $FromDate = '2015.01.01'; $ToDate = '2015.01.08'; $Model = 4
 }
-if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All -and -not $Baseline -and -not $ExportCalendar) { $Unit = $true }
+if (-not $Unit -and $Scenario.Count -eq 0 -and -not $All -and -not $Baseline -and -not $ExportCalendar -and -not $ExportBars) { $Unit = $true }
 $script:runs = @()
 if ($Unit -or $All) { $script:runs += [pscustomobject]@{ Kind = 'unit'; Id = 'unit'; Ini = $null; Set = $null } }
 $scenarioDir = Join-Path $repoEa 'tests\scenarios'
@@ -578,6 +605,15 @@ if ($Baseline) {
             $id = $(if ($pname) { "BL-$pname-$sym" } else { "BL-$sym" })
             $script:runs += [pscustomobject]@{ Kind = 'baseline'; Id = $id; Symbol = $sym; Period = $pname; Ini = $ini.FullName; Set = $preset }
         }
+    }
+}
+
+if ($ExportBars) {
+    $want = @($Symbols | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+    foreach ($ini in (Get-ChildItem -LiteralPath (Join-Path $repoEa 'tests\baseline') -Filter 'BL-*.ini' -File | Sort-Object Name)) {
+        $sym = $ini.BaseName.Substring(3)
+        if ($want.Count -gt 0 -and $want -notcontains $sym) { continue }
+        $script:runs += [pscustomobject]@{ Kind = 'export'; Id = "EX-$sym"; Symbol = $sym; Period = ''; Ini = $ini.FullName; Set = $null }
     }
 }
 

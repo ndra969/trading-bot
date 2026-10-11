@@ -13,6 +13,13 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.29 — 2026-10-11 — spec 31 telemetri harga kandidat, simulator, faktor profit
+
+- `context_json` setiap kandidat memuat `zone_prox`, `zone_dist`, `opp_prox`, `bid`, `ask` (TC-SG-39..40, SC-31). Keputusan entry tidak berubah: backtest ulang IS/OOS/REAL identik dengan 1.28 (0 trade baru/hilang).
+- EA alat `Experts/SDBot/ExportBars.mq5` (Strategy Tester) + runner `-ExportBars`: bar M1 + spread ke `Common\Files\sdbot_bars`.
+- `tools/outcome_sim.py` (simulasi kandidat dengan aturan entry/exit EA, kalibrasi vs `closures`: alasan tutup cocok 98–99%) dan `tools/factor_report.py` (faktor profit dengan label konsistensi, hasil per tahap tolak). TS-100..112.
+- Temuan: gerbang utama membuang kandidat yang rugi; profit konsisten dari jam 13–17 UTC, TP ke zona lawan, pin bar, BUY; trendline di zona, skor ≥ 85%, EURJPY/GBPJPY konsisten rugi (`fase-5c-overview.md` §7).
+
 ### 1.28 — 2026-10-10 — spec 27 EMA bias HTF 21 (H5 diterima)
 
 - Default `InpBiasEmaPeriod` 21: bias HTF memakai EMA 21 H4 (struktur dan EMA tetap harus searah), EMA MTF untuk skor tren tetap 50. Preset 12 simbol ikut.
