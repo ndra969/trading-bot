@@ -154,6 +154,7 @@ void StyleTimeframes(const ENUM_SDB_TRADING_STYLE style, ENUM_TIMEFRAMES &htf, E
    switch(style)
      {
       case SDB_STYLE_SCALPING: htf = PERIOD_M15; mtf = PERIOD_M5;  ltf = PERIOD_M1;  return;
+      case SDB_STYLE_INTRADAY: htf = PERIOD_H1;  mtf = PERIOD_M15; ltf = PERIOD_M5;  return;
       case SDB_STYLE_SWING:    htf = PERIOD_W1;  mtf = PERIOD_D1;  ltf = PERIOD_H4;  return;
       case SDB_STYLE_POSITION: htf = PERIOD_MN1; mtf = PERIOD_W1;  ltf = PERIOD_D1;  return;
       default:                 htf = PERIOD_H4;  mtf = PERIOD_H1;  ltf = PERIOD_M15; return;

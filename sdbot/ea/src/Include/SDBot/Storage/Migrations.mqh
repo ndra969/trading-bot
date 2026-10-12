@@ -4,12 +4,12 @@
 
 #include <SDBot/Storage/MigrationSource.mqh>
 
-#define SDB_SCHEMA_LATEST 4
+#define SDB_SCHEMA_LATEST 5
 
 class CSdbDataMigrations : public ISdbMigrationSource
   {
 public:
-   int    Count()              { return 4; }
+   int    Count()              { return 5; }
    int    Version(const int i) { return i + 1; }
    string Name(const int i)
      {
@@ -19,6 +19,7 @@ public:
          case 1: return "run_key";
          case 2: return "alert_notify";
          case 3: return "signal_score_active";
+         case 4: return "style_intraday";
         }
       return "";
      }
@@ -30,6 +31,7 @@ public:
          case 1: return "0537621d99d4de54936c28ba2cd4de6e5974d702fa1383e61f5e09d372eb36e6";
          case 2: return "3a35561380ac55de9695d078d276eac62ebe7d371de60b9cbcfc250014ee114f";
          case 3: return "fe4b3ea74ea7022289c1a8d1d2a66505ad42727c7a47fef9e2a7227143325479";
+         case 4: return "8e1a4bb50b506132e5789507e7df9467aa386d4793e6d03813e240c5e7c03c4c";
         }
       return "";
      }
@@ -362,6 +364,34 @@ public:
             ArrayResize(out, 1);
             out[0] = "ALTER TABLE signal_scores ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))";
             return 1;
+         case 4:
+            ArrayResize(out, 6);
+            out[0] = "CREATE TABLE signals_v5 (\n" +
+                     "  id             INTEGER PRIMARY KEY,\n" +
+                     "  session_id     INTEGER NOT NULL,\n" +
+                     "  login          INTEGER NOT NULL,\n" +
+                     "  magic          INTEGER NOT NULL,\n" +
+                     "  symbol         TEXT    NOT NULL,\n" +
+                     "  time           INTEGER NOT NULL,\n" +
+                     "  direction      TEXT    NOT NULL CHECK (direction IN ('BUY','SELL')),\n" +
+                     "  style          TEXT    NOT NULL CHECK (style IN ('SCALPING','DAY','SWING','POSITION','INTRADAY')),\n" +
+                     "  zone_ref       TEXT,\n" +
+                     "  score_total    REAL,\n" +
+                     "  spread_points  INTEGER NOT NULL,\n" +
+                     "  status         TEXT    NOT NULL CHECK (status IN ('ACCEPTED','REJECTED')),\n" +
+                     "  reject_stage   TEXT,\n" +
+                     "  reject_detail  TEXT,\n" +
+                     "  context_json   TEXT\n" +
+                     ")";
+            out[1] = "INSERT INTO signals_v5 (id, session_id, login, magic, symbol, time, direction, style, zone_ref, score_total, spread_points,\n" +
+                     "                        status, reject_stage, reject_detail, context_json)\n" +
+                     "  SELECT id, session_id, login, magic, symbol, time, direction, style, zone_ref, score_total, spread_points,\n" +
+                     "         status, reject_stage, reject_detail, context_json FROM signals";
+            out[2] = "DROP TABLE signals";
+            out[3] = "ALTER TABLE signals_v5 RENAME TO signals";
+            out[4] = "CREATE INDEX ix_signals_login_time ON signals (login, time)";
+            out[5] = "CREATE INDEX ix_signals_stage ON signals (reject_stage, time)";
+            return 6;
         }
       return 0;
      }

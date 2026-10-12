@@ -102,6 +102,10 @@ void RunTestSignalEngine()
                                         c.evaluated, c.candidates, c.noBias, c.noZone),
               c.evaluated == 1 && (candidate != notCandidate));
    st.DeleteAll();
+   AssertTrue("TC-SGX-04", "teks gaya: INTRADAY (spec 34) dan nilai lama tetap",
+              SdbStyleText(SDB_STYLE_INTRADAY) == "INTRADAY" && SdbStyleText(SDB_STYLE_DAY) == "DAY" &&
+              SdbStyleText(SDB_STYLE_SCALPING) == "SCALPING" && SdbStyleText(SDB_STYLE_SWING) == "SWING" &&
+              SdbStyleText(SDB_STYLE_POSITION) == "POSITION");
    TfEndSuite();
   }
 

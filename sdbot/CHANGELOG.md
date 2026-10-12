@@ -13,6 +13,12 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.32 — 2026-10-13 — spec 34 gaya INTRADAY (H7 ditolak), skema v5
+
+- `InpTradingStyle` = 4 (`INTRADAY`): H1 / M15 / M5. Skema data v5: `signals.style` menerima `INTRADAY` (migrasi 0005, rebuild tabel `signals`). Default tetap DAY. Uji TC-CU-18, TC-SGX-04, TC-DB-01g, SC-34.
+- `exit_report.py`: kolom trade per bulan dan lama posisi rata-rata (TS-114).
+- IS (acuan 1.31: 4,5 trade/bulan, +0,164R, PF 1,39, +19,8R): intraday R:R 2 9,5/bulan −0,117R PF 0,79 −29,8R; intraday R:R 1,5 14,2/bulan −0,093R PF 0,83 −35,5R; DAY R:R 1,5 6,0/bulan +0,036R PF 1,08 +5,9R. H7 ditolak di IS: di M15 lebih banyak trade kena SL (55% vs 43%) dan spread memakan 20% risiko (DAY 12%).
+
 ### 1.31 — 2026-10-12 — spec 33 entry hanya dengan TP ke zona lawan (H6 diterima)
 
 - Default `InpRequireOppositeZone` true: kandidat tanpa zona lawan ditolak `RR_TOO_LOW` (detail `tanpa zona lawan`); TP selalu proximal zona lawan dengan R:R ≥ 2. Preset 12 simbol ikut.

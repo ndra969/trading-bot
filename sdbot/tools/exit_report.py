@@ -36,6 +36,8 @@ class ExitSummary:
     modify_failed: int | None = 0
     trail_mfe_avg: float | None = None  # spec 26: MFE rata-rata TRAIL_STOP
     trail_giveback_avg: float | None = None  # spec 26: MFE - R hasil rata-rata TRAIL_STOP
+    per_month: float | None = None  # spec 34: trade per bulan dari rentang tester sesi
+    hold_hours_avg: float | None = None  # spec 34: lama posisi rata-rata (jam)
 
     @property
     def r_per_trade(self) -> float | None:
@@ -84,14 +86,17 @@ def exit_summary(conn: sqlite3.Connection, ranges: Ranges) -> ExitSummary:
     s = ExitSummary()
     cond, params = _where("t.session_id", ranges)
     rows = conn.execute(
-        f"SELECT c.reason, c.r_result, c.net_profit, c.mfe_r FROM {CLOSED_EA_FROM} "
+        f"SELECT c.reason, c.r_result, c.net_profit, c.mfe_r, c.holding_sec FROM {CLOSED_EA_FROM} "
         f"WHERE {CLOSED_EA_WHERE} AND {cond}",
         params,
     ).fetchall()
     sums: dict[str, list[float]] = {}
     trail_mfe: list[float] = []
     trail_give: list[float] = []
-    for reason, r, net, mfe in rows:
+    holds: list[float] = []
+    for reason, r, net, mfe, hold in rows:
+        if hold is not None:
+            holds.append(float(hold) / 3600.0)
         s.trades += 1
         s.total_r += float(r)
         if net > 0:
@@ -111,6 +116,14 @@ def exit_summary(conn: sqlite3.Connection, ranges: Ranges) -> ExitSummary:
     if trail_mfe:
         s.trail_mfe_avg = sum(trail_mfe) / len(trail_mfe)
         s.trail_giveback_avg = sum(trail_give) / len(trail_give)
+    if holds:
+        s.hold_hours_avg = sum(holds) / len(holds)
+    cond_s, params_s = _where("id", ranges)
+    span = conn.execute(
+        f"SELECT MIN(tester_from), MAX(tester_to) FROM sessions WHERE {cond_s}", params_s
+    ).fetchone()
+    if span and span[0] is not None and span[1] is not None and span[1] > span[0]:
+        s.per_month = s.trades / ((span[1] - span[0]) / (30.4375 * 86400))
     if _has_table(conn, "position_events"):
         cond_e, params_e = _where("session_id", ranges)
         s.modify_failed = conn.execute(
@@ -132,6 +145,7 @@ def render(summaries: list[tuple[str, ExitSummary]]) -> str:
     for k in keys:
         head += f" {k + ' n':>13} {'R':>6}"
     head += f" {'SL MFE>=0.5':>12} {'MOD_FAIL':>9} {'TRAIL MFE':>10} {'GIVEBACK':>9}"
+    head += f" {'TRADE/BLN':>10} {'HOLD j':>7}"
     lines = [head, "-" * len(head)]
     for name, s in summaries:
         line = f"{name:<10} {s.trades:>6} {_num(s.r_per_trade, '+.3f'):>8} {_num(s.pf, '.2f'):>5}"
@@ -140,6 +154,7 @@ def render(summaries: list[tuple[str, ExitSummary]]) -> str:
             line += f" {n:>13} {_num(avg, '+.2f'):>6}"
         line += f" {s.sl_mfe_half:>12} {_num(s.modify_failed, 'd'):>9}"
         line += f" {_num(s.trail_mfe_avg, '+.2f'):>10} {_num(s.trail_giveback_avg, '+.2f'):>9}"
+        line += f" {_num(s.per_month, '.1f'):>10} {_num(s.hold_hours_avg, '.1f'):>7}"
         lines.append(line)
     return "\n".join(lines)
 

@@ -284,6 +284,8 @@ void RunTestCoreUtilsLogAndUtil()
    AssertTrue("TC-CU-14", "day trading: H4 / H1 / M15", CuTfEq(SDB_STYLE_DAY, PERIOD_H4, PERIOD_H1, PERIOD_M15));
    AssertTrue("TC-CU-15a", "scalping: M15 / M5 / M1", CuTfEq(SDB_STYLE_SCALPING, PERIOD_M15, PERIOD_M5, PERIOD_M1));
    AssertTrue("TC-CU-15b", "swing: W1 / D1 / H4", CuTfEq(SDB_STYLE_SWING, PERIOD_W1, PERIOD_D1, PERIOD_H4));
+   AssertTrue("TC-CU-18", "intraday (spec 34): H1 / M15 / M5, nilai enum 4", CuTfEq(SDB_STYLE_INTRADAY, PERIOD_H1, PERIOD_M15, PERIOD_M5) &&
+              (int)SDB_STYLE_INTRADAY == 4 && (int)SDB_STYLE_POSITION == 3);
    AssertTrue("TC-CU-15c", "position: MN1 / W1 / D1", CuTfEq(SDB_STYLE_POSITION, PERIOD_MN1, PERIOD_W1, PERIOD_D1));
 
    AssertStrEq("TC-CU-16", "ErrText memberi kode error", ErrText(4756), "err=4756");

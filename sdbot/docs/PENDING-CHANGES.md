@@ -3,6 +3,16 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-35: Gaya INTRADAY tersedia, skema v5 (spec 34, H7 ditolak)
+- Status: Open
+- Tanggal disetujui: 2026-10-12 (spec 34)
+- Dokumen: PRD-EA §Gaya dan timeframe, §Parameter input EA, §Tabel DB (`signals.style`), §Roadmap
+- Sumber: spec `ea-34-intraday-style`; sesi IS 2105–2140
+- Perubahan:
+    - Tabel gaya ditambah `INTRADAY` (H1 / M15 / M5), hanya untuk eksperimen; default tetap day trading H4 / H1 / M15.
+    - `signals.style` menerima `INTRADAY` (skema v5).
+    - Catatan Roadmap: intraday diuji untuk menambah frekuensi (permintaan user), ditolak di IS (R:R 2 −0,117R, R:R 1,5 −0,093R per trade); R:R minimum 1,5 di DAY juga lebih buruk (+0,036R vs +0,164R).
+
 ### PC-34: Entry hanya dengan TP ke zona lawan (spec 33, H6 diterima) + kriteria jumlah trade H6
 - Status: Open
 - Tanggal disetujui: 2026-10-12

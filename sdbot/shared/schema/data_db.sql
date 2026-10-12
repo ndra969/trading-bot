@@ -143,7 +143,7 @@ CREATE TABLE signal_scores (
   PRIMARY KEY (signal_id, component)
 );
 
-CREATE TABLE signals (
+CREATE TABLE "signals" (
   id             INTEGER PRIMARY KEY,
   session_id     INTEGER NOT NULL,
   login          INTEGER NOT NULL,
@@ -151,7 +151,7 @@ CREATE TABLE signals (
   symbol         TEXT    NOT NULL,
   time           INTEGER NOT NULL,
   direction      TEXT    NOT NULL CHECK (direction IN ('BUY','SELL')),
-  style          TEXT    NOT NULL CHECK (style IN ('SCALPING','DAY','SWING','POSITION')),
+  style          TEXT    NOT NULL CHECK (style IN ('SCALPING','DAY','SWING','POSITION','INTRADAY')),
   zone_ref       TEXT,
   score_total    REAL,
   spread_points  INTEGER NOT NULL,

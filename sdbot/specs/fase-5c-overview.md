@@ -115,3 +115,4 @@ Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase
 | Spec | Hipotesis | IS (R/trade) | OOS | REAL | Keputusan |
 |---|---|---|---|---|---|
 | 33 | H6 entry hanya dengan TP ke zona lawan | +0,164 vs +0,079 (121 trade) | +0,421 vs +0,163 | +0,224 vs +0,080 (total +12,3 vs +10,1R) | **Diterima** (1.31, PC-34) |
+| 34 | H7 gaya intraday H1/M15/M5 (dan R:R 1,5) | −0,117 / −0,093 (intraday R:R 2 / 1,5), +0,036 (DAY R:R 1,5) vs +0,164 | — | — | Ditolak di IS (lebih banyak SL, spread 20% risiko; 1.32) |

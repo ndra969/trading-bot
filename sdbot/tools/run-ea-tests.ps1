@@ -49,6 +49,8 @@
     Spec 31: EA SDBot\ExportBars di Strategy Tester per simbol baseline (BL-*.ini, bisa dibatasi -Symbols)
     menulis bar M1 + spread ke Common\Files\sdbot_bars\<SIMBOL>_M1.csv untuk tools\outcome_sim.py.
     Rentang default 2024.03.26..hari ini (OHLC M1), bisa diganti -FromDate/-ToDate.
+.PARAMETER Deposit
+    Bersama -Baseline: saldo awal tester (default dari terminal uji), misalnya 1801.37 untuk meniru akun cent live.
 .PARAMETER Symbols
     Batasi -Baseline ke simbol tertentu, misalnya -Symbols EURUSDc,XAUUSDc (kriteria jumlah tetap sama).
 .PARAMETER SkipBuild
@@ -74,6 +76,7 @@ param(
     [string]$FromDate = '',
     [string]$ToDate = '',
     [int]$Model = -1,
+    [double]$Deposit = 0,
     [string[]]$SetInput = @(),
     [switch]$SkipBuild,
     [int]$TimeoutSec = 0,
@@ -264,6 +267,8 @@ function Invoke-TesterRun($r) {
         if ($FromDate) { $tester['FromDate'] = $FromDate }
         if ($ToDate) { $tester['ToDate'] = $ToDate }
         if ($Model -ge 0) { $tester['Model'] = [string]$Model }
+        # Meniru saldo akun live (mis. cent 1801 USC): lot minimum dan pembulatan sama dengan live.
+        if ($Deposit -gt 0) { $tester['Deposit'] = [string]$Deposit }
         $setLines = @(Get-Content -LiteralPath $r.Set -Encoding ASCII | Where-Object { $_ -notmatch '^\s*;' })
         # Spec 22: -SetInput 'Kunci=nilai' mengganti kunci preset yang sama (sapuan ambang, aktivasi komponen).
         foreach ($kv in @($SetInput | ForEach-Object { $_ -split ',' } | Where-Object { $_ -match '=' })) {

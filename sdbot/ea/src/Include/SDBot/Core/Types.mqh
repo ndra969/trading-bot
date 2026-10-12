@@ -44,7 +44,8 @@ enum ENUM_SDB_TRADING_STYLE
    SDB_STYLE_SCALPING = 0,
    SDB_STYLE_DAY = 1,
    SDB_STYLE_SWING = 2,
-   SDB_STYLE_POSITION = 3
+   SDB_STYLE_POSITION = 3,
+   SDB_STYLE_INTRADAY = 4    // spec 34: H1 / M15 / M5 (nilai di akhir agar preset lama tidak bergeser)
   };
 
 enum ENUM_SDB_ACCOUNT_TYPE

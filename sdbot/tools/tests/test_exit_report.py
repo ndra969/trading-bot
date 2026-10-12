@@ -134,4 +134,26 @@ def test_ts90_trail_mfe_and_giveback(db: Path) -> None:
     assert none.trail_mfe_avg is None and none.trail_giveback_avg is None
     out = er.render([("trail", s), ("tanpa", none)])
     assert "GIVEBACK" in out and "+1.75" in out and "+1.00" in out
-    assert out.splitlines()[-1].rstrip().endswith("-")
+    assert (
+        out.splitlines()[-1].split()[-3] == "-"
+    )  # GIVEBACK sebelum TRADE/BLN dan HOLD j (spec 34)
+
+
+def test_ts114_frequency_and_holding(tmp_path: Path) -> None:
+    """TS-114 (spec 34 Req 2.2): trade per bulan dari rentang tester sesi dan lama posisi rata-rata (jam)."""
+    path = tmp_path / "f.sqlite"
+    conn = sqlite3.connect(path)
+    conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+    _session(conn, 1)
+    # rentang tester 2 bulan (60,875 hari = 2 x 30,4375)
+    conn.execute("UPDATE sessions SET tester_from = 0, tester_to = 5259600 WHERE id = 1")
+    _trade(conn, 1, 1, "SL", -1.0, 0.1)
+    _trade(conn, 1, 2, "TP", 2.0, 2.0)
+    conn.execute("UPDATE closures SET holding_sec = 3600 WHERE position_id = 1")
+    conn.execute("UPDATE closures SET holding_sec = 10800 WHERE position_id = 2")
+    conn.commit()
+    s = er.exit_summary(conn, [(1, 1)])
+    conn.close()
+    assert s.per_month == pytest.approx(1.0)
+    assert s.hold_hours_avg == pytest.approx(2.0)
+    assert "TRADE/BLN" in er.render([("x", s)]) and "HOLD j" in er.render([("x", s)])

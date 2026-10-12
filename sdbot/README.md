@@ -34,7 +34,7 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Grup | Input | Default | Batas | Dibuat di |
 |---|---|---|---|---|
 | Umum | `InpMagicNumber` | 2026091901 | 2026091901–2026091999, satu nomor per pair | spec 02 |
-| Umum | `InpTradingStyle` | Day trading (H4/H1/M15) | — | spec 02 |
+| Umum | `InpTradingStyle` | Day trading (H4/H1/M15); 0 = scalping M15/M5/M1, 2 = swing, 3 = position, 4 = intraday H1/M15/M5 (spec 34) | 0–4 | spec 02, 34 |
 | Umum | `InpSymbolSuffix` | kosong (`c` di preset akun cent) | — | spec 02 |
 | Umum | `InpAllowLiveTrading` | false | — | spec 02 |
 | Umum | `InpLogLevel` | INFO | — | spec 02 |
@@ -113,7 +113,7 @@ Semua skrip di `tools/`, dijalankan dari PowerShell (`powershell -ExecutionPolic
 | `run-ea-tests.ps1 -ProbeHistory` | Rentang histori tester per simbol (tester dijalankan pada 2015 yang kosong, `tick_history.py` mengurai jurnal); dasar `periods.ini` |
 | `baseline_report.py --db <sdbot_tester.sqlite> --after-session N [--periods periods.ini]` | Laporan per simbol dari DB tester: kandidat, tahap tolak, trade, win rate, R, PF, DD%; per periode bila `--periods`; dipanggil `-Baseline` |
 | `component_report.py --db <sdbot_tester.sqlite> --sessions A-B [--periods periods.ini] [--candidates]` | Hasil trade per nilai komponen skor (aktif dan bayangan), IS vs OOS, dengan status aktivasi PC-25; `--candidates` = distribusi nilai per tahap tolak |
-| `exit_report.py --db <sdbot_tester.sqlite> --runs NAMA=A-B[,C-D] [--runs ...]` | Per run: trade, R per trade, PF, jumlah dan R rata-rata per alasan tutup (SL, BE_STOP, TRAIL_STOP, TP), SL yang sempat MFE ≥ 0,5R, jumlah `MODIFY_FAILED` (spec 24), MFE dan give-back rata-rata trade TRAIL_STOP (spec 26) |
+| `exit_report.py --db <sdbot_tester.sqlite> --runs NAMA=A-B[,C-D] [--runs ...]` | Per run: trade, R per trade, PF, jumlah dan R rata-rata per alasan tutup (SL, BE_STOP, TRAIL_STOP, TP), SL yang sempat MFE ≥ 0,5R, jumlah `MODIFY_FAILED` (spec 24), MFE dan give-back rata-rata trade TRAIL_STOP (spec 26); trade per bulan (rentang tester sesi) dan lama posisi rata-rata dalam jam (spec 34) |
 | `live_report.py [--from YYYY-MM-DD] [--to ...] [--version 1.25] [--out FILE]` | Ringkasan DB live (read-only): hasil trade dalam R (PF uang dan R, DD R, alasan tutup, posisi terbuka), slippage dan spread, kandidat per tahap, alert (daftar HIGH/CRITICAL), sesi dan celah > 30 menit (spec 28, Fase 6) |
 | `live_compare.py inputs SIMBOL --from --to [--version]` / `compare --replay A-B --from --to [--version] [--no-news]` | Input replay dari `inputs_json` sesi live; perbandingan kandidat dan trade live vs replay tester dengan ambang tahap 4 (spec 29) |
 | `run-live-replay.ps1 -From -To [-Version] [-Symbols] [-ExportCalendar] [-DryRun]` | Replay tester periode live per simbol (real ticks, input live); menolak jalan bila terminal tester hidup; mencetak `replay=A-B` (spec 29) |

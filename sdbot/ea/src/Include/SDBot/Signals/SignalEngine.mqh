@@ -39,6 +39,7 @@ string SdbStyleText(const ENUM_SDB_TRADING_STYLE s)
       case SDB_STYLE_SCALPING: return SDB_TRADING_STYLE_SCALPING;
       case SDB_STYLE_SWING:    return SDB_TRADING_STYLE_SWING;
       case SDB_STYLE_POSITION: return SDB_TRADING_STYLE_POSITION;
+      case SDB_STYLE_INTRADAY: return SDB_TRADING_STYLE_INTRADAY;
       default:                 return SDB_TRADING_STYLE_DAY;
      }
   }

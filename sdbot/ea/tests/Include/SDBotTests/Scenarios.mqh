@@ -1375,6 +1375,21 @@ void CheckSc31(const string id, const CScenarioRecorder &rec)
    AssertTrue(id + "-sl", StringFormat("ACCEPTED %I64d, SL tidak di luar distal %I64d", accepted, slInside), accepted >= 1 && slInside == 0);
   }
 
+// SC-34 (spec 34 Req 1.3, 1.4): gaya INTRADAY menghasilkan kandidat bergaya INTRADAY di bar M5 dan entry.
+void CheckSc34(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
+   long candidates = ScDbCount("SELECT COUNT(*)" + w);
+   long notIntraday = ScDbCount("SELECT COUNT(*)" + w + " AND style <> 'INTRADAY'");
+   long offGrid = ScDbCount("SELECT COUNT(*)" + w + " AND (time % 300) <> 0");
+   long onlyM15 = ScDbCount("SELECT COUNT(*)" + w + " AND (time % 900) <> 0");
+   AssertTrue(id + "-style", StringFormat("kandidat %I64d, bukan INTRADAY %I64d, di luar grid M5 %I64d, bukan kelipatan M15 %I64d",
+                                          candidates, notIntraday, offGrid, onlyM15),
+              candidates >= 1 && notIntraday == 0 && offGrid == 0 && onlyM15 >= 1);
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status = 'ACCEPTED'");
+   AssertTrue(id + "-entry", StringFormat("ACCEPTED %I64d", accepted), accepted >= 1);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1470,6 +1485,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc27(id, rec);
    else if(id == "SC-31")
       CheckSc31(id, rec);
+   else if(id == "SC-34")
+      CheckSc34(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

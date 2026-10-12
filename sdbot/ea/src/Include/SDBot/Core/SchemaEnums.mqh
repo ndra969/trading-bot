@@ -29,6 +29,7 @@
 #define SDB_TRADING_STYLE_DAY "DAY"
 #define SDB_TRADING_STYLE_SWING "SWING"
 #define SDB_TRADING_STYLE_POSITION "POSITION"
+#define SDB_TRADING_STYLE_INTRADAY "INTRADAY"
 
 // signal_status: signals.status
 #define SDB_SIGNAL_STATUS_ACCEPTED "ACCEPTED"
@@ -214,7 +215,7 @@ bool SdbEnumIsValid(const string enumName, const string value)
    if(enumName == "margin_mode")
       return value == "HEDGING" || value == "NETTING" || value == "EXCHANGE";
    if(enumName == "trading_style")
-      return value == "SCALPING" || value == "DAY" || value == "SWING" || value == "POSITION";
+      return value == "SCALPING" || value == "DAY" || value == "SWING" || value == "POSITION" || value == "INTRADAY";
    if(enumName == "signal_status")
       return value == "ACCEPTED" || value == "REJECTED";
    if(enumName == "trade_source")

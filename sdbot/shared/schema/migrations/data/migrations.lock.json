@@ -18,5 +18,10 @@
     "name": "signal_score_active",
     "sha256": "fe4b3ea74ea7022289c1a8d1d2a66505ad42727c7a47fef9e2a7227143325479",
     "released": false
+  },
+  "5": {
+    "name": "style_intraday",
+    "sha256": "8e1a4bb50b506132e5789507e7df9467aa386d4793e6d03813e240c5e7c03c4c",
+    "released": false
   }
 }

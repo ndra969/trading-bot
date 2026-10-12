@@ -14,7 +14,7 @@ Aturan penulisan: nilai huruf besar dengan `_`, dalam backtick, dipisah koma. Ko
 | `session_mode` | `LIVE`, `TESTER` | ya | `sessions.mode` |
 | `account_type` | `DEMO`, `REAL`, `CENT` | ya | `accounts.account_type` |
 | `margin_mode` | `HEDGING`, `NETTING`, `EXCHANGE` | ya | `accounts.margin_mode` |
-| `trading_style` | `SCALPING`, `DAY`, `SWING`, `POSITION` | ya | `signals.style` |
+| `trading_style` | `SCALPING`, `DAY`, `SWING`, `POSITION`, `INTRADAY` | ya | `signals.style` |
 | `signal_status` | `ACCEPTED`, `REJECTED` | ya | `signals.status` |
 | `trade_source` | `EA`, `RECONCILED` | ya | `trades.source` |
 | `deal_entry` | `IN`, `OUT`, `INOUT`, `OUT_BY` | ya | `deals.entry` |

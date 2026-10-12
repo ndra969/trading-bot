@@ -1,0 +1,8 @@
+; SC-34: InpTradingStyle=4 (INTRADAY); kandidat bergaya INTRADAY, waktu bar kelipatan 5 menit, >= 1 ACCEPTED.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpTradingStyle=4
+HarnessScenario=SC-34
+HarnessEveryBars=0
+HarnessPipeline=true
