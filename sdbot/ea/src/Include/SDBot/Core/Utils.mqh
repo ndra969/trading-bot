@@ -270,4 +270,33 @@ bool IsSdbotMagic(const long magic)
    return magic >= SDB_MAGIC_HARNESS && magic <= SDB_MAGIC_MAX;
   }
 
+// Rugi uang (positif) bila harga bergerak priceDiff melawan posisi. Utama: hasil OrderCalcProfit (negatif bila rugi).
+// Bug live 2026-10-12 (BTCUSDc, hari Minggu): OrderCalcProfit sesekali sukses tetapi bernilai 0, sehingga lot tidak
+// bisa dihitung. Cadangan: jumlah tick x SYMBOL_TRADE_TICK_VALUE_LOSS x volume (mata uang akun). false bila keduanya tidak valid.
+bool ResolveLossMoney(const bool calcOk, const double calcProfit, const double priceDiff, const double tickSize,
+                      const double tickValueLoss, const double volume, double &loss, bool &usedFallback)
+  {
+   usedFallback = false;
+   if(calcOk && calcProfit < 0.0)
+     {
+      loss = -calcProfit;
+      return true;
+     }
+   if(priceDiff <= 0.0 || tickSize <= 0.0 || tickValueLoss <= 0.0 || volume <= 0.0)
+      return false;
+   loss = priceDiff / tickSize * tickValueLoss * volume;
+   usedFallback = true;
+   return loss > 0.0;
+  }
+
+// Rugi uang di SL untuk simbol nyata: OrderCalcProfit, cadangan tick value (dipakai Risk, Execution, Position).
+bool SymbolLossMoney(const string symbol, const bool isBuy, const double volume, const double price, const double sl, double &loss,
+                     bool &usedFallback)
+  {
+   double p = 0.0;
+   bool ok = OrderCalcProfit(isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, symbol, volume, price, sl, p);
+   return ResolveLossMoney(ok, p, isBuy ? price - sl : sl - price, SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
+                           SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE_LOSS), volume, loss, usedFallback);
+  }
+
 #endif // SDB_CORE_UTILS_MQH

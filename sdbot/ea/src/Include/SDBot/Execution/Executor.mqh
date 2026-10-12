@@ -228,11 +228,12 @@ private:
       if(res.volumeFilled < req.volume - SDB_VOLUME_EPS)
          LogWarn("Execution", StringFormat("partial fill | diminta=%.2f terisi=%.2f id=%s", req.volume, res.volumeFilled, res.requestId));
 
-      double profitAtSl = 0.0;
+      double lossAtSl = 0.0;
+      bool fallback = false;
       double balance = AccountInfoDouble(ACCOUNT_BALANCE);
       res.riskMoney = SDB_NULL_DOUBLE;
-      if(OrderCalcProfit(req.isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, m_symbol, res.volumeFilled, res.priceFilled, sl, profitAtSl))
-         res.riskMoney = -profitAtSl;
+      if(SymbolLossMoney(m_symbol, req.isBuy, res.volumeFilled, res.priceFilled, sl, lossAtSl, fallback))
+         res.riskMoney = lossAtSl;   // tick value bila OrderCalcProfit 0 (bug live 2026-10-12)
       else
          LogWarn("Execution", "risiko uang tidak bisa dihitung | " + ErrText(GetLastError()));
 

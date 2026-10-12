@@ -135,6 +135,26 @@ void RunTestRiskMathClass()
               ClassPositionLimit(SDB_CLASS_OTHER, limits) == 1);
   }
 
+// TC-RK-20 (bug live 2026-10-12, BTCUSDc): OrderCalcProfit sesekali memberi 0; rugi dihitung dari tick value.
+void RunTestRiskMathLossFallback()
+  {
+   double loss = -1.0;
+   bool src = false;
+   bool okCalc = ResolveLossMoney(true, -200.0, 200.0, 0.01, 0.01, 1.0, loss, src);
+   bool okZero = false;
+   double l2 = -1.0;
+   okZero = ResolveLossMoney(true, 0.0, 200.0, 0.01, 0.01, 1.0, l2, src);
+   bool srcZero = src;
+   double l3 = -1.0;
+   bool okFail = ResolveLossMoney(false, 0.0, 0.0020, 0.00001, 1.0, 0.5, l3, src);
+   double l4 = -1.0;
+   bool okNone = ResolveLossMoney(true, 0.0, 200.0, 0.01, 0.0, 1.0, l4, src);
+   AssertTrue("TC-RK-20", StringFormat("OrderCalcProfit -200 -> 200; 0 -> tick value 200 (fallback=%d); gagal -> 100; tick value 0 -> tidak valid (%.2f %.2f %.2f)",
+                                        srcZero, loss, l2, l3),
+              okCalc && MathAbs(loss - 200.0) < 1e-9 && okZero && srcZero && MathAbs(l2 - 200.0) < 1e-9 && okFail &&
+              MathAbs(l3 - 100.0) < 1e-9 && !okNone);
+  }
+
 void RunTestRiskMath()
   {
    TfBeginSuite("RiskMath");
@@ -144,6 +164,7 @@ void RunTestRiskMath()
    RunTestRiskMathDay();
    RunTestRiskMathClose();
    RunTestRiskMathClass();
+   RunTestRiskMathLossFallback();
    TfEndSuite();
   }
 

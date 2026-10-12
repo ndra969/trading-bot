@@ -45,10 +45,14 @@ private:
    bool OrderLossMoney(const OrderRequest &req, const double volume, double &loss)
      {
       double price = EntryPrice(req.isBuy);
-      double p = 0.0;
-      if(price <= 0.0 || !OrderCalcProfit(req.isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, m_symbol, volume, price, req.sl, p))
+      if(price <= 0.0)
          return false;
-      loss = -p;
+      bool fallback = false;
+      if(!SymbolLossMoney(m_symbol, req.isBuy, volume, price, req.sl, loss, fallback))
+         return false;
+      if(fallback)
+         LogThrottled(SDB_LOG_WARN, "risk-calc-fallback", SDB_LOG_THROTTLE_DEFAULT_SEC, "Risk",
+                      StringFormat("OrderCalcProfit tidak valid, rugi dari tick value | rugi=%.4f vol=%.2f", loss, volume));
       return true;
      }
 
@@ -83,7 +87,7 @@ public:
      {
       double lossPerLot = 0.0;
       if(!OrderLossMoney(req, 1.0, lossPerLot))
-         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "OrderCalcProfit gagal " + ErrText(GetLastError()));
+         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "nilai uang SL tidak bisa dihitung (OrderCalcProfit dan tick value) " + ErrText(GetLastError()));
       double balance = Balance();
       ENUM_SDB_LOT_FLAG flag;
       double lot = CalcLotSize(balance, EffRiskPct(), lossPerLot, SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP),
@@ -127,7 +131,7 @@ public:
       double balance = Balance();
       double loss = 0.0;
       if(!OrderLossMoney(req, req.volume, loss))
-         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "OrderCalcProfit gagal " + ErrText(GetLastError()));
+         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "nilai uang SL tidak bisa dihitung (OrderCalcProfit dan tick value) " + ErrText(GetLastError()));
       double newPct = RiskPctOf(loss, balance);
       if(newPct > EffRiskPct() + SDB_RISK_EPS)
          return Reject(stage, detail, SDB_REJECT_STAGE_RISK_PER_TRADE,

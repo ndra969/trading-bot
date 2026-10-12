@@ -81,10 +81,10 @@ private:
          if(e.owned)
            {
             FindInitialSl(e, comment, order);
-            double p = 0.0;
-            if(e.initialSl > 0.0 &&
-               OrderCalcProfit(e.isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, e.symbol, e.initialVolume, e.entry, e.initialSl, p))
-               e.riskMoney = MathMax(0.0, -p);
+            double loss = 0.0;
+            bool fallback = false;
+            if(e.initialSl > 0.0 && SymbolLossMoney(e.symbol, e.isBuy, e.initialVolume, e.entry, e.initialSl, loss, fallback))
+               e.riskMoney = loss;
            }
          return true;
         }
