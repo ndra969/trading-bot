@@ -204,6 +204,12 @@ def test_ts91_bias_inputs():
         assert preset.get("InpBiasEmaPeriod") == "21", symbol
 
 
+def test_ts113_require_opposite_zone():
+    """Spec 33 Req 1.1, 3.3: InpRequireOppositeZone=true di preset (H6 diterima)."""
+    for symbol in EXPECTED_MAGIC:
+        assert _read(symbol).get("InpRequireOppositeZone") == "true", symbol
+
+
 FIXTURE_SC17 = (
     Path(__file__).resolve().parents[2]
     / "ea"

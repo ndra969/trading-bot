@@ -148,6 +148,7 @@ private:
       sp.maxSlAtr = cfg.inputs.maxSlAtr;
       sp.maxSpreadPoints = cfg.inputs.maxSpreadPoints;
       sp.allowTestedZones = cfg.inputs.allowTestedZones;
+      sp.requireOppositeZone = cfg.inputs.requireOppositeZone;
       if(cfg.signalsOn)
         {
          SdbNewsParams np;

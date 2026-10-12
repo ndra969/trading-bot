@@ -109,3 +109,9 @@ Simulator terkalibrasi: alasan tutup cocok 98–99% di IS/OOS/REAL; real ticks s
 - cross JPY EURJPY dan GBPJPY: zona paling sering gagal, untuk semua kandidat.
 
 Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase 5b): TP selalu ke zona lawan atau R:R minimum lebih tinggi, filter jam overlap, trendline di zona sebagai penolakan, dan aturan khusus cross JPY.
+
+## 8. Perbaikan dari temuan
+
+| Spec | Hipotesis | IS (R/trade) | OOS | REAL | Keputusan |
+|---|---|---|---|---|---|
+| 33 | H6 entry hanya dengan TP ke zona lawan | +0,164 vs +0,079 (121 trade) | +0,421 vs +0,163 | +0,224 vs +0,080 (total +12,3 vs +10,1R) | **Diterima** (1.31, PC-34) |

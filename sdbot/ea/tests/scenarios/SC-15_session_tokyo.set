@@ -8,3 +8,4 @@ HarnessPipeline=true
 InpSessionTokyo=true
 InpSessionLondon=false
 InpSessionNewYork=false
+InpRequireOppositeZone=false

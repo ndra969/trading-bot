@@ -3,6 +3,18 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-34: Entry hanya dengan TP ke zona lawan (spec 33, H6 diterima) + kriteria jumlah trade H6
+- Status: Open
+- Tanggal disetujui: 2026-10-12
+- Dokumen: PRD-EA §Aturan entry, §Parameter input EA, §Pengujian dan kriteria penerimaan (aturan uji Fase 5b), §Roadmap
+- Sumber: spec `ea-33-tp-zone-only` task 3–4; sesi IS 1968–1979, OOS 1980–1991, REAL 1992–2003
+- Perubahan:
+    - §Aturan entry: "TP ke zona lawan lalu cek R:R ≥ 2; tanpa zona lawan TP = 2R" menjadi "TP ke proximal zona lawan dengan R:R ≥ 2; kandidat tanpa zona lawan tidak dientry (`RR_TOO_LOW`, detail `tanpa zona lawan`)".
+    - Tabel input, baris baru di Entry: `| Entry | RequireOppositeZone | true (false = TP 2R bila tidak ada zona lawan, hanya eksperimen) |`.
+    - Kriteria jumlah trade khusus H6: IS ≥ 100 trade dan ≥ 5 per simbol; XAGUSDc (3 trade) dikecualikan atas keputusan user 2026-10-12 sesudah IS, sebelum OOS/REAL dijalankan.
+    - Bukti: IS 121 trade +0,164R PF 1,39; OOS 21 trade +0,421R PF 2,47; REAL 55 trade +0,224R PF 1,58 (acuan 1.28: +0,079 / +0,163 / +0,080).
+    - Catatan RULES §Aturan wajib keamanan: lot dihitung dari `OrderCalcProfit`, cadangan tick value bila bernilai 0 (perbaikan 1.30).
+
 ### PC-33: Telemetri harga kandidat di context_json (spec 31)
 - Status: Open
 - Tanggal disetujui: 2026-10-09 (requirements spec 31)

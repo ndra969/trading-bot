@@ -54,6 +54,7 @@ InpScoreFibMode=1
 InpScoreTrendlineMode=1
 InpScoreBreakoutMode=1
 InpScoreRsiMode=1
+InpRequireOppositeZone=true
 InpAllowTestedZones=false
 InpTelegramToken=
 InpTelegramChatID=

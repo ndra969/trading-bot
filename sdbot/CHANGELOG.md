@@ -13,6 +13,17 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.31 — 2026-10-12 — spec 33 entry hanya dengan TP ke zona lawan (H6 diterima)
+
+- Default `InpRequireOppositeZone` true: kandidat tanpa zona lawan ditolak `RR_TOO_LOW` (detail `tanpa zona lawan`); TP selalu proximal zona lawan dengan R:R ≥ 2. Preset 12 simbol ikut.
+- IS (acuan 1.28: 356 trade, +0,079R, PF 1,17, +28,0R): 121 trade, +0,164R, PF 1,39, +19,8R, DD 6,6R. OOS: 21 trade, +0,421R, PF 2,47 (acuan +0,163R). REAL: 55 trade, +0,224R, PF 1,58, +12,3R, DD 5,0R (acuan +0,080R, PF 1,17, +10,1R, DD 7,3R).
+- Trade yang dibuang tepat trade TP 2R acuan (IS +0,036R, OOS −0,109R, REAL −0,031R per trade). Jumlah trade sekitar sepertiga. Kriteria jumlah trade khusus H6 (IS ≥ 100, ≥ 5 per simbol, XAGUSDc dikecualikan dengan 3 trade; PC-34).
+
+### 1.30 — 2026-10-12 — input `InpRequireOppositeZone`; perbaikan rugi SL dari tick value
+
+- Input `InpRequireOppositeZone` (spec 33; default false di 1.30). `inputs_json` 57 kunci. Uji TC-SG-41..43, TS-113.
+- Perbaikan bug live 2026-10-12 (BTCUSDc): `OrderCalcProfit` sesekali sukses dengan nilai 0, sehingga entry ditolak `OTHER` "nilai uang per lot tidak valid". `SymbolLossMoney` (Core/Utils) memakai cadangan jumlah tick × `SYMBOL_TRADE_TICK_VALUE_LOSS`, dipakai di lot, pre-trade check, `risk_money`, dan R hasil (TC-RK-20).
+
 ### 1.29 — 2026-10-11 — spec 31 telemetri harga kandidat, simulator, faktor profit
 
 - `context_json` setiap kandidat memuat `zone_prox`, `zone_dist`, `opp_prox`, `bid`, `ask` (TC-SG-39..40, SC-31). Keputusan entry tidak berubah: backtest ulang IS/OOS/REAL identik dengan 1.28 (0 trade baru/hilang).

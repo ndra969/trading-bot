@@ -60,6 +60,7 @@ input double                 InpMinRR                 = SDB_DEF_MIN_RR;         
 input double                 InpSlBufferAtr           = SDB_DEF_SL_BUFFER_ATR;      // Buffer SL di luar zona (x ATR MTF)
 input double                 InpMinSlAtr              = SDB_DEF_MIN_SL_ATR;         // Jarak SL minimum (x ATR MTF)
 input double                 InpMaxSlAtr              = SDB_DEF_MAX_SL_ATR;         // Jarak SL maksimum (x ATR MTF)
+input bool                   InpRequireOppositeZone   = SDB_DEF_REQUIRE_OPPOSITE_ZONE; // Entry hanya bila ada zona lawan untuk TP (false = TP 2R bila tidak ada)
 
 input group "Filter"
 input bool                   InpSessionTokyo          = false;                      // Sesi Tokyo 00:00-08:00 UTC
@@ -110,6 +111,7 @@ InputValues CurrentInputs()
    v.emaSlopeBars = InpEmaSlopeBars;
    v.biasMode = InpBiasMode;
    v.biasEmaPeriod = InpBiasEmaPeriod;
+   v.requireOppositeZone = InpRequireOppositeZone;
    v.zoneMinWidthAtr = InpZoneMinWidthAtr;
    v.zoneMaxWidthAtr = InpZoneMaxWidthAtr;
    v.zoneMinLegAtr = InpZoneMinLegAtr;
@@ -155,7 +157,7 @@ string CurrentInputsJson()
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
                  "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
                  "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones", "InpSessionEndHourUtc",
-                 "InpBiasMode", "InpBiasEmaPeriod"};
+                 "InpBiasMode", "InpBiasEmaPeriod", "InpRequireOppositeZone"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -215,6 +217,7 @@ string CurrentInputsJson()
    v[53] = JsonNum(InpSessionEndHourUtc);
    v[54] = JsonStr(EnumToString(InpBiasMode));
    v[55] = JsonNum(InpBiasEmaPeriod);
+   v[56] = JsonBool(InpRequireOppositeZone);
    return CanonicalJson(k, v);
   }
 

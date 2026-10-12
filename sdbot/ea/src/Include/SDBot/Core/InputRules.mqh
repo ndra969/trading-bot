@@ -59,6 +59,7 @@ struct InputValues
    bool              allowTestedZones;   // spec 23: false = zona Tested ditolak NO_VALID_ZONE
    ENUM_SDB_BIAS_MODE biasMode;          // spec 27: aturan gabung struktur dan EMA HTF
    int               biasEmaPeriod;      // spec 27: periode EMA HTF untuk bias, 0 = emaPeriod
+   bool              requireOppositeZone; // spec 33: wajib zona lawan sebagai TP
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -133,6 +134,7 @@ InputValues DefaultInputValues()
    v.allowTestedZones = SDB_DEF_ALLOW_TESTED_ZONES;
    v.biasMode = SDB_DEF_BIAS_MODE;
    v.biasEmaPeriod = SDB_DEF_BIAS_EMA_PERIOD;
+   v.requireOppositeZone = SDB_DEF_REQUIRE_OPPOSITE_ZONE;
    return v;
   }
 

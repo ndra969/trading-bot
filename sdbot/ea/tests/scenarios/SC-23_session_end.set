@@ -6,3 +6,4 @@ InpSessionEndHourUtc=17
 HarnessScenario=SC-23
 HarnessEveryBars=0
 HarnessPipeline=true
+InpRequireOppositeZone=false

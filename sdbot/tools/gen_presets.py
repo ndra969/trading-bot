@@ -131,6 +131,7 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpScoreTrendlineMode", "1"),  # SDB_COMPONENT_SHADOW (spec 19)
     ("InpScoreBreakoutMode", "1"),  # SDB_COMPONENT_SHADOW (spec 20)
     ("InpScoreRsiMode", "1"),  # SDB_COMPONENT_SHADOW (spec 21)
+    ("InpRequireOppositeZone", "true"),  # spec 33 H6 diterima: entry hanya dengan TP ke zona lawan
     ("InpAllowTestedZones", "false"),  # spec 23 H1 diterima (PC-29): entry hanya dari zona Fresh
     # Notifikasi (spec 09): token dan chat ID sengaja kosong; diisi make_local_presets.py di *.local.set.
     ("InpTelegramToken", ""),

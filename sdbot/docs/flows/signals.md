@@ -31,7 +31,7 @@ flowchart TB
     SPD --> S2{posisi instance terbuka?} -->|ya| REJ
     S2 --> S3{pola PA searah?} -->|tidak| REJ
     S3 --> S4{skor >= 65% dari 55?} -->|tidak| REJ
-    S4 --> S5[SL = batas jauh -/+ 0,1 ATR, SELL + spread; TP = zona lawan atau 2R]
+    S4 --> S5[SL = batas jauh -/+ 0,1 ATR, SELL + spread; TP = zona lawan atau 2R; InpRequireOppositeZone: tanpa zona lawan = RR_TOO_LOW]
     S5 --> S6{R > 0, R >= max stops+spread, 0,3 ATR, R <= 3 ATR, R:R >= 2?} -->|tidak| REJ
     S6 --> L[CalcVolume + PreTradeCheck: lot turun per step bila rugi OrderCalcProfit > risiko]
     L -->|tolak| REJ

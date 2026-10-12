@@ -59,6 +59,7 @@ SdbSignalParams SgP0()
    p.maxSlAtr = 3.0;
    p.maxSpreadPoints = 0;
    p.allowTestedZones = true;
+   p.requireOppositeZone = false;
    return p;
   }
 
@@ -627,6 +628,36 @@ void RunTestSignalContextPrices()
               StringFind(xj, "\"ask\":4160.44,") >= 0);
   }
 
+// TC-SG-41..43 (spec 33 Req 1.2-1.4): syarat zona lawan sebagai TP.
+void RunTestSignalOppositeZone()
+  {
+   SdbSignalParams req = SgP0();
+   req.requireOppositeZone = true;
+   SdbSignalFacts f = SgF0();   // tanpa zona lawan
+   SdbDecision d;
+   EvaluateSignal(f, req, d);
+   AssertTrue("TC-SG-41", "tanpa zona lawan + wajib: '" + d.stage + "' (" + d.detail + ")",
+              d.stage == SDB_REJECT_STAGE_RR_TOO_LOW && d.detail == "tanpa zona lawan" && d.stopsKnown && StringLen(d.stops.tpSource) == 0);
+
+   SdbSignalFacts z = SgF0();
+   z.haveOpposite = true;
+   z.oppositeProximal = 1.10350;
+   SdbDecision dz;
+   EvaluateSignal(z, req, dz);
+   AssertTrue("TC-SG-42", StringFormat("zona lawan + wajib: '%s' tp=%.5f rr=%.2f", dz.stage, dz.stops.tp, dz.stops.rr),
+              dz.stage == "" && MathAbs(dz.stops.tp - 1.10350) < 1e-9 && MathAbs(dz.stops.rr - 2.60) < 1e-6 && dz.stops.tpSource == SDB_TP_SOURCE_ZONE);
+
+   SdbDecision dn = SgEval(SgF0());   // tidak wajib: TP 2R seperti sekarang
+   SdbSignalFacts near = SgF0();
+   near.haveOpposite = true;
+   near.oppositeProximal = 1.10200;   // R:R 1,10 < 2
+   SdbDecision dr;
+   EvaluateSignal(near, req, dr);
+   AssertTrue("TC-SG-43", StringFormat("tidak wajib: '%s' %s; zona lawan dekat + wajib: '%s' (%s)", dn.stage, dn.stops.tpSource, dr.stage, dr.detail),
+              dn.stage == "" && dn.stops.tpSource == SDB_TP_SOURCE_RR && dr.stage == SDB_REJECT_STAGE_RR_TOO_LOW &&
+              StringFind(dr.detail, "rr=") == 0);
+  }
+
 void RunTestSignalRules()
   {
    TfBeginSuite("SignalRules");
@@ -643,6 +674,7 @@ void RunTestSignalRules()
    RunTestSignalTestedZones();
    RunTestSignalEndHour();
    RunTestSignalContextPrices();
+   RunTestSignalOppositeZone();
    TfEndSuite();
   }
 

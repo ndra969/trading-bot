@@ -72,6 +72,8 @@ bool BuildStops(const SdbSignalFacts &f, const SdbSignalParams &p, SdbStops &s, 
       s.tp = NormalizeDouble(f.oppositeProximal, f.digits);
       s.tpSource = SDB_TP_SOURCE_ZONE;
      }
+   else if(p.requireOppositeZone)   // spec 33: tanpa target zona tidak entry; tahap tolak yang ada, skema tetap
+      return SgReject(stage, detail, SDB_REJECT_STAGE_RR_TOO_LOW, "tanpa zona lawan");
    else
      {
       s.tp = NormalizeDouble(buy ? s.entry + p.minRR * s.risk : s.entry - p.minRR * s.risk, f.digits);
