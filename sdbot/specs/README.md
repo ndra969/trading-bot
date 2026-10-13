@@ -104,6 +104,7 @@ Use case, pembagian, dan keputusan: [fase-5c-overview.md](fase-5c-overview.md) (
 | 32 | ea-32-trendline-setups | Lab tiga setup trendline H1 + PA M15 (pantulan tanpa zona, + zona, break-retest) | 31 | laporan IS/OOS/REAL per setup dan simbol; keputusan | Belum mulai |
 | 33 | [ea-33-tp-zone-only](ea-33-tp-zone-only/) | H6: entry hanya dengan TP ke zona lawan (`InpRequireOppositeZone`) | 31 | IS/OOS/REAL vs acuan 1.28 | **Done** 2026-10-12 (v1.31; H6 DITERIMA: IS +0,164R PF 1,39, OOS +0,421R PF 2,47, REAL +0,224R PF 1,58; trade sekitar sepertiga; PC-34) |
 | 34 | [ea-34-intraday-style](ea-34-intraday-style/) | H7: gaya intraday H1/M15/M5 dan R:R 1,5 (permintaan user: entry lebih sering) | 33 | IS/OOS/REAL vs acuan 1.31, frekuensi ≥ 2× | **Done** 2026-10-13 (v1.32; H7 DITOLAK di IS: intraday −0,117R / −0,093R per trade, DAY R:R 1,5 +0,036R vs +0,164R; skema v5; PC-35) |
+| 35 | [ea-35-more-symbols](ea-35-more-symbols/) | H8: simbol tambahan (indeks, energi, ETH, cross) dengan aturan sama | 34 | seleksi IS, OOS/REAL kelompok terpilih | **Done** 2026-10-13 (H8 DITOLAK di IS: 2 dari 16 kandidat lolos, GBPAUD dan USTEC; total kandidat −0,16R per trade; ETHUSD tanpa histori tester) |
 
 ## Fase 6 — Validasi live akun cent
 

@@ -1,6 +1,6 @@
 """Bangkitkan preset SDBot per simbol (spec 07 Req 2, PC-10, PC-12).
 
-Satu tabel -> 12 file `ea/src/Presets/SDBot_DAY_<SIMBOL>c.set`, identik kecuali magic, tag, dan
+Satu tabel -> 29 file (12 aktif + 17 kandidat spec 35) `ea/src/Presets/SDBot_DAY_<SIMBOL>c.set`, identik kecuali magic, tag, dan
 komentar kategori. File hanya ASCII agar dialog Inputs -> Load MT5 membacanya apa pun encoding-nya.
 Nilai referensi bot Python (spread, sesi, SL default) disalin dari `config/active_symbols.yaml`
 dan hanya menjadi komentar sampai inputnya ada di Fase 3-4.
@@ -72,6 +72,23 @@ SYMBOLS: dict[str, tuple[int, str, str]] = {
         "spread maks 10 pip (0.01); sesi London + New York; SL default 50 pip",
     ),
     "BTCUSD": (2026091912, "crypto", "spread maks 1000 pip (1.0); sesi 24/7; SL default 1500 pip"),
+    "US30": (2026091913, "indeks (OTHER)", "kandidat spec 35, tanpa referensi bot Python"),
+    "USTEC": (2026091914, "indeks (OTHER)", "kandidat spec 35, tanpa referensi bot Python"),
+    "US500": (2026091915, "indeks (OTHER)", "kandidat spec 35, tanpa referensi bot Python"),
+    "USOIL": (2026091916, "energi (OTHER)", "kandidat spec 35, tanpa referensi bot Python"),
+    "UKOIL": (2026091917, "energi (OTHER)", "kandidat spec 35, tanpa referensi bot Python"),
+    "ETHUSD": (2026091918, "crypto", "kandidat spec 35, tanpa referensi bot Python"),
+    "CADJPY": (2026091919, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "AUDJPY": (2026091920, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "CHFJPY": (2026091921, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "NZDJPY": (2026091922, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "EURCAD": (2026091923, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "EURAUD": (2026091924, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "EURNZD": (2026091925, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "GBPNZD": (2026091926, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "AUDCHF": (2026091927, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "GBPAUD": (2026091928, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
+    "GBPCAD": (2026091929, "forex cross", "kandidat spec 35, tanpa referensi bot Python"),
 }
 
 # Input dengan default PRD (Core/Inputs.mqh). Enum ditulis sebagai angka seperti file .set MT5.
@@ -154,6 +171,24 @@ MAX_SPREAD_POINTS: dict[str, int] = {
     "XAUUSD": 720,
     "XAGUSD": 90,
     "BTCUSD": 3000,
+    # Spec 35 kandidat: 3 x median spread M1 7 hari akun cent, diukur 2026-10-13.
+    "US30": 39,
+    "USTEC": 336,
+    "US500": 120,
+    "USOIL": 60,
+    "UKOIL": 39,
+    "ETHUSD": 300,
+    "CADJPY": 33,
+    "AUDJPY": 33,
+    "CHFJPY": 63,
+    "NZDJPY": 42,
+    "EURCAD": 45,
+    "EURAUD": 51,
+    "EURNZD": 66,
+    "GBPNZD": 72,
+    "AUDCHF": 27,
+    "GBPAUD": 63,
+    "GBPCAD": 54,
 }
 
 

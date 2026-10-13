@@ -13,6 +13,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### Spec 35 simbol tambahan (H8 ditolak) — 2026-10-13 — tanpa perubahan EA, tetap 1.32
+
+- 17 preset kandidat (indeks, energi, ETH, cross JPY dan cross lain; magic 2026091913–29, spread maks 3 × median), baseline kandidat di `ea/tests/baseline/kandidat/`, runner `-BaselineSet`. Uji TS-115, TC-RK-21.
+- IS 16 kandidat (ETHUSD tidak punya histori tester): hanya GBPAUD (+0,547R, PF 3,15) dan USTEC (+0,354R, PF 1,98) lolos; total kandidat 139 trade −21,7R. H8 ditolak (< 3 simbol lolos).
+
 ### 1.32 — 2026-10-13 — spec 34 gaya INTRADAY (H7 ditolak), skema v5
 
 - `InpTradingStyle` = 4 (`INTRADAY`): H1 / M15 / M5. Skema data v5: `signals.style` menerima `INTRADAY` (migrasi 0005, rebuild tabel `signals`). Default tetap DAY. Uji TC-CU-18, TC-SGX-04, TC-DB-01g, SC-34.

@@ -49,6 +49,8 @@
     Spec 31: EA SDBot\ExportBars di Strategy Tester per simbol baseline (BL-*.ini, bisa dibatasi -Symbols)
     menulis bar M1 + spread ke Common\Files\sdbot_bars\<SIMBOL>_M1.csv untuk tools\outcome_sim.py.
     Rentang default 2024.03.26..hari ini (OHLC M1), bisa diganti -FromDate/-ToDate.
+.PARAMETER BaselineSet
+    Bersama -Baseline / -ProbeHistory: subfolder ea\tests\baseline, misalnya 'kandidat' (spec 35); preset tetap dari src\Presets.
 .PARAMETER Deposit
     Bersama -Baseline: saldo awal tester (default dari terminal uji), misalnya 1801.37 untuk meniru akun cent live.
 .PARAMETER Symbols
@@ -77,6 +79,7 @@ param(
     [string]$ToDate = '',
     [int]$Model = -1,
     [double]$Deposit = 0,
+    [string]$BaselineSet = '',
     [string[]]$SetInput = @(),
     [switch]$SkipBuild,
     [int]$TimeoutSec = 0,
@@ -598,11 +601,15 @@ if ($Period) {
         if (-not $script:periods.ContainsKey($name) -or -not $script:periods[$name]['FromDate']) { Write-Run "periode $name tidak lengkap di periods.ini"; exit 2 }
     }
 }
+# Spec 35: -BaselineSet kandidat memakai tests\baseline\kandidat (simbol tambahan), agar baseline 12 simbol tidak bergeser.
+$script:baselineDir = Join-Path $repoEa 'tests\baseline'
+if ($BaselineSet) { $script:baselineDir = Join-Path $script:baselineDir $BaselineSet }
+if (-not (Test-Path -LiteralPath $script:baselineDir)) { Write-Run "folder baseline tidak ada: $($script:baselineDir)"; exit 2 }
 if ($Baseline) {
     $want = @($Symbols | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
     $runPeriods = $(if ($Period -eq 'ALL') { @('IS', 'OOS') } elseif ($Period) { @($Period) } else { @('') })
     foreach ($pname in $runPeriods) {
-        foreach ($ini in (Get-ChildItem -LiteralPath (Join-Path $repoEa 'tests\baseline') -Filter 'BL-*.ini' -File | Sort-Object Name)) {
+        foreach ($ini in (Get-ChildItem -LiteralPath $script:baselineDir -Filter 'BL-*.ini' -File | Sort-Object Name)) {
             $sym = $ini.BaseName.Substring(3)
             if ($want.Count -gt 0 -and $want -notcontains $sym) { continue }
             $preset = Join-Path $repoEa "src\Presets\SDBot_DAY_$sym.set"

@@ -155,6 +155,17 @@ void RunTestRiskMathLossFallback()
               MathAbs(l3 - 100.0) < 1e-9 && !okNone);
   }
 
+// TC-RK-21 (spec 35 Req 1.2): kategori kandidat simbol tambahan, batas posisi OTHER 1.
+void RunTestRiskMathCandidates()
+  {
+   int limits[] = {3, 3, 1, 1};
+   AssertTrue("TC-RK-21", "ETH/USD kripto; CAD/JPY, AUD/CHF, EUR/CAD, GBP/NZD cross; indeks/energi USD/USD OTHER dengan batas 1",
+              AssetClassOf("ETH", "USD") == SDB_CLASS_CRYPTO && AssetClassOf("CAD", "JPY") == SDB_CLASS_FOREX_CROSS &&
+              AssetClassOf("AUD", "CHF") == SDB_CLASS_FOREX_CROSS && AssetClassOf("EUR", "CAD") == SDB_CLASS_FOREX_CROSS &&
+              AssetClassOf("GBP", "NZD") == SDB_CLASS_FOREX_CROSS && AssetClassOf("USD", "USD") == SDB_CLASS_OTHER &&
+              ClassPositionLimit(SDB_CLASS_OTHER, limits) == SDB_MAX_POS_OTHER_CLASS && SDB_MAX_POS_OTHER_CLASS == 1);
+  }
+
 void RunTestRiskMath()
   {
    TfBeginSuite("RiskMath");
@@ -165,6 +176,7 @@ void RunTestRiskMath()
    RunTestRiskMathClose();
    RunTestRiskMathClass();
    RunTestRiskMathLossFallback();
+   RunTestRiskMathCandidates();
    TfEndSuite();
   }
 

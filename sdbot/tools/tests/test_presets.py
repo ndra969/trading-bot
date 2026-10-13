@@ -20,6 +20,23 @@ EXPECTED_MAGIC = {
     "XAUUSD": 2026091910,
     "XAGUSD": 2026091911,
     "BTCUSD": 2026091912,
+    "US30": 2026091913,  # spec 35 kandidat
+    "USTEC": 2026091914,  # spec 35 kandidat
+    "US500": 2026091915,  # spec 35 kandidat
+    "USOIL": 2026091916,  # spec 35 kandidat
+    "UKOIL": 2026091917,  # spec 35 kandidat
+    "ETHUSD": 2026091918,  # spec 35 kandidat
+    "CADJPY": 2026091919,  # spec 35 kandidat
+    "AUDJPY": 2026091920,  # spec 35 kandidat
+    "CHFJPY": 2026091921,  # spec 35 kandidat
+    "NZDJPY": 2026091922,  # spec 35 kandidat
+    "EURCAD": 2026091923,  # spec 35 kandidat
+    "EURAUD": 2026091924,  # spec 35 kandidat
+    "EURNZD": 2026091925,  # spec 35 kandidat
+    "GBPNZD": 2026091926,  # spec 35 kandidat
+    "AUDCHF": 2026091927,  # spec 35 kandidat
+    "GBPAUD": 2026091928,  # spec 35 kandidat
+    "GBPCAD": 2026091929,  # spec 35 kandidat
 }
 SECRET_KEY = re.compile(r"token|chatid|metaquotes|password|secret", re.IGNORECASE)
 
@@ -208,6 +225,38 @@ def test_ts113_require_opposite_zone():
     """Spec 33 Req 1.1, 3.3: InpRequireOppositeZone=true di preset (H6 diterima)."""
     for symbol in EXPECTED_MAGIC:
         assert _read(symbol).get("InpRequireOppositeZone") == "true", symbol
+
+
+# Spec 35: spread maks kandidat = 3 x median spread M1 7 hari akun cent (design §3).
+CANDIDATE_MAX_SPREAD = {
+    "US30": 39,
+    "USTEC": 336,
+    "US500": 120,
+    "USOIL": 60,
+    "UKOIL": 39,
+    "ETHUSD": 300,
+    "CADJPY": 33,
+    "AUDJPY": 33,
+    "CHFJPY": 63,
+    "NZDJPY": 42,
+    "EURCAD": 45,
+    "EURAUD": 51,
+    "EURNZD": 66,
+    "GBPNZD": 72,
+    "AUDCHF": 27,
+    "GBPAUD": 63,
+    "GBPCAD": 54,
+}
+
+
+def test_ts115_candidate_presets():
+    """Spec 35 Req 1.1: 17 preset kandidat, magic 2026091913-29 unik, spread maks sesuai tabel."""
+    magics = list(EXPECTED_MAGIC.values())
+    assert len(magics) == 29 and len(set(magics)) == 29
+    for symbol, spread in CANDIDATE_MAX_SPREAD.items():
+        preset = _read(symbol)
+        assert preset.get("InpMaxSpreadPoints") == str(spread), symbol
+        assert preset.get("InpMagicNumber") == str(EXPECTED_MAGIC[symbol]), symbol
 
 
 FIXTURE_SC17 = (

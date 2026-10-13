@@ -11,7 +11,7 @@
 #include <SDBot/Core/InputRules.mqh>
 
 #define TPR_DIR      "sdbot_presets\\"
-#define TPR_EXPECTED 12
+#define TPR_EXPECTED 29   // 12 aktif + 17 kandidat spec 35
 
 // Nama input EA yang boleh ada di preset (Core/Inputs.mqh); kunci lain = salah ketik.
 string TprKnownKeys()
