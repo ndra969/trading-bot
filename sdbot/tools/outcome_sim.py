@@ -84,6 +84,7 @@ class Outcome:
     mfe_r: float
     passes_rules: bool
     open_at_end: bool = False
+    closed_at: int = 0  # spec 32: waktu bar M1 saat posisi tutup (0 = tidak diketahui)
 
 
 @dataclass
@@ -214,6 +215,7 @@ def simulate(c: Candidate, x: ExitRules, bars: Bars, atr15: Atr) -> Outcome:
                 _reason(buy, s.entry, sl, be_sl, c.point),
                 mfe,
                 s.passes_rules,
+                closed_at=int(bars.time[i]),
             )
         if (adverse <= sl) if buy else (adverse >= sl):
             return Outcome(
@@ -221,6 +223,7 @@ def simulate(c: Candidate, x: ExitRules, bars: Bars, atr15: Atr) -> Outcome:
                 _reason(buy, s.entry, sl, be_sl, c.point),
                 mfe,
                 s.passes_rules,
+                closed_at=int(bars.time[i]),
             )
         peak_r = r_of(favorable)
         mfe = max(mfe, peak_r)
@@ -231,7 +234,9 @@ def simulate(c: Candidate, x: ExitRules, bars: Bars, atr15: Atr) -> Outcome:
             vol -= part
             partial_done = True
         if (favorable >= s.tp) if buy else (favorable <= s.tp):
-            return Outcome(realized + vol * r_of(s.tp), "TP", mfe, s.passes_rules)
+            return Outcome(
+                realized + vol * r_of(s.tp), "TP", mfe, s.passes_rules, closed_at=int(bars.time[i])
+            )
         # 4: BE / trailing untuk bar berikutnya (PickBestSl)
         be_active = be_sl is not None and ((sl >= s.entry) if buy else (sl <= s.entry))
         cand_be = 0.0
@@ -258,7 +263,12 @@ def simulate(c: Candidate, x: ExitRules, bars: Bars, atr15: Atr) -> Outcome:
     if last < start:
         return Outcome(0.0, "NO_DATA", 0.0, s.passes_rules, open_at_end=True)
     return Outcome(
-        realized + vol * r_of(bars.close[last] + adj), "END", mfe, s.passes_rules, open_at_end=True
+        realized + vol * r_of(bars.close[last] + adj),
+        "END",
+        mfe,
+        s.passes_rules,
+        open_at_end=True,
+        closed_at=int(bars.time[last]),
     )
 
 

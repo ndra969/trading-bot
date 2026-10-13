@@ -13,6 +13,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### Spec 32 lab setup trendline (ditolak) — 2026-10-13 — tanpa perubahan EA
+
+- `tools/trendline_lab.py`: port aturan EA (swing, bias H4, trendline, pola PA, ATR dengan jendela EA) di atas bar M1; verifikasi terhadap 31.104 kandidat EA: pola 100%, bias 99,7%, trendline 100%. `outcome_sim.Outcome.closed_at`. Uji TS-116..124.
+- IS: pantulan trendline (A) −0,209R per trade dengan bias, −0,194R tanpa bias (3.800–8.500 trade); break-retest (C) −0,133R / −0,183R. Semua simbol negatif; setup trendline tanpa zona tidak dipakai. Trade EA 1.31 dengan trendline di zona (B): +0,273R (71 trade).
+
 ### Spec 35 simbol tambahan (H8 ditolak) — 2026-10-13 — tanpa perubahan EA, tetap 1.32
 
 - 17 preset kandidat (indeks, energi, ETH, cross JPY dan cross lain; magic 2026091913–29, spread maks 3 × median), baseline kandidat di `ea/tests/baseline/kandidat/`, runner `-BaselineSet`. Uji TS-115, TC-RK-21.
