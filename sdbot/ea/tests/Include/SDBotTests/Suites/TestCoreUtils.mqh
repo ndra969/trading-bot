@@ -186,6 +186,22 @@ void RunTestCoreUtilsInputs()
    b.biasEmaPeriod = 0;
    AssertTrue("TC-IR-03", StringFormat("bias: default AND_EMA/21 (H5 diterima), 0 = ikut InpEmaPeriod (50), mode 0-2 dan periode 0/10/400 lolos, 3 dan 5/401 ditolak (gagal %d)", badBias),
               biasDefaults && badBias == 0 && EffectiveBiasEmaPeriod(b) == 50);
+   // TC-IR-05 (spec 36 Req 1.3): input timeframe semua kosong atau semua diisi berurutan HTF > MTF > LTF.
+   ENUM_TIMEFRAMES tfs[5][3] = {{PERIOD_CURRENT, PERIOD_CURRENT, PERIOD_CURRENT}, {PERIOD_H1, PERIOD_M30, PERIOD_M15},
+                                {PERIOD_CURRENT, PERIOD_M30, PERIOD_CURRENT}, {PERIOD_M30, PERIOD_H1, PERIOD_M15},
+                                {PERIOD_H1, PERIOD_M30, PERIOD_M30}};
+   int badTf = 0;
+   for(int i = 0; i < 5; i++)
+     {
+      InputValues t = DefaultInputValues();
+      t.htfTf = tfs[i][0];
+      t.mtfTf = tfs[i][1];
+      t.ltfTf = tfs[i][2];
+      bool ok = ValidateInputValues(t, false, err);
+      if(i < 2 ? !ok : (ok || !CuContains(err, "InpHtfTimeframe")))
+         badTf++;
+     }
+   AssertTrue("TC-IR-05", StringFormat("timeframe: kosong dan H1/M30/M15 lolos; sebagian, terbalik, sama ditolak (gagal %d)", badTf), badTf == 0);
    // TC-SU-32 (spec 11 Req 5.2): input zona, default dari ukuran histori, min < max.
    InputValues z = DefaultInputValues();
    bool zoneDefaults = MathAbs(z.zoneMinWidthAtr - 0.3) < 1e-9 && MathAbs(z.zoneMaxWidthAtr - 2.0) < 1e-9 &&
@@ -284,6 +300,12 @@ void RunTestCoreUtilsLogAndUtil()
    AssertTrue("TC-CU-14", "day trading: H4 / H1 / M15", CuTfEq(SDB_STYLE_DAY, PERIOD_H4, PERIOD_H1, PERIOD_M15));
    AssertTrue("TC-CU-15a", "scalping: M15 / M5 / M1", CuTfEq(SDB_STYLE_SCALPING, PERIOD_M15, PERIOD_M5, PERIOD_M1));
    AssertTrue("TC-CU-15b", "swing: W1 / D1 / H4", CuTfEq(SDB_STYLE_SWING, PERIOD_W1, PERIOD_D1, PERIOD_H4));
+   ENUM_TIMEFRAMES rh, rm, rl;
+   ResolveTimeframes(SDB_STYLE_DAY, PERIOD_CURRENT, PERIOD_CURRENT, PERIOD_CURRENT, rh, rm, rl);
+   bool dflt = rh == PERIOD_H4 && rm == PERIOD_H1 && rl == PERIOD_M15;
+   ResolveTimeframes(SDB_STYLE_DAY, PERIOD_H1, PERIOD_M30, PERIOD_M15, rh, rm, rl);
+   AssertTrue("TC-CU-19", "ResolveTimeframes (spec 36): input kosong ikut gaya DAY H4/H1/M15; H1/M30/M15 dipakai",
+              dflt && rh == PERIOD_H1 && rm == PERIOD_M30 && rl == PERIOD_M15);
    AssertTrue("TC-CU-18", "intraday (spec 34): H1 / M15 / M5, nilai enum 4", CuTfEq(SDB_STYLE_INTRADAY, PERIOD_H1, PERIOD_M15, PERIOD_M5) &&
               (int)SDB_STYLE_INTRADAY == 4 && (int)SDB_STYLE_POSITION == 3);
    AssertTrue("TC-CU-15c", "position: MN1 / W1 / D1", CuTfEq(SDB_STYLE_POSITION, PERIOD_MN1, PERIOD_W1, PERIOD_D1));

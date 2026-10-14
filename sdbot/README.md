@@ -35,6 +35,7 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 |---|---|---|---|---|
 | Umum | `InpMagicNumber` | 2026091901 | 2026091901–2026091999, satu nomor per pair | spec 02 |
 | Umum | `InpTradingStyle` | Day trading (H4/H1/M15); 0 = scalping M15/M5/M1, 2 = swing, 3 = position, 4 = intraday H1/M15/M5 (spec 34) | 0–4 | spec 02, 34 |
+| Umum | `InpHtfTimeframe` / `InpMtfTimeframe` / `InpLtfTimeframe` | PERIOD_CURRENT: ikut gaya; bila ketiganya diisi menggantikan pasangan gaya (HTF > MTF > LTF) | semua kosong atau semua diisi | spec 36 |
 | Umum | `InpSymbolSuffix` | kosong (`c` di preset akun cent) | — | spec 02 |
 | Umum | `InpAllowLiveTrading` | false | — | spec 02 |
 | Umum | `InpLogLevel` | INFO | — | spec 02 |

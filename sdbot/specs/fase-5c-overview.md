@@ -117,6 +117,9 @@ Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase
 | 33 | H6 entry hanya dengan TP ke zona lawan | +0,164 vs +0,079 (121 trade) | +0,421 vs +0,163 | +0,224 vs +0,080 (total +12,3 vs +10,1R) | **Diterima** (1.31, PC-34) |
 | 34 | H7 gaya intraday H1/M15/M5 (dan R:R 1,5) | −0,117 / −0,093 (intraday R:R 2 / 1,5), +0,036 (DAY R:R 1,5) vs +0,164 | — | — | Ditolak di IS (lebih banyak SL, spread 20% risiko; 1.32) |
 | 35 | H8 simbol tambahan (17 kandidat) | 2 dari 16 lolos (GBPAUD +0,547, USTEC +0,354); total kandidat −0,16R per trade | — | — | Ditolak di IS (< 3 simbol) |
+| 36 | H9 zona M30 lewat input timeframe (V1 H1/M30/M15, V2 H4/M30/M15, V3 H4/H1/M30, V4 M30/M15/M5) | −0,288 / −0,173 / −0,334 / −0,280 (41 / 54 / 22 / 189 trade) vs +0,164 (121) | — | — | Ditolak di IS (hanya V4 cukup sering, 7,0 trade/bulan, tetapi PF 0,56; 1.33) |
 | 32 | Lab setup trendline H1 + PA M15 (A pantulan, C break-retest, B + zona) | A −0,209 / −0,194, C −0,133 / −0,183 (bias / tanpa); B +0,273 (71 trade) | — | — | A dan C ditolak di IS (semua simbol negatif); B tidak dijadikan aturan (sampel kecil) |
 
 **Catatan sesudah spec 34–35 (2026-10-13):** strategi hanya positif di gaya DAY dan di sebagian simbol aktif. Di timeframe kecil (spec 34) dan di simbol baru (spec 35) hasilnya negatif. Kemungkinan keunggulan sekarang sebagian berasal dari simbol dan periode, bukan sifat umum strategi. Kenaikan frekuensi yang aman belum ditemukan; live tetap 1.31.
+
+**Catatan sesudah spec 36 (2026-10-14):** zona di bawah H1 (M30, M15) rugi di semua kombinasi bias dan trigger. Makin kecil timeframe, makin sering trade kena SL (59–64% vs 43%). Keunggulan strategi S&D ini terikat pada zona H1.

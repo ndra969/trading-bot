@@ -3,6 +3,15 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-36: Input timeframe HTF/MTF/LTF (spec 36, H9 ditolak)
+- Status: Open
+- Tanggal disetujui: 2026-10-13 (spec 36)
+- Dokumen: PRD-EA §Gaya dan timeframe, §Parameter input EA, §Roadmap
+- Sumber: spec `ea-36-tf-m30`; sesi IS 2247–2282, 2319–2331
+- Perubahan:
+    - Tabel input, baris baru di Gaya: `| Gaya | HtfTimeframe / MtfTimeframe / LtfTimeframe | PERIOD_CURRENT (ikut gaya); bila diisi, ketiganya wajib dengan urutan HTF > MTF > LTF, hanya eksperimen |`. `signals.style` tetap mencatat gaya; timeframe sebenarnya ada di `inputs_json`.
+    - Catatan Roadmap: zona M30 diuji untuk menambah frekuensi (permintaan user), ditolak di IS: H1/M30/M15 −0,288R, H4/M30/M15 −0,173R, H4/H1/M30 −0,334R, M30/M15/M5 −0,280R per trade (acuan +0,164R).
+
 ### PC-35: Gaya INTRADAY tersedia, skema v5 (spec 34, H7 ditolak)
 - Status: Open
 - Tanggal disetujui: 2026-10-12 (spec 34)

@@ -1390,6 +1390,20 @@ void CheckSc34(const string id, const CScenarioRecorder &rec)
    AssertTrue(id + "-entry", StringFormat("ACCEPTED %I64d", accepted), accepted >= 1);
   }
 
+// SC-36 (spec 36 Req 1.2, 1.5): input timeframe H1/M30/M15 dipakai pipeline: zona M30, entry, input tercatat.
+void CheckSc36(const string id, const CScenarioRecorder &rec)
+  {
+   string ses = rec.SessionIdList();
+   string w = " FROM signals WHERE session_id IN (" + ses + ")";
+   long candidates = ScDbCount("SELECT COUNT(*)" + w);
+   long notM30 = ScDbCount("SELECT COUNT(*)" + w + " AND zone_ref NOT LIKE 'M30-%'");
+   long accepted = ScDbCount("SELECT COUNT(*)" + w + " AND status = 'ACCEPTED'");
+   AssertTrue(id + "-zones", StringFormat("kandidat %I64d, zona bukan M30 %I64d, ACCEPTED %I64d", candidates, notM30, accepted),
+              candidates >= 1 && notM30 == 0 && accepted >= 1);
+   long inputs = ScDbCount("SELECT COUNT(*) FROM sessions WHERE id IN (" + ses + ") AND inputs_json LIKE '%PERIOD_M30%' AND inputs_json LIKE '%PERIOD_H1%'");
+   AssertTrue(id + "-inputs", StringFormat("sesi dengan input timeframe H1/M30: %I64d", inputs), inputs >= 1);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1487,6 +1501,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc31(id, rec);
    else if(id == "SC-34")
       CheckSc34(id, rec);
+   else if(id == "SC-36")
+      CheckSc36(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

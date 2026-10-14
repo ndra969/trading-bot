@@ -1,0 +1,10 @@
+; SC-36: InpHtfTimeframe=H1, InpMtfTimeframe=M30, InpLtfTimeframe=M15; zona M30, >= 1 ACCEPTED, input tercatat.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+InpHtfTimeframe=16385
+InpMtfTimeframe=30
+InpLtfTimeframe=15
+HarnessScenario=SC-36
+HarnessEveryBars=0
+HarnessPipeline=true

@@ -227,6 +227,14 @@ def test_ts113_require_opposite_zone():
         assert _read(symbol).get("InpRequireOppositeZone") == "true", symbol
 
 
+def test_ts125_timeframe_inputs():
+    """Spec 36 Req 1.4: InpHtf/Mtf/LtfTimeframe = 0 (ikut gaya) di semua preset."""
+    for symbol in EXPECTED_MAGIC:
+        preset = _read(symbol)
+        for key in ("InpHtfTimeframe", "InpMtfTimeframe", "InpLtfTimeframe"):
+            assert preset.get(key) == "0", (symbol, key)
+
+
 # Spec 35: spread maks kandidat = 3 x median spread M1 7 hari akun cent (design §3).
 CANDIDATE_MAX_SPREAD = {
     "US30": 39,

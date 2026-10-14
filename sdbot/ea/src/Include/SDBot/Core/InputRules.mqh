@@ -60,6 +60,9 @@ struct InputValues
    ENUM_SDB_BIAS_MODE biasMode;          // spec 27: aturan gabung struktur dan EMA HTF
    int               biasEmaPeriod;      // spec 27: periode EMA HTF untuk bias, 0 = emaPeriod
    bool              requireOppositeZone; // spec 33: wajib zona lawan sebagai TP
+   ENUM_TIMEFRAMES   htfTf;              // spec 36: PERIOD_CURRENT = ikut gaya
+   ENUM_TIMEFRAMES   mtfTf;
+   ENUM_TIMEFRAMES   ltfTf;
   };
 
 // Semua yang dibutuhkan CSdbApp dari input, agar orkestrasi bisa diuji tanpa input global
@@ -135,6 +138,9 @@ InputValues DefaultInputValues()
    v.biasMode = SDB_DEF_BIAS_MODE;
    v.biasEmaPeriod = SDB_DEF_BIAS_EMA_PERIOD;
    v.requireOppositeZone = SDB_DEF_REQUIRE_OPPOSITE_ZONE;
+   v.htfTf = PERIOD_CURRENT;
+   v.mtfTf = PERIOD_CURRENT;
+   v.ltfTf = PERIOD_CURRENT;
    return v;
   }
 
@@ -179,6 +185,10 @@ void IrCheckAnalysis(const InputValues &v, string &errors)
    IrCheckRange("InpBiasMode", (int)v.biasMode, SDB_BIAS_AND_EMA, SDB_BIAS_STRUCTURE_ONLY, errors);
    if(v.biasEmaPeriod != 0)
       IrCheckRange("InpBiasEmaPeriod", v.biasEmaPeriod, SDB_MIN_EMA_PERIOD, SDB_MAX_EMA_PERIOD, errors);
+   // Spec 36: semua kosong (ikut gaya) atau semua diisi dengan HTF > MTF > LTF.
+   int set = (v.htfTf != PERIOD_CURRENT) + (v.mtfTf != PERIOD_CURRENT) + (v.ltfTf != PERIOD_CURRENT);
+   if(set != 0 && (set != 3 || PeriodSeconds(v.htfTf) <= PeriodSeconds(v.mtfTf) || PeriodSeconds(v.mtfTf) <= PeriodSeconds(v.ltfTf)))
+      IrAdd(errors, "InpHtfTimeframe / InpMtfTimeframe / InpLtfTimeframe harus semua PERIOD_CURRENT atau semua diisi dengan HTF > MTF > LTF");
   }
 
 // Periode EMA HTF untuk bias (spec 27 Req 2.1): 0 berarti ikut InpEmaPeriod.

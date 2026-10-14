@@ -13,6 +13,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.33 — 2026-10-14 — spec 36 input timeframe, zona M30 (H9 ditolak)
+
+- Input `InpHtfTimeframe` / `InpMtfTimeframe` / `InpLtfTimeframe` (default `PERIOD_CURRENT` = ikut gaya); bila diisi, ketiganya wajib dengan urutan HTF > MTF > LTF (`ResolveTimeframes`). `inputs_json` 60 kunci; preset dengan tiga input = 0. Uji TC-CU-19, TC-IR-05, TC-SU-04c, TS-125, SC-36.
+- IS (acuan 1.31: 121 trade, 4,5/bulan, +0,164R, PF 1,39): H1/M30/M15 41 trade −0,288R PF 0,55; H4/M30/M15 54 trade −0,173R PF 0,71; H4/H1/M30 22 trade −0,334R PF 0,47; M30/M15/M5 189 trade (7,0/bulan) −0,280R PF 0,56. H9 ditolak: zona M30 tidak menambah trade (kecuali M30/M15/M5), dan SL kena 59–64% vs 43%.
+
 ### Spec 32 lab setup trendline (ditolak) — 2026-10-13 — tanpa perubahan EA
 
 - `tools/trendline_lab.py`: port aturan EA (swing, bias H4, trendline, pola PA, ATR dengan jendela EA) di atas bar M1; verifikasi terhadap 31.104 kandidat EA: pola 100%, bias 99,7%, trendline 100%. `outcome_sim.Outcome.closed_at`. Uji TS-116..124.

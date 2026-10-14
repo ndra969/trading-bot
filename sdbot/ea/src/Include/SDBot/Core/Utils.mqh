@@ -161,6 +161,19 @@ void StyleTimeframes(const ENUM_SDB_TRADING_STYLE style, ENUM_TIMEFRAMES &htf, E
      }
   }
 
+// Spec 36: input timeframe (ketiganya diisi) mengganti pasangan gaya; PERIOD_CURRENT = ikut gaya.
+void ResolveTimeframes(const ENUM_SDB_TRADING_STYLE style, const ENUM_TIMEFRAMES inH, const ENUM_TIMEFRAMES inM,
+                       const ENUM_TIMEFRAMES inL, ENUM_TIMEFRAMES &htf, ENUM_TIMEFRAMES &mtf, ENUM_TIMEFRAMES &ltf)
+  {
+   StyleTimeframes(style, htf, mtf, ltf);
+   if(inH != PERIOD_CURRENT && inM != PERIOD_CURRENT && inL != PERIOD_CURRENT)
+     {
+      htf = inH;
+      mtf = inM;
+      ltf = inL;
+     }
+  }
+
 string ErrText(const int code)
   {
    return "err=" + IntegerToString(code);

@@ -60,6 +60,9 @@ input double                 InpMinRR                 = SDB_DEF_MIN_RR;         
 input double                 InpSlBufferAtr           = SDB_DEF_SL_BUFFER_ATR;      // Buffer SL di luar zona (x ATR MTF)
 input double                 InpMinSlAtr              = SDB_DEF_MIN_SL_ATR;         // Jarak SL minimum (x ATR MTF)
 input double                 InpMaxSlAtr              = SDB_DEF_MAX_SL_ATR;         // Jarak SL maksimum (x ATR MTF)
+input ENUM_TIMEFRAMES        InpHtfTimeframe          = PERIOD_CURRENT;             // HTF (bias); kosong = ikut gaya (spec 36)
+input ENUM_TIMEFRAMES        InpMtfTimeframe          = PERIOD_CURRENT;             // MTF (zona); kosong = ikut gaya
+input ENUM_TIMEFRAMES        InpLtfTimeframe          = PERIOD_CURRENT;             // LTF (trigger); kosong = ikut gaya
 input bool                   InpRequireOppositeZone   = SDB_DEF_REQUIRE_OPPOSITE_ZONE; // Entry hanya bila ada zona lawan untuk TP (false = TP 2R bila tidak ada)
 
 input group "Filter"
@@ -112,6 +115,9 @@ InputValues CurrentInputs()
    v.biasMode = InpBiasMode;
    v.biasEmaPeriod = InpBiasEmaPeriod;
    v.requireOppositeZone = InpRequireOppositeZone;
+   v.htfTf = InpHtfTimeframe;
+   v.mtfTf = InpMtfTimeframe;
+   v.ltfTf = InpLtfTimeframe;
    v.zoneMinWidthAtr = InpZoneMinWidthAtr;
    v.zoneMaxWidthAtr = InpZoneMaxWidthAtr;
    v.zoneMinLegAtr = InpZoneMinLegAtr;
@@ -157,7 +163,8 @@ string CurrentInputsJson()
                  "InpMaxSpreadPoints", "InpTesterUtcOffsetHours", "InpMaxSameDirectionPerCurrency",
                  "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
                  "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones", "InpSessionEndHourUtc",
-                 "InpBiasMode", "InpBiasEmaPeriod", "InpRequireOppositeZone"};
+                 "InpBiasMode", "InpBiasEmaPeriod", "InpRequireOppositeZone",
+                 "InpHtfTimeframe", "InpMtfTimeframe", "InpLtfTimeframe"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -218,6 +225,9 @@ string CurrentInputsJson()
    v[54] = JsonStr(EnumToString(InpBiasMode));
    v[55] = JsonNum(InpBiasEmaPeriod);
    v[56] = JsonBool(InpRequireOppositeZone);
+   v[57] = JsonStr(EnumToString(InpHtfTimeframe));
+   v[58] = JsonStr(EnumToString(InpMtfTimeframe));
+   v[59] = JsonStr(EnumToString(InpLtfTimeframe));
    return CanonicalJson(k, v);
   }
 

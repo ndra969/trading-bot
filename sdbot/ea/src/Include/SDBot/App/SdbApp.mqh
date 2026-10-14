@@ -102,7 +102,7 @@ private:
    bool InitPositions(const SdbAppConfig &cfg)
      {
       ENUM_TIMEFRAMES htf, mtf, ltf;
-      StyleTimeframes(cfg.style, htf, mtf, ltf);
+      ResolveTimeframes(cfg.style, cfg.inputs.htfTf, cfg.inputs.mtfTf, cfg.inputs.ltfTf, htf, mtf, ltf);   // spec 36
       m_atrHandle = iATR(_Symbol, ltf, cfg.inputs.trailAtrPeriod);
       if(m_atrHandle == INVALID_HANDLE)
         {
@@ -122,7 +122,7 @@ private:
    void InitAnalysis(const SdbAppConfig &cfg)
      {
       ENUM_TIMEFRAMES htf, mtf, ltf;
-      StyleTimeframes(cfg.style, htf, mtf, ltf);
+      ResolveTimeframes(cfg.style, cfg.inputs.htfTf, cfg.inputs.mtfTf, cfg.inputs.ltfTf, htf, mtf, ltf);   // spec 36
       SdbStructureParams p;
       p.strength = cfg.inputs.swingStrength;
       p.lookback = cfg.inputs.structureLookback;
