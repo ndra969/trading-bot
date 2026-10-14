@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //| TestTelegramRules.mqh — permintaan dan respons Telegram, teks polos,
 //| teks push, batas push; fungsi murni (spec 09 Req 1.3, 2, 3;
-//| design §3.1, §4.3; TC-TG-01..14).
+//| design §3.1, §4.3; TC-TG-01..19).
 //+------------------------------------------------------------------+
 #ifndef SDB_SUITES_TESTTELEGRAMRULES_MQH
 #define SDB_SUITES_TESTTELEGRAMRULES_MQH
@@ -40,6 +40,18 @@ void RunTestTelegramTransport()
    r = gap.Send(TtgMsg());
    AssertTrue("TC-TG-16", StringFormat("jarak kirim bersama: GV NT_TG_NEXT di depan -> LIMITED %d detik tanpa WebRequest", r.retryAfterSec),
               r.code == SDB_SEND_LIMITED && r.retryAfterSec == 5 && gap.WebRequestCount() == 0 && !gap.IsDisabled());
+   st.DeleteAll();
+
+   // GV NT_TG_NEXT sisa sebelum PC restart: GetTickCount64 mulai dari nol lagi, GV tetap (live 2026-10-14: jeda 1144644 detik).
+   CTelegramTransport boot;
+   boot.Init("123:ABC", "-100", GetPointer(st));
+   ulong before = GetTickCount64();
+   st.Set(SDB_GV_NT_TG_NEXT, (double)(before + 13ULL * 86400 * 1000), false);
+   r = boot.Send(TtgMsg());
+   double reset = st.Get(SDB_GV_NT_TG_NEXT, 0.0);
+   AssertTrue("TC-TG-19", StringFormat("GV NT_TG_NEXT 13 hari di depan (basi) -> slot diambil, GV direset ke jarak kirim (code=%d)", (int)r.code),
+              r.code != SDB_SEND_LIMITED && reset >= (double)(before + SDB_TG_MIN_GAP_MS) &&
+              reset <= (double)(GetTickCount64() + SDB_TG_MIN_GAP_MS));
    st.DeleteAll();
 
    CTelegramTransport empty;
@@ -115,6 +127,13 @@ void RunTestTelegramRules()
    tenOld[0] = now - 60001;
    AssertTrue("TC-TG-14", "push: 1 dalam 1 detik boleh, 2 tidak; 10 dalam 60 detik tidak; tertua lewat 60 detik boleh",
               PushAllowed(one, now) && !PushAllowed(two, now) && !PushAllowed(ten, now) && PushAllowed(tenOld, now));
+
+   ulong t0 = 5000000;
+   AssertTrue("TC-TG-18", "jeda GV: lewat -> 0; 4,5 detik -> 5; tepat batas -> batas; lebih dari batas (basi) -> 0",
+              TgGapWaitSec(t0, (double)(t0 - 1)) == 0 && TgGapWaitSec(t0, (double)t0) == 0 &&
+              TgGapWaitSec(t0, (double)(t0 + 4500)) == 5 &&
+              TgGapWaitSec(t0, (double)(t0 + (ulong)SDB_TG_MAX_GAP_WAIT_SEC * 1000)) == SDB_TG_MAX_GAP_WAIT_SEC &&
+              TgGapWaitSec(t0, (double)(t0 + (ulong)SDB_TG_MAX_GAP_WAIT_SEC * 1000 + 1)) == 0);
 
    RunTestTelegramTransport();
    TfEndSuite();

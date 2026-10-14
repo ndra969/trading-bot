@@ -87,6 +87,7 @@
 #define SDB_TG_TIMEOUT_MS             3000     // PRD
 #define SDB_TG_MIN_GAP_MS             1000     // jarak kiriman semua instance ke satu chat
 #define SDB_TG_TEMP_BACKOFF_SEC       10       // selama gagal sementara: maks 1 kiriman per 10 detik
+#define SDB_TG_MAX_GAP_WAIT_SEC       3600     // GV NT_TG_NEXT lebih jauh dari ini = basi (GetTickCount64 mulai nol setelah PC restart)
 #define SDB_PUSH_MAX_LEN              255      // batas SendNotification
 #define SDB_PUSH_PER_SEC              2
 #define SDB_PUSH_PER_MIN              10

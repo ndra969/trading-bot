@@ -65,6 +65,18 @@ int TgRetryAfter(const string body)
    return (int)StringToInteger(StringSubstr(body, p + StringLen(key), 10));
   }
 
+// Detik tunggu dari GV NT_TG_NEXT (ms GetTickCount64, bersama semua instance; Req 2.5). GetTickCount64 mulai dari
+// nol setelah PC restart sedangkan GV tetap tersimpan, jadi jeda > SDB_TG_MAX_GAP_WAIT_SEC dianggap basi (0 = boleh kirim).
+int TgGapWaitSec(const ulong now, const double next)
+  {
+   if(next <= (double)now)
+      return 0;
+   double ms = next - (double)now;
+   if(ms > (double)SDB_TG_MAX_GAP_WAIT_SEC * 1000.0)
+      return 0;
+   return (int)(((ulong)next - now + 999) / 1000);
+  }
+
 bool TgIsParseError(const string body) { return StringFind(body, "can't parse entities") >= 0; }
 
 // Error WebRequest (http -1) dan kode HTTP Telegram -> hasil (design §4.3).

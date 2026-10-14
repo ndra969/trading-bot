@@ -13,6 +13,10 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.34 — 2026-10-14 — perbaikan jeda Telegram basi sesudah PC restart
+
+- Live 2026-10-14 09:27 (mini PC restart): semua instance mencatat "transport minta jeda 1144644 detik" dan semua notifikasi dibuang `STALE`. GV `NT_TG_NEXT` menyimpan ms `GetTickCount64()` yang mulai dari nol lagi setelah PC restart, sedangkan GV tetap tersimpan (uptime lama ±13 hari). `TgGapWaitSec` (TelegramRules): jeda > `SDB_TG_MAX_GAP_WAIT_SEC` (1 jam) dianggap basi, slot diambil dan GV ditimpa. Uji TC-TG-18, TC-TG-19. Trading tidak terpengaruh; tidak aktif di tester.
+
 ### 1.33 — 2026-10-14 — spec 36 input timeframe, zona M30 (H9 ditolak)
 
 - Input `InpHtfTimeframe` / `InpMtfTimeframe` / `InpLtfTimeframe` (default `PERIOD_CURRENT` = ikut gaya); bila diisi, ketiganya wajib dengan urutan HTF > MTF > LTF (`ResolveTimeframes`). `inputs_json` 60 kunci; preset dengan tiga input = 0. Uji TC-CU-19, TC-IR-05, TC-SU-04c, TS-125, SC-36.

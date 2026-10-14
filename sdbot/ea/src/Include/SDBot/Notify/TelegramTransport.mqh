@@ -3,7 +3,8 @@
 //| sendMessage Telegram Bot API lewat WebRequest (spec 09 Req 1.3, 2;
 //| design §3.4). Jarak kirim 1 detik dan jeda 429 dibagi semua instance
 //| lewat GV NT_TG_NEXT (ms GetTickCount64, satu jam untuk semua EA di
-//| terminal). Error konfigurasi menonaktifkan transport sampai init
+//| terminal; nilai > 1 jam di depan = basi dari sebelum PC restart).
+//| Error konfigurasi menonaktifkan transport sampai init
 //| ulang. Token tidak pernah ditulis ke log. Tidak dipakai di tester.
 //+------------------------------------------------------------------+
 #ifndef SDB_NOTIFY_TELEGRAMTRANSPORT_MQH
@@ -62,8 +63,9 @@ private:
       if(!GlobalVariableCheck(key))
          m_state.Set(SDB_GV_NT_TG_NEXT, 0.0, false);
       double next = m_state.Get(SDB_GV_NT_TG_NEXT, 0.0);
-      if((double)now < next)
-         return (int)(((ulong)next - now + 999) / 1000);
+      int wait = TgGapWaitSec(now, next);   // GV basi dari sebelum PC restart ikut ditimpa di bawah
+      if(wait > 0)
+         return wait;
       return GlobalVariableSetOnCondition(key, (double)(now + SDB_TG_MIN_GAP_MS), next) ? 0 : 1;
      }
 
