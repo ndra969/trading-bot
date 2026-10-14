@@ -9,3 +9,6 @@ HarnessSlPoints=200
 HarnessTpPoints=1000
 HarnessMaxOpen=1
 HarnessFixedLot=0
+; spec 37: default BE 1,5R tanpa partial; skenario ini menguji BE 1R + partial 1,5R
+InpBreakevenR=1.0
+InpPartialR=1.5

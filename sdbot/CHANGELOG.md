@@ -13,6 +13,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.35 — 2026-10-14 — spec 37 breakeven 1,5R tanpa partial (H10 diterima)
+
+- Default `InpBreakevenR` 1.0 → 1.5 dan `InpPartialR` 1.5 → 10.0 (partial praktis mati); `gen_presets.py` + preset. SC-01, SC-01b, SC-04 mem-pin nilai lama (menguji partial). Uji TS-135; `-All` PASS.
+- Acuan 1.31 → V3: IS +0,164 → +0,205R (121 trade, PF 1,37, DD 9,22R); OOS +0,421 → +0,524R (21 trade, PF 2,37); REAL +0,224 → +0,297R (55 trade, +16,4R, PF 1,57). V1 tanpa BE (+0,275R IS) ditolak karena DD 17,7R; V2 BE 1R tanpa partial +0,185R.
+
 ### 1.34 — 2026-10-14 — perbaikan jeda Telegram basi sesudah PC restart
 
 - Live 2026-10-14 09:27 (mini PC restart): semua instance mencatat "transport minta jeda 1144644 detik" dan semua notifikasi dibuang `STALE`. GV `NT_TG_NEXT` menyimpan ms `GetTickCount64()` yang mulai dari nol lagi setelah PC restart, sedangkan GV tetap tersimpan (uptime lama ±13 hari). `TgGapWaitSec` (TelegramRules): jeda > `SDB_TG_MAX_GAP_WAIT_SEC` (1 jam) dianggap basi, slot diambil dan GV ditimpa. Uji TC-TG-18, TC-TG-19. Trading tidak terpengaruh; tidak aktif di tester.

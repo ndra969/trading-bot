@@ -3,6 +3,17 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-37: Breakeven 1,5R tanpa partial (spec 37, H10 diterima)
+- Status: Open
+- Tanggal disetujui: 2026-10-13 (spec 37)
+- Dokumen: PRD-EA §Position management, §Parameter input EA, §Roadmap
+- Sumber: spec `ea-37-tp-zone-pure`; sesi IS 2307–2318, OOS 2376–2387, REAL 2388–2399
+- Perubahan:
+    - §Position management: "BE di 1R (+2 point), partial 50% di 1,5R, trailing ATR(14) × 2 sesudah BE" menjadi "BE di 1,5R (+2 point), tanpa partial, trailing ATR(14) × 2 sesudah BE; TP di proximal zona lawan".
+    - Tabel input: `BreakevenR` default 1,5; `PartialR` default 10 (batas maksimum, partial praktis mati; nilai lebih kecil hanya eksperimen).
+    - Bukti (acuan 1.31 → 1.35): IS +0,164 → +0,205R (121 trade, DD 6,55 → 9,22R); OOS +0,421 → +0,524R (21 trade); REAL +0,224 → +0,297R (55 trade). Jumlah trade tidak berubah.
+    - Catatan risiko (EC-01): posisi lebih lama berisiko penuh sebelum BE, jadi batas risiko terbuka 3% bisa lebih sering tercapai di live.
+
 ### PC-36: Input timeframe HTF/MTF/LTF (spec 36, H9 ditolak)
 - Status: Open
 - Tanggal disetujui: 2026-10-13 (spec 36)

@@ -235,6 +235,14 @@ def test_ts125_timeframe_inputs():
             assert preset.get(key) == "0", (symbol, key)
 
 
+def test_ts135_position_management():
+    """Spec 37 Req 2.3: InpBreakevenR=1.5 dan InpPartialR=10.0 (partial mati) di preset (H10 diterima)."""
+    for symbol in EXPECTED_MAGIC:
+        preset = _read(symbol)
+        assert preset.get("InpBreakevenR") == "1.5", symbol
+        assert preset.get("InpPartialR") == "10.0", symbol
+
+
 # Spec 35: spread maks kandidat = 3 x median spread M1 7 hari akun cent (design §3).
 CANDIDATE_MAX_SPREAD = {
     "US30": 39,

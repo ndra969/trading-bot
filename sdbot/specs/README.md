@@ -106,7 +106,7 @@ Use case, pembagian, dan keputusan: [fase-5c-overview.md](fase-5c-overview.md) (
 | 34 | [ea-34-intraday-style](ea-34-intraday-style/) | H7: gaya intraday H1/M15/M5 dan R:R 1,5 (permintaan user: entry lebih sering) | 33 | IS/OOS/REAL vs acuan 1.31, frekuensi ≥ 2× | **Done** 2026-10-13 (v1.32; H7 DITOLAK di IS: intraday −0,117R / −0,093R per trade, DAY R:R 1,5 +0,036R vs +0,164R; skema v5; PC-35) |
 | 35 | [ea-35-more-symbols](ea-35-more-symbols/) | H8: simbol tambahan (indeks, energi, ETH, cross) dengan aturan sama | 34 | seleksi IS, OOS/REAL kelompok terpilih | **Done** 2026-10-13 (H8 DITOLAK di IS: 2 dari 16 kandidat lolos, GBPAUD dan USTEC; total kandidat −0,16R per trade; ETHUSD tanpa histori tester) |
 | 36 | [ea-36-tf-m30](ea-36-tf-m30/) | H9: zona M30 (H1/M30/M15, H4/M30/M15, H4/H1/M30, M30/M15/M5) lewat input timeframe | 34 | IS/OOS/REAL vs acuan 1.31, frekuensi ≥ 1,5× | **Done** 2026-10-14 (v1.33; H9 DITOLAK di IS: −0,288 / −0,173 / −0,334 / −0,280R per trade; input timeframe tetap untuk eksperimen; PC-36) |
-| 37 | [ea-37-tp-zone-pure](ea-37-tp-zone-pure/) | H10: manajemen posisi lebih ringan (tanpa BE/partial, TP ke zona lawan) | 33 | IS/OOS/REAL vs acuan 1.31 | In progress (spec Approved 2026-10-13) |
+| 37 | [ea-37-tp-zone-pure](ea-37-tp-zone-pure/) | H10: manajemen posisi lebih ringan (tanpa BE/partial, TP ke zona lawan) | 33 | IS/OOS/REAL vs acuan 1.31 | **Done** 2026-10-14 (v1.35; H10 DITERIMA, BE 1,5R tanpa partial: IS +0,205R, OOS +0,524R, REAL +0,297R vs +0,164 / +0,421 / +0,224; PC-37) |
 
 ## Fase 6 — Validasi live akun cent
 

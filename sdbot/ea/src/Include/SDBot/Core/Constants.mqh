@@ -240,9 +240,9 @@
 #define SDB_DEF_DAILY_LOSS_PCT        3.0
 #define SDB_DEF_DD_REDUCE_PCT         10.0
 #define SDB_DEF_DD_STOP_PCT           15.0
-#define SDB_DEF_BREAKEVEN_R           1.0
+#define SDB_DEF_BREAKEVEN_R           1.5      // spec 37 (H10): BE lebih jauh agar pemenang mencapai zona lawan
 #define SDB_DEF_BREAKEVEN_BUFFER_PTS  2
-#define SDB_DEF_PARTIAL_R             1.5
+#define SDB_DEF_PARTIAL_R             10.0     // spec 37 (H10): partial mati (batas maksimum, praktis tidak tercapai)
 #define SDB_DEF_PARTIAL_PCT           50.0
 #define SDB_DEF_TRAIL_ATR_PERIOD      14
 #define SDB_DEF_TRAIL_ATR_MULT        2.0
