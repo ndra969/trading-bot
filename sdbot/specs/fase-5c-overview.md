@@ -126,3 +126,7 @@ Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase
 **Catatan sesudah spec 36 (2026-10-14):** zona di bawah H1 (M30, M15) rugi di semua kombinasi bias dan trigger. Makin kecil timeframe, makin sering trade kena SL (59–64% vs 43%). Keunggulan strategi S&D ini terikat pada zona H1.
 
 **Catatan sesudah spec 37 (2026-10-14):** dengan TP selalu di zona lawan, BE 1R dan partial 50% di 1,5R memotong pemenang. BE 1,5R tanpa partial menaikkan R per trade di ketiga periode dengan jumlah trade yang sama. Frekuensi tidak berubah.
+
+**Temuan H12 (2026-10-14, tanpa spec; pemicu: trade live pertama USDCADc SELL kena SL sesudah CPI):** apakah entry sesudah candle impuls besar atau berita HIGH lebih buruk? Trade backtest 1.35 (sesi 2307–2318, 2376–2399), definisi ditulis sebelum hasil: impuls = candle M15 terbesar dalam 8 bar sebelum entry / rata-rata range 14 bar M15; berita = rilis HIGH mata uang pair ≤ 2 jam sebelum entry.
+- Impuls ≥ 3 tidak lebih buruk: IS +0,410R (19), OOS +0,559R (4), REAL +0,207R (14) vs semua +0,205 / +0,524 / +0,297. Tidak ada alasan menolak entry sesudah candle panjang.
+- Berita ≤ 2 jam lebih lemah tetapi tetap positif: IS +0,033R (24 vs +0,248), REAL +0,084R (15 vs +0,378); OOS hanya 4 trade (SAMPEL KURANG), jadi tidak konsisten menurut aturan §6.3. Memblokirnya membuang ±20% trade dengan R total positif. Tidak dijadikan filter; dipantau di live.

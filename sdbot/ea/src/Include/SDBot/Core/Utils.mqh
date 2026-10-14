@@ -303,14 +303,47 @@ bool ResolveLossMoney(const bool calcOk, const double calcProfit, const double p
    return loss > 0.0;
   }
 
+// Nilai mentah untuk log bila rugi uang tidak bisa dihitung (bug live 2026-10-14 USDCADc: gagal sesaat dengan err=0).
+string LossMoneyDiag(const bool calcOk, const double calcProfit, const double priceDiff, const double tickSize,
+                     const double tickValueLoss, const double volume)
+  {
+   return StringFormat("calc=%s profit=%.4f diff=%.8g tick=%.8g tvLoss=%.8g vol=%.2f", calcOk ? "ok" : "gagal", calcProfit,
+                       priceDiff, tickSize, tickValueLoss, volume);
+  }
+
 // Rugi uang di SL untuk simbol nyata: OrderCalcProfit, cadangan tick value (dipakai Risk, Execution, Position).
+// Di live dicoba sampai SDB_LOSS_MONEY_TRIES kali: kedua sumber pernah gagal sesaat di tick pembuka bar sesudah
+// rilis CPI dan pulih satu bar kemudian. diag berisi nilai mentah percobaan terakhir bila tetap gagal.
+bool SymbolLossMoney(const string symbol, const bool isBuy, const double volume, const double price, const double sl, double &loss,
+                     bool &usedFallback, string &diag)
+  {
+   int tries = MQLInfoInteger(MQL_TESTER) ? 1 : SDB_LOSS_MONEY_TRIES;
+   double diff = isBuy ? price - sl : sl - price;
+   for(int i = 0; i < tries; i++)
+     {
+      if(i > 0)
+         Sleep(SDB_LOSS_MONEY_RETRY_MS);
+      double p = 0.0;
+      ResetLastError();
+      bool ok = OrderCalcProfit(isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, symbol, volume, price, sl, p);
+      int err = GetLastError();
+      double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+      double tvLoss = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
+      if(ResolveLossMoney(ok, p, diff, tickSize, tvLoss, volume, loss, usedFallback))
+        {
+         diag = "";
+         return true;
+        }
+      diag = LossMoneyDiag(ok, p, diff, tickSize, tvLoss, volume) + StringFormat(" percobaan=%d ", i + 1) + ErrText(err);
+     }
+   return false;
+  }
+
 bool SymbolLossMoney(const string symbol, const bool isBuy, const double volume, const double price, const double sl, double &loss,
                      bool &usedFallback)
   {
-   double p = 0.0;
-   bool ok = OrderCalcProfit(isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, symbol, volume, price, sl, p);
-   return ResolveLossMoney(ok, p, isBuy ? price - sl : sl - price, SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE),
-                           SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE_LOSS), volume, loss, usedFallback);
+   string diag;
+   return SymbolLossMoney(symbol, isBuy, volume, price, sl, loss, usedFallback, diag);
   }
 
 #endif // SDB_CORE_UTILS_MQH

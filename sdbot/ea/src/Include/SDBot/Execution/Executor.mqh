@@ -232,10 +232,11 @@ private:
       bool fallback = false;
       double balance = AccountInfoDouble(ACCOUNT_BALANCE);
       res.riskMoney = SDB_NULL_DOUBLE;
-      if(SymbolLossMoney(m_symbol, req.isBuy, res.volumeFilled, res.priceFilled, sl, lossAtSl, fallback))
+      string diag;
+      if(SymbolLossMoney(m_symbol, req.isBuy, res.volumeFilled, res.priceFilled, sl, lossAtSl, fallback, diag))
          res.riskMoney = lossAtSl;   // tick value bila OrderCalcProfit 0 (bug live 2026-10-12)
       else
-         LogWarn("Execution", "risiko uang tidak bisa dihitung | " + ErrText(GetLastError()));
+         LogWarn("Execution", "risiko uang tidak bisa dihitung | " + diag);
 
       TradeRecord t;
       t.positionId = res.positionId;

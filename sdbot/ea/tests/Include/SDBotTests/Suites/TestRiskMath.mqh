@@ -155,6 +155,17 @@ void RunTestRiskMathLossFallback()
               MathAbs(l3 - 100.0) < 1e-9 && !okNone);
   }
 
+// TC-RK-22 (bug live 2026-10-14 13:15 UTC, USDCADc sesudah CPI): rugi uang gagal dihitung dengan err=0 dan
+// sukses satu bar kemudian. Penolakan wajib memuat nilai mentah agar penyebabnya bisa ditelusuri.
+void RunTestRiskMathLossDiag()
+  {
+   string d = LossMoneyDiag(true, 0.0, 0.00151, 0.00001, 0.0, 1.0);
+   string f = LossMoneyDiag(false, 0.0, 0.00151, 0.00001, 0.7001085, 0.07);
+   AssertTrue("TC-RK-22", "diagnostik rugi uang: status OrderCalcProfit, profit, jarak SL, tick size, tick value rugi, volume | " + d + " | " + f,
+              d == "calc=ok profit=0.0000 diff=0.00151 tick=1e-05 tvLoss=0 vol=1.00" &&
+              f == "calc=gagal profit=0.0000 diff=0.00151 tick=1e-05 tvLoss=0.7001085 vol=0.07");
+  }
+
 // TC-RK-21 (spec 35 Req 1.2): kategori kandidat simbol tambahan, batas posisi OTHER 1.
 void RunTestRiskMathCandidates()
   {
@@ -176,6 +187,7 @@ void RunTestRiskMath()
    RunTestRiskMathClose();
    RunTestRiskMathClass();
    RunTestRiskMathLossFallback();
+   RunTestRiskMathLossDiag();
    RunTestRiskMathCandidates();
    TfEndSuite();
   }

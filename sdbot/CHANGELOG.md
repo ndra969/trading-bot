@@ -13,6 +13,10 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.36 — 2026-10-14 — rugi uang SL dicoba ulang, dengan diagnostik
+
+- Live 2026-10-14 13:15 UTC (USDCADc, satu jam sesudah CPI): kandidat ditolak `OTHER` "nilai uang SL tidak bisa dihitung" dengan `err=0`; OrderCalcProfit dan tick value pulih satu bar kemudian (entry di bar berikutnya). `SymbolLossMoney` mencoba sampai 3 kali dengan jeda 100 ms (live saja), dan penolakan memuat nilai mentah (`LossMoneyDiag`: status OrderCalcProfit, profit, jarak SL, tick size, tick value rugi, volume, percobaan, error). Uji TC-RK-22.
+
 ### 1.35 — 2026-10-14 — spec 37 breakeven 1,5R tanpa partial (H10 diterima)
 
 - Default `InpBreakevenR` 1.0 → 1.5 dan `InpPartialR` 1.5 → 10.0 (partial praktis mati); `gen_presets.py` + preset. SC-01, SC-01b, SC-04 mem-pin nilai lama (menguji partial). Uji TS-135; `-All` PASS.

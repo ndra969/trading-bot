@@ -6,10 +6,10 @@
 //| Hanya boleh jalan di Strategy Tester.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.35"
+#property version   "1.36"
 #property description "Harness uji SDBot: entry terjadwal dan assert skenario. Hanya untuk Strategy Tester."
 
-#define SDB_HARNESS_EA_VERSION "1.35"
+#define SDB_HARNESS_EA_VERSION "1.36"
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>

@@ -44,11 +44,20 @@ private:
    // Rugi uang bila order kena SL (positif). false bila tidak bisa dihitung.
    bool OrderLossMoney(const OrderRequest &req, const double volume, double &loss)
      {
+      string diag;
+      return OrderLossMoney(req, volume, loss, diag);
+     }
+
+   bool OrderLossMoney(const OrderRequest &req, const double volume, double &loss, string &diag)
+     {
       double price = EntryPrice(req.isBuy);
       if(price <= 0.0)
+        {
+         diag = "harga entry tidak ada";
          return false;
+        }
       bool fallback = false;
-      if(!SymbolLossMoney(m_symbol, req.isBuy, volume, price, req.sl, loss, fallback))
+      if(!SymbolLossMoney(m_symbol, req.isBuy, volume, price, req.sl, loss, fallback, diag))
          return false;
       if(fallback)
          LogThrottled(SDB_LOG_WARN, "risk-calc-fallback", SDB_LOG_THROTTLE_DEFAULT_SEC, "Risk",
@@ -86,8 +95,9 @@ public:
    bool CalcVolume(OrderRequest &req, string &stage, string &detail)
      {
       double lossPerLot = 0.0;
-      if(!OrderLossMoney(req, 1.0, lossPerLot))
-         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "nilai uang SL tidak bisa dihitung (OrderCalcProfit dan tick value) " + ErrText(GetLastError()));
+      string diag;
+      if(!OrderLossMoney(req, 1.0, lossPerLot, diag))
+         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "nilai uang SL tidak bisa dihitung (OrderCalcProfit dan tick value) | " + diag);
       double balance = Balance();
       ENUM_SDB_LOT_FLAG flag;
       double lot = CalcLotSize(balance, EffRiskPct(), lossPerLot, SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP),
@@ -130,8 +140,9 @@ public:
          return Reject(stage, detail, SDB_REJECT_STAGE_DAILY_PAUSE, "batas rugi harian tercapai");
       double balance = Balance();
       double loss = 0.0;
-      if(!OrderLossMoney(req, req.volume, loss))
-         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "nilai uang SL tidak bisa dihitung (OrderCalcProfit dan tick value) " + ErrText(GetLastError()));
+      string diag;
+      if(!OrderLossMoney(req, req.volume, loss, diag))
+         return Reject(stage, detail, SDB_REJECT_STAGE_OTHER, "nilai uang SL tidak bisa dihitung (OrderCalcProfit dan tick value) | " + diag);
       double newPct = RiskPctOf(loss, balance);
       if(newPct > EffRiskPct() + SDB_RISK_EPS)
          return Reject(stage, detail, SDB_REJECT_STAGE_RISK_PER_TRADE,
