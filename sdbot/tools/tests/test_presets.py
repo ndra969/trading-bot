@@ -243,6 +243,14 @@ def test_ts135_position_management():
         assert preset.get("InpPartialR") == "10.0", symbol
 
 
+def test_ts136_news_impulse_inputs():
+    """Spec 39 Req 2.1, 3.4: InpNewsImpulseMult=0.0 (mati, biaya OOS 9,5% > 5%) dan InpNewsImpulseMinutes=90."""
+    for symbol in EXPECTED_MAGIC:
+        preset = _read(symbol)
+        assert preset.get("InpNewsImpulseMult") == "0.0", symbol
+        assert preset.get("InpNewsImpulseMinutes") == "90", symbol
+
+
 # Spec 35: spread maks kandidat = 3 x median spread M1 7 hari akun cent (design §3).
 CANDIDATE_MAX_SPREAD = {
     "US30": 39,

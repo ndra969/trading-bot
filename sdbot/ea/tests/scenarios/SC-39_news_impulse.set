@@ -1,0 +1,10 @@
+; SC-39: InpNewsImpulseMult=2 (default 0 = mati) agar penolakan impuls muncul di data uji; jendela 90 menit; blackout +-15 menit default.
+InpMagicNumber=2026091900
+InpSymbolSuffix=c
+InpLogLevel=1
+HarnessScenario=SC-39
+HarnessEveryBars=0
+HarnessPipeline=true
+InpNewsCsvFile=sdbot_calendar_sc17.csv
+InpNewsImpulseMult=2
+InpNewsImpulseMinutes=90

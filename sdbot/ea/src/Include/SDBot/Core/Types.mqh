@@ -524,6 +524,9 @@ struct SdbSignalFacts
    string            newsDetail;      // event yang memblokir
    string            newsStatus;      // ON, OFF, DISABLED
    string            newsNext;        // event berdampak terdekat 24 jam; "" = tidak ada
+   double            impulseRatio;    // spec 39: candle LTF terbesar 8 bar / rata-rata 14 bar; SDB_NULL_DOUBLE = tidak dihitung
+   bool              newsImpulseBlocked; // spec 39: berita HIGH <= InpNewsImpulseMinutes dan rasio >= InpNewsImpulseMult
+   string            newsImpulseDetail;
    ENUM_SDB_COMPONENT_MODE fibMode;   // spec 18
    SdbFibResult      fib;
    ENUM_SDB_COMPONENT_MODE tlMode;    // spec 19

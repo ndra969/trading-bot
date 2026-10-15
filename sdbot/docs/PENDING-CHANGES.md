@@ -3,6 +3,16 @@
 Dokumen induk ada di claude.ai (Claude Docs). Salinan di folder ini tidak diedit langsung. Setiap keputusan yang sudah disetujui dan mengubah isi PRD atau RULES dicatat di sini, lalu diterapkan ke dokumen induk dan diekspor ulang ke repo lewat skill `sdbot-docs-sync`.
 
 ## Open
+### PC-38: Input filter impuls sesudah berita (spec 39, H13 ditolak syarat biaya)
+- Status: Open
+- Tanggal disetujui: 2026-10-14 (spec 39)
+- Dokumen: PRD-EA §Filter berita, §Parameter input EA, §Telemetri sinyal, §Roadmap
+- Sumber: spec `ea-39-news-impulse`; sesi IS 2537–2548, OOS 2549–2560, REAL 2561–2572 vs 1.35
+- Perubahan:
+    - Tabel input, baris baru di Filter: `| Filter | NewsImpulseMult / NewsImpulseMinutes | 0 (mati) / 90; bila > 0 (2–20): tolak entry NEWS_BLACKOUT bila ada berita HIGH relevan ≤ menit itu sebelum bar dan candle LTF terbesar 8 bar ≥ mult × rata-rata range 14 bar, hanya eksperimen |`.
+    - §Telemetri sinyal: `context_json` memuat `impulse` (rasio candle impuls, 2 desimal atau null).
+    - Catatan Roadmap: filter pengaman sesudah trade live pertama (USDCADc SELL sesudah CPI, −1R). Dengan 5× / 90 menit IS tidak berubah, OOS dan REAL kehilangan 2 trade untung (XAU/XAG sesudah NFP, −1,8R); syarat biaya (≤ 5% trade hilang) gagal di OOS, jadi default mati.
+
 ### PC-37: Breakeven 1,5R tanpa partial (spec 37, H10 diterima)
 - Status: Open
 - Tanggal disetujui: 2026-10-13 (spec 37)

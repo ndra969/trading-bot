@@ -52,6 +52,8 @@ struct InputValues
    int               newsHighMinutes;
    int               newsMediumMinutes;
    string            newsCsvFile;        // hanya tester
+   double            newsImpulseMult;    // spec 39: candle impuls sesudah berita HIGH (0 = mati)
+   int               newsImpulseMinutes;
    ENUM_SDB_COMPONENT_MODE scoreFibMode;  // spec 18: skor Fibonacci OFF / SHADOW / ACTIVE
    ENUM_SDB_COMPONENT_MODE scoreTrendlineMode; // spec 19
    ENUM_SDB_COMPONENT_MODE scoreBreakoutMode;  // spec 20
@@ -130,6 +132,8 @@ InputValues DefaultInputValues()
    v.newsHighMinutes = SDB_DEF_NEWS_HIGH_MIN;
    v.newsMediumMinutes = SDB_DEF_NEWS_MEDIUM_MIN;
    v.newsCsvFile = SDB_DEF_NEWS_CSV;
+   v.newsImpulseMult = SDB_DEF_NEWS_IMPULSE_MULT;
+   v.newsImpulseMinutes = SDB_DEF_NEWS_IMPULSE_MIN;
    v.scoreFibMode = SDB_COMPONENT_SHADOW;
    v.scoreTrendlineMode = SDB_COMPONENT_SHADOW;
    v.scoreBreakoutMode = SDB_COMPONENT_SHADOW;
@@ -229,6 +233,10 @@ void IrCheckSignals(const InputValues &v, string &errors)
    IrCheckRange("InpMaxSameDirectionPerCurrency", v.maxSameDirectionPerCurrency, 0, SDB_MAX_MAX_SAME_DIR_CCY, errors);
    IrCheckRange("InpNewsHighMinutes", v.newsHighMinutes, 0, SDB_MAX_NEWS_MIN, errors);
    IrCheckRange("InpNewsMediumMinutes", v.newsMediumMinutes, 0, SDB_MAX_NEWS_MIN, errors);
+   if(v.newsImpulseMult != 0.0 && (v.newsImpulseMult < SDB_MIN_NEWS_IMPULSE_MULT || v.newsImpulseMult > SDB_MAX_NEWS_IMPULSE_MULT))
+      IrAdd(errors, "InpNewsImpulseMult=" + IrNum(v.newsImpulseMult) + " harus 0 atau " + IrNum(SDB_MIN_NEWS_IMPULSE_MULT) + " <= x <= " +
+            IrNum(SDB_MAX_NEWS_IMPULSE_MULT));
+   IrCheckRange("InpNewsImpulseMinutes", v.newsImpulseMinutes, SDB_MIN_NEWS_IMPULSE_MIN, SDB_MAX_NEWS_IMPULSE_MIN, errors);
    IrCheckRange("InpScoreFibMode", (int)v.scoreFibMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
    IrCheckRange("InpScoreTrendlineMode", (int)v.scoreTrendlineMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);
    IrCheckRange("InpScoreBreakoutMode", (int)v.scoreBreakoutMode, SDB_COMPONENT_OFF, SDB_COMPONENT_ACTIVE, errors);

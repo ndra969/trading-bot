@@ -13,6 +13,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 
 ## EA
 
+### 1.37 — 2026-10-15 — spec 39 filter impuls sesudah berita (H13 ditolak, default mati)
+
+- Input `InpNewsImpulseMult` (0 = mati; 2–20) dan `InpNewsImpulseMinutes` (90; 15–240): tolak entry `NEWS_BLACKOUT` (detail `impuls x… sesudah <event>`) bila ada berita HIGH relevan dalam jendela dan candle LTF terbesar 8 bar ≥ mult × rata-rata range 14 bar. Dicek sesudah blackout ±15 menit, sebelum sesi. `context_json` memuat `impulse` untuk setiap kandidat. `inputs_json` 62 kunci. Uji TC-NW-12..14, TC-IR-06, TC-SU-04c/04e, TC-SG-44/45, TS-136, SC-39.
+- Backtest 5× / 90 menit vs 1.35: IS sama (121 trade, 14 kandidat ditolak); OOS 21 → 19 trade, +0,524 → +0,485R; REAL 55 → 53, +0,297 → +0,275R. Dua trade yang hilang (XAU/XAG sesudah NFP 2026-09-04) untung. Syarat biaya gagal di OOS (9,5% > 5%), default mati; input tersedia untuk dipakai manual.
+
 ### 1.36 — 2026-10-14 — rugi uang SL dicoba ulang, dengan diagnostik
 
 - Live 2026-10-14 13:15 UTC (USDCADc, satu jam sesudah CPI): kandidat ditolak `OTHER` "nilai uang SL tidak bisa dihitung" dengan `err=0`; OrderCalcProfit dan tick value pulih satu bar kemudian (entry di bar berikutnya). `SymbolLossMoney` mencoba sampai 3 kali dengan jeda 100 ms (live saja), dan penolakan memuat nilai mentah (`LossMoneyDiag`: status OrderCalcProfit, profit, jarak SL, tick size, tick value rugi, volume, percobaan, error). Uji TC-RK-22.

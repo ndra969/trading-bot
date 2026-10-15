@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| SDBot.mq5 — EA Supply & Demand + konfluensi (PRD-EA).
-//| v1.36 (rugi uang SL dicoba ulang + diagnostik; 1.35 BE 1,5R tanpa partial, H10 diterima; 1.34 jeda Telegram basi sesudah PC restart; 1.33 input timeframe HTF/MTF/LTF; 1.32 gaya INTRADAY H1/M15/M5, skema v5; 1.31 wajib zona lawan untuk TP, H6 diterima; 1.30 input InpRequireOppositeZone, perbaikan rugi SL dari tick value; 1.29 telemetri harga kandidat di context_json; 1.28 EMA bias HTF 21, H5 diterima; 1.27 mode bias HTF InpBiasMode, InpBiasEmaPeriod; 1.26 jam akhir entry InpSessionEndHourUtc; 1.25 zona Fresh saja, InpAllowTestedZones; 1.24 perbaikan throttle log di tester; 1.23 RSI divergence bayangan; 1.22 breakout & retest; 1.21 trendline, CConfirmations; 1.20 Fibonacci bayangan; 1.19 skema v4; 1.18 perbaikan lot-fit; spec 16 filter berita, Fase 4 selesai di 1.17; Fase 3 selesai di 1.12): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
+//| v1.37 (filter impuls sesudah berita HIGH, spec 39; 1.36 rugi uang SL dicoba ulang + diagnostik; 1.35 BE 1,5R tanpa partial, H10 diterima; 1.34 jeda Telegram basi sesudah PC restart; 1.33 input timeframe HTF/MTF/LTF; 1.32 gaya INTRADAY H1/M15/M5, skema v5; 1.31 wajib zona lawan untuk TP, H6 diterima; 1.30 input InpRequireOppositeZone, perbaikan rugi SL dari tick value; 1.29 telemetri harga kandidat di context_json; 1.28 EMA bias HTF 21, H5 diterima; 1.27 mode bias HTF InpBiasMode, InpBiasEmaPeriod; 1.26 jam akhir entry InpSessionEndHourUtc; 1.25 zona Fresh saja, InpAllowTestedZones; 1.24 perbaikan throttle log di tester; 1.23 RSI divergence bayangan; 1.22 breakout & retest; 1.21 trendline, CConfirmations; 1.20 Fibonacci bayangan; 1.19 skema v4; 1.18 perbaikan lot-fit; spec 16 filter berita, Fase 4 selesai di 1.17; Fase 3 selesai di 1.12): hanya meneruskan event ke CSdbApp (spec 04 Req 6.6),
 //| yang memegang validasi input dan akun, state bersama, pencatatan
 //| SQLite, CExecutor, risk management (spec 05), dan manajemen posisi
 //| (BE, partial, trailing ATR, closure, rekonsiliasi), metrik OnTester, notifier
@@ -9,10 +9,10 @@
 //| (bias + zona + trigger PA, skor, SL/TP dari zona) lewat jalur risiko Fase 1.
 //+------------------------------------------------------------------+
 #property copyright "SDBot"
-#property version   "1.36"
-#property description "SDBot EA v1.36: entry S&D (bias HTF, zona H1, trigger PA M15, skor), risk management, manajemen posisi, pencatatan SQLite, notifikasi Telegram."
+#property version   "1.37"
+#property description "SDBot EA v1.37: entry S&D (bias HTF, zona H1, trigger PA M15, skor), risk management, manajemen posisi, pencatatan SQLite, notifikasi Telegram."
 
-#define SDB_EA_VERSION "1.36"   // sama dengan #property version
+#define SDB_EA_VERSION "1.37"   // sama dengan #property version
 
 #include <SDBot/Core/Inputs.mqh>
 #include <SDBot/App/SdbApp.mqh>

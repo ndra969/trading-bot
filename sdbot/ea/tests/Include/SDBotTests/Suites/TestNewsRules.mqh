@@ -1,6 +1,7 @@
 //+------------------------------------------------------------------+
 //| TestNewsRules.mqh — filter berita sebagai fungsi murni (spec 16
-//| design §3.1, §6.1; TC-NW-01..11). Event dasar: USD HIGH NFP pukul
+//| design §3.1, §6.1; TC-NW-01..11) dan filter impuls sesudah berita
+//| (spec 39 design §3, §6; TC-NW-12..14). Event dasar: USD HIGH NFP pukul
 //| 12:30 server.
 //+------------------------------------------------------------------+
 #ifndef SDB_SUITES_TESTNEWSRULES_MQH
@@ -29,6 +30,8 @@ SdbNewsParams TnwParams()
    p.enabled = true;
    p.highMinutes = 30;
    p.mediumMinutes = 10;
+   p.impulseMult = 0.0;
+   p.impulseMinutes = 90;
    return p;
   }
 
@@ -42,6 +45,85 @@ void TnwPush(SdbNewsEvent &ev[], const SdbNewsEvent &e)
 bool TnwBlocked(const SdbNewsEvent &ev[], const datetime bar, const string base = "EUR", const string quote = "USD")
   {
    return FindBlackout(ev, bar, base, quote, TnwParams()) >= 0;
+  }
+
+// Range 13 bar = 10, satu bar = big di indeks bigAt (0 = bar tertutup terbaru), n bar.
+void TnwBars(double &h[], double &l[], const int n, const int bigAt, const double big)
+  {
+   ArrayResize(h, n);
+   ArrayResize(l, n);
+   for(int i = 0; i < n; i++)
+     {
+      l[i] = 100.0;
+      h[i] = 100.0 + (i == bigAt ? big : 10.0);
+     }
+  }
+
+// TC-NW-12..14 (spec 39): rasio impuls, berita HIGH terbaru, keputusan.
+void RunTestNewsImpulse()
+  {
+   double h[], l[];
+   TnwBars(h, l, 14, 0, 60.0);
+   double r0 = ImpulseRatio(h, l, 14);
+   AssertTrue("TC-NW-12", StringFormat("rasio impuls 60 / rata-rata 13,571 = 4,421 (%.4f)", r0), MathAbs(r0 - 60.0 / (190.0 / 14.0)) < 1e-9);
+   TnwBars(h, l, 14, 7, 60.0);
+   double r7 = ImpulseRatio(h, l, 14);
+   TnwBars(h, l, 14, 8, 60.0);
+   double r8 = ImpulseRatio(h, l, 14);
+   AssertTrue("TC-NW-12b", StringFormat("puncak di bar ke-8 dihitung (%.4f), ke-9 tidak (%.4f)", r7, r8),
+              MathAbs(r7 - r0) < 1e-9 && MathAbs(r8 - 10.0 / (190.0 / 14.0)) < 1e-9);
+   TnwBars(h, l, 13, 0, 60.0);
+   bool shortNull = ImpulseRatio(h, l, 13) == SDB_NULL_DOUBLE;
+   TnwBars(h, l, 14, 0, 0.0);
+   for(int i = 0; i < 14; i++)
+      h[i] = l[i];
+   bool zeroNull = ImpulseRatio(h, l, 14) == SDB_NULL_DOUBLE;
+   AssertTrue("TC-NW-12c", "kurang dari 14 bar atau range nol -> null", shortNull && zeroNull);
+
+   datetime bar = TNW_DAY + 14 * 3600;
+   SdbNewsEvent ev[];
+   TnwPush(ev, TnwEv(bar - 90 * 60, "USD", SDB_NEWS_HIGH, "Batas90"));
+   int at90 = FindRecentHigh(ev, bar, "USD", "CAD", 90);
+   SdbNewsEvent ev2[];
+   TnwPush(ev2, TnwEv(bar - 91 * 60, "USD", SDB_NEWS_HIGH, "Lewat91"));
+   TnwPush(ev2, TnwEv(bar + 60, "USD", SDB_NEWS_HIGH, "BelumRilis"));
+   TnwPush(ev2, TnwEv(bar - 10 * 60, "USD", SDB_NEWS_MEDIUM, "Medium"));
+   TnwPush(ev2, TnwEv(bar - 10 * 60, "EUR", SDB_NEWS_HIGH, "EurUntukUsdJpy"));
+   int none = FindRecentHigh(ev2, bar, "USD", "JPY", 90);
+   SdbNewsEvent ev3[];
+   TnwPush(ev3, TnwEv(bar - 80 * 60, "USD", SDB_NEWS_HIGH, "Lama"));
+   TnwPush(ev3, TnwEv(bar - 20 * 60, "CAD", SDB_NEWS_HIGH, "Baru"));
+   int recent = FindRecentHigh(ev3, bar, "USD", "CAD", 90);
+   AssertTrue("TC-NW-13", StringFormat("berita HIGH terbaru: 90 menit inklusif (%d), 91 / belum rilis / medium / mata uang lain tidak (%d), terbaru dipilih (%s)",
+                                       at90, none, recent >= 0 ? ev3[recent].name : "-"),
+              at90 == 0 && none < 0 && recent == 1);
+
+   SdbNewsParams p = TnwParams();
+   p.impulseMult = 5.0;
+   p.impulseMinutes = 90;
+   SdbNewsEvent cpi[];
+   TnwPush(cpi, TnwEv(bar - 60 * 60, "USD", SDB_NEWS_HIGH, "CPI m/m"));
+   string d = "";
+   bool at5 = ImpulseDecision(cpi, bar, "USD", "CAD", p, 5.0, d);
+   string d2 = "";
+   bool below = ImpulseDecision(cpi, bar, "USD", "CAD", p, 4.99, d2);
+   SdbNewsEvent empty[];
+   string d3 = "";
+   bool noNews = ImpulseDecision(empty, bar, "USD", "CAD", p, 9.0, d3);
+   SdbNewsParams off = p;
+   off.impulseMult = 0.0;
+   string d4 = "";
+   bool multOff = ImpulseDecision(cpi, bar, "USD", "CAD", off, 9.0, d4);
+   SdbNewsParams dis = p;
+   dis.enabled = false;
+   string d5 = "";
+   bool disabled = ImpulseDecision(cpi, bar, "USD", "CAD", dis, 9.0, d5);
+   string d6 = "";
+   bool nullRatio = ImpulseDecision(cpi, bar, "USD", "CAD", p, SDB_NULL_DOUBLE, d6);
+   string d7 = "";
+   bool xau = ImpulseDecision(cpi, bar, "XAU", "USD", p, 9.0, d7);
+   AssertTrue("TC-NW-14", "keputusan impuls: 5,00 + CPI 60m tolak (" + d + "); 4,99 / tanpa berita / mult 0 / filter mati / rasio null lolos; XAU lewat USD tolak",
+              at5 && d == "impuls x5.00 sesudah CPI m/m USD HIGH 60m" && !below && !noNews && !multOff && !disabled && !nullRatio && xau);
   }
 
 void RunTestNewsRules()
@@ -122,6 +204,7 @@ void RunTestNewsRules()
    err = "";
    bool md = !ValidateInputValues(v, false, err) && StringFind(err, "InpNewsMediumMinutes") >= 0;
    AssertTrue("TC-NW-11", "input berita: default lolos; 241 dan -1 ditolak dengan nama", defaults && hi && md);
+   RunTestNewsImpulse();
    TfEndSuite();
   }
 

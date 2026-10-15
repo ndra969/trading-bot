@@ -212,6 +212,15 @@ public:
       return true;
      }
 
+   // Spec 39: berita HIGH relevan dalam jendela + rasio impuls >= ambang; mati bila kalender tidak ON (Req 2.2).
+   bool ImpulseBlocked(const datetime bar, const double ratio, string &detail) const
+     {
+      detail = "";
+      if(m_status != SDB_NEWS_STATUS_ON)
+         return false;
+      return ImpulseDecision(m_ev, bar, m_base, m_quote, m_p, ratio, detail);
+     }
+
    string NearestText(const datetime bar) const
      {
       if(m_status != SDB_NEWS_STATUS_ON)

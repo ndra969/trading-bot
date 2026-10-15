@@ -118,6 +118,7 @@ Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase
 | 34 | H7 gaya intraday H1/M15/M5 (dan R:R 1,5) | −0,117 / −0,093 (intraday R:R 2 / 1,5), +0,036 (DAY R:R 1,5) vs +0,164 | — | — | Ditolak di IS (lebih banyak SL, spread 20% risiko; 1.32) |
 | 35 | H8 simbol tambahan (17 kandidat) | 2 dari 16 lolos (GBPAUD +0,547, USTEC +0,354); total kandidat −0,16R per trade | — | — | Ditolak di IS (< 3 simbol) |
 | 37 | H10 manajemen posisi lebih ringan (V3: BE 1,5R, tanpa partial) | +0,205 vs +0,164 (121 trade) | +0,524 vs +0,421 | +0,297 vs +0,224 (total +16,4 vs +12,3R) | **Diterima** (1.35, PC-37) |
+| 39 | H13 tolak entry ≤ 90 menit sesudah berita HIGH bila candle ≥ 5× (pengaman risiko) | +0,206 vs +0,205 (0 trade hilang) | +0,485 vs +0,524 (2 hilang, 9,5%) | +0,275 vs +0,297 (2 hilang) | Ditolak syarat biaya; default mati, input tetap (1.37, PC-38) |
 | 36 | H9 zona M30 lewat input timeframe (V1 H1/M30/M15, V2 H4/M30/M15, V3 H4/H1/M30, V4 M30/M15/M5) | −0,288 / −0,173 / −0,334 / −0,280 (41 / 54 / 22 / 189 trade) vs +0,164 (121) | — | — | Ditolak di IS (hanya V4 cukup sering, 7,0 trade/bulan, tetapi PF 0,56; 1.33) |
 | 32 | Lab setup trendline H1 + PA M15 (A pantulan, C break-retest, B + zona) | A −0,209 / −0,194, C −0,133 / −0,183 (bias / tanpa); B +0,273 (71 trade) | — | — | A dan C ditolak di IS (semua simbol negatif); B tidak dijadikan aturan (sampel kecil) |
 

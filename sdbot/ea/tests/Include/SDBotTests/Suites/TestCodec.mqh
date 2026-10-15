@@ -50,7 +50,9 @@ void RunTestCodec()
    for(int i = 0; i < StringLen(json); i++)
       if(StringGetCharacter(json, i) == ':')
          keys++;
-   AssertIntEq("TC-SU-04c", "JSON input berisi 60 input (... + InpRequireOppositeZone spec 33 + InpHtf/Mtf/LtfTimeframe spec 36)", keys, 60);
+   AssertIntEq("TC-SU-04c", "JSON input berisi 62 input (... + InpHtf/Mtf/LtfTimeframe spec 36 + InpNewsImpulseMult/Minutes spec 39)", keys, 62);
+   AssertTrue("TC-SU-04e", "JSON input memuat input impuls pasca-berita dengan default (spec 39 Req 2.1)",
+              StringFind(json, "\"InpNewsImpulseMult\":0,") >= 0 && StringFind(json, "\"InpNewsImpulseMinutes\":90") >= 0);
    AssertTrue("TC-SU-04d", "JSON input tanpa token dan chat ID (spec 09 Req 1.3)",
               StringFind(json, "InpTelegramToken") < 0 && StringFind(json, "InpTelegramChatID") < 0 &&
               StringFind(json, "\"InpTelegramConfigured\":false") >= 0 && StringFind(json, "\"InpHeartbeatMinutes\":60") >= 0);

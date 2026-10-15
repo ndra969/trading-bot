@@ -202,6 +202,26 @@ void RunTestCoreUtilsInputs()
          badTf++;
      }
    AssertTrue("TC-IR-05", StringFormat("timeframe: kosong dan H1/M30/M15 lolos; sebagian, terbalik, sama ditolak (gagal %d)", badTf), badTf == 0);
+   // TC-IR-06 (spec 39 Req 2.1): impuls pasca-berita, mult 0 atau 2-20, menit 15-240.
+   double mults[6] = {0.0, 2.0, 20.0, 5.0, 1.5, 21.0};
+   int mins[6] = {15, 240, 90, 90, 14, 241};
+   int badImp = 0;
+   for(int i = 0; i < 6; i++)
+     {
+      InputValues t = DefaultInputValues();
+      t.newsImpulseMult = mults[i];
+      bool okM = ValidateInputValues(t, false, err);
+      if(i < 4 ? !okM : (okM || !CuContains(err, "InpNewsImpulseMult")))
+         badImp++;
+      t = DefaultInputValues();
+      t.newsImpulseMinutes = mins[i];
+      bool okN = ValidateInputValues(t, false, err);
+      if(i < 4 ? !okN : (okN || !CuContains(err, "InpNewsImpulseMinutes")))
+         badImp++;
+     }
+   InputValues dImp = DefaultInputValues();
+   AssertTrue("TC-IR-06", StringFormat("impuls pasca-berita: default 0 (mati)/90; mult 0/2/20/5 dan menit 15/240/90 lolos; 1,5/21 dan 14/241 ditolak (gagal %d)", badImp),
+              badImp == 0 && dImp.newsImpulseMult == 0.0 && dImp.newsImpulseMinutes == 90);
    // TC-SU-32 (spec 11 Req 5.2): input zona, default dari ukuran histori, min < max.
    InputValues z = DefaultInputValues();
    bool zoneDefaults = MathAbs(z.zoneMinWidthAtr - 0.3) < 1e-9 && MathAbs(z.zoneMaxWidthAtr - 2.0) < 1e-9 &&

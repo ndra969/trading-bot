@@ -76,6 +76,8 @@ input bool                   InpNewsFilter            = true;                   
 input int                    InpNewsHighMinutes       = SDB_DEF_NEWS_HIGH_MIN;      // Blackout berita high (+- menit, 0 = tidak)
 input int                    InpNewsMediumMinutes     = SDB_DEF_NEWS_MEDIUM_MIN;    // Blackout berita medium (+- menit, 0 = tidak)
 input string                 InpNewsCsvFile           = SDB_DEF_NEWS_CSV;           // CSV kalender di Common\Files (hanya tester)
+input double                 InpNewsImpulseMult       = SDB_DEF_NEWS_IMPULSE_MULT;  // Tolak entry sesudah berita HIGH bila candle >= x range normal (0 = mati; uji 5)
+input int                    InpNewsImpulseMinutes    = SDB_DEF_NEWS_IMPULSE_MIN;   // Jendela filter impuls sesudah rilis HIGH (menit)
 input ENUM_SDB_COMPONENT_MODE InpScoreFibMode         = SDB_COMPONENT_SHADOW;       // Skor Fibonacci: OFF / SHADOW (dicatat saja) / ACTIVE
 input ENUM_SDB_COMPONENT_MODE InpScoreTrendlineMode   = SDB_COMPONENT_SHADOW;       // Skor trendline searah: OFF / SHADOW / ACTIVE
 input ENUM_SDB_COMPONENT_MODE InpScoreBreakoutMode    = SDB_COMPONENT_SHADOW;       // Skor breakout & retest: OFF / SHADOW / ACTIVE
@@ -139,6 +141,8 @@ InputValues CurrentInputs()
    v.newsHighMinutes = InpNewsHighMinutes;
    v.newsMediumMinutes = InpNewsMediumMinutes;
    v.newsCsvFile = InpNewsCsvFile;
+   v.newsImpulseMult = InpNewsImpulseMult;
+   v.newsImpulseMinutes = InpNewsImpulseMinutes;
    v.scoreFibMode = InpScoreFibMode;
    v.scoreTrendlineMode = InpScoreTrendlineMode;
    v.scoreBreakoutMode = InpScoreBreakoutMode;
@@ -164,7 +168,7 @@ string CurrentInputsJson()
                  "InpNewsFilter", "InpNewsHighMinutes", "InpNewsMediumMinutes", "InpNewsCsvFile", "InpScoreFibMode", "InpScoreTrendlineMode",
                  "InpScoreBreakoutMode", "InpScoreRsiMode", "InpAllowTestedZones", "InpSessionEndHourUtc",
                  "InpBiasMode", "InpBiasEmaPeriod", "InpRequireOppositeZone",
-                 "InpHtfTimeframe", "InpMtfTimeframe", "InpLtfTimeframe"};
+                 "InpHtfTimeframe", "InpMtfTimeframe", "InpLtfTimeframe", "InpNewsImpulseMult", "InpNewsImpulseMinutes"};
    string v[];
    ArrayResize(v, ArraySize(k));
    v[0] = JsonNum((double)InpMagicNumber);
@@ -228,6 +232,8 @@ string CurrentInputsJson()
    v[57] = JsonStr(EnumToString(InpHtfTimeframe));
    v[58] = JsonStr(EnumToString(InpMtfTimeframe));
    v[59] = JsonStr(EnumToString(InpLtfTimeframe));
+   v[60] = JsonNum(InpNewsImpulseMult);
+   v[61] = JsonNum(InpNewsImpulseMinutes);
    return CanonicalJson(k, v);
   }
 

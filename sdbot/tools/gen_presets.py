@@ -144,6 +144,9 @@ COMMON_INPUTS: list[tuple[str, str]] = [
     ("InpNewsHighMinutes", "15"),
     ("InpNewsMediumMinutes", "0"),
     ("InpNewsCsvFile", "sdbot_calendar.csv"),
+    # spec 39: mati (H13 gagal syarat biaya OOS); 5.0 = tolak entry sesudah berita HIGH bila candle >= 5x
+    ("InpNewsImpulseMult", "0.0"),
+    ("InpNewsImpulseMinutes", "90"),
     ("InpScoreFibMode", "1"),  # SDB_COMPONENT_SHADOW (spec 18)
     ("InpScoreTrendlineMode", "1"),  # SDB_COMPONENT_SHADOW (spec 19)
     ("InpScoreBreakoutMode", "1"),  # SDB_COMPONENT_SHADOW (spec 20)

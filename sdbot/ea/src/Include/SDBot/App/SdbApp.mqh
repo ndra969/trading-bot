@@ -155,6 +155,8 @@ private:
          np.enabled = cfg.inputs.newsFilter;
          np.highMinutes = cfg.inputs.newsHighMinutes;
          np.mediumMinutes = cfg.inputs.newsMediumMinutes;
+         np.impulseMult = cfg.inputs.newsImpulseMult;
+         np.impulseMinutes = cfg.inputs.newsImpulseMinutes;
          m_news.Init(_Symbol, SymbolInfoString(_Symbol, SYMBOL_CURRENCY_BASE), SymbolInfoString(_Symbol, SYMBOL_CURRENCY_PROFIT), np,
                      MQLInfoInteger(MQL_TESTER) != 0, cfg.inputs.newsCsvFile, m_sink, cfg.inputs.magic);
         }

@@ -70,6 +70,7 @@ Kolom "Dibuat di" pada tabel input di bawah menunjukkan spec yang menambahkannya
 | Filter | `InpTesterUtcOffsetHours` | 0 (selisih server–UTC di Strategy Tester; Exness GMT+0) | −12..14 | spec 14 |
 | Filter | `InpNewsFilter` / `InpNewsHighMinutes` / `InpNewsMediumMinutes` | true / 15 / 0 menit (± waktu rilis, mata uang simbol; XAU/XAG/BTC lewat USD; 0 = tidak diblokir) | — / 0–240 / 0–240 | spec 16 |
 | Filter | `InpNewsCsvFile` | `sdbot_calendar.csv` di Common\Files (hanya tester; dibuat `ExportCalendar`) | — | spec 16 |
+| Filter | `InpNewsImpulseMult` / `InpNewsImpulseMinutes` | 0 (mati) / 90 | mult 0 (mati) atau 2–20; menit 15–240 | spec 39: tolak entry sesudah berita HIGH bila candle LTF ≥ mult × range normal |
 | Skor | `InpScoreFibMode` | SHADOW (1): skor Fibonacci dicatat di `signal_scores` dengan `active = 0`, tidak ikut skor gerbang; ACTIVE (2) menambah maks 15; OFF (0) tidak dihitung | 0–2 | spec 18 |
 | Skor | `InpScoreTrendlineMode` | SHADOW (1): skor trendline searah (support naik untuk BUY, resistance turun untuk SELL; 3+ sentuhan 15, 2 sentuhan 7) dicatat dengan `active = 0`; ACTIVE (2) ikut skor gerbang, maks +15; OFF (0) tidak dihitung | 0–2 | spec 19 |
 | Skor | `InpScoreBreakoutMode` | SHADOW (1): skor breakout & retest (level swing H1 ditembus close searah sinyal lalu diuji ulang oleh zona = 10) dicatat dengan `active = 0`; ACTIVE (2) ikut skor gerbang, maks +10; OFF (0) tidak dihitung | 0–2 | spec 20 |

@@ -108,6 +108,9 @@ SdbSignalFacts SgF0()
    f.newsDetail = "";
    f.newsStatus = "ON";
    f.newsNext = "";
+   f.impulseRatio = SDB_NULL_DOUBLE;
+   f.newsImpulseBlocked = false;
+   f.newsImpulseDetail = "";
    f.fibMode = SDB_COMPONENT_OFF;
    ZeroMemory(f.fib);
    f.fib.ratio = -1.0;
@@ -309,7 +312,7 @@ void RunTestSignalMisc()
    f.oppositeProximal = 1.10350;
    SdbDecision d = SgEval(f);
    string json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   string expect = "{\"ask\":1.10090,\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bid\":1.10080,\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"opp_prox\":1.10350,\"pa\":\"PIN\",\"rr\":2.60,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
+   string expect = "{\"ask\":1.10090,\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bid\":1.10080,\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":1.10090,\"fib_level\":null,\"fib_ratio\":null,\"impulse\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"opp_prox\":1.10350,\"pa\":\"PIN\",\"rr\":2.60,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
                    "\"score_pct\":80.0,\"session\":\"OVERLAP\",\"sl\":1.09990,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":1.10350,\"tp_source\":\"ZONE\",\"zone_dist\":1.10000,\"zone_prox\":1.10060,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-21", "konteks sinyal lolos", json, expect);
 
@@ -317,7 +320,7 @@ void RunTestSignalMisc()
    f.pattern = SgPat(SDB_PA_PATTERN_NONE, SDB_DIR_NONE);
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
-   expect = "{\"ask\":1.10090,\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bid\":1.10080,\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"opp_prox\":null,\"pa\":\"NONE\",\"rr\":null,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
+   expect = "{\"ask\":1.10090,\"atr_mtf\":0.00100,\"bias_reason\":\"OK\",\"bid\":1.10080,\"bo_age\":null,\"bo_dist\":null,\"bo_level\":null,\"entry\":null,\"fib_level\":null,\"fib_ratio\":null,\"impulse\":null,\"max_active\":55,\"max_spread\":0,\"news\":\"ON\",\"news_next\":null,\"opp_prox\":null,\"pa\":\"NONE\",\"rr\":null,\"rsi_age\":null,\"rsi_diff\":null,\"rsi_pdiff\":null,"
             "\"score_pct\":67.3,\"session\":\"OVERLAP\",\"sl\":null,\"tl_dist\":null,\"tl_slope\":null,\"tl_touches\":null,\"tp\":null,\"tp_source\":null,\"zone_dist\":1.10000,\"zone_prox\":1.10060,\"zone_status\":\"FRESH\"}";
    AssertStrEq("TC-SG-22", "konteks NO_PA_TRIGGER: harga null", json, expect);
 
@@ -329,7 +332,7 @@ void RunTestSignalMisc()
    d = SgEval(f);
    json = SignalContextJson(f, d, SgP0(), SDB_BIAS_OK);
    AssertTrue("TC-SG-22b", "konteks Fibonacci bayangan: " + json,
-              StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"max_active\":55,") >= 0);
+              StringFind(json, "\"fib_level\":0.618,\"fib_ratio\":0.630,\"impulse\":null,\"max_active\":55,") >= 0);
   }
 
 // TC-SG-35..37 (spec 23 Req 1.2-1.5, EC-03/04): zona TESTED ditolak NO_VALID_ZONE bila InpAllowTestedZones=false,
@@ -658,6 +661,35 @@ void RunTestSignalOppositeZone()
               StringFind(dr.detail, "rr=") == 0);
   }
 
+// TC-SG-44..45 (spec 39 Req 1.4, 2.3): filter impuls sesudah berita dan telemetri impulse.
+void RunTestSignalNewsImpulse()
+  {
+   SdbSignalFacts f = SgF0();
+   f.newsImpulseBlocked = true;
+   f.newsImpulseDetail = "impuls x9.80 sesudah CPI m/m USD HIGH 60m";
+   SdbDecision a = SgEval(f);
+   f.newsBlocked = true;
+   f.newsDetail = "CPI m/m USD HIGH 10m";
+   SdbDecision b = SgEval(f);
+   f.newsBlocked = false;
+   f.sessionAllowed = false;
+   SdbDecision c = SgEval(f);
+   AssertTrue("TC-SG-44", "impuls: " + a.stage + " (" + a.detail + "); + blackout: " + b.detail + "; + luar sesi: " + c.stage,
+              a.stage == SDB_REJECT_STAGE_NEWS_BLACKOUT && a.detail == "impuls x9.80 sesudah CPI m/m USD HIGH 60m" &&
+              b.stage == SDB_REJECT_STAGE_NEWS_BLACKOUT && b.detail == "CPI m/m USD HIGH 10m" &&
+              c.stage == SDB_REJECT_STAGE_NEWS_BLACKOUT);
+
+   SdbSignalFacts g = SgF0();
+   g.impulseRatio = 5.126;
+   SdbDecision dg = SgEval(g);
+   string jg = SignalContextJson(g, dg, SgP0(), SDB_BIAS_OK);
+   SdbSignalFacts n = SgF0();
+   SdbDecision dn = SgEval(n);
+   string jn = SignalContextJson(n, dn, SgP0(), SDB_BIAS_OK);
+   AssertTrue("TC-SG-45", "context_json impulse: 5.126 -> 5.13, null bila tidak dihitung",
+              StringFind(jg, "\"impulse\":5.13,") >= 0 && StringFind(jn, "\"impulse\":null,") >= 0);
+  }
+
 void RunTestSignalRules()
   {
    TfBeginSuite("SignalRules");
@@ -675,6 +707,7 @@ void RunTestSignalRules()
    RunTestSignalEndHour();
    RunTestSignalContextPrices();
    RunTestSignalOppositeZone();
+   RunTestSignalNewsImpulse();
    TfEndSuite();
   }
 

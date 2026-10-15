@@ -138,6 +138,23 @@ private:
         }
      }
 
+   // Spec 39: rasio impuls dari SDB_IMPULSE_BARS bar LTF sampai bar yang dinilai (indeks 0 = m_lastBar).
+   double LtfImpulseRatio() const
+     {
+      double h[], l[];
+      ArraySetAsSeries(h, true);
+      ArraySetAsSeries(l, true);
+      int nh = CopyHigh(m_symbol, m_ltf, m_lastBar, SDB_IMPULSE_BARS, h);
+      int nl = CopyLow(m_symbol, m_ltf, m_lastBar, SDB_IMPULSE_BARS, l);
+      if(nh < SDB_IMPULSE_BARS || nl < SDB_IMPULSE_BARS)
+        {
+         LogThrottled(SDB_LOG_DEBUG, "impulse-bars", SDB_LOG_THROTTLE_DEFAULT_SEC, "Signals",
+                      StringFormat("bar LTF kurang untuk rasio impuls | high=%d low=%d", nh, nl));
+         return SDB_NULL_DOUBLE;
+        }
+      return ImpulseRatio(h, l, SDB_IMPULSE_BARS);
+     }
+
    void CollectFacts(const SdbBias &bias, const SdbZone &zone, SdbSignalFacts &f)
      {
       ZeroMemory(f);
@@ -169,11 +186,15 @@ private:
       f.newsBlocked = false;
       f.newsDetail = "";
       f.newsNext = "";
+      f.impulseRatio = LtfImpulseRatio();
+      f.newsImpulseBlocked = false;
+      f.newsImpulseDetail = "";
       if(m_news != NULL)
         {
          m_news.Refresh(TimeTradeServer());
          f.newsStatus = m_news.Status();
          f.newsBlocked = m_news.Blocked(m_lastBar, f.newsDetail);
+         f.newsImpulseBlocked = m_news.ImpulseBlocked(m_lastBar, f.impulseRatio, f.newsImpulseDetail);
          f.newsNext = m_news.NearestText(m_lastBar);
         }
       m_conf.Evaluate(zone, bias.dir, f.atrMtf, f);

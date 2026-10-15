@@ -3,10 +3,14 @@
 //| 1–2, 4–5; design §3.1; PC-24): model event kalender, baris CSV,
 //| relevansi mata uang simbol, jendela blackout per dampak, pilihan
 //| event saat tumpang tindih, event terdekat. Hanya jadwal event yang
-//| dipakai, tidak pernah nilai actual (tanpa lookahead).
+//| dipakai, tidak pernah nilai actual (tanpa lookahead). Spec 39:
+//| rasio candle impuls dan berita HIGH terbaru (filter pasca-berita).
 //+------------------------------------------------------------------+
 #ifndef SDB_FILTERS_NEWSRULES_MQH
 #define SDB_FILTERS_NEWSRULES_MQH
+
+#include <SDBot/Core/Constants.mqh>
+#include <SDBot/Core/Types.mqh>
 
 #define SDB_NEWS_LOW    0
 #define SDB_NEWS_MEDIUM 1
@@ -26,6 +30,8 @@ struct SdbNewsParams
    bool              enabled;
    int               highMinutes;
    int               mediumMinutes;
+   double            impulseMult;     // spec 39: 0 = filter impuls mati
+   int               impulseMinutes;
   };
 
 int ImpactFromText(const string s)
@@ -152,6 +158,55 @@ int NearestUpcoming(const SdbNewsEvent &ev[], const datetime bar, const string b
 string BlackoutDetail(const SdbNewsEvent &e, const datetime bar)
   {
    return StringFormat("%s %s %s %dm", e.name, e.ccy, ImpactText(e.impact), MinutesToEvent(bar, e.time));
+  }
+
+// Spec 39 (H13): range bar terbesar dalam SDB_IMPULSE_PEAK_BARS bar terakhir dibagi rata-rata range SDB_IMPULSE_BARS bar
+// terakhir. Indeks 0 = bar LTF tertutup terbaru. SDB_NULL_DOUBLE bila data kurang atau range normal nol (EC-03, EC-04).
+double ImpulseRatio(const double &high[], const double &low[], const int n)
+  {
+   if(n < SDB_IMPULSE_BARS || ArraySize(high) < SDB_IMPULSE_BARS || ArraySize(low) < SDB_IMPULSE_BARS)
+      return SDB_NULL_DOUBLE;
+   double sum = 0.0, peak = 0.0;
+   for(int i = 0; i < SDB_IMPULSE_BARS; i++)
+     {
+      double r = high[i] - low[i];
+      sum += r;
+      if(i < SDB_IMPULSE_PEAK_BARS && r > peak)
+         peak = r;
+     }
+   double avg = sum / SDB_IMPULSE_BARS;
+   return avg > 0.0 ? peak / avg : SDB_NULL_DOUBLE;
+  }
+
+// Berita HIGH relevan yang sudah rilis paling lama `minutes` menit sebelum bar (inklusif), paling baru; -1 bila tidak ada.
+int FindRecentHigh(const SdbNewsEvent &ev[], const datetime bar, const string base, const string quote, const int minutes)
+  {
+   int best = -1;
+   for(int i = 0; i < ArraySize(ev); i++)
+     {
+      if(ev[i].impact != SDB_NEWS_HIGH || !EventForSymbol(ev[i], base, quote))
+         continue;
+      long age = (long)bar - (long)ev[i].time;
+      if(age < 0 || age > (long)minutes * 60)
+         continue;
+      if(best < 0 || ev[i].time > ev[best].time)
+         best = i;
+     }
+   return best;
+  }
+
+// Tolak kandidat bila ada berita HIGH relevan dalam jendela dan rasio impuls >= ambang (spec 39 Req 1.1–1.3, 2.2).
+bool ImpulseDecision(const SdbNewsEvent &ev[], const datetime bar, const string base, const string quote, const SdbNewsParams &p,
+                     const double ratio, string &detail)
+  {
+   detail = "";
+   if(!p.enabled || p.impulseMult <= 0.0 || ratio == SDB_NULL_DOUBLE || ratio < p.impulseMult - 1e-9)
+      return false;
+   int i = FindRecentHigh(ev, bar, base, quote, p.impulseMinutes);
+   if(i < 0)
+      return false;
+   detail = StringFormat("impuls x%.2f sesudah %s", ratio, BlackoutDetail(ev[i], bar));
+   return true;
   }
 
 #endif // SDB_FILTERS_NEWSRULES_MQH

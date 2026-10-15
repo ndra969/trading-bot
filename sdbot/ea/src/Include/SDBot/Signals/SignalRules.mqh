@@ -154,6 +154,13 @@ void EvaluateSignal(const SdbSignalFacts &f, const SdbSignalParams &p, SdbDecisi
       d.detail = f.newsDetail;
       return;
      }
+   // Spec 39 (H13): sesudah blackout +-15 menit, sebelum sesi; tahap yang sama, detail "impuls ..." (Req 1.4).
+   if(f.newsImpulseBlocked)
+     {
+      d.stage = SDB_REJECT_STAGE_NEWS_BLACKOUT;
+      d.detail = f.newsImpulseDetail;
+      return;
+     }
    if(!f.sessionAllowed)
      {
       d.stage = SDB_REJECT_STAGE_OUTSIDE_SESSION;
@@ -210,7 +217,7 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    string k[] = {"atr_mtf", "bias_reason", "entry", "max_active", "pa", "rr", "score_pct", "sl", "tp", "tp_source", "zone_status",
                  "max_spread", "session", "news", "news_next", "fib_level", "fib_ratio", "tl_dist", "tl_slope",
                  "tl_touches", "bo_age", "bo_dist", "bo_level", "rsi_age", "rsi_diff", "rsi_pdiff",
-                 "zone_prox", "zone_dist", "opp_prox", "bid", "ask"};
+                 "zone_prox", "zone_dist", "opp_prox", "bid", "ask", "impulse"};
    string v[];
    ArrayResize(v, ArraySize(k));
    bool known = d.stopsKnown && d.stops.risk > 0.0;
@@ -250,6 +257,7 @@ string SignalContextJson(const SdbSignalFacts &f, const SdbDecision &d, const Sd
    v[28] = f.haveOpposite ? DoubleToString(f.oppositeProximal, f.digits) : "null";
    v[29] = DoubleToString(f.bid, f.digits);
    v[30] = DoubleToString(f.ask, f.digits);
+   v[31] = f.impulseRatio == SDB_NULL_DOUBLE ? "null" : DoubleToString(f.impulseRatio, 2);
    return CanonicalJson(k, v);
   }
 

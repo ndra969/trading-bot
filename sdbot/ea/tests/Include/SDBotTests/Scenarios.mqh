@@ -1404,6 +1404,24 @@ void CheckSc36(const string id, const CScenarioRecorder &rec)
    AssertTrue(id + "-inputs", StringFormat("sesi dengan input timeframe H1/M30: %I64d", inputs), inputs >= 1);
   }
 
+// SC-39 (spec 39 Req 1.1, 2.3, EC-09): ambang 2x, kalender fixture USD HIGH 12:30. Penolakan impuls hanya 12:30 < bar <= 14:00
+// (jendela 90 menit; 12:15-12:45 milik blackout +-15), rasio di konteks >= 2, dan semua kandidat membawa rasio impuls.
+void CheckSc39(const string id, const CScenarioRecorder &rec)
+  {
+   string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
+   string imp = " AND reject_stage='NEWS_BLACKOUT' AND reject_detail LIKE 'impuls x%'";
+   long impulse = ScDbCount("SELECT COUNT(*)" + w + imp);
+   long outside = ScDbCount("SELECT COUNT(*)" + w + imp + " AND (((time % 86400) <= 45000) OR ((time % 86400) > 50400))");
+   long lowRatio = ScDbCount("SELECT COUNT(*)" + w + imp + " AND json_extract(context_json, '$.impulse') < 2");
+   AssertTrue(id + "-impulse", StringFormat("penolakan impuls %I64d, di luar 12:30-14:00 %I64d, rasio < 2 %I64d", impulse, outside, lowRatio),
+              impulse >= 1 && outside == 0 && lowRatio == 0);
+   long candidates = ScDbCount("SELECT COUNT(*)" + w);
+   long noRatio = ScDbCount("SELECT COUNT(*)" + w + " AND json_type(context_json, '$.impulse') IS NOT 'real' AND json_type(context_json, '$.impulse') IS NOT 'integer'");
+   long inputs = ScDbCount("SELECT COUNT(*) FROM sessions WHERE id IN (" + rec.SessionIdList() + ") AND inputs_json LIKE '%\"InpNewsImpulseMult\":2,%'");
+   AssertTrue(id + "-telemetry", StringFormat("kandidat %I64d, tanpa rasio impuls %I64d, sesi dengan InpNewsImpulseMult=2 %I64d", candidates, noRatio, inputs),
+              candidates >= 1 && noRatio == 0 && inputs >= 1);
+  }
+
 void CheckSc17(const string id, const CScenarioRecorder &rec)
   {
    string w = " FROM signals WHERE session_id IN (" + rec.SessionIdList() + ")";
@@ -1503,6 +1521,8 @@ void CheckScenario(const string id, const CScenarioRecorder &rec, const CFakeTra
       CheckSc34(id, rec);
    else if(id == "SC-36")
       CheckSc36(id, rec);
+   else if(id == "SC-39")
+      CheckSc39(id, rec);
    else
       AssertTrue(id, "skenario tidak dikenal harness: '" + id + "'", false);
    TfEndSuite();

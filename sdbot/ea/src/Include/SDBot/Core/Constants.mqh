@@ -184,6 +184,14 @@
 #define SDB_DEF_NEWS_MEDIUM_MIN       0        // PC-24: medium tidak diblokir secara default
 #define SDB_MAX_NEWS_MIN              240
 #define SDB_DEF_NEWS_CSV              "sdbot_calendar.csv"
+#define SDB_DEF_NEWS_IMPULSE_MULT     0.0      // spec 39 (H13): mati; 5 = candle M15 >= 5x range normal sesudah berita HIGH (biaya OOS 9,5% > 5%)
+#define SDB_DEF_NEWS_IMPULSE_MIN      90       // spec 39: jendela sesudah rilis HIGH
+#define SDB_MIN_NEWS_IMPULSE_MULT     2.0
+#define SDB_MAX_NEWS_IMPULSE_MULT     20.0
+#define SDB_MIN_NEWS_IMPULSE_MIN      15
+#define SDB_MAX_NEWS_IMPULSE_MIN      240
+#define SDB_IMPULSE_BARS              14       // range normal = rata-rata 14 bar LTF tertutup (definisi analisis H12)
+#define SDB_IMPULSE_PEAK_BARS         8        // candle terbesar dicari di 8 bar LTF tertutup terakhir (2 jam M15)
 #define SDB_DEF_REQUIRE_OPPOSITE_ZONE true   // spec 33 H6 diterima: entry hanya dengan TP ke zona lawan
 #define SDB_DEF_ALLOW_TESTED_ZONES    false  // spec 23 (H1 diterima, PC-29): entry hanya dari zona Fresh
 
