@@ -11,6 +11,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 - `tools/run-live-replay.ps1`: replay tester per simbol dengan input live (real ticks), menolak jalan bila terminal tester hidup.
 - `LEGACY_INPUTS` (TS-134): input yang belum ada di sesi live diisi nilai perilaku lama agar replay dengan EA terbaru (1.28) sebanding. Replay pertama 2026-10-09 (v1.25): 58 dari 58 kandidat cocok tahapnya; belum ada trade.
 
+### Spec 38 lab strategi kedua (H11 ditolak) — 2026-10-15 — tanpa perubahan EA
+
+- `tools/strategy_lab.py`: setup S1 London breakout (range Asia), S2 New York opening range, S3 pullback EMA 21 H1 searah bias H4 + pola PA M15; TP tetap 1,5R/2R tanpa BE; satu posisi per simbol per setup; tutup Jumat 21:45 UTC; filter jarak SL dan spread ≤ 15% R; simulasi gabungan dengan trade EA. `outcome_sim.simulate(close_after=)`. Uji TS-137..149, TS-144b.
+- IS 12 simbol: S1 −0,015R (85 trade/bulan), S2 −0,03R (200/bulan), S3 −0,09R (105/bulan) per trade; tidak ada setup yang lolos (≥ +0,10R, PF ≥ 1,20). Jam server Broker B = UTC terverifikasi di bar ekspor (TS-137).
+
 ## EA
 
 ### 1.37 — 2026-10-15 — spec 39 filter impuls sesudah berita (H13 ditolak, default mati)

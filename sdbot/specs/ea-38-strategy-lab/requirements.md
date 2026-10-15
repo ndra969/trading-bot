@@ -1,6 +1,6 @@
 # Requirements — Lab strategi kedua untuk frekuensi (H11)
 
-Status: Approved (2026-10-14)
+Status: Done (2026-10-15)
 Use case: UC-83, UC-84 (baru, [fase-5c-overview.md](../fase-5c-overview.md))
 Asal: permintaan user 2026-10-13/14 (intraday, R:R minimal 1,5 sampai 2, lebih sering trade, tidak terlalu lama menunggu); PRD-EA §Gaya dan timeframe, §Position management, §Di luar lingkup; PC-28 (aturan uji); python-bot-lessons §1; temuan spec 31 (jam 13–17 UTC menguntungkan), spec 32 (setup trendline rugi), spec 34/36 (zona di bawah H1 rugi, spread ≈ 20% risiko di M15)
 Butuh: spec 32 (lab dan port aturan), spec 37 (acuan 1.35). Acuan = EA 1.35 (DAY H4/H1/M15, zona lawan wajib, BE 1,5R tanpa partial)

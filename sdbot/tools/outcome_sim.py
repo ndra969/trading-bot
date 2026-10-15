@@ -185,8 +185,14 @@ def _reason(buy: bool, entry: float, level: float, be_sl: float | None, point: f
     return "SL"
 
 
-def simulate(c: Candidate, x: ExitRules, bars: Bars, atr15: Atr) -> Outcome:
-    """Hasil satu kandidat dalam R (Req 2.1-2.7); bar mulai sesudah bar M15 kandidat tutup."""
+def simulate(
+    c: Candidate, x: ExitRules, bars: Bars, atr15: Atr, close_after: int | None = None
+) -> Outcome:
+    """Hasil satu kandidat dalam R (Req 2.1-2.7); bar mulai sesudah bar M15 kandidat tutup.
+
+    close_after (spec 38 Req 5.4): bar M1 pertama dengan waktu >= nilai ini menutup posisi di open-nya
+    (alasan FRIDAY). None = perilaku spec 31.
+    """
     s = build_stops(c, x)
     if s.risk <= 0:
         return Outcome(0.0, "INVALID", 0.0, False)
@@ -205,6 +211,10 @@ def simulate(c: Candidate, x: ExitRules, bars: Bars, atr15: Atr) -> Outcome:
 
     for i in range(start, len(bars.time)):
         o = bars.open[i] + adj
+        if close_after is not None and bars.time[i] >= close_after:
+            return Outcome(
+                realized + vol * r_of(o), "FRIDAY", mfe, s.passes_rules, closed_at=int(bars.time[i])
+            )
         hi = bars.high[i] + adj
         lo = bars.low[i] + adj
         adverse, favorable = (lo, hi) if buy else (hi, lo)
