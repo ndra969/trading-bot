@@ -118,6 +118,7 @@ Kandidat perbaikan berikutnya (masing-masing spec sendiri dengan aturan uji Fase
 | 34 | H7 gaya intraday H1/M15/M5 (dan R:R 1,5) | −0,117 / −0,093 (intraday R:R 2 / 1,5), +0,036 (DAY R:R 1,5) vs +0,164 | — | — | Ditolak di IS (lebih banyak SL, spread 20% risiko; 1.32) |
 | 35 | H8 simbol tambahan (17 kandidat) | 2 dari 16 lolos (GBPAUD +0,547, USTEC +0,354); total kandidat −0,16R per trade | — | — | Ditolak di IS (< 3 simbol) |
 | 37 | H10 manajemen posisi lebih ringan (V3: BE 1,5R, tanpa partial) | +0,205 vs +0,164 (121 trade) | +0,524 vs +0,421 | +0,297 vs +0,224 (total +16,4 vs +12,3R) | **Diterima** (1.35, PC-37) |
+| 41 | H15 USTEC sebagai simbol ke-13 (konfigurasi live) | +0,297 (14 trade, PF 1,69) | +6,53 (2 trade) | +3,10 (4 trade, tumpang tindih IS/OOS) | **Lolos**; kandidat chart ke-13, menunggu user |
 | 40 | H14 scalping XAUUSD (X1 S&D SCALPING M15/M5/M1 di EA; X2 mean reversion BB/RSI M5) | X1 −0,321 (128 trade), X2 −0,020 (449) vs acak −0,060 | — | — | Ditolak di IS |
 | 38 | H11 lab strategi kedua intraday tanpa zona (S1 London breakout, S2 NY opening range, S3 pullback EMA H1; TP 1,5R/2R) | S1 −0,015, S2 −0,031 / −0,028, S3 −0,087 (2.200–5.400 trade) | — | — | Ditolak di IS (tidak ada setup positif) |
 | 39 | H13 tolak entry ≤ 90 menit sesudah berita HIGH bila candle ≥ 5× (pengaman risiko) | +0,206 vs +0,205 (0 trade hilang) | +0,485 vs +0,524 (2 hilang, 9,5%) | +0,275 vs +0,297 (2 hilang) | Ditolak syarat biaya; default mati, input tetap (1.37, PC-38) |

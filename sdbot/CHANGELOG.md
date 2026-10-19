@@ -11,6 +11,10 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 - `tools/run-live-replay.ps1`: replay tester per simbol dengan input live (real ticks), menolak jalan bila terminal tester hidup.
 - `LEGACY_INPUTS` (TS-134): input yang belum ada di sesi live diisi nilai perilaku lama agar replay dengan EA terbaru (1.28) sebanding. Replay pertama 2026-10-09 (v1.25): 58 dari 58 kandidat cocok tahapnya; belum ada trade.
 
+### Spec 41 USTEC simbol ke-13 (H15 lolos) — 2026-10-19 — tanpa perubahan EA
+
+- Backtest USTECc (preset dan baseline kandidat spec 35) dengan konfigurasi 1.37: IS 14 trade +0,297R PF 1,69; OOS 2 trade +13,1R; REAL 4 trade +12,4R (tumpang tindih IS/OOS); saldo 1.777,78 USC risk 1%: 14/14 kandidat terbuka. Kandidat chart ke-13; live menunggu persetujuan user.
+
 ### Spec 40 riset scalping XAUUSD (H14 ditolak) — 2026-10-19 — tanpa perubahan EA
 
 - `strategy_lab.py xau`: X2 mean reversion M5 (BB(20,2) + RSI(14) 75/25, TP garis tengah, R:R ≥ 1,5), pembanding entry acak, laporan EA `ea_report` (spread/R, tahap tolak); `outcome_sim.simulate(bar_sec=)` untuk sinyal M5. Uji TS-150..156.
