@@ -416,3 +416,126 @@ def test_ts144b_tp_rounding_not_rejected() -> None:
         if sl.filter_candidate(c, x) == "SL_RANGE" and not legit:
             rejected += 1
     assert rejected == 0
+
+
+# --- Spec 40: scalping XAUUSD ---
+
+
+def test_ts150_simulate_bar_sec() -> None:
+    """TS-150: bar_sec=300 -> entry sesudah bar M5 tutup (t + 300); default tetap t + 900."""
+    t = FRI
+    rows = [(1.1000, 1.1000, 1.1000, 1.1000)] * 20
+    rows[5] = (1.1000, 1.1030, 1.1000, 1.1000)  # menit ke-5: TP 2R tersentuh
+    rows[15] = (1.1000, 1.1000, 1.0980, 1.0985)  # menit ke-15: SL tersentuh
+    bars = _bars(rows, t)
+    atr = osim.Atr(np.array([], dtype=np.int64), np.array([]))
+    c = _cand(t)
+    x = sl.LAB_RULES[2.0]
+    assert osim.simulate(c, x, bars, atr, bar_sec=300).reason == "TP"
+    assert osim.simulate(c, x, bars, atr).reason == "SL"
+
+
+def test_ts151_indicators() -> None:
+    """TS-151: BB(20,2) pada 1..20 -> mid 10,5, sd populasi 5,766; RSI naik terus 100, selang-seling 50 di benih."""
+    close = np.arange(1.0, 21.0)
+    mid, up, lo = sl.bollinger(close, 20, 2.0)
+    assert np.isnan(mid[18]) and mid[19] == pytest.approx(10.5)
+    sd = np.sqrt(399.0 / 12.0)
+    assert up[19] == pytest.approx(10.5 + 2 * sd) and lo[19] == pytest.approx(10.5 - 2 * sd)
+    up_only = sl.rsi_wilder(np.arange(1.0, 40.0), 14)
+    assert (
+        np.isnan(up_only[13])
+        and up_only[14] == pytest.approx(100.0)
+        and up_only[-1] == pytest.approx(100.0)
+    )
+    alt = np.array([10.0 + (i % 2) for i in range(30)])
+    assert sl.rsi_wilder(alt, 14)[14] == pytest.approx(50.0)
+
+
+def test_ts152_mr_decision() -> None:
+    """TS-152: close > band atas + RSI 76 jam 10 -> SELL tp = mid; RSI 74 -> None; close < band bawah + RSI 24 -> BUY;
+    jam 18 -> None."""
+    assert sl.mr_decision(105.0, 104.0, 96.0, 100.0, 76.0, 10) == ("SELL", 100.0)
+    assert sl.mr_decision(105.0, 104.0, 96.0, 100.0, 74.0, 10) is None
+    assert sl.mr_decision(95.0, 104.0, 96.0, 100.0, 24.0, 10) == ("BUY", 100.0)
+    assert sl.mr_decision(105.0, 104.0, 96.0, 100.0, 80.0, 18) is None
+    assert sl.mr_decision(105.0, 104.0, 96.0, 100.0, 80.0, 6) is None
+
+
+def _mr_cand(high: float, tp: float, spread: float) -> osim.Candidate:
+    sig = sl.Signal("X2", DAY0 + 10 * 3600, "SELL", high, "", tp)
+    return sl.to_candidate(sig, "XAUUSDc", 1.1000, spread, ATR, 0.00001, 5, tp=tp)
+
+
+def test_ts153_filter_mr() -> None:
+    """TS-153: TP 1,4R -> RR; SL 0,4 ATR -> SL_RANGE; spread 16,7% R -> SPREAD; R:R 1,5 tepat -> lolos."""
+    x = sl.MR_RULES
+    risk = 0.0007  # high 1.1006 + 0,1 ATR = SL 1.1007, entry 1.1000
+    assert sl.filter_mr(_mr_cand(1.1006, 1.1000 - 1.4 * risk, 0.0), x) == "RR"
+    assert sl.filter_mr(_mr_cand(1.1003, 1.0980, 0.0), x) == "SL_RANGE"
+    assert sl.filter_mr(_mr_cand(1.1006, 1.0980, 0.00014), x) == "SPREAD"
+    assert sl.filter_mr(_mr_cand(1.1006, 1.1000 - 1.5 * risk, 0.0), x) is None
+
+
+XAU_CSV = sl.DEFAULT_BARS_DIR / "XAUUSDc_M1.csv"
+
+
+@pytest.mark.skipif(not XAU_CSV.is_file(), reason="bar ekspor XAU tidak ada")
+def test_ts154_mr_no_lookahead() -> None:
+    """TS-154: sinyal X2 XAUUSDc Mar 2026 identik sebelum dan sesudah data sesudah bar sinyal dibuang."""
+    full = sl.load_xau5(sl.DEFAULT_BARS_DIR)
+    assert full is not None
+    t_from = int(dt.datetime(2026, 3, 2, tzinfo=UTC).timestamp())
+    t_to = int(dt.datetime(2026, 3, 14, tzinfo=UTC).timestamp())
+    sigs = sl.mr_signals(full, t_from, t_to)
+    assert len(sigs) >= 5
+    for s in sigs[:15]:
+        cut = sl.truncate_xau5(full, s.time + sl.M5_SEC)
+        again = [x for x in sl.mr_signals(cut, t_from, s.time + sl.M5_SEC) if x.time == s.time]
+        assert again == [s], s
+
+
+@pytest.mark.skipif(not XAU_CSV.is_file(), reason="bar ekspor XAU tidak ada")
+def test_ts155_random_signals() -> None:
+    """TS-155: seed sama -> hasil sama; jam 07-17 UTC; jangkar 0,9 ATR M5 dari close bar sinyal."""
+    d = sl.load_xau5(sl.DEFAULT_BARS_DIR)
+    assert d is not None
+    t_from = int(dt.datetime(2026, 3, 2, tzinfo=UTC).timestamp())
+    t_to = int(dt.datetime(2026, 3, 14, tzinfo=UTC).timestamp())
+    a = sl.random_signals(d, t_from, t_to, 50, seed=3)
+    b = sl.random_signals(d, t_from, t_to, 50, seed=3)
+    assert a == b and len(a) == 50
+    assert {x.direction for x in a} == {"BUY", "SELL"}
+    for x in a:
+        assert 7 <= (x.time % 86400) // 3600 < 17
+        j = int(np.searchsorted(d.m5.time, x.time))
+        dist = abs(float(d.m5.close[j]) - x.anchor)
+        assert dist == pytest.approx(0.9 * float(d.atr5[j]))
+
+
+def test_ts156_ea_report(tmp_path) -> None:
+    """TS-156: ea_report pada DB sintetis: 2 trade (+2R, -1R), spread/R 0,02, satu tolak SPREAD_TOO_WIDE."""
+    import sqlite3
+
+    db = tmp_path / "t.sqlite"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE trades (session_id INT, position_id INT, opened_at INT, price_open REAL, sl_initial REAL,"
+        " signal_id INT);"
+        "CREATE TABLE closures (session_id INT, position_id INT, closed_at INT, r_result REAL, reason TEXT,"
+        " holding_sec INT);"
+        "CREATE TABLE signals (id INT, session_id INT, spread_points INT, status TEXT, reject_stage TEXT);"
+        "INSERT INTO trades VALUES (5, 1, 1000, 4000.0, 3990.0, 11), (5, 2, 9000, 4000.0, 4015.0, 12);"
+        "INSERT INTO closures VALUES (5, 1, 4600, 2.0, 'TP', 3600), (5, 2, 16200, -1.0, 'SL', 7200);"
+        "INSERT INTO signals VALUES (11, 5, 200, 'ACCEPTED', NULL), (12, 5, 300, 'ACCEPTED', NULL),"
+        " (13, 5, 900, 'REJECTED', 'SPREAD_TOO_WIDE');"
+    )
+    con.commit()
+    con.close()
+    rep = sl.ea_report(db, [(5, 5)], point=0.001)
+    assert [t.r for t in rep.trades] == [2.0, -1.0]
+    assert rep.trades[0].spread_r == pytest.approx(0.02) and rep.trades[
+        1
+    ].spread_r == pytest.approx(0.02)
+    assert rep.trades[1].closed_at - rep.trades[1].time == 7200
+    assert rep.rejects == {"SPREAD_TOO_WIDE": 1}

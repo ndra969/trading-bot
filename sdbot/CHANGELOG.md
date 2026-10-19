@@ -11,6 +11,11 @@ Format: satu bagian per rilis EA dan backoffice (RULES §Git). Versi EA `MAJOR.M
 - `tools/run-live-replay.ps1`: replay tester per simbol dengan input live (real ticks), menolak jalan bila terminal tester hidup.
 - `LEGACY_INPUTS` (TS-134): input yang belum ada di sesi live diisi nilai perilaku lama agar replay dengan EA terbaru (1.28) sebanding. Replay pertama 2026-10-09 (v1.25): 58 dari 58 kandidat cocok tahapnya; belum ada trade.
 
+### Spec 40 riset scalping XAUUSD (H14 ditolak) — 2026-10-19 — tanpa perubahan EA
+
+- `strategy_lab.py xau`: X2 mean reversion M5 (BB(20,2) + RSI(14) 75/25, TP garis tengah, R:R ≥ 1,5), pembanding entry acak, laporan EA `ea_report` (spread/R, tahap tolak); `outcome_sim.simulate(bar_sec=)` untuk sinyal M5. Uji TS-150..156.
+- IS XAUUSDc: X1 gaya SCALPING EA (M15/M5/M1) 128 trade, −0,321R, PF 0,55; X2 449 trade (16,6/bulan), −0,020R, PF 0,98; acak −0,060R. Tidak ada setup yang lolos.
+
 ### Spec 38 lab strategi kedua (H11 ditolak) — 2026-10-15 — tanpa perubahan EA
 
 - `tools/strategy_lab.py`: setup S1 London breakout (range Asia), S2 New York opening range, S3 pullback EMA 21 H1 searah bias H4 + pola PA M15; TP tetap 1,5R/2R tanpa BE; satu posisi per simbol per setup; tutup Jumat 21:45 UTC; filter jarak SL dan spread ≤ 15% R; simulasi gabungan dengan trade EA. `outcome_sim.simulate(close_after=)`. Uji TS-137..149, TS-144b.

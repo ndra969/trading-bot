@@ -106,6 +106,7 @@ class Signal:
     direction: str
     anchor: float  # jangkar SL (build_stops menambah 0,1 ATR, SELL + spread)
     pattern: str = ""
+    tp: float | None = None  # spec 40: TP tetap di harga (garis tengah BB); None = TP min_rr x R
 
 
 def session_range(m1: osim.Bars, day_start: int, start_sec: int, end_sec: int) -> Range | None:
@@ -325,9 +326,16 @@ class Merged:
 
 
 def to_candidate(
-    sig: Signal, symbol: str, close: float, spread: float, atr_h1: float, point: float, digits: int
+    sig: Signal,
+    symbol: str,
+    close: float,
+    spread: float,
+    atr_h1: float,
+    point: float,
+    digits: int,
+    tp: float | None = None,
 ) -> osim.Candidate:
-    """Kandidat simulator: jangkar SL di zone_dist, TP tetap (opp_prox None); bid = close, ask = bid + spread."""
+    """Kandidat simulator: jangkar SL di zone_dist; TP = tp (opp_prox) atau min_rr x R bila None; ask = bid + spread."""
     return osim.Candidate(
         signal_id=sig.time,
         session_id=0,
@@ -337,7 +345,7 @@ def to_candidate(
         stage=None,
         zone_prox=sig.anchor,
         zone_dist=sig.anchor,
-        opp_prox=None,
+        opp_prox=tp,
         bid=close,
         ask=close + spread,
         atr_mtf=atr_h1,
@@ -480,12 +488,12 @@ def run_symbol(
     return run_sequential(sigs, sim)
 
 
-def stats(trades: list[LabTrade], months: float) -> dict[str, float]:
+def stats(trades: list[LabTrade], months: float, entry_lag: int = M15_SEC) -> dict[str, float]:
     st = tl.summarize([t.r for t in trades], months)
     n = len(trades)
     st["win"] = 100.0 * sum(1 for t in trades if t.r > 0) / n if n else 0.0
     st["spread_r"] = sum(t.spread_r for t in trades) / n if n else 0.0
-    hold = sum(max(0, t.closed_at - t.time - M15_SEC) for t in trades)
+    hold = sum(max(0, t.closed_at - t.time - entry_lag) for t in trades)
     st["hold_h"] = hold / n / HOUR if n else 0.0
     return st
 
@@ -624,10 +632,352 @@ def cmd_combine(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- Spec 40: scalping XAUUSD, X2 mean reversion M5 ---
+
+M5_SEC = 300
+BB_N = 20
+BB_K = 2.0
+RSI_N = 14
+RSI_HI = 75.0
+RSI_LO = 25.0
+MR_FROM_H, MR_TO_H = 7, 17  # Req 2.5: London + overlap New York (UTC)
+MR_MIN_RR = 1.5
+XAU_MIN_PER_MONTH = 20.0  # Req 3.1
+XAU_MAX_DD = 25.0
+
+MR_RULES = osim.ExitRules(
+    sl_buffer_atr=0.1,
+    min_rr=MR_MIN_RR,
+    min_sl_atr=0.5,
+    max_sl_atr=3.0,
+    be_r=NO_BE_R,
+    be_buffer_pts=2,
+    partial_r=NO_BE_R,
+    partial_pct=50.0,
+    trail_atr_period=14,
+    trail_atr_mult=2.0,
+)
+
+
+def bollinger(close: np.ndarray, n: int = BB_N, k: float = BB_K) -> tuple[np.ndarray, ...]:
+    """iBands MT5: SMA n close dan deviasi standar populasi; NaN sebelum n bar."""
+    c = np.asarray(close, dtype=float)
+    mid = np.full(len(c), np.nan)
+    sd = np.full(len(c), np.nan)
+    if len(c) >= n:
+        win = np.lib.stride_tricks.sliding_window_view(c, n)
+        mid[n - 1 :] = win.mean(axis=1)
+        sd[n - 1 :] = win.std(axis=1)
+    return mid, mid + k * sd, mid - k * sd
+
+
+def rsi_wilder(close: np.ndarray, n: int = RSI_N) -> np.ndarray:
+    """iRSI MT5 (Wilder): benih rata-rata sederhana n perubahan pertama; NaN sebelum indeks n."""
+    c = np.asarray(close, dtype=float)
+    out = np.full(len(c), np.nan)
+    if len(c) <= n:
+        return out
+    d = np.diff(c)
+    gain, loss = np.maximum(d, 0.0), np.maximum(-d, 0.0)
+    ag, al = gain[:n].mean(), loss[:n].mean()
+
+    def value(g: float, lo: float) -> float:
+        if lo == 0.0:
+            return 100.0 if g > 0.0 else 50.0
+        return 100.0 - 100.0 / (1.0 + g / lo)
+
+    out[n] = value(ag, al)
+    for i in range(n, len(d)):
+        ag = (ag * (n - 1) + gain[i]) / n
+        al = (al * (n - 1) + loss[i]) / n
+        out[i + 1] = value(ag, al)
+    return out
+
+
+def mr_decision(
+    close: float, up: float, lo: float, mid: float, rsi: float, hour: int
+) -> tuple[str, float] | None:
+    """Req 2.2, 2.5: arah dan TP garis tengah; None bila tidak ada setup."""
+    if not (MR_FROM_H <= hour < MR_TO_H) or np.isnan(mid) or np.isnan(rsi):
+        return None
+    if close > up and rsi >= RSI_HI:
+        return ("SELL", mid)
+    if close < lo and rsi <= RSI_LO:
+        return ("BUY", mid)
+    return None
+
+
+def filter_mr(c: osim.Candidate, x: osim.ExitRules) -> str | None:
+    """Req 2.4: SL_RANGE, RR (R:R ke TP sebelum pembulatan, lihat TS-144b), SPREAD; None bila lolos."""
+    st = osim.build_stops(c, x)
+    eps = 1e-9 * c.atr_mtf
+    lo = max(c.ask - c.bid, x.min_sl_atr * c.atr_mtf)
+    if st.risk <= 0 or st.risk < lo - eps or st.risk > x.max_sl_atr * c.atr_mtf + eps:
+        return "SL_RANGE"
+    if c.opp_prox is None:
+        return "RR"
+    reward = (c.opp_prox - st.entry) if c.direction == "BUY" else (st.entry - c.opp_prox)
+    if reward / st.risk < x.min_rr - 1e-9:
+        return "RR"
+    if spread_too_wide(c.ask - c.bid, st.risk):
+        return "SPREAD"
+    return None
+
+
+XAU = "XAUUSDc"
+ATR_N = 14
+
+
+def atr_series(h: np.ndarray, lo: np.ndarray, c: np.ndarray, n: int = ATR_N) -> np.ndarray:
+    """ATR Wilder per bar (benih SMA n TR pertama); 0 sebelum terisi."""
+    tr = h - lo
+    tr[1:] = np.maximum(tr[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(lo[1:] - c[:-1])))
+    out = np.zeros(len(c))
+    if len(c) < n:
+        return out
+    a = tr[:n].mean()
+    out[n - 1] = a
+    for i in range(n, len(c)):
+        a = (a * (n - 1) + tr[i]) / n
+        out[i] = a
+    return out
+
+
+@dataclass
+class Xau5:
+    m1: osim.Bars
+    m5: osim.Bars
+    atr15: osim.Atr
+    mid: np.ndarray
+    up: np.ndarray
+    lo: np.ndarray
+    rsi: np.ndarray
+    atr5: np.ndarray
+
+
+def _xau5_from_m1(m1: osim.Bars) -> Xau5:
+    m5 = tl.aggregate(m1, M5_SEC)
+    mid, up, lo = bollinger(m5.close)
+    return Xau5(
+        m1,
+        m5,
+        osim.m15_atr(m1, 14),
+        mid,
+        up,
+        lo,
+        rsi_wilder(m5.close),
+        atr_series(m5.high.copy(), m5.low.copy(), m5.close.copy()),
+    )
+
+
+def load_xau5(bars_dir: Path) -> Xau5 | None:
+    csv = bars_dir / f"{XAU}_M1.csv"
+    return _xau5_from_m1(osim.load_bars(csv)) if csv.is_file() else None
+
+
+def truncate_xau5(d: Xau5, t: int) -> Xau5:
+    """Data sebelum t (uji tanpa lookahead, TS-154)."""
+    n = int(np.searchsorted(d.m1.time, t, side="left"))
+    m = d.m1
+    sp = m.spread[:n] if m.spread is not None else None
+    return _xau5_from_m1(
+        osim.Bars(m.time[:n], m.open[:n], m.high[:n], m.low[:n], m.close[:n], m.point, m.digits, sp)
+    )
+
+
+def _m5_range(d: Xau5, t_from: int, t_to: int) -> range:
+    j0 = int(np.searchsorted(d.m5.time, t_from, side="left"))
+    j1 = int(np.searchsorted(d.m5.time, t_to, side="left"))
+    return range(max(j0, BB_N), j1)
+
+
+def mr_signals(d: Xau5, t_from: int, t_to: int) -> list[Signal]:
+    """Sinyal X2 di bar M5 tertutup dalam [t_from, t_to) (Req 2.1-2.3)."""
+    out: list[Signal] = []
+    for j in _m5_range(d, t_from, t_to):
+        t = int(d.m5.time[j])
+        res = mr_decision(
+            float(d.m5.close[j]),
+            float(d.up[j]),
+            float(d.lo[j]),
+            float(d.mid[j]),
+            float(d.rsi[j]),
+            (t % DAY) // HOUR,
+        )
+        if res is None:
+            continue
+        anchor = float(d.m5.high[j]) if res[0] == "SELL" else float(d.m5.low[j])
+        out.append(Signal("X2", t, res[0], anchor, "", res[1]))
+    return out
+
+
+def random_signals(d: Xau5, t_from: int, t_to: int, n: int, seed: int) -> list[Signal]:
+    """Pembanding acak (Req 3.3): jam 07-17 UTC, arah acak, SL 1 ATR M5 (jangkar 0,9 ATR + buffer 0,1)."""
+    rng = np.random.default_rng(seed)
+    idx = [
+        j
+        for j in _m5_range(d, t_from, t_to)
+        if MR_FROM_H <= (int(d.m5.time[j]) % DAY) // HOUR < MR_TO_H and d.atr5[j] > 0
+    ]
+    if not idx:
+        return []
+    pick = sorted(rng.choice(idx, size=min(n, len(idx)), replace=False))
+    out: list[Signal] = []
+    for j in pick:
+        buy = bool(rng.integers(0, 2))
+        close, atr = float(d.m5.close[j]), float(d.atr5[j])
+        anchor = close - 0.9 * atr if buy else close + 0.9 * atr
+        out.append(Signal("ACAK", int(d.m5.time[j]), "BUY" if buy else "SELL", anchor))
+    return out
+
+
+def run_xau(
+    d: Xau5,
+    sigs: list[Signal],
+    rules: osim.ExitRules,
+    filt: Callable[[osim.Candidate, osim.ExitRules], str | None],
+    skipped: Counter[str],
+) -> list[LabTrade]:
+    """Simulasi berurutan satu posisi sekaligus per setup (Req 2.5, 2.6); entry sesudah bar M5 tutup."""
+
+    def sim(s: Signal) -> LabTrade | None:
+        j = int(np.searchsorted(d.m5.time, s.time, side="left"))
+        close = float(d.m5.close[j])
+        spread = float(d.m5.spread[j]) * d.m5.point if d.m5.spread is not None else 0.0
+        c = to_candidate(s, XAU, close, spread, float(d.atr5[j]), d.m5.point, d.m5.digits, tp=s.tp)
+        why = filt(c, rules)
+        if why is not None:
+            skipped[f"{s.setup} {why}"] += 1
+            return None
+        o = osim.simulate(
+            c,
+            rules,
+            d.m1,
+            d.atr15,
+            close_after=friday_close(s.time + M5_SEC, False),
+            bar_sec=M5_SEC,
+        )
+        if o.open_at_end:
+            skipped[f"{s.setup} OPEN_END"] += 1
+            return None
+        risk = osim.build_stops(c, rules).risk
+        return LabTrade(
+            s.setup, XAU, s.time, s.direction, o.r, o.reason, o.closed_at, "", spread / risk
+        )
+
+    return run_sequential(sigs, sim)
+
+
+@dataclass
+class EaReport:
+    trades: list[LabTrade]
+    rejects: dict[str, int]
+
+
+def ea_report(db: Path, ranges: list[tuple[int, int]], point: float) -> EaReport:
+    """Trade EA (X1) dan tahap tolak dari tester DB read-only (Req 1.2, 1.3); spread/R dari spread sinyal."""
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        trades: list[LabTrade] = []
+        rejects: Counter[str] = Counter()
+        for a, b in ranges:
+            rows = con.execute(
+                "SELECT t.opened_at, c.closed_at, c.r_result, c.reason, t.price_open, t.sl_initial,"
+                " s.spread_points FROM trades t JOIN closures c ON c.position_id = t.position_id"
+                " AND c.session_id = t.session_id LEFT JOIN signals s ON s.id = t.signal_id"
+                " WHERE t.session_id BETWEEN ? AND ? AND c.r_result IS NOT NULL ORDER BY t.opened_at",
+                (a, b),
+            ).fetchall()
+            for opened, closed, r, reason, entry, sl0, spread_pts in rows:
+                risk = abs(float(entry) - float(sl0))
+                share = (float(spread_pts or 0) * point / risk) if risk > 0 else 0.0
+                trades.append(
+                    LabTrade(
+                        "X1", XAU, int(opened), "", float(r), str(reason), int(closed), "", share
+                    )
+                )
+            for stage, n in con.execute(
+                "SELECT reject_stage, COUNT(*) FROM signals WHERE session_id BETWEEN ? AND ?"
+                " AND reject_stage IS NOT NULL GROUP BY reject_stage",
+                (a, b),
+            ):
+                rejects[str(stage)] += int(n)
+        return EaReport(trades, dict(rejects))
+    finally:
+        con.close()
+
+
+def passes_xau_is(st: dict[str, float]) -> bool:
+    """Req 3.1: >= 20 trade/bulan, R/trade >= +0,10, PF >= 1,20, DD <= 25R."""
+    return (
+        st["per_month"] >= XAU_MIN_PER_MONTH - 1e-9
+        and st["r"] >= IS_MIN_R - 1e-9
+        and st["pf"] >= IS_MIN_PF - 1e-9
+        and st["dd"] <= XAU_MAX_DD + 1e-9
+    )
+
+
+def _xrow(name: str, tp: str, period: str, st: dict[str, float], mark: str) -> str:
+    return (
+        f"{name:<6} {tp:>5} {period:<7} {int(st['n']):>6} {st['per_month']:>5.1f} {st['win']:>5.1f} "
+        f"{st['r']:>+8.3f} {st['total']:>+7.1f} {st['pf']:>5.2f} {st['dd']:>6.1f} {st['spread_r']:>8.3f} "
+        f"{st['hold_h']:>7.1f}  {mark}"
+    )
+
+
+def cmd_xau(args: argparse.Namespace) -> int:
+    """Spec 40: X1 (EA, dari --ea), X2 mean reversion M5, pembanding ACAK; aturan Req 3.1-3.3."""
+    d = load_xau5(args.bars)
+    if d is None:
+        print(f"[strategy_lab] {XAU}: CSV bar tidak ada")
+        return 2
+    ea_runs = dict(x.split("=", 1) for x in args.ea)
+    if ea_runs and args.db is None:
+        print("[strategy_lab] --ea butuh --db")
+        return 2
+    periods = tl._periods(args.period, args.periods_ini)
+    print(HEADER)
+    for pname, (f, t) in periods.items():
+        months = (t - f) / MONTH_SEC
+        skipped: Counter[str] = Counter()
+        rows: list[tuple[str, str, list[LabTrade], int]] = []
+        if pname in ea_runs:
+            rep = ea_report(args.db, _parse_ranges(ea_runs[pname]), d.m5.point)
+            rows.append(("X1", "zona", rep.trades, 0))
+            top = sorted(rep.rejects.items(), key=lambda kv: -kv[1])[:5]
+            print(f"  {pname} X1 tolak: " + ", ".join(f"{k} {v}" for k, v in top))
+        x2 = run_xau(d, mr_signals(d, f, t), MR_RULES, filter_mr, skipped)
+        rows.append(("X2", "mid", x2, M5_SEC))
+        rnd = run_xau(
+            d,
+            random_signals(d, f, t, args.random_n, args.seed),
+            LAB_RULES[1.5],
+            filter_candidate,
+            skipped,
+        )
+        rows.append(("ACAK", "1.5R", rnd, M5_SEC))
+        for name, tp, trades, lag in rows:
+            st = stats(trades, months, entry_lag=lag)
+            if name == "ACAK":
+                mark = "pembanding"
+            elif pname == "IS":
+                mark = "LOLOS IS" if passes_xau_is(st) else "-"
+            else:
+                mark = "LOLOS konfirmasi" if passes_confirm(st) else "GAGAL konfirmasi"
+            reasons = Counter(x.reason for x in trades)
+            tail = " ".join(f"{k}:{v}" for k, v in sorted(reasons.items()))
+            print(_xrow(name, tp, pname, st, mark) + "  " + tail)
+        if skipped:
+            print(
+                f"  {pname} dilewati: " + ", ".join(f"{k} {v}" for k, v in sorted(skipped.items()))
+            )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("run", "combine"):
+    for name in ("run", "combine", "xau"):
         p = sub.add_parser(name)
         p.add_argument("--bars", type=Path, default=DEFAULT_BARS_DIR)
         p.add_argument("--symbols", default=DEFAULT_SYMBOLS)
@@ -639,12 +989,24 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--setups", default=",".join(SETUPS))
             p.add_argument("--rr", default=",".join(str(x) for x in TP_VARIANTS))
             p.add_argument("--out", help="CSV trade")
+        elif name == "xau":
+            p.add_argument(
+                "--period", action="append", required=True, choices=("IS", "OOS", "REAL")
+            )
+            p.add_argument("--db", type=Path, help="tester DB untuk baris X1")
+            p.add_argument(
+                "--ea", action="append", default=[], help="PERIODE=A-B sesi X1 (gaya SCALPING)"
+            )
+            p.add_argument("--random-n", type=int, default=3000)
+            p.add_argument("--seed", type=int, default=7)
         else:
             p.add_argument("--db", required=True, type=Path)
             p.add_argument("--setup", required=True, choices=SETUPS)
             p.add_argument("--rr", required=True, type=float, choices=TP_VARIANTS)
             p.add_argument("--ea", action="append", required=True, help="PERIODE=A-B sesi EA 1.35")
     args = ap.parse_args(argv)
+    if args.cmd == "xau":
+        return cmd_xau(args)
     return cmd_run(args) if args.cmd == "run" else cmd_combine(args)
 
 

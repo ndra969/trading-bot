@@ -186,12 +186,18 @@ def _reason(buy: bool, entry: float, level: float, be_sl: float | None, point: f
 
 
 def simulate(
-    c: Candidate, x: ExitRules, bars: Bars, atr15: Atr, close_after: int | None = None
+    c: Candidate,
+    x: ExitRules,
+    bars: Bars,
+    atr15: Atr,
+    close_after: int | None = None,
+    bar_sec: int = M15_SEC,
 ) -> Outcome:
-    """Hasil satu kandidat dalam R (Req 2.1-2.7); bar mulai sesudah bar M15 kandidat tutup.
+    """Hasil satu kandidat dalam R (Req 2.1-2.7); bar mulai sesudah bar sinyal kandidat tutup.
 
     close_after (spec 38 Req 5.4): bar M1 pertama dengan waktu >= nilai ini menutup posisi di open-nya
     (alasan FRIDAY). None = perilaku spec 31.
+    bar_sec (spec 40 Req 2.3): durasi bar sinyal; 900 = M15 (EA dan spec 31/38), 300 = M5.
     """
     s = build_stops(c, x)
     if s.risk <= 0:
@@ -204,7 +210,7 @@ def simulate(
     sl, vol, realized, mfe = s.sl, 1.0, 0.0, 0.0
     be_sl: float | None = None
     partial_done = False
-    start = int(np.searchsorted(bars.time, c.time + M15_SEC, side="left"))
+    start = int(np.searchsorted(bars.time, c.time + bar_sec, side="left"))
 
     def r_of(price: float) -> float:
         return sign * (price - s.entry) / s.risk
